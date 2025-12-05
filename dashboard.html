@@ -13,14 +13,16 @@
     <!-- Alpine.js -->
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 
-    <!-- Проверка авторизации -->
+    <!-- Конфигурация API -->
     <script>
-        (function() {
-            const user = localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser');
-            if (!user) {
-                window.location.href = 'login.html';
-            }
-        })();
+        // Измени на IP сервера для доступа с других устройств (например: 'http://192.168.1.100:3000')
+        const API_BASE = 'http://localhost:3000';
+
+        // Проверка авторизации и получение данных пользователя
+        const novaUserData = JSON.parse(localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser') || 'null');
+        if (!novaUserData || !novaUserData.loggedIn) {
+            window.location.href = 'login.html';
+        }
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -209,7 +211,7 @@
         }
     </style>
 </head>
-<body x-data="dashboard()" class="text-gray-800">
+<body x-data="dashboard()" x-init="init()" class="text-gray-800">
     <div class="flex h-screen">
         <!-- Сайдбар -->
         <aside class="glass-sidebar w-64 flex-shrink-0 flex flex-col p-5">
@@ -306,6 +308,28 @@
         
         <!-- Основной контент -->
         <main class="flex-1 overflow-y-auto p-6">
+            <!-- Индикатор загрузки -->
+            <div x-show="loading" class="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                <div class="text-center">
+                    <i class="fas fa-spinner fa-spin text-4xl text-indigo-500 mb-4"></i>
+                    <div class="text-gray-600">Загрузка данных...</div>
+                </div>
+            </div>
+
+            <!-- Ошибка подключения -->
+            <div x-show="error" x-cloak class="glass rounded-2xl p-6 mb-6 border-l-4 border-red-500">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-red-500 mr-3"></i>
+                    <div>
+                        <div class="font-bold text-red-700">Ошибка подключения к серверу</div>
+                        <div class="text-sm text-gray-600" x-text="error"></div>
+                    </div>
+                    <button @click="loadAllData()" class="ml-auto px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200">
+                        <i class="fas fa-redo mr-1"></i> Повторить
+                    </button>
+                </div>
+            </div>
+
             <!-- Шапка -->
             <div class="flex items-center justify-between mb-8">
                 <div>
@@ -325,12 +349,17 @@
                     <div class="relative" x-data="{open: false}">
                         <button @click="open = !open" class="flex items-center glass px-4 py-2 rounded-xl hover:bg-gray-50">
                             <div class="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center">
-                                <span class="text-white text-sm font-medium">A</span>
+                                <span class="text-white text-sm font-medium" x-text="currentUser.username ? currentUser.username.substring(0,1).toUpperCase() : 'U'">U</span>
                             </div>
+                            <span class="ml-2 text-sm font-medium hidden md:block" x-text="currentUser.username"></span>
                             <i class="fas fa-chevron-down ml-2 text-gray-400 text-xs"></i>
                         </button>
-                        
-                        <div x-show="open" @click.outside="open = false" class="absolute right-0 mt-2 w-48 glass rounded-xl p-2 shadow-xl">
+
+                        <div x-show="open" @click.outside="open = false" class="absolute right-0 mt-2 w-56 glass rounded-xl p-2 shadow-xl z-50">
+                            <div class="px-3 py-2 border-b border-gray-100 mb-2">
+                                <div class="font-medium" x-text="currentUser.username"></div>
+                                <div class="text-xs text-gray-500" x-text="currentUser.role === 'director' ? 'Директор' : (currentUser.role === 'admin' ? 'Администратор' : 'Переводчик')"></div>
+                            </div>
                             <a href="#" @click="logout()" class="flex items-center p-3 rounded-lg hover:bg-red-50 text-red-500">
                                 <i class="fas fa-sign-out-alt mr-3"></i>
                                 <span>Выход</span>
@@ -390,68 +419,72 @@
                                 <i class="fas fa-user text-blue-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold">120/150</div>
+                                <div class="text-3xl font-bold" x-text="botsStatus.online + '/' + stats.metrics.totalProfiles">0/0</div>
                                 <div class="text-gray-500">Анкеты онлайн</div>
                             </div>
                         </div>
-                        <div class="text-sm text-green-600">+5 за сегодня</div>
+                        <div class="text-sm" :class="stats.metrics.growthPercent >= 0 ? 'text-green-600' : 'text-red-600'" x-text="(stats.metrics.growthPercent >= 0 ? '+' : '') + stats.metrics.growthPercent + '% к вчера'"></div>
                     </div>
-                    
-                    <!-- Ответы -->
+
+                    <!-- Ответы сегодня (письма + чаты) -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 flex items-center justify-center mr-4">
                                 <i class="fas fa-comment-alt text-purple-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold">1,450</div>
+                                <div class="text-3xl font-bold" x-text="stats.today.letters + stats.today.chats">0</div>
                                 <div class="text-gray-500">Ответов сегодня</div>
                             </div>
                         </div>
-                        <div class="text-sm text-green-600">+12% к вчера</div>
+                        <div class="text-sm text-gray-500" x-text="'Писем: ' + stats.today.letters + ' | Чатов: ' + stats.today.chats"></div>
                     </div>
-                    
-                    <!-- Среднее время -->
+
+                    <!-- Доход сегодня -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-green-50 to-green-100 flex items-center justify-center mr-4">
-                                <i class="fas fa-clock text-green-500"></i>
+                                <i class="fas fa-dollar-sign text-green-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold">45с</div>
-                                <div class="text-gray-500">Среднее время</div>
+                                <div class="text-3xl font-bold" x-text="'$' + stats.today.income">$0</div>
+                                <div class="text-gray-500">Доход сегодня</div>
                             </div>
                         </div>
-                        <div class="text-sm text-green-600">-3с к вчера</div>
+                        <div class="text-sm text-gray-500" x-text="'За месяц: $' + stats.month.income"></div>
                     </div>
-                    
-                    <!-- Медианное время -->
+
+                    <!-- Среднее время ответа -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 flex items-center justify-center mr-4">
-                                <i class="fas fa-chart-median text-orange-500"></i>
+                                <i class="fas fa-clock text-orange-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold">38с</div>
-                                <div class="text-gray-500">Медианное время</div>
+                                <div class="text-3xl font-bold" x-text="stats.metrics.avgResponseTime + ' мин'">0 мин</div>
+                                <div class="text-gray-500">Среднее время</div>
                             </div>
                         </div>
-                        <div class="text-sm text-green-600">-5с к вчера</div>
+                        <div class="text-sm text-gray-500" x-text="'Уникальных мужчин: ' + stats.today.uniqueMen"></div>
                     </div>
                 </div>
-                
-                <!-- Активные чаты и переводчики -->
+
+                <!-- Активные чаты и боты -->
                 <div class="grid grid-cols-2 gap-6 mb-8">
                     <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6">Активные чаты</h3>
-                        <div class="text-3xl font-bold mb-2">87</div>
-                        <div class="text-sm text-gray-500">+8 за последний час</div>
+                        <h3 class="text-lg font-bold mb-6">Статус ботов</h3>
+                        <div class="text-3xl font-bold mb-2" x-text="botsStatus.online">0</div>
+                        <div class="text-sm text-gray-500">
+                            <span class="text-green-600" x-text="'Online: ' + botsStatus.online"></span> |
+                            <span class="text-yellow-600" x-text="'Idle: ' + botsStatus.idle"></span> |
+                            <span class="text-gray-400" x-text="'Offline: ' + botsStatus.offline"></span>
+                        </div>
                     </div>
-                    
+
                     <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6">Количество переводчиков</h3>
-                        <div class="text-3xl font-bold mb-2">15</div>
-                        <div class="text-sm text-gray-500">3 активных сейчас</div>
+                        <h3 class="text-lg font-bold mb-6">Ошибки</h3>
+                        <div class="text-3xl font-bold mb-2" :class="stats.today.errors > 0 ? 'text-red-500' : 'text-green-500'" x-text="stats.today.errors">0</div>
+                        <div class="text-sm text-gray-500" x-text="'За неделю: ' + stats.week.errors + ' ошибок'"></div>
                     </div>
                 </div>
                 
@@ -1311,6 +1344,9 @@
     <script>
         function dashboard() {
             return {
+                // Данные пользователя из авторизации
+                currentUser: novaUserData,
+
                 language: 'ru',
                 activeMenu: 'stats',
                 activeSubmenu: 'general',
@@ -1323,26 +1359,46 @@
                 sortBy: 'date',
                 sortDirection: 'desc',
                 searchQuery: '',
-                
+                loading: true,
+                error: null,
+
+                // Статистика с сервера
+                stats: {
+                    today: { letters: 0, chats: 0, uniqueMen: 0, income: '0.00', errors: 0 },
+                    yesterday: { letters: 0, chats: 0, income: '0.00' },
+                    week: { letters: 0, chats: 0, uniqueMen: 0, income: '0.00', errors: 0 },
+                    month: { letters: 0, chats: 0, uniqueMen: 0, income: '0.00' },
+                    metrics: { totalProfiles: 0, avgResponseTime: 0, growthPercent: 0, avgDailyIncome: '0.00' }
+                },
+
+                // Статус ботов
+                botsStatus: { online: 0, idle: 0, offline: 0, never_connected: 0 },
+
+                // Последняя активность
+                recentActivity: [],
+
+                // Почасовая активность для графика
+                hourlyActivity: [],
+
                 statsFilter: {
                     admin: '',
                     translator: '',
-                    dateRange: 'Декабрь 2025'
+                    dateRange: 'Текущий месяц'
                 },
-                
+
                 monitoringFilter: {
                     admin: '',
                     translator: '',
                     dateRange: 'Текущий месяц'
                 },
-                
+
                 monitoringFunction: 'lastResponses',
-                
+
                 newAccountIds: '',
                 newAccountComment: '',
                 newAccountLogin: '',
                 newAccountPassword: '',
-                
+
                 newAdmin: {
                     id: null,
                     name: '',
@@ -1352,127 +1408,145 @@
                     isMyAdmin: false,
                     salary: ''
                 },
-                
+
                 selectedAdmin: null,
                 accountsToAssign: '',
                 assignComment: '',
-                
+
                 generationPrompt: '',
-                
-                accounts: [
-                    {
-                        id: '456123',
-                        login: 'anna_25',
-                        password: 'pass123',
-                        status: 'online',
-                        lastOnline: '2 часа назад',
-                        letters: 5,
-                        admin: '',
-                        addedDate: '05.12.2025',
-                        comment: 'Активная анкета',
-                        paused: false
-                    },
-                    {
-                        id: '789456',
-                        login: 'maria_28',
-                        password: 'pass456',
-                        status: 'working',
-                        lastOnline: '30 минут назад',
-                        letters: 0,
-                        admin: 'admin1',
-                        addedDate: '04.12.2025',
-                        comment: 'Нет писем за неделю',
-                        paused: false
-                    },
-                    {
-                        id: '123789',
-                        login: 'kseniya_23',
-                        password: 'pass789',
-                        status: 'offline',
-                        lastOnline: '2 дня назад',
-                        letters: 12,
-                        admin: '',
-                        addedDate: '03.12.2025',
-                        comment: '',
-                        paused: true
+
+                // Данные загружаются с сервера
+                accounts: [],
+                bots: [],
+                admins: [],
+                team: [],
+
+                // Инициализация - загрузка данных с сервера
+                async init() {
+                    console.log('Dashboard init, user:', this.currentUser);
+                    await this.loadAllData();
+                    // Автообновление каждые 30 секунд
+                    setInterval(() => this.loadDashboardStats(), 30000);
+                },
+
+                async loadAllData() {
+                    this.loading = true;
+                    try {
+                        await Promise.all([
+                            this.loadDashboardStats(),
+                            this.loadAccounts(),
+                            this.loadBotsStatus(),
+                            this.loadTeam(),
+                            this.loadRecentActivity(),
+                            this.loadHourlyActivity()
+                        ]);
+                    } catch (e) {
+                        console.error('Error loading data:', e);
+                        this.error = 'Ошибка загрузки данных';
                     }
-                ],
-                
-                bots: [
-                    {
-                        id: 1,
-                        name: 'Бот #1',
-                        icon: 'fas fa-desktop',
-                        status: 'active',
-                        os: 'Windows 11',
-                        ip: '192.168.1.100',
-                        proxies: 5,
-                        activeProxies: 3
-                    },
-                    {
-                        id: 2,
-                        name: 'Бот #2',
-                        icon: 'fas fa-laptop',
-                        status: 'inactive',
-                        os: 'macOS 14',
-                        ip: '192.168.1.101',
-                        proxies: 3,
-                        activeProxies: 0
-                    }
-                ],
-                
-                admins: [
-                    {
-                        id: 1,
-                        name: 'Иван А.',
-                        login: 'admin1',
-                        password: 'pass123',
-                        initials: 'ИА',
-                        accounts: 5,
-                        conversion: 24.3,
-                        isMyAdmin: false,
-                        salary: 50000,
-                        translators: [
-                            { 
-                                id: 1, 
-                                name: 'Мария', 
-                                login: 'translator1',
-                                password: 'pass456',
-                                conversion: 24.3,
-                                accounts: ['456123', '789456']
-                            },
-                            { 
-                                id: 2, 
-                                name: 'Анна', 
-                                login: 'translator2',
-                                password: 'pass789',
-                                conversion: 21.5,
-                                accounts: ['123789']
-                            }
-                        ]
-                    },
-                    {
-                        id: 2,
-                        name: 'Петр С.',
-                        login: 'admin2',
-                        password: 'pass456',
-                        initials: 'ПС',
-                        accounts: 2,
-                        conversion: 18.7,
-                        isMyAdmin: true,
-                        salary: null,
-                        translators: [
-                            { 
-                                id: 3, 
-                                name: 'Дарья', 
-                                login: 'translator3',
-                                password: 'pass012',
-                                conversion: 18.7,
-                                accounts: []
-                            }
-                        ]
-                    }
-                ],
+                    this.loading = false;
+                },
+
+                async loadDashboardStats() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/dashboard?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.stats = data.dashboard;
+                        }
+                    } catch (e) { console.error('loadDashboardStats error:', e); }
+                },
+
+                async loadAccounts() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/profiles?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.accounts = data.list.map(p => ({
+                                id: p.profile_id,
+                                login: p.profile_id,
+                                status: 'offline',
+                                lastOnline: '-',
+                                letters: 0,
+                                admin: p.admin_name || '',
+                                translator: p.trans_name || '',
+                                addedDate: new Date(p.added_at).toLocaleDateString('ru-RU'),
+                                comment: p.note || '',
+                                paused: false
+                            }));
+                        }
+                    } catch (e) { console.error('loadAccounts error:', e); }
+                },
+
+                async loadBotsStatus() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/status?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.botsStatus = data.summary;
+                            this.bots = data.bots.map(b => ({
+                                id: b.profileId,
+                                name: `Бот ${b.profileId}`,
+                                icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
+                                status: b.status === 'online' ? 'active' : 'inactive',
+                                os: b.platform || 'Unknown',
+                                ip: b.ip || '-',
+                                version: b.version || '-',
+                                lastHeartbeat: b.lastHeartbeat
+                            }));
+                        }
+                    } catch (e) { console.error('loadBotsStatus error:', e); }
+                },
+
+                async loadTeam() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/team?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.team = data.list;
+                            // Формируем admins с переводчиками
+                            const adminsList = data.list.filter(u => u.role === 'admin');
+                            const translatorsList = data.list.filter(u => u.role === 'translator');
+                            this.admins = adminsList.map(a => ({
+                                id: a.id,
+                                name: a.username,
+                                login: a.username,
+                                initials: a.username.substring(0, 2).toUpperCase(),
+                                accounts: 0,
+                                conversion: 0,
+                                isMyAdmin: false,
+                                salary: null,
+                                translators: translatorsList.filter(t => t.owner_id === a.id).map(t => ({
+                                    id: t.id,
+                                    name: t.username,
+                                    login: t.username,
+                                    conversion: 0,
+                                    accounts: []
+                                }))
+                            }));
+                        }
+                    } catch (e) { console.error('loadTeam error:', e); }
+                },
+
+                async loadRecentActivity() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/activity/recent?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=20`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.recentActivity = data.activity;
+                        }
+                    } catch (e) { console.error('loadRecentActivity error:', e); }
+                },
+
+                async loadHourlyActivity() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/stats/hourly-activity?userId=${this.currentUser.id}&role=${this.currentUser.role}&days=7`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.hourlyActivity = data.hourlyData;
+                        }
+                    } catch (e) { console.error('loadHourlyActivity error:', e); }
+                },
                 
                 setActiveMenu(menu) {
                     this.activeMenu = menu;
@@ -1510,12 +1584,17 @@
                 },
                 
                 getActivityLevel(hour) {
-                    if (hour >= 8 && hour <= 10) return 0.8 + Math.random() * 0.2;
-                    if (hour >= 14 && hour <= 16) return 0.9 + Math.random() * 0.1;
-                    if (hour >= 19 && hour <= 21) return 0.7 + Math.random() * 0.3;
-                    return 0.3 + Math.random() * 0.4;
+                    // Используем реальные данные если есть
+                    if (this.hourlyActivity && this.hourlyActivity.length > 0) {
+                        const hourData = this.hourlyActivity.find(h => h.hour === hour);
+                        if (hourData) {
+                            return Math.min(hourData.intensity / 100, 1) || 0.1;
+                        }
+                    }
+                    // Fallback на базовые значения
+                    return 0.1;
                 },
-                
+
                 getActivityColor(hour) {
                     const level = this.getActivityLevel(hour);
                     if (level > 0.8) return 'from-red-400 to-orange-400';
@@ -1523,12 +1602,15 @@
                     if (level > 0.4) return 'from-blue-400 to-cyan-400';
                     return 'from-gray-300 to-gray-400';
                 },
-                
+
                 setDateRange(range) {
+                    const now = new Date();
+                    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                                        'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
                     const ranges = {
-                        'month': 'Декабрь 2025',
-                        'week': '1-7 декабря 2025',
-                        'day': '5 декабря 2025'
+                        'month': `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
+                        'week': 'Текущая неделя',
+                        'day': now.toLocaleDateString('ru-RU')
                     };
                     this.statsFilter.dateRange = ranges[range];
                     this.showCalendar = false;
