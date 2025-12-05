@@ -529,9 +529,9 @@ app.get('/api/profiles', async (req, res) => {
             LEFT JOIN users u_trans ON p.assigned_translator_id = u_trans.id
             LEFT JOIN LATERAL (
                 SELECT
-                    COUNT(*) FILTER (WHERE a.action_type = 'letter' AND DATE(a.created_at) = CURRENT_DATE) as letters_today,
+                    COUNT(*) FILTER (WHERE a.action_type = 'incoming' AND DATE(a.created_at) = CURRENT_DATE) as letters_today,
                     COUNT(*) FILTER (WHERE a.action_type = 'chat' AND DATE(a.created_at) = CURRENT_DATE) as chats_today,
-                    COUNT(*) FILTER (WHERE a.action_type = 'letter') as letters_total,
+                    COUNT(*) FILTER (WHERE a.action_type = 'incoming') as letters_total,
                     COUNT(*) FILTER (WHERE a.action_type = 'chat') as chats_total
                 FROM activity_log a
                 WHERE a.profile_id = p.profile_id
@@ -543,12 +543,13 @@ app.get('/api/profiles', async (req, res) => {
         const result = await pool.query(query, params);
 
         // Также считаем из messages для совместимости если activity_log пустой
+        // Входящие письма = type = 'incoming' (от мужчин к девушкам)
         const msgStatsQuery = `
             SELECT
                 p.profile_id,
-                COUNT(*) FILTER (WHERE m.type = 'outgoing' AND DATE(m.timestamp) = CURRENT_DATE) as letters_today,
+                COUNT(*) FILTER (WHERE m.type = 'incoming' AND DATE(m.timestamp) = CURRENT_DATE) as letters_today,
                 COUNT(*) FILTER (WHERE m.type = 'chat_msg' AND DATE(m.timestamp) = CURRENT_DATE) as chats_today,
-                COUNT(*) FILTER (WHERE m.type = 'outgoing') as letters_total,
+                COUNT(*) FILTER (WHERE m.type = 'incoming') as letters_total,
                 COUNT(*) FILTER (WHERE m.type = 'chat_msg') as chats_total
             FROM allowed_profiles p
             LEFT JOIN messages m ON p.profile_id = m.account_id
@@ -863,7 +864,60 @@ app.post('/api/activity/log', async (req, res) => {
 });
 
 // ==========================================
-// 5.5. СТАТУС ПРОФИЛЯ (POST /api/profile/status)
+// 5.5. ЛЮБИМЫЙ ШАБЛОН (POST/GET /api/profile/favorite-template)
+// ==========================================
+app.post('/api/profile/favorite-template', async (req, res) => {
+    const { profileId, templateName, templateText } = req.body;
+
+    try {
+        // Добавляем колонку если её нет (миграция)
+        await pool.query(`
+            ALTER TABLE allowed_profiles
+            ADD COLUMN IF NOT EXISTS favorite_template_name VARCHAR(255),
+            ADD COLUMN IF NOT EXISTS favorite_template_text TEXT
+        `);
+
+        // Сохраняем избранный шаблон
+        await pool.query(`
+            UPDATE allowed_profiles
+            SET favorite_template_name = $1, favorite_template_text = $2
+            WHERE profile_id = $3
+        `, [templateName || null, templateText || null, profileId]);
+
+        console.log(`⭐ Сохранён избранный шаблон для ${profileId}: ${templateName}`);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('❌ Ошибка сохранения шаблона:', error.message);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/profile/favorite-template', async (req, res) => {
+    const { profileId } = req.query;
+
+    try {
+        const result = await pool.query(`
+            SELECT favorite_template_name, favorite_template_text
+            FROM allowed_profiles
+            WHERE profile_id = $1
+        `, [profileId]);
+
+        if (result.rows.length > 0) {
+            res.json({
+                success: true,
+                templateName: result.rows[0].favorite_template_name,
+                templateText: result.rows[0].favorite_template_text
+            });
+        } else {
+            res.json({ success: true, templateName: null, templateText: null });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ==========================================
+// 5.6. СТАТУС ПРОФИЛЯ (POST /api/profile/status)
 // ==========================================
 app.post('/api/profile/status', async (req, res) => {
     const { botId, profileId, status, lastOnline } = req.body;
@@ -1713,6 +1767,10 @@ app.get('/api/dashboard', async (req, res) => {
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter' AND DATE(a.created_at) = CURRENT_DATE), 0) as letters_today,
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat' AND DATE(a.created_at) = CURRENT_DATE), 0) as chats_today,
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'incoming' AND DATE(a.created_at) = CURRENT_DATE), 0) as incoming_today,
+                -- AI использования
+                COALESCE(COUNT(*) FILTER (WHERE a.used_ai = true AND DATE(a.created_at) = CURRENT_DATE), 0) as ai_usage_today,
+                COALESCE(COUNT(*) FILTER (WHERE a.used_ai = true AND a.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as ai_usage_week,
+                COALESCE(COUNT(*) FILTER (WHERE a.used_ai = true AND a.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as ai_usage_month,
                 -- Вчера (для сравнения)
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter' AND DATE(a.created_at) = CURRENT_DATE - 1), 0) as letters_yesterday,
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat' AND DATE(a.created_at) = CURRENT_DATE - 1), 0) as chats_yesterday,
@@ -1724,10 +1782,34 @@ app.get('/api/dashboard', async (req, res) => {
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter' AND a.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as letters_month,
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat' AND a.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as chats_month,
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'incoming' AND a.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as incoming_month,
-                -- Уникальные мужчины
-                COUNT(DISTINCT CASE WHEN DATE(a.created_at) = CURRENT_DATE THEN a.man_id END) as unique_men_today,
-                COUNT(DISTINCT CASE WHEN a.created_at >= CURRENT_DATE - INTERVAL '7 days' THEN a.man_id END) as unique_men_week,
-                COUNT(DISTINCT CASE WHEN a.created_at >= CURRENT_DATE - INTERVAL '30 days' THEN a.man_id END) as unique_men_month,
+                -- НОВЫЕ уникальные мужчины (первый контакт в выбранном периоде)
+                COUNT(DISTINCT CASE
+                    WHEN DATE(a.created_at) = CURRENT_DATE
+                    AND NOT EXISTS (
+                        SELECT 1 FROM activity_log prev
+                        WHERE prev.man_id = a.man_id
+                        AND DATE(prev.created_at) < CURRENT_DATE
+                    )
+                    THEN a.man_id
+                END) as unique_men_today,
+                COUNT(DISTINCT CASE
+                    WHEN a.created_at >= CURRENT_DATE - INTERVAL '7 days'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM activity_log prev
+                        WHERE prev.man_id = a.man_id
+                        AND prev.created_at < CURRENT_DATE - INTERVAL '7 days'
+                    )
+                    THEN a.man_id
+                END) as unique_men_week,
+                COUNT(DISTINCT CASE
+                    WHEN a.created_at >= CURRENT_DATE - INTERVAL '30 days'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM activity_log prev
+                        WHERE prev.man_id = a.man_id
+                        AND prev.created_at < CURRENT_DATE - INTERVAL '30 days'
+                    )
+                    THEN a.man_id
+                END) as unique_men_month,
                 -- Среднее время ответа (в секундах -> минуты)
                 COALESCE(AVG(a.response_time_sec) FILTER (WHERE a.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as avg_response_seconds,
                 -- Медиана времени ответа
@@ -1765,9 +1847,33 @@ app.get('/api/dashboard', async (req, res) => {
                 COALESCE(COUNT(*) FILTER (WHERE m.type = 'chat_msg' AND m.timestamp >= CURRENT_DATE - INTERVAL '7 days' AND m.status = 'success'), 0) as chats_week,
                 COALESCE(COUNT(*) FILTER (WHERE m.type = 'outgoing' AND m.timestamp >= CURRENT_DATE - INTERVAL '30 days' AND m.status = 'success'), 0) as letters_month,
                 COALESCE(COUNT(*) FILTER (WHERE m.type = 'chat_msg' AND m.timestamp >= CURRENT_DATE - INTERVAL '30 days' AND m.status = 'success'), 0) as chats_month,
-                COUNT(DISTINCT CASE WHEN DATE(m.timestamp) = CURRENT_DATE THEN m.sender_id END) as unique_men_today,
-                COUNT(DISTINCT CASE WHEN m.timestamp >= CURRENT_DATE - INTERVAL '7 days' THEN m.sender_id END) as unique_men_week,
-                COUNT(DISTINCT CASE WHEN m.timestamp >= CURRENT_DATE - INTERVAL '30 days' THEN m.sender_id END) as unique_men_month,
+                COUNT(DISTINCT CASE
+                    WHEN DATE(m.timestamp) = CURRENT_DATE
+                    AND NOT EXISTS (
+                        SELECT 1 FROM messages prev
+                        WHERE prev.sender_id = m.sender_id
+                        AND DATE(prev.timestamp) < CURRENT_DATE
+                    )
+                    THEN m.sender_id
+                END) as unique_men_today,
+                COUNT(DISTINCT CASE
+                    WHEN m.timestamp >= CURRENT_DATE - INTERVAL '7 days'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM messages prev
+                        WHERE prev.sender_id = m.sender_id
+                        AND prev.timestamp < CURRENT_DATE - INTERVAL '7 days'
+                    )
+                    THEN m.sender_id
+                END) as unique_men_week,
+                COUNT(DISTINCT CASE
+                    WHEN m.timestamp >= CURRENT_DATE - INTERVAL '30 days'
+                    AND NOT EXISTS (
+                        SELECT 1 FROM messages prev
+                        WHERE prev.sender_id = m.sender_id
+                        AND prev.timestamp < CURRENT_DATE - INTERVAL '30 days'
+                    )
+                    THEN m.sender_id
+                END) as unique_men_month,
                 COALESCE(AVG(m.response_time) FILTER (WHERE m.timestamp >= CURRENT_DATE - INTERVAL '7 days'), 0) as avg_response_seconds
             FROM allowed_profiles p
             LEFT JOIN messages m ON m.account_id = p.profile_id
@@ -1837,7 +1943,8 @@ app.get('/api/dashboard', async (req, res) => {
                     incomingLetters: incomingToday,
                     uniqueMen: parseInt(stats.unique_men_today) || parseInt(msgStats.unique_men_today) || 0,
                     income: incomeToday.toFixed(2),
-                    errors: parseInt(errors.errors_today) || 0
+                    errors: parseInt(errors.errors_today) || 0,
+                    aiUsage: parseInt(stats.ai_usage_today) || 0
                 },
                 // Вчера (для сравнения)
                 yesterday: {
@@ -1852,7 +1959,8 @@ app.get('/api/dashboard', async (req, res) => {
                     incomingLetters: incomingWeek,
                     uniqueMen: parseInt(stats.unique_men_week) || parseInt(msgStats.unique_men_week) || 0,
                     income: incomeWeek.toFixed(2),
-                    errors: parseInt(errors.errors_week) || 0
+                    errors: parseInt(errors.errors_week) || 0,
+                    aiUsage: parseInt(stats.ai_usage_week) || 0
                 },
                 // За месяц
                 month: {
@@ -1860,7 +1968,8 @@ app.get('/api/dashboard', async (req, res) => {
                     chats: chatsMonth,
                     incomingLetters: incomingMonth,
                     uniqueMen: parseInt(stats.unique_men_month) || parseInt(msgStats.unique_men_month) || 0,
-                    income: incomeMonth.toFixed(2)
+                    income: incomeMonth.toFixed(2),
+                    aiUsage: parseInt(stats.ai_usage_month) || 0
                 },
                 // Метрики
                 metrics: {

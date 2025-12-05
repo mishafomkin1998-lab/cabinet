@@ -501,8 +501,9 @@
                         <h3 class="text-lg font-bold mb-6">Статус ботов</h3>
                         <div class="text-3xl font-bold mb-2" x-text="bots.length">0</div>
                         <div class="text-sm text-gray-500">
-                            <span class="text-green-600" x-text="'Online: ' + bots.filter(b => b.status === 'active').length"></span> |
-                            <span class="text-red-500" x-text="'Offline: ' + bots.filter(b => b.status !== 'active').length"></span>
+                            <span class="text-green-600" x-text="'Online: ' + botsStatus.online"></span> |
+                            <span class="text-yellow-500" x-text="'Idle: ' + botsStatus.idle"></span> |
+                            <span class="text-red-500" x-text="'Offline: ' + (botsStatus.offline + botsStatus.never_connected)"></span>
                         </div>
                     </div>
 
@@ -595,34 +596,40 @@
                 </div>
                 
                 <!-- Сортировка -->
-                <div class="glass rounded-2xl p-4 mb-4">
-                    <div class="flex items-center space-x-4">
-                        <span class="text-gray-600">Сортировать:</span>
-                        <button @click="sortAccounts('status')" class="px-3 py-1 rounded-lg" :class="sortBy === 'status' ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-gray-100'">
-                            Статус
-                        </button>
-                        <button @click="sortAccounts('date')" class="px-3 py-1 rounded-lg" :class="sortBy === 'date' ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-gray-100'">
-                            Дата
-                        </button>
-                        <button @click="sortAccounts('letters')" class="px-3 py-1 rounded-lg" :class="sortBy === 'letters' ? 'bg-indigo-50 text-indigo-600' : 'hover:bg-gray-100'">
-                            Письма
-                        </button>
-                    </div>
-                </div>
-                
                 <div class="glass rounded-2xl overflow-hidden">
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead>
                                 <tr class="border-b border-gray-100">
-                                    <th class="text-left py-4 px-6">ID</th>
-                                    <th class="text-left py-4 px-6">Логин</th>
+                                    <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('id')">
+                                        ID
+                                        <i class="fas ml-1" :class="sortBy === 'id' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                    </th>
+                                    <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('login')">
+                                        Логин
+                                        <i class="fas ml-1" :class="sortBy === 'login' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                    </th>
                                     <th class="text-left py-4 px-6">Пароль</th>
-                                    <th class="text-left py-4 px-6">Статус</th>
-                                    <th class="text-left py-4 px-6">Дата онлайн</th>
-                                    <th class="text-left py-4 px-6">Писем</th>
-                                    <th class="text-left py-4 px-6">Админ</th>
-                                    <th class="text-left py-4 px-6">Дата добавления</th>
+                                    <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('status')">
+                                        Статус
+                                        <i class="fas ml-1" :class="sortBy === 'status' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                    </th>
+                                    <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('lastOnline')">
+                                        Дата онлайн
+                                        <i class="fas ml-1" :class="sortBy === 'lastOnline' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                    </th>
+                                    <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('letters')">
+                                        Входящие
+                                        <i class="fas ml-1" :class="sortBy === 'letters' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                    </th>
+                                    <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('admin')">
+                                        Админ
+                                        <i class="fas ml-1" :class="sortBy === 'admin' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                    </th>
+                                    <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('date')">
+                                        Дата добавления
+                                        <i class="fas ml-1" :class="sortBy === 'date' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                    </th>
                                     <th class="text-left py-4 px-6">Комментарий</th>
                                     <th class="text-left py-4 px-6">Действия</th>
                                 </tr>
@@ -1581,7 +1588,8 @@
                             // Группируем по botId чтобы получить уникальные боты
                             const botsMap = {};
                             data.bots.forEach(b => {
-                                const botId = b.botId || b.bot_id;
+                                // Используем botId или profileId как ключ
+                                const botId = b.botId || b.bot_id || b.profileId || b.profile_id;
                                 if (botId && botId !== 'null' && botId !== 'undefined') {
                                     // Определяем активность бота
                                     const isActive = b.status === 'online' || b.status === 'active' || b.status === 'idle';
@@ -2004,20 +2012,35 @@
                     }
                     
                     filtered.sort((a, b) => {
-                        if (this.sortBy === 'status') {
-                            const statusOrder = { 'online': 1, 'working': 2, 'offline': 3, 'inactive': 4 };
-                            return statusOrder[a.status] - statusOrder[b.status];
-                        } else if (this.sortBy === 'date') {
-                            return new Date(b.addedDate) - new Date(a.addedDate);
-                        } else if (this.sortBy === 'letters') {
-                            return a.letters - b.letters;
+                        let result = 0;
+                        switch (this.sortBy) {
+                            case 'id':
+                                result = (a.id || '').localeCompare(b.id || '');
+                                break;
+                            case 'login':
+                                result = (a.login || '').localeCompare(b.login || '');
+                                break;
+                            case 'status':
+                                const statusOrder = { 'online': 1, 'working': 2, 'offline': 3, 'inactive': 4 };
+                                result = (statusOrder[a.status] || 5) - (statusOrder[b.status] || 5);
+                                break;
+                            case 'lastOnline':
+                                result = new Date(a.lastOnline || 0) - new Date(b.lastOnline || 0);
+                                break;
+                            case 'letters':
+                                result = (a.letters || 0) - (b.letters || 0);
+                                break;
+                            case 'admin':
+                                result = (a.admin || '').localeCompare(b.admin || '');
+                                break;
+                            case 'date':
+                                result = new Date(a.addedDate || 0) - new Date(b.addedDate || 0);
+                                break;
+                            default:
+                                result = 0;
                         }
-                        return 0;
+                        return this.sortDirection === 'desc' ? -result : result;
                     });
-                    
-                    if (this.sortDirection === 'desc') {
-                        filtered.reverse();
-                    }
                     
                     return filtered;
                 },

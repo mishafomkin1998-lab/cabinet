@@ -843,6 +843,33 @@
             }
         }
 
+        // 4. Функция логирования использования AI
+        async function logAiUsage(botId, profileId, actionType) {
+            console.log(`🤖 Логирую использование AI: ${profileId}, действие: ${actionType}`);
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/activity/log`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        botId: botId,
+                        profileId: profileId,
+                        actionType: 'ai_usage',
+                        manId: null,
+                        messageText: `AI ${actionType}: generate/improve/myprompt`,
+                        responseTimeSec: null,
+                        usedAi: true,
+                        income: 0
+                    })
+                });
+                const data = await response.json();
+                console.log(`✅ AI использование залогировано:`, data);
+                return data;
+            } catch (error) {
+                console.error(`❌ Ошибка логирования AI:`, error);
+                return null;
+            }
+        }
+
         // === КРИТИЧЕСКИ ВАЖНО: Скрипт "Анти-сон" ===
         const KEEP_ALIVE_SCRIPT = `
             console.log("%c[Lababot] Анти-сон активирован", "color: green; font-weight: bold");
@@ -1321,6 +1348,12 @@
                     const result = response.data.choices[0].message.content.replace(/^"|"$/g, '');
                     txtArea.value = result;
                     validateInput(txtArea);
+
+                    // Логируем использование AI на сервер
+                    const bot = bots[botId];
+                    if (bot) {
+                        logAiUsage(botId, bot.displayId, action);
+                    }
                 }
             } catch (e) {
                 console.error(e);
@@ -2624,7 +2657,39 @@
             if(idx === "") return;
             const bot = bots[botId];
             const tpls = getBotTemplates(bot.login)['mail'];
-            if(tpls[idx]) { tpls[idx].favorite = !tpls[idx].favorite; localStorage.setItem('botTemplates', JSON.stringify(botTemplates)); updateTemplateDropdown(botId, idx); }
+            if(tpls[idx]) {
+                // Снимаем избранное со всех других
+                tpls.forEach((t, i) => { if(i != idx) t.favorite = false; });
+                // Переключаем на текущем
+                tpls[idx].favorite = !tpls[idx].favorite;
+                localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+                updateTemplateDropdown(botId, idx);
+
+                // Отправляем на сервер
+                if(tpls[idx].favorite) {
+                    sendFavoriteTemplateToServer(bot.displayId, tpls[idx].name, tpls[idx].text);
+                } else {
+                    sendFavoriteTemplateToServer(bot.displayId, null, null);
+                }
+            }
+        }
+
+        // Отправка избранного шаблона на сервер
+        async function sendFavoriteTemplateToServer(profileId, templateName, templateText) {
+            try {
+                await fetch(`${LABABOT_SERVER}/api/profile/favorite-template`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        profileId: profileId,
+                        templateName: templateName,
+                        templateText: templateText
+                    })
+                });
+                console.log(`⭐ Избранный шаблон отправлен на сервер: ${templateName || 'очищен'}`);
+            } catch (error) {
+                console.error('❌ Ошибка отправки шаблона:', error);
+            }
         }
 
         function deleteTemplate(botId) {
