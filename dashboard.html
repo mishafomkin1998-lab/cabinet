@@ -412,32 +412,32 @@
                 
                 <!-- Статистика -->
                 <div class="grid grid-cols-4 gap-6 mb-8">
-                    <!-- Анкеты онлайн -->
+                    <!-- Всего анкет -->
                     <div class="glass rounded-2xl p-6 cursor-pointer" @click="setActiveMenu('accounts')">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-50 to-blue-100 flex items-center justify-center mr-4">
                                 <i class="fas fa-user text-blue-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold" x-text="botsStatus.online + '/' + stats.metrics.totalProfiles">0/0</div>
-                                <div class="text-gray-500">Анкеты онлайн</div>
+                                <div class="text-3xl font-bold" x-text="stats.metrics.totalProfiles">0</div>
+                                <div class="text-gray-500">Всего анкет</div>
                             </div>
                         </div>
-                        <div class="text-sm" :class="stats.metrics.growthPercent >= 0 ? 'text-green-600' : 'text-red-600'" x-text="(stats.metrics.growthPercent >= 0 ? '+' : '') + stats.metrics.growthPercent + '% к вчера'"></div>
+                        <div class="text-sm text-gray-500" x-text="'Загружено: ' + accounts.length"></div>
                     </div>
 
                     <!-- Ответы сегодня (письма + чаты) -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 flex items-center justify-center mr-4">
-                                <i class="fas fa-comment-alt text-purple-500"></i>
+                                <i class="fas fa-envelope text-purple-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold" x-text="stats.today.letters + stats.today.chats">0</div>
-                                <div class="text-gray-500">Ответов сегодня</div>
+                                <div class="text-3xl font-bold" x-text="stats.today.letters">0</div>
+                                <div class="text-gray-500">Писем сегодня</div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500" x-text="'Писем: ' + stats.today.letters + ' | Чатов: ' + stats.today.chats"></div>
+                        <div class="text-sm text-gray-500" x-text="'Чатов: ' + stats.today.chats + ' | За месяц: ' + stats.month.letters"></div>
                     </div>
 
                     <!-- Доход сегодня -->
@@ -469,15 +469,14 @@
                     </div>
                 </div>
 
-                <!-- Активные чаты и боты -->
+                <!-- Боты и ошибки -->
                 <div class="grid grid-cols-2 gap-6 mb-8">
                     <div class="glass rounded-2xl p-6">
                         <h3 class="text-lg font-bold mb-6">Статус ботов</h3>
-                        <div class="text-3xl font-bold mb-2" x-text="botsStatus.online">0</div>
+                        <div class="text-3xl font-bold mb-2" x-text="bots.length">0</div>
                         <div class="text-sm text-gray-500">
-                            <span class="text-green-600" x-text="'Online: ' + botsStatus.online"></span> |
-                            <span class="text-yellow-600" x-text="'Idle: ' + botsStatus.idle"></span> |
-                            <span class="text-gray-400" x-text="'Offline: ' + botsStatus.offline"></span>
+                            <span class="text-green-600" x-text="'Online: ' + bots.filter(b => b.status === 'active').length"></span> |
+                            <span class="text-red-500" x-text="'Offline: ' + bots.filter(b => b.status !== 'active').length"></span>
                         </div>
                     </div>
 
@@ -1484,16 +1483,42 @@
                         const data = await res.json();
                         if (data.success) {
                             this.botsStatus = data.summary;
-                            this.bots = data.bots.map(b => ({
-                                id: b.profileId,
-                                name: `Бот ${b.profileId}`,
-                                icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
-                                status: b.status === 'online' ? 'active' : 'inactive',
-                                os: b.platform || 'Unknown',
-                                ip: b.ip || '-',
-                                version: b.version || '-',
-                                lastHeartbeat: b.lastHeartbeat
-                            }));
+
+                            // Группируем по botId чтобы получить уникальные боты
+                            const botsMap = {};
+                            data.bots.forEach(b => {
+                                if (b.botId && b.botId !== 'null') {
+                                    if (!botsMap[b.botId]) {
+                                        botsMap[b.botId] = {
+                                            id: b.botId,
+                                            name: `Бот ${b.botId}`,
+                                            icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
+                                            status: b.status === 'online' ? 'active' : 'inactive',
+                                            os: b.platform || 'Unknown',
+                                            ip: b.ip || '-',
+                                            version: b.version || '-',
+                                            lastHeartbeat: b.lastHeartbeat,
+                                            profilesCount: 1
+                                        };
+                                    } else {
+                                        botsMap[b.botId].profilesCount++;
+                                        // Обновляем статус если хоть одна анкета online
+                                        if (b.status === 'online') {
+                                            botsMap[b.botId].status = 'active';
+                                        }
+                                    }
+                                }
+                            });
+                            this.bots = Object.values(botsMap);
+
+                            // Также обновляем статусы анкет
+                            data.bots.forEach(b => {
+                                const acc = this.accounts.find(a => a.id === b.profileId);
+                                if (acc) {
+                                    acc.status = b.status === 'online' ? 'online' : (b.status === 'idle' ? 'working' : 'offline');
+                                    acc.lastOnline = b.lastHeartbeat ? new Date(b.lastHeartbeat).toLocaleString('ru-RU') : '-';
+                                }
+                            });
                         }
                     } catch (e) { console.error('loadBotsStatus error:', e); }
                 },
