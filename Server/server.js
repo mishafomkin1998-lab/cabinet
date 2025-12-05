@@ -955,6 +955,96 @@ app.get('/api/favorite-templates', async (req, res) => {
 });
 
 // ==========================================
+// 5.5.2. ИСТОРИЯ ИЗМЕНЕНИЙ АНКЕТ (GET /api/profile-history)
+// ==========================================
+app.get('/api/profile-history', async (req, res) => {
+    const { userId, role, dateFrom, dateTo, adminId } = req.query;
+
+    try {
+        let filter = "";
+        let params = [];
+        let paramIndex = 1;
+
+        // Фильтр по датам
+        if (dateFrom) {
+            filter += ` AND ph.created_at >= $${paramIndex}`;
+            params.push(dateFrom);
+            paramIndex++;
+        }
+        if (dateTo) {
+            filter += ` AND ph.created_at <= $${paramIndex}::date + interval '1 day'`;
+            params.push(dateTo);
+            paramIndex++;
+        }
+
+        // Фильтр по роли
+        if (role === 'translator') {
+            filter += ` AND p.assigned_translator_id = $${paramIndex}`;
+            params.push(userId);
+            paramIndex++;
+        } else if (role === 'admin') {
+            filter += ` AND p.assigned_admin_id = $${paramIndex}`;
+            params.push(userId);
+            paramIndex++;
+        }
+
+        // Фильтр по выбранному админу
+        if (adminId) {
+            filter += ` AND p.assigned_admin_id = $${paramIndex}`;
+            params.push(adminId);
+            paramIndex++;
+        }
+
+        // Проверяем есть ли таблица profile_history
+        const tableCheck = await pool.query(`
+            SELECT EXISTS (
+                SELECT FROM information_schema.tables
+                WHERE table_name = 'profile_history'
+            )
+        `);
+
+        if (!tableCheck.rows[0].exists) {
+            // Создаём таблицу если не существует
+            await pool.query(`
+                CREATE TABLE IF NOT EXISTS profile_history (
+                    id SERIAL PRIMARY KEY,
+                    profile_id VARCHAR(20) NOT NULL,
+                    action_type VARCHAR(50) NOT NULL,
+                    performed_by VARCHAR(100),
+                    details TEXT,
+                    created_at TIMESTAMP DEFAULT NOW()
+                )
+            `);
+            return res.json({ success: true, history: [] });
+        }
+
+        const result = await pool.query(`
+            SELECT ph.id, ph.profile_id, ph.action_type, ph.performed_by, ph.details, ph.created_at
+            FROM profile_history ph
+            LEFT JOIN allowed_profiles p ON ph.profile_id = p.profile_id
+            WHERE 1=1 ${filter}
+            ORDER BY ph.created_at DESC
+            LIMIT 100
+        `, params);
+
+        res.json({
+            success: true,
+            history: result.rows.map(r => ({
+                id: r.id,
+                profile_id: r.profile_id,
+                action_type: r.action_type,
+                performed_by: r.performed_by,
+                details: r.details,
+                created_at: r.created_at
+            }))
+        });
+    } catch (error) {
+        console.error('Profile history error:', error.message);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==========================================
 // 5.6. СТАТУС ПРОФИЛЯ (POST /api/profile/status)
 // ==========================================
 app.post('/api/profile/status', async (req, res) => {

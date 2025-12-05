@@ -253,8 +253,9 @@
         .calendar-popup {
             background: white !important;
             border: 1px solid #e5e7eb;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-            z-index: 9999 !important;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+            z-index: 99999 !important;
+            position: absolute !important;
         }
 
         .calendar-popup .grid > div {
@@ -263,6 +264,19 @@
             display: flex;
             align-items: center;
             justify-content: center;
+        }
+
+        /* Кнопки - предотвращаем переполнение текста */
+        button, .btn {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Компактные заголовки таблиц */
+        table th {
+            padding-top: 0.5rem !important;
+            padding-bottom: 0.5rem !important;
         }
 
         .chat-bubble {
@@ -302,12 +316,12 @@
         <!-- Сайдбар -->
         <aside class="glass-sidebar w-64 flex-shrink-0 flex flex-col p-5">
             <!-- Логотип -->
-            <div class="flex items-center mb-10">
-                <a href="index.html" class="flex items-center">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center shadow-sm">
-                        <i class="fas fa-robot text-white text-sm"></i>
+            <div class="flex items-center justify-center mb-10">
+                <a href="index.html" class="flex items-center justify-center w-full">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg">
+                        <i class="fas fa-robot text-white text-lg"></i>
                     </div>
-                    <h1 class="text-xl font-bold ml-3 gradient-text">Nova</h1>
+                    <h1 class="text-2xl font-bold ml-3 gradient-text">Nova</h1>
                 </a>
             </div>
             
@@ -414,10 +428,10 @@
                 
                 <div class="flex items-center space-x-3">
                     <!-- Выбор языка -->
-                    <select class="glass px-4 py-2 rounded-xl text-sm focus:outline-none" x-model="language" @change="changeLanguage">
-                        <option value="ru">🇷🇺 RU</option>
-                        <option value="en">🇺🇸 EN</option>
-                        <option value="ua">🇺🇦 UA</option>
+                    <select class="glass px-3 py-2 rounded-xl text-sm font-medium focus:outline-none" x-model="language" @change="changeLanguage">
+                        <option value="ru">RU</option>
+                        <option value="en">EN</option>
+                        <option value="ua">UK</option>
                     </select>
                     
                     <!-- Профиль -->
@@ -516,8 +530,11 @@
                             </div>
                         </div>
 
-                        <button @click="loadDashboardStats()" class="ml-auto px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600">
+                        <button @click="loadDashboardStats()" class="px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600">
                             <i class="fas fa-sync-alt mr-2"></i>Обновить
+                        </button>
+                        <button @click="exportStats()" class="ml-2 px-4 py-2.5 rounded-xl bg-green-500 text-white hover:bg-green-600">
+                            <i class="fas fa-download mr-2"></i>Выгрузить
                         </button>
                     </div>
                 </div>
@@ -663,22 +680,18 @@
             <!-- Анкеты -->
             <div x-show="activeMenu === 'accounts'" x-cloak class="fade-in">
                 <div class="flex items-center justify-between mb-6">
-                    <div>
-                        <h3 class="text-xl font-bold">Управление анкетами</h3>
-                        <p class="text-gray-500">Добавление и распределение анкет между админами</p>
-                    </div>
                     <div class="flex items-center space-x-3">
                         <!-- Поиск -->
                         <div class="relative">
-                            <input type="text" placeholder="Поиск по ID или логину..." 
+                            <input type="text" placeholder="Поиск по ID или логину..."
                                    class="glass pl-10 pr-4 py-2.5 rounded-xl w-64"
                                    x-model="searchQuery">
                             <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
                         </div>
-                        <button @click="showAddAccountModal = true" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
-                            + Добавить анкету
-                        </button>
                     </div>
+                    <button @click="showAddAccountModal = true" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                        + Добавить
+                    </button>
                 </div>
                 
                 <!-- Сортировка -->
@@ -1259,33 +1272,103 @@
             
             <!-- История -->
             <div x-show="activeMenu === 'history'" x-cloak class="fade-in">
+                <!-- Фильтры истории -->
+                <div class="glass rounded-2xl p-5 mb-6">
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <!-- Выбор админа -->
+                        <div>
+                            <select class="glass px-4 py-2.5 rounded-xl" x-model="historyFilter.admin">
+                                <option value="">Все Админы</option>
+                                <template x-for="admin in admins" :key="admin.id">
+                                    <option :value="admin.id" x-text="admin.name"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <!-- Календарь -->
+                        <div class="relative">
+                            <div class="glass px-4 py-2.5 rounded-xl flex items-center cursor-pointer" @click="showHistoryCalendar = !showHistoryCalendar">
+                                <i class="fas fa-calendar mr-2 text-gray-400"></i>
+                                <span x-text="getHistoryDateRangeText()"></span>
+                                <i class="fas fa-chevron-down ml-2 text-gray-400"></i>
+                            </div>
+
+                            <!-- Всплывающий календарь -->
+                            <div x-show="showHistoryCalendar" @click.outside="showHistoryCalendar = false" class="absolute mt-2 rounded-xl p-4 w-72 calendar-popup" style="left: 0;">
+                                <div class="flex justify-between items-center mb-4">
+                                    <button @click="calendarMonth--" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-left"></i></button>
+                                    <span class="font-medium" x-text="getCalendarMonthName()"></span>
+                                    <button @click="calendarMonth++" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-right"></i></button>
+                                </div>
+                                <div class="grid grid-cols-7 gap-1 text-center text-sm mb-2">
+                                    <div class="text-gray-400">Пн</div>
+                                    <div class="text-gray-400">Вт</div>
+                                    <div class="text-gray-400">Ср</div>
+                                    <div class="text-gray-400">Чт</div>
+                                    <div class="text-gray-400">Пт</div>
+                                    <div class="text-gray-400">Сб</div>
+                                    <div class="text-gray-400">Вс</div>
+                                </div>
+                                <div class="grid grid-cols-7 gap-1 text-center text-sm">
+                                    <template x-for="day in getCalendarDays()" :key="day.date">
+                                        <div @click="selectHistoryCalendarDate(day.date)"
+                                             class="p-2 rounded cursor-pointer"
+                                             :class="{
+                                                 'bg-indigo-500 text-white': isHistoryDateSelected(day.date),
+                                                 'bg-indigo-100': isHistoryDateInRange(day.date),
+                                                 'text-gray-300': !day.currentMonth,
+                                                 'hover:bg-gray-100': !isHistoryDateSelected(day.date)
+                                             }"
+                                             x-text="day.day">
+                                        </div>
+                                    </template>
+                                </div>
+                                <div class="flex gap-2 mt-4">
+                                    <button @click="setHistoryQuickRange('month')" class="flex-1 px-2 py-1 rounded-lg text-sm bg-gray-100">Месяц</button>
+                                    <button @click="setHistoryQuickRange('week')" class="flex-1 px-2 py-1 rounded-lg text-sm bg-gray-100">Неделя</button>
+                                    <button @click="setHistoryQuickRange('today')" class="flex-1 px-2 py-1 rounded-lg text-sm bg-gray-100">Сегодня</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button @click="loadProfileHistory()" class="px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600">
+                            <i class="fas fa-sync-alt mr-2"></i>Обновить
+                        </button>
+                    </div>
+                </div>
+
                 <div class="glass rounded-2xl p-6">
-                    <h3 class="text-xl font-bold mb-6">История действий</h3>
+                    <h3 class="text-lg font-bold mb-6">История изменений анкет</h3>
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead>
                                 <tr class="border-b border-gray-100">
-                                    <th class="text-left py-4 px-6">Время</th>
-                                    <th class="text-left py-4 px-6">Анкета</th>
-                                    <th class="text-left py-4 px-6">Тип</th>
-                                    <th class="text-left py-4 px-6">Мужчина</th>
+                                    <th class="text-left py-2 px-4">Дата</th>
+                                    <th class="text-left py-2 px-4">Анкета</th>
+                                    <th class="text-left py-2 px-4">Действие</th>
+                                    <th class="text-left py-2 px-4">Кем</th>
+                                    <th class="text-left py-2 px-4">Детали</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-for="action in historyActions" :key="action.id">
+                                <template x-for="action in profileHistory" :key="action.id">
                                     <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                        <td class="py-4 px-6" x-text="formatHistoryTime(action.timestamp)"></td>
-                                        <td class="py-4 px-6" x-text="'#' + action.account_id"></td>
-                                        <td class="py-4 px-6">
+                                        <td class="py-3 px-4 text-sm" x-text="formatHistoryTime(action.created_at)"></td>
+                                        <td class="py-3 px-4 font-mono" x-text="'#' + action.profile_id"></td>
+                                        <td class="py-3 px-4">
                                             <span class="px-2 py-1 rounded-full text-xs"
-                                                  :class="getActionTypeClass(action.type)"
-                                                  x-text="getActionTypeLabel(action.type)"></span>
+                                                  :class="getProfileActionClass(action.action_type)"
+                                                  x-text="getProfileActionLabel(action.action_type)"></span>
                                         </td>
-                                        <td class="py-4 px-6" x-text="action.sender_id ? '#' + action.sender_id : '-'"></td>
+                                        <td class="py-3 px-4 text-sm" x-text="action.performed_by || '-'"></td>
+                                        <td class="py-3 px-4 text-sm text-gray-600" x-text="action.details || '-'"></td>
                                     </tr>
                                 </template>
-                                <tr x-show="historyActions.length === 0">
-                                    <td colspan="4" class="py-4 px-6 text-center text-gray-500">Нет истории действий</td>
+                                <tr x-show="profileHistory.length === 0">
+                                    <td colspan="5" class="py-8 px-4 text-center text-gray-500">
+                                        <i class="fas fa-history text-3xl mb-2 opacity-30"></i>
+                                        <p>Нет истории изменений за выбранный период</p>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1421,39 +1504,62 @@
     
     <!-- Модальное окно распределения анкет админу -->
     <div x-show="showAssignAccountsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div class="glass rounded-2xl p-6 w-full max-w-2xl" @click.outside="showAssignAccountsModal = false">
+        <div class="glass rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" @click.outside="showAssignAccountsModal = false">
             <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold">Распределение анкет для <span x-text="selectedAdmin?.name"></span></h3>
+                <h3 class="text-xl font-bold">Анкеты для <span x-text="selectedAdmin?.name"></span></h3>
                 <button @click="showAssignAccountsModal = false" class="text-gray-500 hover:text-gray-700">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            
+
             <div class="space-y-4">
+                <!-- Выбор из существующих анкет -->
                 <div>
-                    <label class="block text-sm font-medium mb-2">Добавить анкеты (ID через запятую)</label>
-                    <textarea 
-                        class="glass w-full px-4 py-3 rounded-xl"
-                        placeholder="Введите ID анкет через запятую: 123456, 234567, 345678"
-                        rows="3"
-                        x-model="accountsToAssign"></textarea>
-                    <p class="text-sm text-gray-500 mt-1">Можно ввести несколько ID через запятую</p>
+                    <label class="block text-sm font-medium mb-2">Выбрать из существующих анкет</label>
+                    <div class="glass rounded-xl p-3 max-h-48 overflow-y-auto">
+                        <div class="space-y-2">
+                            <template x-for="account in accounts.filter(a => !a.admin || a.admin === '')" :key="account.id">
+                                <label class="flex items-center p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                    <input type="checkbox"
+                                           :value="account.id"
+                                           x-model="selectedAccountIds"
+                                           class="rounded mr-3">
+                                    <span class="font-mono text-sm">#<span x-text="account.id"></span></span>
+                                    <span class="ml-2 text-gray-500 text-sm" x-text="account.login || ''"></span>
+                                    <span class="ml-auto text-xs text-gray-400" x-text="account.comment || ''"></span>
+                                </label>
+                            </template>
+                            <div x-show="accounts.filter(a => !a.admin || a.admin === '').length === 0" class="text-center text-gray-500 py-4">
+                                Нет свободных анкет
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">Выбрано: <span x-text="selectedAccountIds.length"></span> анкет</p>
                 </div>
-                
+
+                <div class="border-t border-gray-200 pt-4">
+                    <label class="block text-sm font-medium mb-2">Или введите ID вручную</label>
+                    <textarea
+                        class="glass w-full px-4 py-3 rounded-xl"
+                        placeholder="Введите ID анкет через запятую: 123456, 234567"
+                        rows="2"
+                        x-model="accountsToAssign"></textarea>
+                </div>
+
                 <div>
-                    <label class="block text-sm font-medium mb-2">Комментарий для всех анкет</label>
-                    <input type="text" 
+                    <label class="block text-sm font-medium mb-2">Комментарий</label>
+                    <input type="text"
                            class="glass w-full px-4 py-3 rounded-xl"
                            placeholder="Общий комментарий"
                            x-model="assignComment">
                 </div>
-                
+
                 <div class="flex justify-end space-x-3 pt-4">
                     <button @click="showAssignAccountsModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
                         Отмена
                     </button>
                     <button @click="assignAccountsToAdminConfirm" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
-                        Назначить анкеты
+                        Назначить
                     </button>
                 </div>
             </div>
@@ -1597,8 +1703,18 @@
                 selectedAdmin: null,
                 accountsToAssign: '',
                 assignComment: '',
+                selectedAccountIds: [],
 
                 generationPrompt: '',
+
+                // Фильтры истории
+                historyFilter: {
+                    admin: '',
+                    dateFrom: '',
+                    dateTo: ''
+                },
+                showHistoryCalendar: false,
+                profileHistory: [],
 
                 // Данные загружаются с сервера
                 accounts: [],
@@ -1633,6 +1749,9 @@
 
                     this.accountsFilter.dateFrom = formatDate(firstDay);
                     this.accountsFilter.dateTo = formatDate(now);
+
+                    this.historyFilter.dateFrom = formatDate(firstDay);
+                    this.historyFilter.dateTo = formatDate(now);
                 },
 
                 async loadAllData() {
@@ -1647,7 +1766,8 @@
                             this.loadFavoriteTemplates(),
                             this.loadHourlyActivity(),
                             this.loadTranslatorStats(),
-                            this.loadHistoryActions()
+                            this.loadHistoryActions(),
+                            this.loadProfileHistory()
                         ]);
                     } catch (e) {
                         console.error('Error loading data:', e);
@@ -2273,25 +2393,30 @@
                     this.selectedAdmin = admin;
                     this.accountsToAssign = '';
                     this.assignComment = '';
+                    this.selectedAccountIds = [];
                     this.showAssignAccountsModal = true;
                 },
-                
+
                 assignAccountsToAdminConfirm() {
-                    if (!this.accountsToAssign.trim()) {
-                        alert('Введите ID анкет');
-                        return;
+                    // Собираем ID из чекбоксов и текстового поля
+                    let ids = [...this.selectedAccountIds];
+
+                    if (this.accountsToAssign.trim()) {
+                        const manualIds = this.accountsToAssign.split(/[\s,]+/).filter(id => id.length >= 5);
+                        ids = [...ids, ...manualIds];
                     }
-                    
-                    const ids = this.accountsToAssign.split(/[\s,]+/).filter(id => id.length === 6);
-                    
+
+                    // Убираем дубликаты
+                    ids = [...new Set(ids)];
+
                     if (ids.length === 0) {
-                        alert('Введите корректные ID (6 цифр)');
+                        alert('Выберите или введите ID анкет');
                         return;
                     }
-                    
+
                     // Обновляем анкеты в базе данных
                     ids.forEach(id => {
-                        const accountIndex = this.accounts.findIndex(a => a.id === id);
+                        const accountIndex = this.accounts.findIndex(a => String(a.id) === String(id));
                         if (accountIndex > -1) {
                             this.accounts[accountIndex].admin = this.selectedAdmin.login;
                             if (this.assignComment) {
@@ -2299,8 +2424,9 @@
                             }
                         }
                     });
-                    
+
                     this.showAssignAccountsModal = false;
+                    this.selectedAccountIds = [];
                     alert(`Назначено ${ids.length} анкет администратору ${this.selectedAdmin.name}`);
                 },
                 
@@ -2381,6 +2507,142 @@
                 syncPromptWithBots() {
                     console.log('Промт синхронизирован с ботами:', this.generationPrompt);
                     alert('Промт синхронизирован с ботами');
+                },
+
+                // === Функции экспорта статистики ===
+                exportStats() {
+                    const dateFrom = this.statsFilter.dateFrom || 'все';
+                    const dateTo = this.statsFilter.dateTo || 'все';
+
+                    // Формируем CSV данные
+                    let csv = 'Статистика Nova\n';
+                    csv += `Период: ${dateFrom} - ${dateTo}\n\n`;
+                    csv += 'Показатель,Сегодня,За месяц\n';
+                    csv += `Письма,${this.stats.today.letters || 0},${this.stats.month.letters || 0}\n`;
+                    csv += `Чаты,${this.stats.today.chats || 0},${this.stats.month.chats || 0}\n`;
+                    csv += `Уникальные мужчины,${this.stats.today.uniqueMen || 0},${this.stats.month.uniqueMen || 0}\n`;
+                    csv += `Доход,$${this.stats.today.income || '0.00'},$${this.stats.month.income || '0.00'}\n`;
+                    csv += `\nВремя работы сегодня: ${this.stats.metrics.workTime || '0ч 0м'}\n`;
+                    csv += `Время работы за месяц: ${this.stats.metrics.workTimeMonth || '0ч 0м'}\n`;
+
+                    // Скачиваем файл
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `nova_stats_${dateFrom}_${dateTo}.csv`;
+                    link.click();
+                },
+
+                // === Функции истории изменений анкет ===
+                getHistoryDateRangeText() {
+                    if (this.historyFilter.dateFrom && this.historyFilter.dateTo) {
+                        const from = new Date(this.historyFilter.dateFrom);
+                        const to = new Date(this.historyFilter.dateTo);
+                        return `${from.toLocaleDateString('ru-RU')} - ${to.toLocaleDateString('ru-RU')}`;
+                    }
+                    return 'Выбрать период';
+                },
+
+                selectHistoryCalendarDate(date) {
+                    if (!date) return;
+
+                    if (this.calendarSelectingStart || !this.historyFilter.dateFrom) {
+                        this.historyFilter.dateFrom = date;
+                        this.historyFilter.dateTo = date;
+                        this.calendarSelectingStart = false;
+                    } else {
+                        if (date < this.historyFilter.dateFrom) {
+                            this.historyFilter.dateTo = this.historyFilter.dateFrom;
+                            this.historyFilter.dateFrom = date;
+                        } else {
+                            this.historyFilter.dateTo = date;
+                        }
+                        this.calendarSelectingStart = true;
+                        this.showHistoryCalendar = false;
+                    }
+                },
+
+                isHistoryDateSelected(date) {
+                    return date === this.historyFilter.dateFrom || date === this.historyFilter.dateTo;
+                },
+
+                isHistoryDateInRange(date) {
+                    if (!this.historyFilter.dateFrom || !this.historyFilter.dateTo) return false;
+                    return date >= this.historyFilter.dateFrom && date <= this.historyFilter.dateTo;
+                },
+
+                setHistoryQuickRange(range) {
+                    const now = new Date();
+                    const formatDate = (d) => d.toISOString().split('T')[0];
+
+                    if (range === 'today') {
+                        this.historyFilter.dateFrom = formatDate(now);
+                        this.historyFilter.dateTo = formatDate(now);
+                    } else if (range === 'week') {
+                        const weekAgo = new Date(now);
+                        weekAgo.setDate(now.getDate() - 7);
+                        this.historyFilter.dateFrom = formatDate(weekAgo);
+                        this.historyFilter.dateTo = formatDate(now);
+                    } else if (range === 'month') {
+                        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                        this.historyFilter.dateFrom = formatDate(firstDay);
+                        this.historyFilter.dateTo = formatDate(now);
+                    }
+
+                    this.showHistoryCalendar = false;
+                    this.loadProfileHistory();
+                },
+
+                async loadProfileHistory() {
+                    try {
+                        let url = `${API_BASE}/api/profile-history?userId=${this.currentUser.id}&role=${this.currentUser.role}`;
+                        if (this.historyFilter.dateFrom) {
+                            url += `&dateFrom=${this.historyFilter.dateFrom}`;
+                        }
+                        if (this.historyFilter.dateTo) {
+                            url += `&dateTo=${this.historyFilter.dateTo}`;
+                        }
+                        if (this.historyFilter.admin) {
+                            url += `&adminId=${this.historyFilter.admin}`;
+                        }
+                        const res = await fetch(url);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.profileHistory = data.history || [];
+                        } else {
+                            // Заглушка если API не реализован
+                            this.profileHistory = [];
+                        }
+                    } catch (e) {
+                        console.error('loadProfileHistory error:', e);
+                        this.profileHistory = [];
+                    }
+                },
+
+                getProfileActionClass(actionType) {
+                    const classes = {
+                        'added': 'bg-green-100 text-green-800',
+                        'removed': 'bg-red-100 text-red-800',
+                        'assigned': 'bg-blue-100 text-blue-800',
+                        'unassigned': 'bg-yellow-100 text-yellow-800',
+                        'paused': 'bg-gray-100 text-gray-800',
+                        'resumed': 'bg-emerald-100 text-emerald-800',
+                        'updated': 'bg-purple-100 text-purple-800'
+                    };
+                    return classes[actionType] || 'bg-gray-100 text-gray-800';
+                },
+
+                getProfileActionLabel(actionType) {
+                    const labels = {
+                        'added': 'Добавлена',
+                        'removed': 'Удалена',
+                        'assigned': 'Назначена',
+                        'unassigned': 'Снята',
+                        'paused': 'Приостановлена',
+                        'resumed': 'Возобновлена',
+                        'updated': 'Изменена'
+                    };
+                    return labels[actionType] || actionType;
                 },
 
                 logout() {
