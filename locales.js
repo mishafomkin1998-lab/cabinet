@@ -157,7 +157,8 @@ const LOCALES = {
             translators: 'Переводчики',
             myAdmin: 'Мой админ',
             noAccessNote: 'без доступа к добавлению анкет и финансам',
-            amount: 'Сумма'
+            amount: 'Сумма',
+            aiEnabled: 'Разрешить использование ИИ'
         },
 
         // Monitoring section
@@ -473,7 +474,8 @@ const LOCALES = {
             translators: 'Operators',
             myAdmin: 'My admin',
             noAccessNote: 'no access to adding profiles and finances',
-            amount: 'Amount'
+            amount: 'Amount',
+            aiEnabled: 'Allow AI usage'
         },
 
         // Monitoring section
@@ -789,7 +791,8 @@ const LOCALES = {
             translators: 'Перекладачі',
             myAdmin: 'Мій адмін',
             noAccessNote: 'без доступу до додавання анкет та фінансів',
-            amount: 'Сума'
+            amount: 'Сума',
+            aiEnabled: 'Дозволити використання ШІ'
         },
 
         // Monitoring section

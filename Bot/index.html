@@ -2786,19 +2786,34 @@
         async function performLogin(login, pass, displayId) {
             const e=document.getElementById('loginError'); const s=document.getElementById('loginSpinner'); if(s) s.style.display='inline-block';
             try {
+                // Проверяем регистрацию профиля перед входом
+                try {
+                    const checkRes = await fetch(`${LABABOT_SERVER}/api/profiles/check/${displayId}`);
+                    const checkData = await checkRes.json();
+
+                    if (checkData.success && !checkData.allowed) {
+                        if(e) e.innerText = checkData.message || 'Анкета не зарегистрирована в системе';
+                        if(s) s.style.display='none';
+                        return false;
+                    }
+                } catch (checkErr) {
+                    console.warn('⚠️ Не удалось проверить регистрацию профиля:', checkErr.message);
+                    // Продолжаем вход даже если проверка не удалась
+                }
+
                 const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: login, Password: pass });
-                
+
                 if(res.data.Token) {
                     const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
                     const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
-                    bots[bid] = bot; createInterface(bot); selectTab(bid); saveSession(); 
-                    
+                    bots[bid] = bot; createInterface(bot); selectTab(bid); saveSession();
+
                     // Отправляем первый heartbeat после создания бота
                     setTimeout(() => sendHeartbeatToLababot(bid, displayId, 'online'), 2000);
                     return true;
                 }
-            } catch(err) { 
-                if(e) e.innerText = err.response ? (err.response.data.Error || `Ошибка входа: ${err.response.status}`) : "Ошибка входа. Проверьте Proxy для Ladadate."; 
+            } catch(err) {
+                if(e) e.innerText = err.response ? (err.response.data.Error || `Ошибка входа: ${err.response.status}`) : "Ошибка входа. Проверьте Proxy для Ladadate.";
             }
             finally { if(s) s.style.display='none'; }
             return false;

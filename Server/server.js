@@ -375,6 +375,7 @@ app.get('/api/team', async (req, res) => {
                 u.owner_id,
                 u.salary,
                 u.is_restricted,
+                COALESCE(u.ai_enabled, false) as ai_enabled,
                 u.created_at,
                 -- Количество анкет
                 COALESCE(profiles.accounts_count, 0) as accounts_count,
@@ -476,12 +477,15 @@ app.get('/api/team', async (req, res) => {
 });
 
 app.post('/api/users', async (req, res) => {
-    const { username, password, role, ownerId, salary, isRestricted } = req.body;
+    const { username, password, role, ownerId, salary, isRestricted, aiEnabled } = req.body;
     try {
+        // Миграция: добавляем колонку ai_enabled если её нет
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT false`);
+
         const hash = await bcrypt.hash(password, 10);
         await pool.query(
-            `INSERT INTO users (username, password_hash, role, owner_id, salary, is_restricted) VALUES ($1, $2, $3, $4, $5, $6)`,
-            [username, hash, role, ownerId, salary || null, isRestricted || false]
+            `INSERT INTO users (username, password_hash, role, owner_id, salary, is_restricted, ai_enabled) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [username, hash, role, ownerId, salary || null, isRestricted || false, aiEnabled || false]
         );
         res.json({ success: true });
     } catch (e) { res.json({ success: false, error: 'Логин занят' }); }
@@ -489,18 +493,21 @@ app.post('/api/users', async (req, res) => {
 
 app.put('/api/users/:id', async (req, res) => {
     const userId = req.params.id;
-    const { username, password, salary, isRestricted } = req.body;
+    const { username, password, salary, isRestricted, aiEnabled } = req.body;
     try {
+        // Миграция: добавляем колонку ai_enabled если её нет
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT false`);
+
         if (password) {
             const hash = await bcrypt.hash(password, 10);
             await pool.query(
-                `UPDATE users SET username = $1, password_hash = $2, salary = $3, is_restricted = $4 WHERE id = $5`,
-                [username, hash, salary || null, isRestricted || false, userId]
+                `UPDATE users SET username = $1, password_hash = $2, salary = $3, is_restricted = $4, ai_enabled = $5 WHERE id = $6`,
+                [username, hash, salary || null, isRestricted || false, aiEnabled || false, userId]
             );
         } else {
             await pool.query(
-                `UPDATE users SET username = $1, salary = $2, is_restricted = $3 WHERE id = $4`,
-                [username, salary || null, isRestricted || false, userId]
+                `UPDATE users SET username = $1, salary = $2, is_restricted = $3, ai_enabled = $4 WHERE id = $5`,
+                [username, salary || null, isRestricted || false, aiEnabled || false, userId]
             );
         }
         res.json({ success: true });
@@ -624,8 +631,20 @@ app.get('/api/profiles', async (req, res) => {
 });
 
 app.post('/api/profiles/bulk', async (req, res) => {
-    const { profiles, note, adminId } = req.body;
+    const { profiles, note, adminId, performedBy } = req.body;
     try {
+        // Создаём таблицу profile_history если не существует
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS profile_history (
+                id SERIAL PRIMARY KEY,
+                profile_id VARCHAR(20) NOT NULL,
+                action_type VARCHAR(50) NOT NULL,
+                performed_by VARCHAR(100),
+                details TEXT,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+
         for (const id of profiles) {
             if (id.trim().length > 2) {
                 await pool.query(
@@ -634,6 +653,13 @@ app.post('/api/profiles/bulk', async (req, res) => {
                      ON CONFLICT (profile_id) DO UPDATE SET assigned_admin_id = $3`,
                     [id.trim(), note, adminId || null]
                 );
+
+                // Логируем добавление в историю
+                await pool.query(
+                    `INSERT INTO profile_history (profile_id, action_type, performed_by, details)
+                     VALUES ($1, 'added', $2, $3)`,
+                    [id.trim(), performedBy || 'Система', note || null]
+                );
             }
         }
         res.json({ success: true });
@@ -641,12 +667,115 @@ app.post('/api/profiles/bulk', async (req, res) => {
 });
 
 app.post('/api/profiles/assign', async (req, res) => {
-    const { profileIds, targetUserId, roleTarget } = req.body;
+    const { profileIds, targetUserId, roleTarget, performedBy, targetUserName } = req.body;
     try {
         let field = roleTarget === 'admin' ? 'assigned_admin_id' : 'assigned_translator_id';
         const placeholders = profileIds.map((_, i) => `$${i + 2}`).join(',');
         const query = `UPDATE allowed_profiles SET ${field} = $1 WHERE id IN (${placeholders})`;
         await pool.query(query, [targetUserId, ...profileIds]);
+
+        // Логируем назначение в историю
+        const actionType = roleTarget === 'admin' ? 'assigned_admin' : 'assigned_translator';
+        for (const profileId of profileIds) {
+            // Получаем profile_id из id
+            const profileResult = await pool.query(
+                `SELECT profile_id FROM allowed_profiles WHERE id = $1`,
+                [profileId]
+            );
+            if (profileResult.rows.length > 0) {
+                await pool.query(
+                    `INSERT INTO profile_history (profile_id, action_type, performed_by, details)
+                     VALUES ($1, $2, $3, $4)`,
+                    [profileResult.rows[0].profile_id, actionType, performedBy || 'Система', targetUserName || `ID: ${targetUserId}`]
+                );
+            }
+        }
+
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Удаление профиля
+app.delete('/api/profiles/:profileId', async (req, res) => {
+    const { profileId } = req.params;
+    const { performedBy } = req.body;
+    try {
+        // Логируем удаление в историю
+        await pool.query(
+            `INSERT INTO profile_history (profile_id, action_type, performed_by, details)
+             VALUES ($1, 'removed', $2, 'Профиль удалён')`,
+            [profileId, performedBy || 'Система']
+        );
+
+        // Удаляем профиль
+        await pool.query(`DELETE FROM allowed_profiles WHERE profile_id = $1`, [profileId]);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Проверка регистрации профиля (для бота)
+app.get('/api/profiles/check/:profileId', async (req, res) => {
+    const { profileId } = req.params;
+    try {
+        // Добавляем колонку paused если не существует
+        await pool.query(`ALTER TABLE allowed_profiles ADD COLUMN IF NOT EXISTS paused BOOLEAN DEFAULT false`);
+
+        const result = await pool.query(
+            `SELECT profile_id, paused FROM allowed_profiles WHERE profile_id = $1`,
+            [profileId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.json({
+                success: true,
+                registered: false,
+                allowed: false,
+                message: 'Анкета не зарегистрирована в системе'
+            });
+        }
+
+        const profile = result.rows[0];
+        if (profile.paused) {
+            return res.json({
+                success: true,
+                registered: true,
+                allowed: false,
+                message: 'Анкета приостановлена'
+            });
+        }
+
+        return res.json({
+            success: true,
+            registered: true,
+            allowed: true,
+            message: 'OK'
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// Приостановка/возобновление профиля
+app.post('/api/profiles/toggle-access', async (req, res) => {
+    const { profileId, paused, performedBy } = req.body;
+    try {
+        // Добавляем колонку paused если не существует
+        await pool.query(`ALTER TABLE allowed_profiles ADD COLUMN IF NOT EXISTS paused BOOLEAN DEFAULT false`);
+
+        // Обновляем статус
+        await pool.query(
+            `UPDATE allowed_profiles SET paused = $1 WHERE profile_id = $2`,
+            [paused, profileId]
+        );
+
+        // Логируем в историю
+        const actionType = paused ? 'paused' : 'resumed';
+        await pool.query(
+            `INSERT INTO profile_history (profile_id, action_type, performed_by, details)
+             VALUES ($1, $2, $3, $4)`,
+            [profileId, actionType, performedBy || 'Система', paused ? 'Профиль приостановлен' : 'Профиль возобновлён']
+        );
+
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -698,6 +827,27 @@ app.post('/api/message_sent', async (req, res) => {
              VALUES ($1, $2, $3, $4, NOW(), $5, $6, $7, $8, $9, $10, $11, $12)`,
             [botId, accountDisplayId, msgType, recipientId, responseTime || null, isFirst || false, isLast || false, convId || null, length || 0, status || 'success', contentId, errorLogId]
         );
+
+        // 4. Записываем в activity_log для мониторинга
+        const profile = check.rows[0];
+        const actionType = msgType === 'outgoing' ? 'letter' : (msgType === 'chat_msg' ? 'chat' : msgType);
+        const income = actionType === 'letter' ? PRICE_LETTER : (actionType === 'chat' ? PRICE_CHAT : 0);
+
+        await pool.query(`
+            INSERT INTO activity_log (profile_id, bot_id, admin_id, translator_id, action_type, man_id, message_text, response_time_sec, used_ai, income)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        `, [
+            accountDisplayId,
+            botId || null,
+            profile.assigned_admin_id || null,
+            profile.assigned_translator_id || null,
+            actionType,
+            recipientId || null,
+            textContent || null,
+            responseTime || null,
+            false,
+            status === 'success' ? income : 0
+        ]);
 
         console.log(`✅ Сообщение от бота ${botId} для анкеты ${accountDisplayId} сохранено (contentId: ${contentId})`);
 

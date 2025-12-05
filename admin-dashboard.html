@@ -508,15 +508,15 @@
                         </div>
                     </div>
                     <div>
-                        <div @click="setActiveMenu('training')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'training' ? 'active' : ''">
-                            <i class="fas fa-graduation-cap w-5 text-gray-600"></i>
-                            <span class="ml-3 font-medium" x-text="t('menu.training')"></span>
-                        </div>
-                    </div>
-                    <div>
                         <div @click="setActiveMenu('history')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'history' ? 'active' : ''">
                             <i class="fas fa-history w-5 text-gray-600"></i>
                             <span class="ml-3 font-medium" x-text="t('menu.history')"></span>
+                        </div>
+                    </div>
+                    <div>
+                        <div @click="setActiveMenu('training')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'training' ? 'active' : ''">
+                            <i class="fas fa-graduation-cap w-5 text-gray-600"></i>
+                            <span class="ml-3 font-medium" x-text="t('menu.training')"></span>
                         </div>
                     </div>
                 </div>
