@@ -1433,7 +1433,14 @@
 
                 async loadDashboardStats() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/dashboard?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        let url = `${API_BASE}/api/dashboard?userId=${this.currentUser.id}&role=${this.currentUser.role}`;
+                        if (this.statsFilter.dateFrom) {
+                            url += `&dateFrom=${this.statsFilter.dateFrom}`;
+                        }
+                        if (this.statsFilter.dateTo) {
+                            url += `&dateTo=${this.statsFilter.dateTo}`;
+                        }
+                        const res = await fetch(url);
                         const data = await res.json();
                         if (data.success) {
                             this.stats = data.dashboard;
@@ -1448,15 +1455,16 @@
                         if (data.success) {
                             this.accounts = data.list.map(p => ({
                                 id: p.profile_id,
-                                login: p.profile_id,
-                                status: 'offline',
-                                lastOnline: '-',
-                                letters: 0,
+                                login: p.login || p.profile_id,
+                                password: p.password || '',
+                                status: p.status || 'offline',
+                                lastOnline: p.last_online ? new Date(p.last_online).toLocaleString('ru-RU') : '-',
+                                letters: p.letters_today || 0,
                                 admin: p.admin_name || '',
                                 translator: p.trans_name || '',
                                 addedDate: new Date(p.added_at).toLocaleDateString('ru-RU'),
                                 comment: p.note || '',
-                                paused: false
+                                paused: p.paused || false
                             }));
                         }
                     } catch (e) { console.error('loadAccounts error:', e); }
