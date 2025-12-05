@@ -989,23 +989,23 @@
                         
                         <!-- Последние ответы -->
                         <div x-show="monitoringFunction === 'lastResponses'" class="space-y-4 max-h-96 overflow-y-auto scrollbar-thin">
-                            <div class="p-3 rounded-xl border border-gray-100">
-                                <div class="font-medium mb-2">История ответов #4521</div>
-                                <div class="space-y-2 text-sm">
-                                    <div class="bg-gray-100 p-2 rounded-lg">
-                                        <span class="font-medium">Мужчина:</span> Привет, как дела?
+                            <template x-for="activity in recentActivity.filter(a => a.action_type === 'chat' || a.action_type === 'letter').slice(0, 10)" :key="activity.id">
+                                <div class="p-3 rounded-xl border border-gray-100">
+                                    <div class="font-medium mb-2">
+                                        Анкета #<span x-text="activity.profile_id"></span> →
+                                        Мужчина #<span x-text="activity.man_id"></span>
                                     </div>
-                                    <div class="bg-blue-50 p-2 rounded-lg">
-                                        <span class="font-medium text-blue-600">Переводчик:</span> Привет) Хорошо, а у тебя?
+                                    <div class="space-y-2 text-sm">
+                                        <div class="bg-blue-50 p-2 rounded-lg">
+                                            <span class="font-medium text-blue-600">Ответ:</span>
+                                            <span x-text="activity.message_text || '(текст не сохранён)'"></span>
+                                        </div>
                                     </div>
-                                    <div class="bg-gray-100 p-2 rounded-lg">
-                                        <span class="font-medium">Мужчина:</span> Тоже хорошо, чем занимаешься?
-                                    </div>
-                                    <div class="bg-blue-50 p-2 rounded-lg">
-                                        <span class="font-medium text-blue-600">Переводчик:</span> Смотрю фильм, а ты?
-                                    </div>
+                                    <div class="text-xs text-gray-400 mt-2" x-text="formatActivityTime(activity.created_at)"></div>
                                 </div>
-                                <div class="text-xs text-gray-400 mt-2">2 минуты назад</div>
+                            </template>
+                            <div x-show="recentActivity.filter(a => a.action_type === 'chat' || a.action_type === 'letter').length === 0" class="text-center text-gray-500 py-8">
+                                Нет данных об ответах
                             </div>
                         </div>
                         
@@ -1032,14 +1032,15 @@
                         
                         <!-- Любимая рассылка -->
                         <div x-show="monitoringFunction === 'favoriteMailing'" class="space-y-4 max-h-96 overflow-y-auto scrollbar-thin">
-                            <div class="p-4 rounded-xl bg-gradient-to-r from-pink-50 to-rose-50">
-                                <div class="font-medium mb-2">⭐ Избранная рассылка</div>
-                                <div class="text-sm text-gray-700 mb-3">
-                                    "Привет! Как твои выходные? Я сегодня с подругами в кафе, скучаю по общению..."
+                            <template x-for="activity in recentActivity.filter(a => a.action_type === 'letter').slice(0, 5)" :key="activity.id">
+                                <div class="p-4 rounded-xl bg-gradient-to-r from-pink-50 to-rose-50">
+                                    <div class="font-medium mb-2">📨 Рассылка на #<span x-text="activity.man_id"></span></div>
+                                    <div class="text-sm text-gray-700 mb-3" x-text="activity.message_text ? '\"' + activity.message_text + '\"' : '(текст не сохранён)'"></div>
+                                    <div class="text-xs text-gray-500" x-text="formatActivityTime(activity.created_at)"></div>
                                 </div>
-                                <div class="text-xs text-gray-500">
-                                    Использовано: 24 раза | Конверсия: 18%
-                                </div>
+                            </template>
+                            <div x-show="recentActivity.filter(a => a.action_type === 'letter').length === 0" class="text-center text-gray-500 py-8">
+                                Нет данных о рассылках
                             </div>
                         </div>
                         
@@ -1066,20 +1067,21 @@
                             <div class="glass p-4 rounded-xl">
                                 <div class="flex justify-between items-center mb-2">
                                     <div class="font-medium">Генерации ИИ</div>
-                                    <div class="text-2xl font-bold text-orange-600">156</div>
+                                    <div class="text-2xl font-bold text-orange-600" x-text="recentActivity.filter(a => a.used_ai).length"></div>
                                 </div>
-                                <div class="text-sm text-gray-600">За текущий месяц</div>
+                                <div class="text-sm text-gray-600">За последнее время</div>
                             </div>
                             <div class="glass p-4 rounded-xl">
                                 <div class="font-medium mb-2">Последние генерации:</div>
                                 <div class="space-y-2 text-sm">
-                                    <div class="border-l-4 border-orange-400 pl-3 py-1">
-                                        <div>"Привет, как прошел твой день?"</div>
-                                        <div class="text-xs text-gray-500">2 часа назад</div>
-                                    </div>
-                                    <div class="border-l-4 border-orange-400 pl-3 py-1">
-                                        <div>"Что ты любишь делать в свободное время?"</div>
-                                        <div class="text-xs text-gray-500">4 часа назад</div>
+                                    <template x-for="activity in recentActivity.filter(a => a.used_ai).slice(0, 5)" :key="activity.id">
+                                        <div class="border-l-4 border-orange-400 pl-3 py-1">
+                                            <div x-text="activity.message_text ? '\"' + activity.message_text.substring(0, 100) + '...\"' : '(ИИ генерация)'"></div>
+                                            <div class="text-xs text-gray-500" x-text="formatActivityTime(activity.created_at)"></div>
+                                        </div>
+                                    </template>
+                                    <div x-show="recentActivity.filter(a => a.used_ai).length === 0" class="text-gray-500">
+                                        Нет данных об использовании ИИ
                                     </div>
                                 </div>
                             </div>
@@ -1088,26 +1090,23 @@
                     
                     <!-- Переписка -->
                     <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6">Переписка</h3>
-                        <div class="space-y-3 mb-4">
-                            <div class="flex justify-end">
-                                <div class="chat-bubble sent p-3">
-                                    <div>Привет! Как дела?</div>
-                                    <div class="text-xs opacity-80 mt-1">14:30</div>
+                        <h3 class="text-lg font-bold mb-6">Последняя активность</h3>
+                        <div class="space-y-3 mb-4 max-h-64 overflow-y-auto">
+                            <template x-for="activity in recentActivity.slice(0, 8)" :key="activity.id">
+                                <div class="flex" :class="activity.action_type === 'incoming' ? 'justify-start' : 'justify-end'">
+                                    <div class="p-3 rounded-xl max-w-xs"
+                                         :class="activity.action_type === 'incoming' ? 'bg-gray-100' : 'bg-blue-100'">
+                                        <div class="text-xs font-medium mb-1"
+                                             :class="activity.action_type === 'incoming' ? 'text-gray-600' : 'text-blue-600'"
+                                             x-text="activity.action_type === 'incoming' ? 'Входящее от #' + activity.man_id : 'Отправлено #' + activity.profile_id"></div>
+                                        <div class="text-sm" x-text="activity.message_text ? activity.message_text.substring(0, 80) + '...' : '(без текста)'"></div>
+                                        <div class="text-xs opacity-60 mt-1" x-text="formatActivityTime(activity.created_at)"></div>
+                                    </div>
                                 </div>
+                            </template>
+                            <div x-show="recentActivity.length === 0" class="text-center text-gray-500 py-4">
+                                Нет активности
                             </div>
-                            <div class="flex justify-start">
-                                <div class="chat-bubble received p-3">
-                                    <div>Привет) Хорошо, а у тебя?</div>
-                                    <div class="text-xs text-gray-500 mt-1">14:32</div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="flex">
-                            <input type="text" placeholder="Сообщение..." class="flex-1 glass px-4 py-2 rounded-l-xl border-r-0">
-                            <button class="glow-button px-4 rounded-r-xl text-white">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
                         </div>
                     </div>
                 </div>
