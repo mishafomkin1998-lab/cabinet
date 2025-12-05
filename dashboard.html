@@ -1,28 +1,33 @@
 [file name]: dashboard.html
 [file content begin]
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" x-data="{ htmlLang: 'ru' }" :lang="htmlLang">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Личный кабинет - Nova</title>
+    <title>Nova Dashboard</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Localization -->
+    <script src="locales.js"></script>
     <!-- Alpine.js -->
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 
-    <!-- Конфигурация API -->
+    <!-- Configuration -->
     <script>
-        // Измени на IP сервера для доступа с других устройств (например: 'http://192.168.1.100:3000')
+        // API Server URL (change for remote access, e.g.: 'http://192.168.1.100:3000')
         const API_BASE = 'http://localhost:3000';
 
-        // Проверка авторизации и получение данных пользователя
+        // Auth check
         const novaUserData = JSON.parse(localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser') || 'null');
         if (!novaUserData || !novaUserData.loggedIn) {
             window.location.href = 'login.html';
         }
+
+        // Load saved language or default to Russian
+        const savedLanguage = localStorage.getItem('novaLanguage') || 'ru';
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
@@ -325,116 +330,103 @@
                 </a>
             </div>
             
-            <!-- Меню -->
+            <!-- Menu -->
             <nav class="flex-1">
                 <div class="space-y-1">
-                    <!-- Статистика -->
                     <div>
                         <div @click="setActiveMenu('stats')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'stats' ? 'active' : ''">
                             <i class="fas fa-chart-pie w-5 text-gray-600"></i>
-                            <span class="ml-3 font-medium">Статистика</span>
+                            <span class="ml-3 font-medium" x-text="t('menu.statistics')"></span>
                         </div>
                     </div>
-                    
-                    <!-- Анкеты -->
                     <div>
                         <div @click="setActiveMenu('accounts')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'accounts' ? 'active' : ''">
                             <i class="fas fa-folder w-5 text-gray-600"></i>
-                            <span class="ml-3 font-medium">Анкеты</span>
+                            <span class="ml-3 font-medium" x-text="t('menu.profiles')"></span>
                         </div>
                     </div>
-                    
-                    <!-- Управление -->
                     <div>
                         <div @click="setActiveMenu('control')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'control' ? 'active' : ''">
                             <i class="fas fa-sliders-h w-5 text-gray-600"></i>
-                            <span class="ml-3 font-medium">Управление</span>
+                            <span class="ml-3 font-medium" x-text="t('menu.control')"></span>
                         </div>
                     </div>
-                    
-                    <!-- Команда -->
                     <div>
                         <div @click="setActiveMenu('team')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'team' ? 'active' : ''">
                             <i class="fas fa-users w-5 text-gray-600"></i>
-                            <span class="ml-3 font-medium">Команда</span>
+                            <span class="ml-3 font-medium" x-text="t('menu.team')"></span>
                         </div>
                     </div>
-                    
-                    <!-- Мониторинг -->
                     <div>
                         <div @click="setActiveMenu('monitoring')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'monitoring' ? 'active' : ''">
                             <i class="fas fa-eye w-5 text-gray-600"></i>
-                            <span class="ml-3 font-medium">Мониторинг</span>
+                            <span class="ml-3 font-medium" x-text="t('menu.monitoring')"></span>
                         </div>
                     </div>
-                    
-                    <!-- Обучение (новое) -->
                     <div>
                         <div @click="setActiveMenu('training')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'training' ? 'active' : ''">
                             <i class="fas fa-graduation-cap w-5 text-gray-600"></i>
-                            <span class="ml-3 font-medium">Обучение</span>
+                            <span class="ml-3 font-medium" x-text="t('menu.training')"></span>
                         </div>
                     </div>
-                    
-                    <!-- История (новое) -->
                     <div>
                         <div @click="setActiveMenu('history')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'history' ? 'active' : ''">
                             <i class="fas fa-history w-5 text-gray-600"></i>
-                            <span class="ml-3 font-medium">История</span>
+                            <span class="ml-3 font-medium" x-text="t('menu.history')"></span>
                         </div>
                     </div>
                 </div>
             </nav>
-            
-            <!-- Статус -->
+
+            <!-- Status -->
             <div class="pt-5 border-t border-gray-100">
                 <div class="flex items-center">
                     <div class="status-dot mr-2"></div>
-                    <span class="text-sm text-gray-600">Все системы активны</span>
+                    <span class="text-sm text-gray-600" x-text="t('messages.allSystemsActive')"></span>
                 </div>
             </div>
         </aside>
-        
-        <!-- Основной контент -->
+
+        <!-- Main content -->
         <main class="flex-1 overflow-y-auto p-6">
-            <!-- Индикатор загрузки -->
+            <!-- Loading indicator -->
             <div x-show="loading" class="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
                 <div class="text-center">
                     <i class="fas fa-spinner fa-spin text-4xl text-indigo-500 mb-4"></i>
-                    <div class="text-gray-600">Загрузка данных...</div>
+                    <div class="text-gray-600" x-text="t('common.loading')"></div>
                 </div>
             </div>
 
-            <!-- Ошибка подключения -->
+            <!-- Connection error -->
             <div x-show="error" x-cloak class="glass rounded-2xl p-6 mb-6 border-l-4 border-red-500">
                 <div class="flex items-center">
                     <i class="fas fa-exclamation-triangle text-red-500 mr-3"></i>
                     <div>
-                        <div class="font-bold text-red-700">Ошибка подключения к серверу</div>
+                        <div class="font-bold text-red-700" x-text="t('messages.connectionError')"></div>
                         <div class="text-sm text-gray-600" x-text="error"></div>
                     </div>
                     <button @click="loadAllData()" class="ml-auto px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200">
-                        <i class="fas fa-redo mr-1"></i> Повторить
+                        <i class="fas fa-redo mr-1"></i> <span x-text="t('messages.retry')"></span>
                     </button>
                 </div>
             </div>
 
-            <!-- Шапка -->
+            <!-- Header -->
             <div class="flex items-center justify-between mb-8">
                 <div>
                     <h2 class="text-2xl font-bold" x-text="getPageTitle()"></h2>
                     <p class="text-gray-500" x-text="getPageSubtitle()"></p>
                 </div>
-                
+
                 <div class="flex items-center space-x-3">
-                    <!-- Выбор языка -->
-                    <select class="glass px-3 py-2 rounded-xl text-sm font-medium focus:outline-none" x-model="language" @change="changeLanguage">
+                    <!-- Language selector -->
+                    <select class="glass px-3 py-2 rounded-xl text-sm font-bold focus:outline-none cursor-pointer hover:bg-gray-50 transition-colors" x-model="language" @change="changeLanguage">
                         <option value="ru">RU</option>
                         <option value="en">EN</option>
-                        <option value="ua">UK</option>
+                        <option value="uk">UK</option>
                     </select>
-                    
-                    <!-- Профиль -->
+
+                    <!-- Profile -->
                     <div class="relative" x-data="{open: false}">
                         <button @click="open = !open" class="flex items-center glass px-4 py-2 rounded-xl hover:bg-gray-50">
                             <div class="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center">
@@ -447,37 +439,37 @@
                         <div x-show="open" @click.outside="open = false" class="absolute right-0 mt-2 w-56 glass rounded-xl p-2 shadow-xl z-50">
                             <div class="px-3 py-2 border-b border-gray-100 mb-2">
                                 <div class="font-medium" x-text="currentUser.username"></div>
-                                <div class="text-xs text-gray-500" x-text="currentUser.role === 'director' ? 'Директор' : (currentUser.role === 'admin' ? 'Администратор' : 'Переводчик')"></div>
+                                <div class="text-xs text-gray-500" x-text="t('roles.' + currentUser.role)"></div>
                             </div>
                             <a href="#" @click="logout()" class="flex items-center p-3 rounded-lg hover:bg-red-50 text-red-500">
                                 <i class="fas fa-sign-out-alt mr-3"></i>
-                                <span>Выход</span>
+                                <span x-text="t('userMenu.logout')"></span>
                             </a>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- Контент -->
-            <!-- Статистика -->
+            <!-- Content -->
+            <!-- Statistics -->
             <div x-show="activeMenu === 'stats'" class="fade-in">
-                <!-- Фильтры: Админы, Переводчики, Календарь -->
+                <!-- Filters -->
                 <div class="glass rounded-2xl p-5 mb-6">
                     <div class="flex items-center gap-4 flex-wrap">
-                        <!-- Выбор админа -->
+                        <!-- Admin filter -->
                         <div>
                             <select class="glass px-4 py-2.5 rounded-xl" x-model="statsFilter.admin" @change="statsFilter.translator = ''">
-                                <option value="">Все Админы</option>
+                                <option value="" x-text="t('filters.allAdmins')"></option>
                                 <template x-for="admin in admins" :key="admin.id">
                                     <option :value="admin.id" x-text="admin.name"></option>
                                 </template>
                             </select>
                         </div>
 
-                        <!-- Выбор переводчика (показывается при выборе админа) -->
+                        <!-- Translator filter -->
                         <div x-show="statsFilter.admin">
                             <select class="glass px-4 py-2.5 rounded-xl" x-model="statsFilter.translator">
-                                <option value="">Все Переводчики</option>
+                                <option value="" x-text="t('filters.allTranslators')"></option>
                                 <template x-for="translator in admins.find(a => a.id == statsFilter.admin)?.translators || []" :key="translator.id">
                                     <option :value="translator.id" x-text="translator.name"></option>
                                 </template>
@@ -523,25 +515,25 @@
                                     </template>
                                 </div>
                                 <div class="flex gap-2 mt-4">
-                                    <button @click="setQuickDateRange('month')" class="flex-1 px-2 py-1 rounded-lg text-sm" :class="statsFilter.quickRange === 'month' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100'">Этот месяц</button>
-                                    <button @click="setQuickDateRange('week')" class="flex-1 px-2 py-1 rounded-lg text-sm" :class="statsFilter.quickRange === 'week' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100'">Неделя</button>
-                                    <button @click="setQuickDateRange('today')" class="flex-1 px-2 py-1 rounded-lg text-sm" :class="statsFilter.quickRange === 'today' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100'">Сегодня</button>
+                                    <button @click="setQuickDateRange('month')" class="flex-1 px-2 py-1 rounded-lg text-sm" :class="statsFilter.quickRange === 'month' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100'" x-text="t('common.month')"></button>
+                                    <button @click="setQuickDateRange('week')" class="flex-1 px-2 py-1 rounded-lg text-sm" :class="statsFilter.quickRange === 'week' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100'" x-text="t('common.week')"></button>
+                                    <button @click="setQuickDateRange('today')" class="flex-1 px-2 py-1 rounded-lg text-sm" :class="statsFilter.quickRange === 'today' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100'" x-text="t('common.today')"></button>
                                 </div>
                             </div>
                         </div>
 
                         <button @click="loadDashboardStats()" class="px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600">
-                            <i class="fas fa-sync-alt mr-2"></i>Обновить
+                            <i class="fas fa-sync-alt mr-2"></i><span x-text="t('common.refresh')"></span>
                         </button>
                         <button @click="exportStats()" class="ml-2 px-4 py-2.5 rounded-xl bg-green-500 text-white hover:bg-green-600">
-                            <i class="fas fa-download mr-2"></i>Выгрузить
+                            <i class="fas fa-download mr-2"></i><span x-text="t('common.export')"></span>
                         </button>
                     </div>
                 </div>
-                
-                <!-- Статистика -->
+
+                <!-- Stats cards -->
                 <div class="grid grid-cols-4 gap-6 mb-8">
-                    <!-- Всего анкет -->
+                    <!-- Total profiles -->
                     <div class="glass rounded-2xl p-6 cursor-pointer" @click="setActiveMenu('accounts')">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-50 to-blue-100 flex items-center justify-center mr-4">
@@ -549,13 +541,13 @@
                             </div>
                             <div>
                                 <div class="text-3xl font-bold" x-text="stats.metrics.totalProfiles">0</div>
-                                <div class="text-gray-500">Всего анкет</div>
+                                <div class="text-gray-500" x-text="t('stats.totalProfiles')"></div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500" x-text="'Загружено: ' + accounts.length"></div>
+                        <div class="text-sm text-gray-500"><span x-text="t('stats.loaded')"></span>: <span x-text="accounts.length"></span></div>
                     </div>
 
-                    <!-- Входящие письма от мужчин -->
+                    <!-- Incoming letters -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 flex items-center justify-center mr-4">
@@ -563,57 +555,57 @@
                             </div>
                             <div>
                                 <div class="text-3xl font-bold" x-text="stats.today.incomingLetters || 0">0</div>
-                                <div class="text-gray-500">Входящих писем</div>
+                                <div class="text-gray-500" x-text="t('stats.incomingLetters')"></div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500" x-text="'Чатов: ' + stats.today.chats + ' | За месяц: ' + (stats.month.incomingLetters || 0)"></div>
+                        <div class="text-sm text-gray-500"><span x-text="t('stats.chats')"></span>: <span x-text="stats.today.chats"></span> | <span x-text="t('stats.forMonth')"></span>: <span x-text="stats.month.incomingLetters || 0"></span></div>
                     </div>
 
-                    <!-- Медианное время ответа -->
+                    <!-- Median response time -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-green-50 to-green-100 flex items-center justify-center mr-4">
                                 <i class="fas fa-stopwatch text-green-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold" x-text="(stats.metrics.medianResponseTime || 0) + ' мин'">0 мин</div>
-                                <div class="text-gray-500">Медианное время</div>
+                                <div class="text-3xl font-bold"><span x-text="stats.metrics.medianResponseTime || 0"></span> <span x-text="t('time.min')"></span></div>
+                                <div class="text-gray-500" x-text="t('stats.medianTime')"></div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500">Медианное время ответа оператора</div>
+                        <div class="text-sm text-gray-500" x-text="t('stats.medianResponseTime')"></div>
                     </div>
 
-                    <!-- Среднее время ответа -->
+                    <!-- Average response time -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 flex items-center justify-center mr-4">
                                 <i class="fas fa-clock text-orange-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold" x-text="stats.metrics.avgResponseTime + ' мин'">0 мин</div>
-                                <div class="text-gray-500">Среднее время</div>
+                                <div class="text-3xl font-bold"><span x-text="stats.metrics.avgResponseTime"></span> <span x-text="t('time.min')"></span></div>
+                                <div class="text-gray-500" x-text="t('stats.avgTime')"></div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500" x-text="'Уникальных мужчин: ' + stats.today.uniqueMen"></div>
+                        <div class="text-sm text-gray-500"><span x-text="t('stats.uniqueMen')"></span>: <span x-text="stats.today.uniqueMen"></span></div>
                     </div>
                 </div>
 
-                <!-- Боты и ошибки -->
+                <!-- Bots and work time -->
                 <div class="grid grid-cols-2 gap-6 mb-8">
                     <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6">Статус ботов</h3>
+                        <h3 class="text-lg font-bold mb-6" x-text="t('stats.botsStatus')"></h3>
                         <div class="text-3xl font-bold mb-2" x-text="bots.length">0</div>
                         <div class="text-sm text-gray-500">
-                            <span class="text-green-600" x-text="'Online: ' + botsStatus.online"></span> |
-                            <span class="text-yellow-500" x-text="'Idle: ' + botsStatus.idle"></span> |
-                            <span class="text-red-500" x-text="'Offline: ' + (botsStatus.offline + botsStatus.never_connected)"></span>
+                            <span class="text-green-600"><span x-text="t('stats.online')"></span>: <span x-text="botsStatus.online"></span></span> |
+                            <span class="text-yellow-500"><span x-text="t('stats.idle')"></span>: <span x-text="botsStatus.idle"></span></span> |
+                            <span class="text-red-500"><span x-text="t('stats.offline')"></span>: <span x-text="botsStatus.offline + botsStatus.never_connected"></span></span>
                         </div>
                     </div>
 
                     <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6">Время работы</h3>
-                        <div class="text-3xl font-bold mb-2 text-purple-600" x-text="stats.metrics.workTime || '0ч 0м'">0ч 0м</div>
-                        <div class="text-sm text-gray-500" x-text="'За месяц: ' + (stats.metrics.workTimeMonth || '0ч 0м')"></div>
+                        <h3 class="text-lg font-bold mb-6" x-text="t('stats.workTime')"></h3>
+                        <div class="text-3xl font-bold mb-2 text-purple-600" x-text="stats.metrics.workTime || '0h 0m'"></div>
+                        <div class="text-sm text-gray-500"><span x-text="t('stats.forMonth')"></span>: <span x-text="stats.metrics.workTimeMonth || '0h 0m'"></span></div>
                     </div>
                 </div>
                 
@@ -701,36 +693,36 @@
                             <thead>
                                 <tr class="border-b border-gray-100">
                                     <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('id')">
-                                        ID
+                                        <span x-text="t('profiles.id')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'id' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
                                     <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('login')">
-                                        Логин
+                                        <span x-text="t('profiles.loginCol')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'login' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
-                                    <th class="text-left py-4 px-6">Пароль</th>
+                                    <th class="text-left py-4 px-6" x-text="t('profiles.passwordCol')"></th>
                                     <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('status')">
-                                        Статус
+                                        <span x-text="t('profiles.statusCol')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'status' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
                                     <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('lastOnline')">
-                                        Дата онлайн
+                                        <span x-text="t('profiles.lastOnline')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'lastOnline' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
                                     <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('letters')">
-                                        Входящие
+                                        <span x-text="t('profiles.incoming')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'letters' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
                                     <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('admin')">
-                                        Админ
+                                        <span x-text="t('profiles.admin')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'admin' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
                                     <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('date')">
-                                        Дата добавления
+                                        <span x-text="t('profiles.addedDate')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'date' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
-                                    <th class="text-left py-4 px-6">Комментарий</th>
-                                    <th class="text-left py-4 px-6">Действия</th>
+                                    <th class="text-left py-4 px-6" x-text="t('profiles.commentCol')"></th>
+                                    <th class="text-left py-4 px-6" x-text="t('common.actions')"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1615,10 +1607,61 @@
     <script>
         function dashboard() {
             return {
-                // Данные пользователя из авторизации
+                // User data from auth
                 currentUser: novaUserData,
 
-                language: 'ru',
+                // Localization
+                language: savedLanguage,
+
+                // Translation function
+                t(key) {
+                    const keys = key.split('.');
+                    let value = LOCALES[this.language];
+                    for (const k of keys) {
+                        if (value && value[k] !== undefined) {
+                            value = value[k];
+                        } else {
+                            // Fallback to Russian
+                            value = LOCALES['ru'];
+                            for (const k2 of keys) {
+                                if (value && value[k2] !== undefined) {
+                                    value = value[k2];
+                                } else {
+                                    return key; // Return key if not found
+                                }
+                            }
+                            return value;
+                        }
+                    }
+                    return value;
+                },
+
+                // Change language and save to localStorage
+                changeLanguage() {
+                    localStorage.setItem('novaLanguage', this.language);
+                    document.documentElement.lang = this.language === 'uk' ? 'uk' : (this.language === 'en' ? 'en' : 'ru');
+                    document.title = this.t('pageTitle');
+                },
+
+                // Get localized date
+                formatDate(date, options = {}) {
+                    if (!date) return '-';
+                    const locale = getDateLocale(this.language);
+                    return new Date(date).toLocaleDateString(locale, options);
+                },
+
+                // Get localized date and time
+                formatDateTime(date) {
+                    if (!date) return '-';
+                    const locale = getDateLocale(this.language);
+                    return new Date(date).toLocaleString(locale, {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                },
+
                 activeMenu: 'stats',
                 activeSubmenu: 'general',
                 showCalendar: false,
@@ -1987,29 +2030,13 @@
                 },
                 
                 getPageTitle() {
-                    const titles = {
-                        'stats': 'Статистика',
-                        'accounts': 'Анкеты',
-                        'control': 'Управление',
-                        'team': 'Команда',
-                        'monitoring': 'Мониторинг',
-                        'training': 'Обучение',
-                        'history': 'История'
-                    };
-                    return titles[this.activeMenu];
+                    const page = this.t('pages.' + this.activeMenu);
+                    return page?.title || this.activeMenu;
                 },
-                
+
                 getPageSubtitle() {
-                    const subtitles = {
-                        'stats': 'Общая аналитика и метрики',
-                        'accounts': 'Управление анкетами',
-                        'control': 'Контроль ботов и рассылки',
-                        'team': 'Администраторы и переводчики',
-                        'monitoring': 'Live мониторинг событий',
-                        'training': 'Обучающие материалы и документация',
-                        'history': 'История действий пользователей'
-                    };
-                    return subtitles[this.activeMenu];
+                    const page = this.t('pages.' + this.activeMenu);
+                    return page?.subtitle || '';
                 },
                 
                 getActivityLevel(hour) {
@@ -2034,12 +2061,12 @@
 
                 setDateRange(range) {
                     const now = new Date();
-                    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-                                        'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+                    const months = this.t('calendar.months');
+                    const locale = getDateLocale(this.language);
                     const ranges = {
-                        'month': `${monthNames[now.getMonth()]} ${now.getFullYear()}`,
-                        'week': 'Текущая неделя',
-                        'day': now.toLocaleDateString('ru-RU')
+                        'month': `${months[now.getMonth()]} ${now.getFullYear()}`,
+                        'week': this.t('common.week'),
+                        'day': now.toLocaleDateString(locale)
                     };
                     this.statsFilter.dateRange = ranges[range];
                     this.showCalendar = false;
@@ -2075,14 +2102,15 @@
                     this.loadDashboardStats();
                 },
 
-                // Функции календаря
+                // Calendar functions
                 getDateRangeText() {
                     if (!this.statsFilter.dateFrom || !this.statsFilter.dateTo) {
-                        return 'Выберите период';
+                        return this.t('common.selectPeriod');
                     }
                     const from = new Date(this.statsFilter.dateFrom);
                     const to = new Date(this.statsFilter.dateTo);
-                    const formatShort = (d) => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+                    const locale = getDateLocale(this.language);
+                    const formatShort = (d) => d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 
                     if (this.statsFilter.dateFrom === this.statsFilter.dateTo) {
                         return formatShort(from);
@@ -2091,9 +2119,8 @@
                 },
 
                 getCalendarMonthName() {
-                    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-                                        'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
-                    return `${monthNames[this.calendarMonth]} ${this.calendarYear}`;
+                    const months = this.t('calendar.months');
+                    return `${months[this.calendarMonth]} ${this.calendarYear}`;
                 },
 
                 getCalendarDays() {
@@ -2236,15 +2263,12 @@
                     const diffMs = now - date;
                     const diffMins = Math.floor(diffMs / 60000);
                     const diffHours = Math.floor(diffMs / 3600000);
+                    const locale = getDateLocale(this.language);
 
-                    if (diffMins < 1) return 'только что';
-                    if (diffMins < 60) return `${diffMins} мин. назад`;
-                    if (diffHours < 24) return `${diffHours} ч. назад`;
-                    return date.toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-                },
-                
-                changeLanguage() {
-                    console.log('Язык изменен на:', this.language);
+                    if (diffMins < 1) return this.t('time.justNow');
+                    if (diffMins < 60) return `${diffMins} ${this.t('time.minutesAgo')}`;
+                    if (diffHours < 24) return `${diffHours} ${this.t('time.hoursAgo')}`;
+                    return date.toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
                 },
                 
                 get filteredAccounts() {
@@ -2312,13 +2336,8 @@
                 },
                 
                 getStatusText(status) {
-                    const texts = {
-                        'online': 'Свободна',
-                        'working': 'В работе',
-                        'offline': 'Оффлайн',
-                        'inactive': 'Неактивна'
-                    };
-                    return texts[status] || 'Неизвестно';
+                    const statuses = this.t('profiles.profileStatuses');
+                    return statuses[status] || status;
                 },
                 
                 toggleAccountAccess(account) {
@@ -2633,16 +2652,8 @@
                 },
 
                 getProfileActionLabel(actionType) {
-                    const labels = {
-                        'added': 'Добавлена',
-                        'removed': 'Удалена',
-                        'assigned': 'Назначена',
-                        'unassigned': 'Снята',
-                        'paused': 'Приостановлена',
-                        'resumed': 'Возобновлена',
-                        'updated': 'Изменена'
-                    };
-                    return labels[actionType] || actionType;
+                    const actions = this.t('history.actions');
+                    return actions[actionType] || actionType;
                 },
 
                 logout() {
