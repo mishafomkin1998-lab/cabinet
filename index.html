@@ -408,15 +408,8 @@
                 });
             });
             
-            // Имитация перехода на страницу входа (для демонстрации)
-            const loginBtn = document.querySelector('a[href="login.html"]');
-            if (loginBtn) {
-                loginBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    alert('Для демонстрации: переход на страницу личного кабинета. В реальном проекте здесь будет загрузка login.html');
-                    // window.location.href = 'login.html';
-                });
-            }
+            // Кнопка "Личный кабинет" ведет напрямую на login.html
+            // Ссылка уже настроена в HTML: href="login.html"
             
             // Имитация скачивания
             const downloadBtns = document.querySelectorAll('a[href="#"]');
