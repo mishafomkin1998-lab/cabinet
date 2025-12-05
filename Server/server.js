@@ -685,6 +685,41 @@ app.post('/api/heartbeat', async (req, res) => {
     const { botId, accountDisplayId, status, timestamp, ip, systemInfo } = req.body;
 
     try {
+        // 1. Записываем/обновляем в таблицу bots (чтобы показывался в dashboard)
+        await pool.query(`
+            INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat)
+            VALUES ($1, $2, $3, $4, $5, NOW())
+            ON CONFLICT (bot_id) DO UPDATE SET
+                platform = EXCLUDED.platform,
+                ip = EXCLUDED.ip,
+                version = EXCLUDED.version,
+                status = EXCLUDED.status,
+                last_heartbeat = NOW()
+        `, [
+            botId,
+            systemInfo?.platform || null,
+            ip || null,
+            systemInfo?.version || null,
+            status || 'online'
+        ]);
+
+        // 2. Связываем бота с профилем
+        if (accountDisplayId) {
+            await pool.query(`
+                INSERT INTO bot_profiles (bot_id, profile_id)
+                VALUES ($1, $2)
+                ON CONFLICT (bot_id, profile_id) DO NOTHING
+            `, [botId, accountDisplayId]);
+
+            // 3. Обновляем статус профиля
+            await pool.query(`
+                UPDATE allowed_profiles
+                SET status = $1, last_online = NOW()
+                WHERE profile_id = $2
+            `, [status || 'online', accountDisplayId]);
+        }
+
+        // 4. Записываем в heartbeats для истории
         await pool.query(`
             INSERT INTO heartbeats (
                 bot_id, account_display_id, status,
