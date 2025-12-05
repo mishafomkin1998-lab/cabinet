@@ -1,0 +1,13 @@
+# Игнорировать папку с зависимостями, которая слишком большая
+node_modules
+
+# Игнорировать системные и временные файлы
+*.DS_Store
+npm-debug.log*# Ignore node_modules directory
+node_modules
+
+# Ignore large system files
+*.DS_Store
+
+# Ignore log and temp files
+npm-debug.log*
