@@ -72,6 +72,7 @@ async function initDatabase() {
         // Добавляем недостающие колонки если их нет
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS login VARCHAR(100)`);
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS salary DECIMAL(10,2)`);
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_restricted BOOLEAN DEFAULT FALSE`);
 
         // 2. Таблица Анкет (профилей) - расширенная
         await pool.query(`
@@ -324,7 +325,16 @@ app.post('/api/login', async (req, res) => {
 
         if (isMatch) {
             console.log(`✅ [LOGIN] Успешный вход: ${username} (${user.role})`);
-            res.json({ success: true, user: { id: user.id, username: user.username, role: user.role } });
+            res.json({
+                success: true,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    role: user.role,
+                    salary: user.salary,
+                    isRestricted: user.is_restricted || false
+                }
+            });
         } else {
             console.log(`❌ [LOGIN] Неверный пароль для "${username}"`);
             res.json({ success: false, error: 'Неверный пароль' });
@@ -364,6 +374,7 @@ app.get('/api/team', async (req, res) => {
                 u.role,
                 u.owner_id,
                 u.salary,
+                u.is_restricted,
                 u.created_at,
                 -- Количество анкет
                 COALESCE(profiles.accounts_count, 0) as accounts_count,
@@ -448,6 +459,7 @@ app.get('/api/team', async (req, res) => {
                 role: row.role,
                 owner_id: row.owner_id,
                 salary: row.salary,
+                is_restricted: row.is_restricted,
                 accounts_count: parseInt(row.accounts_count) || 0,
                 letters_today: lettersToday,
                 conversion: parseFloat(row.conversion) || parseFloat(conversion),
@@ -464,15 +476,35 @@ app.get('/api/team', async (req, res) => {
 });
 
 app.post('/api/users', async (req, res) => {
-    const { username, password, role, ownerId } = req.body;
+    const { username, password, role, ownerId, salary, isRestricted } = req.body;
     try {
         const hash = await bcrypt.hash(password, 10);
         await pool.query(
-            `INSERT INTO users (username, password_hash, role, owner_id) VALUES ($1, $2, $3, $4)`,
-            [username, hash, role, ownerId]
+            `INSERT INTO users (username, password_hash, role, owner_id, salary, is_restricted) VALUES ($1, $2, $3, $4, $5, $6)`,
+            [username, hash, role, ownerId, salary || null, isRestricted || false]
         );
         res.json({ success: true });
     } catch (e) { res.json({ success: false, error: 'Логин занят' }); }
+});
+
+app.put('/api/users/:id', async (req, res) => {
+    const userId = req.params.id;
+    const { username, password, salary, isRestricted } = req.body;
+    try {
+        if (password) {
+            const hash = await bcrypt.hash(password, 10);
+            await pool.query(
+                `UPDATE users SET username = $1, password_hash = $2, salary = $3, is_restricted = $4 WHERE id = $5`,
+                [username, hash, salary || null, isRestricted || false, userId]
+            );
+        } else {
+            await pool.query(
+                `UPDATE users SET username = $1, salary = $2, is_restricted = $3 WHERE id = $4`,
+                [username, salary || null, isRestricted || false, userId]
+            );
+        }
+        res.json({ success: true });
+    } catch (e) { res.json({ success: false, error: e.message }); }
 });
 
 app.delete('/api/users/:id', async (req, res) => {

@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova Dashboard</title>
+    <title>Nova - Панель администратора</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
@@ -20,10 +20,14 @@
         // API Server URL (change for remote access, e.g.: 'http://192.168.1.100:3000')
         const API_BASE = 'http://localhost:3000';
 
-        // Auth check
+        // Auth check - only admins allowed
         const novaUserData = JSON.parse(localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser') || 'null');
         if (!novaUserData || !novaUserData.loggedIn) {
             window.location.href = 'login.html';
+        }
+        // Redirect non-admins to regular dashboard
+        if (novaUserData && novaUserData.role !== 'admin') {
+            window.location.href = 'dashboard.html';
         }
 
         // Load saved language or default to Russian
@@ -442,13 +446,19 @@
         <!-- Сайдбар -->
         <aside class="glass-sidebar w-64 flex-shrink-0 flex flex-col p-5">
             <!-- Логотип -->
-            <div class="mb-10">
+            <div class="mb-6">
                 <a href="index.html" class="flex items-center">
                     <div class="w-11 h-11 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg">
                         <i class="fas fa-robot text-white text-base"></i>
                     </div>
                     <h1 class="text-xl font-bold ml-3 gradient-text">Nova</h1>
                 </a>
+            </div>
+
+            <!-- Баланс (показывается только если не ограниченный доступ) -->
+            <div x-show="!currentUser.isRestricted && currentUser.salary" class="mb-8 glass rounded-xl p-4">
+                <div class="text-sm text-gray-500 mb-1">Ваш баланс</div>
+                <div class="text-2xl font-bold text-green-600">$<span x-text="currentUser.salary || 0"></span></div>
             </div>
             
             <!-- Menu -->
@@ -466,18 +476,7 @@
                             <span class="ml-3 font-medium" x-text="t('menu.profiles')"></span>
                         </div>
                     </div>
-                    <div>
-                        <div @click="setActiveMenu('control')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'control' ? 'active' : ''">
-                            <i class="fas fa-sliders-h w-5 text-gray-600"></i>
-                            <span class="ml-3 font-medium" x-text="t('menu.control')"></span>
-                        </div>
-                    </div>
-                    <div>
-                        <div @click="setActiveMenu('team')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'team' ? 'active' : ''">
-                            <i class="fas fa-users w-5 text-gray-600"></i>
-                            <span class="ml-3 font-medium" x-text="t('menu.team')"></span>
-                        </div>
-                    </div>
+                    <!-- Управление и Команда убраны для админов -->
                     <div>
                         <div @click="setActiveMenu('monitoring')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'monitoring' ? 'active' : ''">
                             <i class="fas fa-eye w-5 text-gray-600"></i>
@@ -579,24 +578,14 @@
             <!-- Content -->
             <!-- Statistics -->
             <div x-show="activeMenu === 'stats'" class="fade-in">
-                <!-- Filters -->
+                <!-- Filters (для админа - только переводчики) -->
                 <div class="glass rounded-2xl p-5 mb-6">
                     <div class="flex items-center gap-4 flex-wrap">
-                        <!-- Admin filter -->
+                        <!-- Translator filter - показываем только переводчиков этого админа -->
                         <div>
-                            <select class="glass px-4 py-2.5 rounded-xl" x-model="statsFilter.admin" @change="statsFilter.translator = ''">
-                                <option value="" x-text="t('filters.allAdmins')"></option>
-                                <template x-for="admin in admins" :key="admin.id">
-                                    <option :value="admin.id" x-text="admin.name"></option>
-                                </template>
-                            </select>
-                        </div>
-
-                        <!-- Translator filter -->
-                        <div x-show="statsFilter.admin">
                             <select class="glass px-4 py-2.5 rounded-xl" x-model="statsFilter.translator">
                                 <option value="" x-text="t('filters.allTranslators')"></option>
-                                <template x-for="translator in admins.find(a => a.id == statsFilter.admin)?.translators || []" :key="translator.id">
+                                <template x-for="translator in translators" :key="translator.id">
                                     <option :value="translator.id" x-text="translator.name"></option>
                                 </template>
                             </select>
@@ -716,18 +705,8 @@
                     </div>
                 </div>
 
-                <!-- Bots and work time -->
-                <div class="grid grid-cols-2 gap-6 mb-8">
-                    <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6" x-text="t('stats.botsStatus')"></h3>
-                        <div class="text-3xl font-bold mb-2" x-text="bots.length">0</div>
-                        <div class="text-sm text-gray-500">
-                            <span class="text-green-600"><span x-text="t('stats.online')"></span>: <span x-text="botsStatus.online"></span></span> |
-                            <span class="text-yellow-500"><span x-text="t('stats.idle')"></span>: <span x-text="botsStatus.idle"></span></span> |
-                            <span class="text-red-500"><span x-text="t('stats.offline')"></span>: <span x-text="botsStatus.offline + botsStatus.never_connected"></span></span>
-                        </div>
-                    </div>
-
+                <!-- Work time (Боты убраны для админов) -->
+                <div class="grid grid-cols-1 gap-6 mb-8">
                     <div class="glass rounded-2xl p-6">
                         <h3 class="text-lg font-bold mb-6" x-text="t('stats.workTime')"></h3>
                         <div class="text-3xl font-bold mb-2 text-purple-600" x-text="stats.metrics.workTime || '0h 0m'"></div>
@@ -807,7 +786,8 @@
                             <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
                         </div>
                     </div>
-                    <button @click="showAddAccountModal = true" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                    <!-- Кнопка добавления анкеты - скрыта для ограниченных админов -->
+                    <button x-show="!currentUser.isRestricted" @click="showAddAccountModal = true" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
                         + Добавить
                     </button>
                 </div>
@@ -902,218 +882,19 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Управление -->
-            <div x-show="activeMenu === 'control'" x-cloak class="fade-in">
-                <div class="grid grid-cols-2 gap-6">
-                    <!-- Сессии -->
-                    <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6">Активные сессии</h3>
-                        <div class="space-y-4">
-                            <template x-for="bot in bots" :key="bot.id">
-                                <div class="p-4 rounded-xl border border-gray-100">
-                                    <div class="flex items-center justify-between mb-3">
-                                        <div class="flex items-center">
-                                            <i :class="bot.icon + ' mr-3'" :class="bot.status === 'active' ? 'text-green-500' : 'text-red-500'"></i>
-                                            <div>
-                                                <div class="font-medium flex items-center">
-                                                    <span x-text="bot.name"></span>
-                                                    <span class="ml-2 text-xs px-2 py-0.5 rounded-full" 
-                                                          :class="bot.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
-                                                          x-text="bot.status === 'active' ? 'Активен' : 'Неактивен'">
-                                                    </span>
-                                                </div>
-                                                <div class="text-sm text-gray-500" x-text="bot.os"></div>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <button @click="toggleBotStatus(bot)" 
-                                                    class="px-3 py-1 rounded-lg text-sm"
-                                                    :class="bot.status === 'active' ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'">
-                                                <span x-text="bot.status === 'active' ? 'Выключить' : 'Активировать'"></span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Детальная информация -->
-                                    <div class="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                                        <div>
-                                            <span class="font-medium">IP:</span>
-                                            <span x-text="bot.ip"></span>
-                                        </div>
-                                        <div>
-                                            <span class="font-medium">Версия:</span>
-                                            <span x-text="bot.version"></span>
-                                        </div>
-                                        <div>
-                                            <span class="font-medium">Анкет:</span>
-                                            <span x-text="bot.profilesCount"></span>
-                                        </div>
-                                        <div>
-                                            <span class="font-medium">Последний отклик:</span>
-                                            <span x-text="bot.lastHeartbeat ? new Date(bot.lastHeartbeat).toLocaleString('ru-RU') : '-'"></span>
-                                        </div>
-                                    </div>
 
-                                    <!-- Если бот неактивен - возможность изменить название -->
-                                    <div x-show="bot.status === 'inactive'" class="mt-3 pt-3 border-t border-gray-100">
-                                        <!-- Изменение названия -->
-                                        <div class="flex items-center space-x-2">
-                                            <input type="text"
-                                                   x-model="bot.name"
-                                                   class="flex-1 glass px-3 py-1 rounded-lg text-sm"
-                                                   placeholder="Название бота">
-                                            <button @click="saveBotName(bot)"
-                                                    class="px-2 py-1 bg-blue-100 text-blue-600 rounded-lg text-sm hover:bg-blue-200">
-                                                Сохранить
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                    
-                    <!-- Управление -->
-                    <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6">Настройки рассылки</h3>
-                        <div class="space-y-4">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <div class="font-medium">Включить рассылку</div>
-                                    <div class="text-sm text-gray-500">Автоматические сообщения</div>
-                                </div>
-                                <div class="ios-toggle active" @click="toggleActive(this)"></div>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <div class="font-medium">Остановить спам</div>
-                                    <div class="text-sm text-gray-500">При жалобах</div>
-                                </div>
-                                <div class="ios-toggle" @click="toggleActive(this)"></div>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-8">
-                            <button class="w-full py-3 rounded-xl bg-gradient-to-r from-red-500 to-pink-500 text-white font-medium">
-                                Panic Mode
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Кнопка "Обновить все боты" -->
-                <div class="mt-6">
-                    <button @click="updateAllBots" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
-                        <i class="fas fa-sync mr-2"></i>Обновить все боты
-                    </button>
-                </div>
-                
-                <!-- Промт для генерации -->
-                <div class="glass rounded-2xl p-6 mt-6">
-                    <h3 class="text-lg font-bold mb-4">Промт для генерации</h3>
-                    <textarea 
-                        class="glass w-full px-4 py-3 rounded-xl"
-                        rows="4"
-                        placeholder="Введите промт для генерации ответов..."
-                        x-model="generationPrompt"></textarea>
-                    <p class="text-sm text-gray-500 mt-2">Синхронизируется с промтом "Generate" в боте</p>
-                    <button @click="syncPromptWithBots" class="mt-3 glow-button px-4 py-2 rounded-xl text-white text-sm">
-                        Синхронизировать с ботами
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Команда -->
-            <div x-show="activeMenu === 'team'" x-cloak class="fade-in">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl font-bold">Управление командой</h3>
-                    <button @click="showAddAdminModal = true" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
-                        + Добавить админа
-                    </button>
-                </div>
-                
-                <div class="grid grid-cols-3 gap-6">
-                    <!-- Администраторы -->
-                    <template x-for="admin in admins" :key="admin.id">
-                        <div class="glass rounded-2xl p-6">
-                            <div class="flex items-center justify-between mb-4">
-                                <div class="flex items-center">
-                                    <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center mr-3">
-                                        <span class="text-white font-medium" x-text="admin.initials"></span>
-                                    </div>
-                                    <div>
-                                        <div class="font-bold" x-text="admin.name"></div>
-                                        <div class="text-sm text-gray-500" x-text="admin.accounts + ' анкет'"></div>
-                                    </div>
-                                </div>
-                                <div class="flex items-center space-x-2">
-                                    <div class="text-sm" x-text="admin.isMyAdmin ? 'Мой админ' : ''"></div>
-                                </div>
-                            </div>
-                            <div class="text-sm text-gray-600 mb-4">
-                                Конверсия: <span class="font-bold text-green-600" x-text="admin.conversion + '%'"></span>
-                            </div>
-                            <div class="flex space-x-2">
-                                <button @click="editAdmin(admin)" class="flex-1 py-2 rounded-lg bg-gray-100 hover:bg-gray-200">
-                                    Редактировать
-                                </button>
-                                <button @click="assignAccountsToAdmin(admin)" class="flex-1 py-2 rounded-lg bg-indigo-100 hover:bg-indigo-200 text-indigo-600">
-                                    Анкеты
-                                </button>
-                                <button @click="viewAdminDetails(admin)" class="flex-1 py-2 rounded-lg bg-blue-100 hover:bg-blue-200 text-blue-600">
-                                    Просмотреть
-                                </button>
-                            </div>
-                            
-                            <!-- Список переводчиков админа -->
-                            <div x-show="admin.translators.length > 0" class="mt-4 pt-4 border-t border-gray-100">
-                                <h4 class="text-sm font-medium mb-2">Переводчики:</h4>
-                                <div class="space-y-2">
-                                    <template x-for="translator in admin.translators" :key="translator.id">
-                                        <div class="flex items-center justify-between text-sm">
-                                            <div>
-                                                <span x-text="translator.name"></span>
-                                                <div class="text-xs text-gray-500" x-text="'Логин: ' + translator.login + ' | Пароль: ' + translator.password"></div>
-                                            </div>
-                                            <span class="text-green-600" x-text="translator.conversion + '%'"></span>
-                                        </div>
-                                    </template>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-                    
-                    <!-- Добавить -->
-                    <div class="glass rounded-2xl p-6 flex items-center justify-center border-2 border-dashed border-gray-200">
-                        <button @click="showAddAdminModal = true" class="text-gray-500 hover:text-gray-700 text-center">
-                            <i class="fas fa-user-plus text-2xl mb-2 block"></i>
-                            <div>Добавить админа</div>
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <!-- Управление и Команда убраны для админов -->
             
             <!-- Мониторинг -->
             <div x-show="activeMenu === 'monitoring'" x-cloak class="fade-in">
-                <!-- Фильтры для мониторинга -->
+                <!-- Фильтры для мониторинга (для админа - только переводчики) -->
                 <div class="glass rounded-2xl p-5 mb-6">
                     <div class="flex items-center gap-4 flex-wrap">
-                        <!-- Выбор админа -->
+                        <!-- Выбор переводчика -->
                         <div>
-                            <select class="glass px-4 py-2.5 rounded-xl" x-model="monitoringFilter.admin" @change="monitoringFilter.translator = ''">
-                                <option value="">Все Админы</option>
-                                <template x-for="admin in admins" :key="admin.id">
-                                    <option :value="admin.id" x-text="admin.name"></option>
-                                </template>
-                            </select>
-                        </div>
-
-                        <!-- Выбор переводчика (показывается при выборе админа) -->
-                        <div x-show="monitoringFilter.admin">
                             <select class="glass px-4 py-2.5 rounded-xl" x-model="monitoringFilter.translator">
                                 <option value="">Все Переводчики</option>
-                                <template x-for="translator in admins.find(a => a.id == monitoringFilter.admin)?.translators || []" :key="translator.id">
+                                <template x-for="translator in translators" :key="translator.id">
                                     <option :value="translator.id" x-text="translator.name"></option>
                                 </template>
                             </select>
@@ -1896,6 +1677,7 @@
                 accounts: [],
                 bots: [],
                 admins: [],
+                translators: [], // Переводчики этого админа
                 team: [],
                 translatorStats: [],
                 historyActions: [],
@@ -2055,25 +1837,14 @@
                         const data = await res.json();
                         if (data.success) {
                             this.team = data.list;
-                            // Формируем admins с переводчиками
-                            const adminsList = data.list.filter(u => u.role === 'admin');
+                            // Для админа - загружаем только своих переводчиков
                             const translatorsList = data.list.filter(u => u.role === 'translator');
-                            this.admins = adminsList.map(a => ({
-                                id: a.id,
-                                name: a.username,
-                                login: a.username,
-                                initials: a.username.substring(0, 2).toUpperCase(),
-                                accounts: a.accounts_count || 0,
-                                conversion: a.conversion || 0,
-                                isMyAdmin: a.is_restricted || false,
-                                salary: a.salary || null,
-                                translators: translatorsList.filter(t => t.owner_id === a.id).map(t => ({
-                                    id: t.id,
-                                    name: t.username,
-                                    login: t.username,
-                                    conversion: t.conversion || 0,
-                                    accounts: t.accounts || []
-                                }))
+                            this.translators = translatorsList.map(t => ({
+                                id: t.id,
+                                name: t.username,
+                                login: t.username,
+                                conversion: t.conversion || 0,
+                                accounts: t.accounts || []
                             }));
                         }
                     } catch (e) { console.error('loadTeam error:', e); }

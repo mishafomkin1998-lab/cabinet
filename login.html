@@ -243,10 +243,15 @@
         const API_BASE = 'http://localhost:3000';
 
         document.addEventListener('DOMContentLoaded', function() {
-            // Если уже авторизован - перенаправляем на dashboard
+            // Если уже авторизован - перенаправляем на соответствующий dashboard
             const existingUser = localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser');
             if (existingUser) {
-                window.location.href = 'dashboard.html';
+                const user = JSON.parse(existingUser);
+                if (user.role === 'admin') {
+                    window.location.href = 'admin-dashboard.html';
+                } else {
+                    window.location.href = 'dashboard.html';
+                }
                 return;
             }
 
@@ -301,6 +306,8 @@
                             id: data.user.id,
                             username: data.user.username,
                             role: data.user.role,
+                            salary: data.user.salary,
+                            isRestricted: data.user.isRestricted,
                             loggedIn: true,
                             loginTime: new Date().toISOString()
                         };
@@ -312,8 +319,12 @@
                             sessionStorage.setItem('novaUser', JSON.stringify(userData));
                         }
 
-                        // Перенаправляем на dashboard
-                        window.location.href = 'dashboard.html';
+                        // Перенаправляем в зависимости от роли
+                        if (data.user.role === 'admin') {
+                            window.location.href = 'admin-dashboard.html';
+                        } else {
+                            window.location.href = 'dashboard.html';
+                        }
                     } else {
                         // Ошибка входа
                         showError(data.error || 'Ошибка авторизации');
