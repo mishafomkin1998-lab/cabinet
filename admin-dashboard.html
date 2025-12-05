@@ -10,6 +10,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Flatpickr -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
     <!-- Localization -->
     <script src="locales.js"></script>
     <!-- Alpine.js -->
@@ -611,49 +615,16 @@
                             </select>
                         </div>
 
-                        <!-- Календарь выбора диапазона -->
-                        <div class="calendar-container">
-                            <div class="glass px-4 py-2.5 rounded-xl flex items-center cursor-pointer" @click="openCalendar($event, 'stats')">
+                        <!-- Календарь выбора диапазона (Flatpickr) -->
+                        <div class="flex items-center gap-2">
+                            <div class="glass px-4 py-2.5 rounded-xl flex items-center">
                                 <i class="fas fa-calendar mr-2 text-gray-400"></i>
-                                <span x-text="getDateRangeText()"></span>
-                                <i class="fas fa-chevron-down ml-2 text-gray-400"></i>
+                                <input type="text" id="statsDatePicker" class="bg-transparent border-none outline-none w-48 text-sm" readonly placeholder="Выберите даты">
                             </div>
-
-                            <!-- Всплывающий календарь -->
-                            <div x-show="showStatsCalendar" @click.outside="showStatsCalendar = false" class="rounded-lg calendar-popup" :style="calendarPosition">
-                                <div class="flex justify-between items-center mb-4">
-                                    <button @click="calendarMonth--" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-left"></i></button>
-                                    <span class="font-medium" x-text="getCalendarMonthName()"></span>
-                                    <button @click="calendarMonth++" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-right"></i></button>
-                                </div>
-                                <div class="grid grid-cols-7 gap-1 text-center text-sm mb-2">
-                                    <div class="text-gray-400">Пн</div>
-                                    <div class="text-gray-400">Вт</div>
-                                    <div class="text-gray-400">Ср</div>
-                                    <div class="text-gray-400">Чт</div>
-                                    <div class="text-gray-400">Пт</div>
-                                    <div class="text-gray-400">Сб</div>
-                                    <div class="text-gray-400">Вс</div>
-                                </div>
-                                <div class="grid grid-cols-7 gap-1 text-center text-sm">
-                                    <template x-for="day in getCalendarDays()" :key="day.date">
-                                        <div @click="selectCalendarDate(day.date)"
-                                             class="p-2 rounded cursor-pointer"
-                                             :class="{
-                                                 'bg-indigo-500 text-white': isDateSelected(day.date),
-                                                 'bg-indigo-100': isDateInRange(day.date),
-                                                 'text-gray-300': !day.currentMonth,
-                                                 'hover:bg-gray-100': !isDateSelected(day.date)
-                                             }"
-                                             x-text="day.day">
-                                        </div>
-                                    </template>
-                                </div>
-                                <div class="flex gap-2 mt-4">
-                                    <button @click="setQuickDateRange('month')" class="flex-1 px-2 py-1 rounded-lg text-sm" :class="statsFilter.quickRange === 'month' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100'" x-text="t('common.month')"></button>
-                                    <button @click="setQuickDateRange('week')" class="flex-1 px-2 py-1 rounded-lg text-sm" :class="statsFilter.quickRange === 'week' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100'" x-text="t('common.week')"></button>
-                                    <button @click="setQuickDateRange('today')" class="flex-1 px-2 py-1 rounded-lg text-sm" :class="statsFilter.quickRange === 'today' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100'" x-text="t('common.today')"></button>
-                                </div>
+                            <div class="flex gap-1">
+                                <button @click="setQuickDateRange('month')" class="px-3 py-2 rounded-lg text-sm" :class="statsFilter.quickRange === 'month' ? 'bg-indigo-500 text-white' : 'glass hover:bg-gray-100'" x-text="t('common.month')"></button>
+                                <button @click="setQuickDateRange('week')" class="px-3 py-2 rounded-lg text-sm" :class="statsFilter.quickRange === 'week' ? 'bg-indigo-500 text-white' : 'glass hover:bg-gray-100'" x-text="t('common.week')"></button>
+                                <button @click="setQuickDateRange('today')" class="px-3 py-2 rounded-lg text-sm" :class="statsFilter.quickRange === 'today' ? 'bg-indigo-500 text-white' : 'glass hover:bg-gray-100'" x-text="t('common.today')"></button>
                             </div>
                         </div>
 
@@ -920,50 +891,10 @@
                             </select>
                         </div>
 
-                        <!-- Календарь выбора диапазона -->
-                        <div class="calendar-container">
-                            <div class="glass px-4 py-2.5 rounded-xl flex items-center cursor-pointer" @click="openCalendar($event, 'monitoring')">
-                                <i class="fas fa-calendar mr-2 text-gray-400"></i>
-                                <span x-text="getMonitoringDateRangeText()"></span>
-                                <i class="fas fa-chevron-down ml-2 text-gray-400"></i>
-                            </div>
-
-                            <!-- Всплывающий календарь -->
-                            <div x-show="showMonitoringCalendar" @click.outside="showMonitoringCalendar = false" class="rounded-lg calendar-popup" :style="calendarPosition">
-                                <div class="flex justify-between items-center mb-4">
-                                    <button @click="calendarMonth--" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-left"></i></button>
-                                    <span class="font-medium" x-text="getCalendarMonthName()"></span>
-                                    <button @click="calendarMonth++" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-right"></i></button>
-                                </div>
-                                <div class="grid grid-cols-7 gap-1 text-center text-sm mb-2">
-                                    <div class="text-gray-400">Пн</div>
-                                    <div class="text-gray-400">Вт</div>
-                                    <div class="text-gray-400">Ср</div>
-                                    <div class="text-gray-400">Чт</div>
-                                    <div class="text-gray-400">Пт</div>
-                                    <div class="text-gray-400">Сб</div>
-                                    <div class="text-gray-400">Вс</div>
-                                </div>
-                                <div class="grid grid-cols-7 gap-1 text-center text-sm">
-                                    <template x-for="day in getCalendarDays()" :key="day.date">
-                                        <div @click="selectMonitoringCalendarDate(day.date)"
-                                             class="p-2 rounded cursor-pointer"
-                                             :class="{
-                                                 'bg-indigo-500 text-white': isMonitoringDateSelected(day.date),
-                                                 'bg-indigo-100': isMonitoringDateInRange(day.date),
-                                                 'text-gray-300': !day.currentMonth,
-                                                 'hover:bg-gray-100': !isMonitoringDateSelected(day.date)
-                                             }"
-                                             x-text="day.day">
-                                        </div>
-                                    </template>
-                                </div>
-                                <div class="flex gap-2 mt-4">
-                                    <button @click="setMonitoringQuickRange('month')" class="flex-1 px-2 py-1 rounded-lg text-sm bg-indigo-100 text-indigo-700">Этот месяц</button>
-                                    <button @click="setMonitoringQuickRange('week')" class="flex-1 px-2 py-1 rounded-lg text-sm bg-gray-100">Неделя</button>
-                                    <button @click="setMonitoringQuickRange('today')" class="flex-1 px-2 py-1 rounded-lg text-sm bg-gray-100">Сегодня</button>
-                                </div>
-                            </div>
+                        <!-- Календарь выбора диапазона (Flatpickr) -->
+                        <div class="glass px-4 py-2.5 rounded-xl flex items-center">
+                            <i class="fas fa-calendar mr-2 text-gray-400"></i>
+                            <input type="text" id="monitoringDatePicker" class="bg-transparent border-none outline-none w-48 text-sm" readonly placeholder="Выберите даты">
                         </div>
                     </div>
                 </div>
@@ -1204,50 +1135,10 @@
                             </select>
                         </div>
 
-                        <!-- Календарь -->
-                        <div class="calendar-container">
-                            <div class="glass px-4 py-2.5 rounded-xl flex items-center cursor-pointer" @click="openCalendar($event, 'history')">
-                                <i class="fas fa-calendar mr-2 text-gray-400"></i>
-                                <span x-text="getHistoryDateRangeText()"></span>
-                                <i class="fas fa-chevron-down ml-2 text-gray-400"></i>
-                            </div>
-
-                            <!-- Всплывающий календарь -->
-                            <div x-show="showHistoryCalendar" @click.outside="showHistoryCalendar = false" class="rounded-lg calendar-popup" :style="calendarPosition">
-                                <div class="flex justify-between items-center mb-4">
-                                    <button @click="calendarMonth--" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-left"></i></button>
-                                    <span class="font-medium" x-text="getCalendarMonthName()"></span>
-                                    <button @click="calendarMonth++" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-right"></i></button>
-                                </div>
-                                <div class="grid grid-cols-7 gap-1 text-center text-sm mb-2">
-                                    <div class="text-gray-400">Пн</div>
-                                    <div class="text-gray-400">Вт</div>
-                                    <div class="text-gray-400">Ср</div>
-                                    <div class="text-gray-400">Чт</div>
-                                    <div class="text-gray-400">Пт</div>
-                                    <div class="text-gray-400">Сб</div>
-                                    <div class="text-gray-400">Вс</div>
-                                </div>
-                                <div class="grid grid-cols-7 gap-1 text-center text-sm">
-                                    <template x-for="day in getCalendarDays()" :key="day.date">
-                                        <div @click="selectHistoryCalendarDate(day.date)"
-                                             class="p-2 rounded cursor-pointer"
-                                             :class="{
-                                                 'bg-indigo-500 text-white': isHistoryDateSelected(day.date),
-                                                 'bg-indigo-100': isHistoryDateInRange(day.date),
-                                                 'text-gray-300': !day.currentMonth,
-                                                 'hover:bg-gray-100': !isHistoryDateSelected(day.date)
-                                             }"
-                                             x-text="day.day">
-                                        </div>
-                                    </template>
-                                </div>
-                                <div class="flex gap-2 mt-4">
-                                    <button @click="setHistoryQuickRange('month')" class="flex-1 px-2 py-1 rounded-lg text-sm bg-gray-100">Месяц</button>
-                                    <button @click="setHistoryQuickRange('week')" class="flex-1 px-2 py-1 rounded-lg text-sm bg-gray-100">Неделя</button>
-                                    <button @click="setHistoryQuickRange('today')" class="flex-1 px-2 py-1 rounded-lg text-sm bg-gray-100">Сегодня</button>
-                                </div>
-                            </div>
+                        <!-- Календарь (Flatpickr) -->
+                        <div class="glass px-4 py-2.5 rounded-xl flex items-center">
+                            <i class="fas fa-calendar mr-2 text-gray-400"></i>
+                            <input type="text" id="historyDatePicker" class="bg-transparent border-none outline-none w-48 text-sm" readonly placeholder="Выберите даты">
                         </div>
 
                         <button @click="loadProfileHistory()" class="px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600">
@@ -1729,9 +1620,62 @@
                     console.log('Dashboard init, user:', this.currentUser);
                     // Устанавливаем период по умолчанию - текущий месяц
                     this.setDefaultDateRange();
+                    // Инициализация Flatpickr
+                    this.$nextTick(() => this.initFlatpickr());
                     await this.loadAllData();
                     // Автообновление каждые 30 секунд
                     setInterval(() => this.loadDashboardStats(), 30000);
+                },
+
+                // Инициализация Flatpickr календарей
+                initFlatpickr() {
+                    const self = this;
+                    const config = {
+                        mode: 'range',
+                        dateFormat: 'Y-m-d',
+                        locale: 'ru',
+                        defaultDate: [this.statsFilter.dateFrom, this.statsFilter.dateTo],
+                        onChange: function(selectedDates, dateStr) {
+                            if (selectedDates.length === 2) {
+                                const formatDate = (d) => d.toISOString().split('T')[0];
+                                self.statsFilter.dateFrom = formatDate(selectedDates[0]);
+                                self.statsFilter.dateTo = formatDate(selectedDates[1]);
+                                self.statsFilter.quickRange = '';
+                                self.loadDashboardStats();
+                            }
+                        }
+                    };
+
+                    // Календарь статистики
+                    this.statsDatePicker = flatpickr('#statsDatePicker', config);
+
+                    // Календарь мониторинга
+                    this.monitoringDatePicker = flatpickr('#monitoringDatePicker', {
+                        ...config,
+                        defaultDate: [this.monitoringFilter.dateFrom, this.monitoringFilter.dateTo],
+                        onChange: function(selectedDates) {
+                            if (selectedDates.length === 2) {
+                                const formatDate = (d) => d.toISOString().split('T')[0];
+                                self.monitoringFilter.dateFrom = formatDate(selectedDates[0]);
+                                self.monitoringFilter.dateTo = formatDate(selectedDates[1]);
+                                self.loadMonitoringData();
+                            }
+                        }
+                    });
+
+                    // Календарь истории
+                    this.historyDatePicker = flatpickr('#historyDatePicker', {
+                        ...config,
+                        defaultDate: [this.historyFilter.dateFrom, this.historyFilter.dateTo],
+                        onChange: function(selectedDates) {
+                            if (selectedDates.length === 2) {
+                                const formatDate = (d) => d.toISOString().split('T')[0];
+                                self.historyFilter.dateFrom = formatDate(selectedDates[0]);
+                                self.historyFilter.dateTo = formatDate(selectedDates[1]);
+                                self.loadProfileHistory();
+                            }
+                        }
+                    });
                 },
 
                 // Установить период по умолчанию - с 1 числа текущего месяца до сегодня
@@ -2021,25 +1965,31 @@
                 setQuickDateRange(range) {
                     const now = new Date();
                     const formatDate = (d) => d.toISOString().split('T')[0];
+                    let dateFrom, dateTo;
 
                     this.statsFilter.quickRange = range;
 
                     if (range === 'today') {
-                        this.statsFilter.dateFrom = formatDate(now);
-                        this.statsFilter.dateTo = formatDate(now);
+                        dateFrom = new Date(now);
+                        dateTo = new Date(now);
                     } else if (range === 'week') {
-                        const weekAgo = new Date(now);
-                        weekAgo.setDate(now.getDate() - 7);
-                        this.statsFilter.dateFrom = formatDate(weekAgo);
-                        this.statsFilter.dateTo = formatDate(now);
+                        dateFrom = new Date(now);
+                        dateFrom.setDate(now.getDate() - 7);
+                        dateTo = new Date(now);
                     } else if (range === 'month') {
                         // Текущий месяц: с 1 числа до сегодня
-                        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-                        this.statsFilter.dateFrom = formatDate(firstDay);
-                        this.statsFilter.dateTo = formatDate(now);
+                        dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+                        dateTo = new Date(now);
                     }
 
-                    this.showStatsCalendar = false;
+                    this.statsFilter.dateFrom = formatDate(dateFrom);
+                    this.statsFilter.dateTo = formatDate(dateTo);
+
+                    // Обновить Flatpickr
+                    if (this.statsDatePicker) {
+                        this.statsDatePicker.setDate([dateFrom, dateTo], false);
+                    }
+
                     this.applyDateFilter();
                 },
 
