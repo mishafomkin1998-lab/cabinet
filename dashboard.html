@@ -546,34 +546,26 @@
                             <thead>
                                 <tr class="border-b border-gray-100">
                                     <th class="text-left py-4 px-6">Переводчик</th>
-                                    <th class="text-left py-4 px-6">Ответов</th>
+                                    <th class="text-left py-4 px-6">Писем</th>
+                                    <th class="text-left py-4 px-6">Чатов</th>
                                     <th class="text-left py-4 px-6">Ср. время</th>
-                                    <th class="text-left py-4 px-6">Конверсия</th>
-                                    <th class="text-left py-4 px-6">Рейтинг</th>
+                                    <th class="text-left py-4 px-6">Доход</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                    <td class="py-4 px-6">Переводчик 1</td>
-                                    <td class="py-4 px-6">245</td>
-                                    <td class="py-4 px-6">42с</td>
-                                    <td class="py-4 px-6">
-                                        <span class="text-green-600 font-bold">24.3%</span>
-                                    </td>
-                                    <td class="py-4 px-6">
-                                        <span class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs">4.8</span>
-                                    </td>
-                                </tr>
-                                <tr class="hover:bg-gray-50">
-                                    <td class="py-4 px-6">Переводчик 2</td>
-                                    <td class="py-4 px-6">187</td>
-                                    <td class="py-4 px-6">51с</td>
-                                    <td class="py-4 px-6">
-                                        <span class="text-green-600 font-bold">18.7%</span>
-                                    </td>
-                                    <td class="py-4 px-6">
-                                        <span class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs">4.5</span>
-                                    </td>
+                                <template x-for="translator in translatorStats" :key="translator.id">
+                                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                        <td class="py-4 px-6" x-text="translator.username"></td>
+                                        <td class="py-4 px-6" x-text="translator.letters"></td>
+                                        <td class="py-4 px-6" x-text="translator.chats"></td>
+                                        <td class="py-4 px-6" x-text="translator.avgResponseTime + ' мин'"></td>
+                                        <td class="py-4 px-6">
+                                            <span class="text-green-600 font-bold" x-text="'$' + translator.totalIncome"></span>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <tr x-show="translatorStats.length === 0">
+                                    <td colspan="5" class="py-4 px-6 text-center text-gray-500">Нет данных о переводчиках</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -656,12 +648,13 @@
                                                   x-text="account.letters"></span>
                                         </td>
                                         <td class="py-4 px-6">
-                                            <select class="glass px-2 py-1 rounded-lg text-sm" 
+                                            <select class="glass px-2 py-1 rounded-lg text-sm"
                                                     x-model="account.admin"
                                                     @change="assignAccount(account)">
                                                 <option value="">Не назначен</option>
-                                                <option value="admin1">Иван А.</option>
-                                                <option value="admin2">Петр С.</option>
+                                                <template x-for="admin in admins" :key="admin.id">
+                                                    <option :value="admin.login" x-text="admin.name"></option>
+                                                </template>
                                             </select>
                                         </td>
                                         <td class="py-4 px-6" x-text="account.addedDate"></td>
@@ -1052,22 +1045,19 @@
                         
                         <!-- Время работы -->
                         <div x-show="monitoringFunction === 'workTime'" class="space-y-4">
-                            <div class="grid grid-cols-3 gap-4">
+                            <div class="grid grid-cols-2 gap-4">
                                 <div class="glass p-4 rounded-xl text-center">
-                                    <div class="text-2xl font-bold text-blue-600">4ч 25м</div>
+                                    <div class="text-2xl font-bold text-blue-600" x-text="stats.metrics.workTime || '0ч 0м'"></div>
                                     <div class="text-sm text-gray-600">Сегодня</div>
                                 </div>
                                 <div class="glass p-4 rounded-xl text-center">
-                                    <div class="text-2xl font-bold text-green-600">28ч 15м</div>
-                                    <div class="text-sm text-gray-600">За неделю</div>
-                                </div>
-                                <div class="glass p-4 rounded-xl text-center">
-                                    <div class="text-2xl font-bold text-purple-600">112ч 40м</div>
+                                    <div class="text-2xl font-bold text-purple-600" x-text="stats.metrics.workTimeMonth || '0ч 0м'"></div>
                                     <div class="text-sm text-gray-600">За месяц</div>
                                 </div>
                             </div>
                             <div class="text-sm text-gray-600">
-                                Кликов в боте: 245 | Активных действий: 187
+                                Писем: <span x-text="stats.month.letters || 0"></span> |
+                                Чатов: <span x-text="stats.month.chats || 0"></span>
                             </div>
                         </div>
                         
@@ -1157,41 +1147,26 @@
                             <thead>
                                 <tr class="border-b border-gray-100">
                                     <th class="text-left py-4 px-6">Время</th>
-                                    <th class="text-left py-4 px-6">Пользователь</th>
-                                    <th class="text-left py-4 px-6">Действие</th>
-                                    <th class="text-left py-4 px-6">Детали</th>
+                                    <th class="text-left py-4 px-6">Анкета</th>
+                                    <th class="text-left py-4 px-6">Тип</th>
+                                    <th class="text-left py-4 px-6">Мужчина</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                    <td class="py-4 px-6">05.12.2025 10:30</td>
-                                    <td class="py-4 px-6">Иван А. (админ)</td>
-                                    <td class="py-4 px-6">
-                                        <span class="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">
-                                            Добавлено
-                                        </span>
-                                    </td>
-                                    <td class="py-4 px-6">Анкета #456123 назначена переводчику Мария</td>
-                                </tr>
-                                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                    <td class="py-4 px-6">05.12.2025 09:15</td>
-                                    <td class="py-4 px-6">Петр С. (админ)</td>
-                                    <td class="py-4 px-6">
-                                        <span class="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs">
-                                            Изменено
-                                        </span>
-                                    </td>
-                                    <td class="py-4 px-6">Изменен статус анкеты #789456 на "В работе"</td>
-                                </tr>
-                                <tr class="hover:bg-gray-50">
-                                    <td class="py-4 px-6">04.12.2025 18:45</td>
-                                    <td class="py-4 px-6">Директор</td>
-                                    <td class="py-4 px-6">
-                                        <span class="px-2 py-1 rounded-full bg-purple-100 text-purple-800 text-xs">
-                                            Создано
-                                        </span>
-                                    </td>
-                                    <td class="py-4 px-6">Добавлен новый администратор "Алексей"</td>
+                                <template x-for="action in historyActions" :key="action.id">
+                                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                        <td class="py-4 px-6" x-text="formatHistoryTime(action.timestamp)"></td>
+                                        <td class="py-4 px-6" x-text="'#' + action.account_id"></td>
+                                        <td class="py-4 px-6">
+                                            <span class="px-2 py-1 rounded-full text-xs"
+                                                  :class="getActionTypeClass(action.type)"
+                                                  x-text="getActionTypeLabel(action.type)"></span>
+                                        </td>
+                                        <td class="py-4 px-6" x-text="action.sender_id ? '#' + action.sender_id : '-'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="historyActions.length === 0">
+                                    <td colspan="4" class="py-4 px-6 text-center text-gray-500">Нет истории действий</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1508,6 +1483,8 @@
                 bots: [],
                 admins: [],
                 team: [],
+                translatorStats: [],
+                historyActions: [],
 
                 // Инициализация - загрузка данных с сервера
                 async init() {
@@ -1545,7 +1522,9 @@
                             this.loadBotsStatus(),
                             this.loadTeam(),
                             this.loadRecentActivity(),
-                            this.loadHourlyActivity()
+                            this.loadHourlyActivity(),
+                            this.loadTranslatorStats(),
+                            this.loadHistoryActions()
                         ]);
                     } catch (e) {
                         console.error('Error loading data:', e);
@@ -1699,7 +1678,51 @@
                         }
                     } catch (e) { console.error('loadHourlyActivity error:', e); }
                 },
-                
+
+                async loadTranslatorStats() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/stats/translators?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.translatorStats = data.translators;
+                        }
+                    } catch (e) { console.error('loadTranslatorStats error:', e); }
+                },
+
+                async loadHistoryActions() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/history?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=50`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.historyActions = data.list || [];
+                        }
+                    } catch (e) { console.error('loadHistoryActions error:', e); }
+                },
+
+                formatHistoryTime(timestamp) {
+                    if (!timestamp) return '';
+                    const date = new Date(timestamp);
+                    return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                },
+
+                getActionTypeLabel(type) {
+                    const labels = {
+                        'outgoing': 'Письмо',
+                        'chat_msg': 'Чат',
+                        'incoming': 'Входящее'
+                    };
+                    return labels[type] || type;
+                },
+
+                getActionTypeClass(type) {
+                    const classes = {
+                        'outgoing': 'bg-green-100 text-green-800',
+                        'chat_msg': 'bg-blue-100 text-blue-800',
+                        'incoming': 'bg-purple-100 text-purple-800'
+                    };
+                    return classes[type] || 'bg-gray-100 text-gray-800';
+                },
+
                 setActiveMenu(menu) {
                     this.activeMenu = menu;
                     this.activeSubmenu = 'general';

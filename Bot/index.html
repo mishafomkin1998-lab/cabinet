@@ -812,6 +812,37 @@
             }
         }
 
+        // 4. Функция отправки входящего письма на сервер
+        async function sendIncomingToLababot(botId, accountDisplayId, senderId, senderName) {
+            console.log(`📩 Отправляю входящее письмо на Lababot: ${accountDisplayId} <- ${senderId}`);
+
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/activity/log`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        botId: botId,
+                        profileId: accountDisplayId,
+                        actionType: 'incoming',
+                        manId: String(senderId),
+                        messageText: `Входящее письмо от ${senderName || senderId}`,
+                        responseTimeSec: null,
+                        usedAi: false,
+                        income: 0
+                    })
+                });
+
+                const data = await response.json();
+                console.log(`✅ Входящее письмо отправлено на сервер:`, data);
+                return data;
+            } catch (error) {
+                console.error(`❌ Ошибка отправки входящего:`, error);
+                return null;
+            }
+        }
+
         // === КРИТИЧЕСКИ ВАЖНО: Скрипт "Анти-сон" ===
         const KEEP_ALIVE_SCRIPT = `
             console.log("%c[Lababot] Анти-сон активирован", "color: green; font-weight: bold");
@@ -1735,6 +1766,14 @@
                                     { partnerId: msg.User.AccountId, partnerName: msg.User.Name, messageId: msg.MessageId }
                                 );
                                 playSound('message');
+
+                                // Отправляем на Lababot сервер для статистики
+                                sendIncomingToLababot(
+                                    this.id,
+                                    this.displayId,
+                                    msg.User.AccountId,
+                                    msg.User.Name || `ID ${msg.User.AccountId}`
+                                );
                             }
                         });
 

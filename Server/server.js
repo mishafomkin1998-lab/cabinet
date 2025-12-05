@@ -1712,15 +1712,18 @@ app.get('/api/dashboard', async (req, res) => {
                 -- Сегодня
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter' AND DATE(a.created_at) = CURRENT_DATE), 0) as letters_today,
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat' AND DATE(a.created_at) = CURRENT_DATE), 0) as chats_today,
+                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'incoming' AND DATE(a.created_at) = CURRENT_DATE), 0) as incoming_today,
                 -- Вчера (для сравнения)
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter' AND DATE(a.created_at) = CURRENT_DATE - 1), 0) as letters_yesterday,
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat' AND DATE(a.created_at) = CURRENT_DATE - 1), 0) as chats_yesterday,
                 -- За 7 дней
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter' AND a.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as letters_week,
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat' AND a.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as chats_week,
+                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'incoming' AND a.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as incoming_week,
                 -- За 30 дней
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter' AND a.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as letters_month,
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat' AND a.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as chats_month,
+                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'incoming' AND a.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as incoming_month,
                 -- Уникальные мужчины
                 COUNT(DISTINCT CASE WHEN DATE(a.created_at) = CURRENT_DATE THEN a.man_id END) as unique_men_today,
                 COUNT(DISTINCT CASE WHEN a.created_at >= CURRENT_DATE - INTERVAL '7 days' THEN a.man_id END) as unique_men_week,
@@ -1783,6 +1786,11 @@ app.get('/api/dashboard', async (req, res) => {
         const lettersMonth = parseInt(stats.letters_month) || parseInt(msgStats.letters_month) || 0;
         const chatsMonth = parseInt(stats.chats_month) || parseInt(msgStats.chats_month) || 0;
 
+        // Входящие письма от мужчин
+        const incomingToday = parseInt(stats.incoming_today) || 0;
+        const incomingWeek = parseInt(stats.incoming_week) || 0;
+        const incomingMonth = parseInt(stats.incoming_month) || 0;
+
         // Доход из activity_log или расчет по messages
         const incomeToday = parseFloat(stats.income_today) || (lettersToday * PRICE_LETTER + chatsToday * PRICE_CHAT);
         const incomeYesterday = parseFloat(stats.income_yesterday) || (lettersYesterday * PRICE_LETTER + chatsYesterday * PRICE_CHAT);
@@ -1798,6 +1806,27 @@ app.get('/api/dashboard', async (req, res) => {
         const avgResponseSec = parseFloat(stats.avg_response_seconds) || parseFloat(msgStats.avg_response_seconds) || 0;
         const medianResponseSec = parseFloat(stats.median_response_seconds) || 0;
 
+        // Расчёт времени работы на основе heartbeats (количество уникальных часов онлайн)
+        const workTimeQuery = `
+            SELECT
+                COUNT(DISTINCT DATE_TRUNC('hour', timestamp)) FILTER (WHERE DATE(timestamp) = CURRENT_DATE) as hours_today,
+                COUNT(DISTINCT DATE_TRUNC('hour', timestamp)) FILTER (WHERE timestamp >= CURRENT_DATE - INTERVAL '30 days') as hours_month
+            FROM heartbeats
+            WHERE status = 'online'
+        `;
+        const workTimeResult = await pool.query(workTimeQuery);
+        const workTimeData = workTimeResult.rows[0] || {};
+        const hoursToday = parseInt(workTimeData.hours_today) || 0;
+        const hoursMonth = parseInt(workTimeData.hours_month) || 0;
+
+        // Форматирование времени работы
+        const formatWorkTime = (hours) => {
+            if (hours < 1) return '0ч 0м';
+            const h = Math.floor(hours);
+            const m = Math.round((hours - h) * 60);
+            return `${h}ч ${m}м`;
+        };
+
         res.json({
             success: true,
             dashboard: {
@@ -1805,6 +1834,7 @@ app.get('/api/dashboard', async (req, res) => {
                 today: {
                     letters: lettersToday,
                     chats: chatsToday,
+                    incomingLetters: incomingToday,
                     uniqueMen: parseInt(stats.unique_men_today) || parseInt(msgStats.unique_men_today) || 0,
                     income: incomeToday.toFixed(2),
                     errors: parseInt(errors.errors_today) || 0
@@ -1819,6 +1849,7 @@ app.get('/api/dashboard', async (req, res) => {
                 week: {
                     letters: lettersWeek,
                     chats: chatsWeek,
+                    incomingLetters: incomingWeek,
                     uniqueMen: parseInt(stats.unique_men_week) || parseInt(msgStats.unique_men_week) || 0,
                     income: incomeWeek.toFixed(2),
                     errors: parseInt(errors.errors_week) || 0
@@ -1827,6 +1858,7 @@ app.get('/api/dashboard', async (req, res) => {
                 month: {
                     letters: lettersMonth,
                     chats: chatsMonth,
+                    incomingLetters: incomingMonth,
                     uniqueMen: parseInt(stats.unique_men_month) || parseInt(msgStats.unique_men_month) || 0,
                     income: incomeMonth.toFixed(2)
                 },
@@ -1836,7 +1868,9 @@ app.get('/api/dashboard', async (req, res) => {
                     avgResponseTime: Math.round(avgResponseSec / 60),
                     medianResponseTime: Math.round(medianResponseSec / 60),
                     growthPercent: parseFloat(growthPercent) || 0,
-                    avgDailyIncome: (incomeWeek / 7).toFixed(2)
+                    avgDailyIncome: (incomeWeek / 7).toFixed(2),
+                    workTime: formatWorkTime(hoursToday),
+                    workTimeMonth: formatWorkTime(hoursMonth)
                 }
             }
         });
