@@ -234,17 +234,6 @@
                             <i class="fas fa-chart-pie w-5 text-gray-600"></i>
                             <span class="ml-3 font-medium">Статистика</span>
                         </div>
-                        <div class="ml-8 mt-1 space-y-1" x-show="activeMenu === 'stats'" x-transition>
-                            <a @click="setActiveSubmenu('general')" class="block py-2 px-3 rounded-lg text-sm" :class="activeSubmenu === 'general' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-gray-700'">
-                                Общая
-                            </a>
-                            <a @click="setActiveSubmenu('admins')" class="block py-2 px-3 rounded-lg text-sm" :class="activeSubmenu === 'admins' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-gray-700'">
-                                По Админам
-                            </a>
-                            <a @click="setActiveSubmenu('translators')" class="block py-2 px-3 rounded-lg text-sm" :class="activeSubmenu === 'translators' ? 'text-indigo-600 bg-indigo-50' : 'text-gray-500 hover:text-gray-700'">
-                                По Переводчикам
-                            </a>
-                        </div>
                     </div>
                     
                     <!-- Анкеты -->
@@ -372,41 +361,31 @@
             <!-- Контент -->
             <!-- Статистика -->
             <div x-show="activeMenu === 'stats'" class="fade-in">
-                <!-- Фильтры -->
+                <!-- Фильтр по датам -->
                 <div class="glass rounded-2xl p-5 mb-6">
-                    <div class="grid grid-cols-4 gap-4">
-                        <div>
-                            <select class="glass px-4 py-2.5 rounded-xl w-full" x-model="statsFilter.admin">
-                                <option value="">Все Админы</option>
-                                <option value="admin1">Иван А.</option>
-                                <option value="admin2">Петр С.</option>
-                            </select>
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <span class="text-gray-600 font-medium">С:</span>
+                            <input type="date"
+                                   x-model="statsFilter.dateFrom"
+                                   class="glass px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                   @change="applyDateFilter()">
                         </div>
-                        <div x-show="statsFilter.admin">
-                            <select class="glass px-4 py-2.5 rounded-xl w-full" x-model="statsFilter.translator">
-                                <option value="">Все Переводчики</option>
-                                <option value="translator1">Переводчик 1</option>
-                                <option value="translator2">Переводчик 2</option>
-                            </select>
+                        <div class="flex items-center gap-2">
+                            <span class="text-gray-600 font-medium">По:</span>
+                            <input type="date"
+                                   x-model="statsFilter.dateTo"
+                                   class="glass px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                                   @change="applyDateFilter()">
                         </div>
-                        <div class="col-span-2">
-                            <div class="glass px-4 py-2.5 rounded-xl flex items-center justify-between cursor-pointer" @click="showCalendar = !showCalendar">
-                                <div class="flex items-center">
-                                    <i class="fas fa-calendar mr-2 text-gray-400"></i>
-                                    <span x-text="statsFilter.dateRange"></span>
-                                </div>
-                                <i class="fas fa-chevron-down text-gray-400"></i>
-                            </div>
-                            <div x-show="showCalendar" @click.outside="showCalendar = false" class="absolute mt-1 glass rounded-xl p-4 shadow-xl z-10">
-                                <!-- Календарь можно подключить через библиотеку -->
-                                <div class="text-center mb-4">
-                                    <button @click="setDateRange('month')" class="px-3 py-1 rounded-lg bg-indigo-50 text-indigo-600 mr-2">Месяц</button>
-                                    <button @click="setDateRange('week')" class="px-3 py-1 rounded-lg bg-gray-100 text-gray-700 mr-2">Неделя</button>
-                                    <button @click="setDateRange('day')" class="px-3 py-1 rounded-lg bg-gray-100 text-gray-700">День</button>
-                                </div>
-                                <div class="text-sm text-gray-500">Выберите период статистики</div>
-                            </div>
+                        <div class="flex gap-2 ml-4">
+                            <button @click="setQuickDateRange('today')" class="px-3 py-2 rounded-lg text-sm" :class="statsFilter.quickRange === 'today' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">Сегодня</button>
+                            <button @click="setQuickDateRange('week')" class="px-3 py-2 rounded-lg text-sm" :class="statsFilter.quickRange === 'week' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">Неделя</button>
+                            <button @click="setQuickDateRange('month')" class="px-3 py-2 rounded-lg text-sm" :class="statsFilter.quickRange === 'month' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">Месяц</button>
                         </div>
+                        <button @click="loadDashboardStats()" class="ml-auto px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600">
+                            <i class="fas fa-sync-alt mr-2"></i>Обновить
+                        </button>
                     </div>
                 </div>
                 
@@ -440,18 +419,18 @@
                         <div class="text-sm text-gray-500" x-text="'Чатов: ' + stats.today.chats + ' | За месяц: ' + stats.month.letters"></div>
                     </div>
 
-                    <!-- Доход сегодня -->
+                    <!-- Медианное время ответа -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-green-50 to-green-100 flex items-center justify-center mr-4">
-                                <i class="fas fa-dollar-sign text-green-500"></i>
+                                <i class="fas fa-stopwatch text-green-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold" x-text="'$' + stats.today.income">$0</div>
-                                <div class="text-gray-500">Доход сегодня</div>
+                                <div class="text-3xl font-bold" x-text="(stats.metrics.medianResponseTime || 0) + ' мин'">0 мин</div>
+                                <div class="text-gray-500">Медианное время</div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500" x-text="'За месяц: $' + stats.month.income"></div>
+                        <div class="text-sm text-gray-500">Медианное время ответа оператора</div>
                     </div>
 
                     <!-- Среднее время ответа -->
@@ -481,9 +460,9 @@
                     </div>
 
                     <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6">Ошибки</h3>
-                        <div class="text-3xl font-bold mb-2" :class="stats.today.errors > 0 ? 'text-red-500' : 'text-green-500'" x-text="stats.today.errors">0</div>
-                        <div class="text-sm text-gray-500" x-text="'За неделю: ' + stats.week.errors + ' ошибок'"></div>
+                        <h3 class="text-lg font-bold mb-6">Доход</h3>
+                        <div class="text-3xl font-bold mb-2 text-green-600" x-text="'$' + stats.today.income">$0</div>
+                        <div class="text-sm text-gray-500" x-text="'За месяц: $' + stats.month.income"></div>
                     </div>
                 </div>
                 
@@ -695,29 +674,32 @@
                                     <!-- Детальная информация -->
                                     <div class="grid grid-cols-2 gap-2 text-sm text-gray-600">
                                         <div>
-                                            <span class="font-medium">IP:</span> 
+                                            <span class="font-medium">IP:</span>
                                             <span x-text="bot.ip"></span>
                                         </div>
                                         <div>
-                                            <span class="font-medium">Прокси:</span> 
-                                            <span x-text="bot.proxies"></span>
+                                            <span class="font-medium">Версия:</span>
+                                            <span x-text="bot.version"></span>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium">Анкет:</span>
+                                            <span x-text="bot.profilesCount"></span>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium">Последний отклик:</span>
+                                            <span x-text="bot.lastHeartbeat ? new Date(bot.lastHeartbeat).toLocaleString('ru-RU') : '-'"></span>
                                         </div>
                                     </div>
-                                    
-                                    <!-- Если бот неактивен -->
+
+                                    <!-- Если бот неактивен - возможность изменить название -->
                                     <div x-show="bot.status === 'inactive'" class="mt-3 pt-3 border-t border-gray-100">
-                                        <div class="text-sm text-gray-600 mb-2">
-                                            <span class="font-medium">Активных прокси:</span> 
-                                            <span x-text="bot.activeProxies"></span>
-                                        </div>
-                                        
                                         <!-- Изменение названия -->
-                                        <div class="flex items-center space-x-2 mt-2">
-                                            <input type="text" 
-                                                   x-model="bot.name" 
+                                        <div class="flex items-center space-x-2">
+                                            <input type="text"
+                                                   x-model="bot.name"
                                                    class="flex-1 glass px-3 py-1 rounded-lg text-sm"
                                                    placeholder="Название бота">
-                                            <button @click="saveBotName(bot)" 
+                                            <button @click="saveBotName(bot)"
                                                     class="px-2 py-1 bg-blue-100 text-blue-600 rounded-lg text-sm hover:bg-blue-200">
                                                 Сохранить
                                             </button>
@@ -1382,7 +1364,10 @@
                 statsFilter: {
                     admin: '',
                     translator: '',
-                    dateRange: 'Текущий месяц'
+                    dateRange: 'Текущий месяц',
+                    dateFrom: '',
+                    dateTo: '',
+                    quickRange: 'month'
                 },
 
                 monitoringFilter: {
@@ -1639,6 +1624,39 @@
                     };
                     this.statsFilter.dateRange = ranges[range];
                     this.showCalendar = false;
+                },
+
+                setQuickDateRange(range) {
+                    const now = new Date();
+                    const formatDate = (d) => d.toISOString().split('T')[0];
+
+                    this.statsFilter.quickRange = range;
+
+                    if (range === 'today') {
+                        this.statsFilter.dateFrom = formatDate(now);
+                        this.statsFilter.dateTo = formatDate(now);
+                    } else if (range === 'week') {
+                        const weekAgo = new Date(now);
+                        weekAgo.setDate(now.getDate() - 7);
+                        this.statsFilter.dateFrom = formatDate(weekAgo);
+                        this.statsFilter.dateTo = formatDate(now);
+                    } else if (range === 'month') {
+                        const monthAgo = new Date(now);
+                        monthAgo.setMonth(now.getMonth() - 1);
+                        this.statsFilter.dateFrom = formatDate(monthAgo);
+                        this.statsFilter.dateTo = formatDate(now);
+                    }
+
+                    this.applyDateFilter();
+                },
+
+                applyDateFilter() {
+                    // Сбрасываем quickRange при ручном изменении дат
+                    if (this.statsFilter.dateFrom || this.statsFilter.dateTo) {
+                        this.statsFilter.quickRange = '';
+                    }
+                    // Перезагружаем статистику с новым фильтром
+                    this.loadDashboardStats();
                 },
                 
                 setMonitoringDateRange(range) {
