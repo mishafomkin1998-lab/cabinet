@@ -25,32 +25,102 @@
         }
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
         * {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
-        
+
         body {
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 50%, #f1f5f9 100%);
             min-height: 100vh;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #334155;
         }
-        
+
+        h1, h2, h3, h4, h5, h6 {
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: #1e293b;
+        }
+
+        .text-3xl { font-size: 1.875rem; font-weight: 700; letter-spacing: -0.03em; }
+        .text-2xl { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.025em; }
+        .text-xl { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.02em; }
+        .text-lg { font-size: 1.125rem; font-weight: 500; }
+
+        /* Улучшенные тени для карточек */
         .glass {
-            background: rgba(255, 255, 255, 0.82);
-            backdrop-filter: blur(40px);
-            -webkit-backdrop-filter: blur(40px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 
-                0 8px 32px rgba(0, 0, 0, 0.04),
-                inset 0 1px 0 rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(226, 232, 240, 0.8);
+            border-radius: 16px;
+            box-shadow:
+                0 1px 3px rgba(0, 0, 0, 0.04),
+                0 4px 12px rgba(0, 0, 0, 0.03);
         }
-        
+
         .glass-sidebar {
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(50px);
-            border-right: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 5px 0 30px rgba(0, 0, 0, 0.03);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.95) 100%);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(226, 232, 240, 0.6);
+            box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02);
+        }
+
+        /* Улучшенные таблицы */
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        table th {
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            background: rgba(248, 250, 252, 0.8);
+        }
+
+        table td {
+            font-size: 0.875rem;
+        }
+
+        table tbody tr {
+            transition: background-color 0.15s ease;
+        }
+
+        table tbody tr:hover {
+            background-color: rgba(99, 102, 241, 0.04);
+        }
+
+        /* Улучшенные кнопки */
+        button, .btn {
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        /* Улучшенные инпуты */
+        input, select, textarea {
+            font-size: 0.875rem;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        /* Числа и статистика */
+        .stat-number {
+            font-weight: 700;
+            font-feature-settings: 'tnum';
+            letter-spacing: -0.02em;
         }
         
         .gradient-text {
@@ -179,6 +249,22 @@
             border-radius: 3px;
         }
         
+        /* Календарь */
+        .calendar-popup {
+            background: white !important;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            z-index: 9999 !important;
+        }
+
+        .calendar-popup .grid > div {
+            min-width: 32px;
+            min-height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .chat-bubble {
             border-radius: 20px;
             max-width: 70%;
@@ -217,7 +303,7 @@
         <aside class="glass-sidebar w-64 flex-shrink-0 flex flex-col p-5">
             <!-- Логотип -->
             <div class="flex items-center mb-10">
-                <a href="https://example.com/download" target="_blank" class="flex items-center">
+                <a href="index.html" class="flex items-center">
                     <div class="w-10 h-10 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center shadow-sm">
                         <i class="fas fa-robot text-white text-sm"></i>
                     </div>
@@ -393,7 +479,7 @@
                             </div>
 
                             <!-- Всплывающий календарь -->
-                            <div x-show="showStatsCalendar" @click.outside="showStatsCalendar = false" class="absolute mt-2 glass rounded-xl p-4 shadow-xl z-50 w-72">
+                            <div x-show="showStatsCalendar" @click.outside="showStatsCalendar = false" class="absolute mt-2 rounded-xl p-4 w-72 calendar-popup" style="right: 0;">
                                 <div class="flex justify-between items-center mb-4">
                                     <button @click="calendarMonth--" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-left"></i></button>
                                     <span class="font-medium" x-text="getCalendarMonthName()"></span>
@@ -911,7 +997,7 @@
                             </div>
 
                             <!-- Всплывающий календарь -->
-                            <div x-show="showMonitoringCalendar" @click.outside="showMonitoringCalendar = false" class="absolute mt-2 glass rounded-xl p-4 shadow-xl z-50 w-72">
+                            <div x-show="showMonitoringCalendar" @click.outside="showMonitoringCalendar = false" class="absolute mt-2 rounded-xl p-4 w-72 calendar-popup" style="right: 0;">
                                 <div class="flex justify-between items-center mb-4">
                                     <button @click="calendarMonth--" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-left"></i></button>
                                     <span class="font-medium" x-text="getCalendarMonthName()"></span>
@@ -994,12 +1080,12 @@
                     <div class="glass rounded-2xl p-6 col-span-2">
                         <h3 class="text-lg font-bold mb-6" x-text="getMonitoringTitle()"></h3>
                         
-                        <!-- Последние ответы -->
+                        <!-- Последние ответы (ТОЛЬКО ответы на входящие письма, не рассылка) -->
                         <div x-show="monitoringFunction === 'lastResponses'" class="space-y-4 max-h-96 overflow-y-auto scrollbar-thin">
-                            <template x-for="activity in recentActivity.filter(a => a.action_type === 'chat' || a.action_type === 'letter').slice(0, 10)" :key="activity.id">
-                                <div class="p-3 rounded-xl border border-gray-100">
+                            <template x-for="activity in recentActivity.filter(a => (a.action_type === 'chat' || a.action_type === 'letter') && a.is_reply).slice(0, 10)" :key="activity.id">
+                                <div class="p-3 rounded-xl border border-gray-100 bg-blue-50">
                                     <div class="font-medium mb-2">
-                                        Анкета #<span x-text="activity.profile_id"></span> →
+                                        <span class="text-blue-600">↩️ Ответ</span> | Анкета #<span x-text="activity.profile_id"></span> →
                                         Мужчина #<span x-text="activity.man_id"></span>
                                     </div>
                                     <div class="space-y-2 text-sm">
@@ -1037,17 +1123,21 @@
                             </div>
                         </div>
                         
-                        <!-- Любимая рассылка -->
+                        <!-- Любимая рассылка (избранные шаблоны с сердечком из бота) -->
                         <div x-show="monitoringFunction === 'favoriteMailing'" class="space-y-4 max-h-96 overflow-y-auto scrollbar-thin">
-                            <template x-for="activity in recentActivity.filter(a => a.action_type === 'letter').slice(0, 5)" :key="activity.id">
-                                <div class="p-4 rounded-xl bg-gradient-to-r from-pink-50 to-rose-50">
-                                    <div class="font-medium mb-2">📨 Рассылка на #<span x-text="activity.man_id"></span></div>
-                                    <div class="text-sm text-gray-700 mb-3" x-text="activity.message_text ? '\"' + activity.message_text + '\"' : '(текст не сохранён)'"></div>
-                                    <div class="text-xs text-gray-500" x-text="formatActivityTime(activity.created_at)"></div>
+                            <template x-for="template in favoriteTemplates" :key="template.profileId">
+                                <div class="p-4 rounded-xl bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200">
+                                    <div class="flex items-center mb-2">
+                                        <i class="fas fa-heart text-red-500 mr-2"></i>
+                                        <span class="font-medium" x-text="template.name || 'Без названия'"></span>
+                                        <span class="ml-auto text-xs text-gray-500">Анкета #<span x-text="template.profileId"></span></span>
+                                    </div>
+                                    <div class="text-sm text-gray-700 bg-white p-3 rounded-lg border border-pink-100" x-text="template.text || '(текст не сохранён)'"></div>
                                 </div>
                             </template>
-                            <div x-show="recentActivity.filter(a => a.action_type === 'letter').length === 0" class="text-center text-gray-500 py-8">
-                                Нет данных о рассылках
+                            <div x-show="favoriteTemplates.length === 0" class="text-center text-gray-500 py-8">
+                                <i class="fas fa-heart text-gray-300 text-4xl mb-3 block"></i>
+                                Нет избранных шаблонов. Отметьте шаблон сердечком в боте.
                             </div>
                         </div>
                         
@@ -1095,24 +1185,47 @@
                         </div>
                     </div>
                     
-                    <!-- Переписка -->
+                    <!-- Переписка - реальные диалоги -->
                     <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6">Последняя активность</h3>
-                        <div class="space-y-3 mb-4 max-h-64 overflow-y-auto">
-                            <template x-for="activity in recentActivity.slice(0, 8)" :key="activity.id">
-                                <div class="flex" :class="activity.action_type === 'incoming' ? 'justify-start' : 'justify-end'">
-                                    <div class="p-3 rounded-xl max-w-xs"
-                                         :class="activity.action_type === 'incoming' ? 'bg-gray-100' : 'bg-blue-100'">
-                                        <div class="text-xs font-medium mb-1"
-                                             :class="activity.action_type === 'incoming' ? 'text-gray-600' : 'text-blue-600'"
-                                             x-text="activity.action_type === 'incoming' ? 'Входящее от #' + activity.man_id : 'Отправлено #' + activity.profile_id"></div>
-                                        <div class="text-sm" x-text="activity.message_text ? activity.message_text.substring(0, 80) + '...' : '(без текста)'"></div>
-                                        <div class="text-xs opacity-60 mt-1" x-text="formatActivityTime(activity.created_at)"></div>
+                        <h3 class="text-lg font-bold mb-4 flex items-center">
+                            <i class="fas fa-comments text-indigo-500 mr-2"></i>
+                            Последняя переписка
+                        </h3>
+                        <div class="space-y-2 max-h-80 overflow-y-auto pr-2" style="scrollbar-width: thin;">
+                            <template x-for="activity in recentActivity.filter(a => a.action_type === 'incoming' || a.action_type === 'letter' || a.action_type === 'chat').slice(0, 15)" :key="activity.id">
+                                <div class="flex items-start gap-2" :class="activity.action_type === 'incoming' ? '' : 'flex-row-reverse'">
+                                    <!-- Аватар -->
+                                    <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
+                                         :class="activity.action_type === 'incoming' ? 'bg-gray-400' : 'bg-gradient-to-r from-pink-500 to-rose-500'">
+                                        <span x-text="activity.action_type === 'incoming' ? '♂' : '♀'"></span>
+                                    </div>
+                                    <!-- Сообщение -->
+                                    <div class="max-w-[75%]">
+                                        <div class="text-xs mb-1 flex items-center gap-2"
+                                             :class="activity.action_type === 'incoming' ? 'text-gray-500' : 'text-pink-600 justify-end'">
+                                            <span x-show="activity.action_type === 'incoming'" x-text="'Мужчина #' + activity.man_id"></span>
+                                            <span x-show="activity.action_type !== 'incoming'" x-text="'Анкета #' + activity.profile_id"></span>
+                                            <span class="opacity-60" x-text="formatActivityTime(activity.created_at)"></span>
+                                        </div>
+                                        <div class="p-3 rounded-2xl text-sm leading-relaxed"
+                                             :class="activity.action_type === 'incoming' ? 'bg-gray-100 text-gray-800 rounded-tl-sm' : 'bg-gradient-to-r from-pink-100 to-rose-100 text-gray-800 rounded-tr-sm'">
+                                            <span x-text="activity.message_text ? activity.message_text.substring(0, 120) + (activity.message_text.length > 120 ? '...' : '') : '(сообщение)'"></span>
+                                        </div>
+                                        <div class="flex items-center gap-2 mt-1 text-xs"
+                                             :class="activity.action_type === 'incoming' ? '' : 'justify-end'">
+                                            <span x-show="activity.action_type !== 'incoming' && activity.used_ai" class="text-purple-500">
+                                                <i class="fas fa-robot"></i> AI
+                                            </span>
+                                            <span x-show="activity.action_type !== 'incoming' && activity.income > 0" class="text-green-500">
+                                                +$<span x-text="activity.income.toFixed(2)"></span>
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </template>
-                            <div x-show="recentActivity.length === 0" class="text-center text-gray-500 py-4">
-                                Нет активности
+                            <div x-show="recentActivity.filter(a => a.action_type === 'incoming' || a.action_type === 'letter' || a.action_type === 'chat').length === 0" class="text-center text-gray-500 py-8">
+                                <i class="fas fa-inbox text-4xl mb-3 opacity-30"></i>
+                                <p>Нет переписки</p>
                             </div>
                         </div>
                     </div>
@@ -1429,6 +1542,9 @@
                 // Последняя активность
                 recentActivity: [],
 
+                // Избранные шаблоны
+                favoriteTemplates: [],
+
                 // Почасовая активность для графика
                 hourlyActivity: [],
 
@@ -1528,6 +1644,7 @@
                             this.loadBotsStatus(),
                             this.loadTeam(),
                             this.loadRecentActivity(),
+                            this.loadFavoriteTemplates(),
                             this.loadHourlyActivity(),
                             this.loadTranslatorStats(),
                             this.loadHistoryActions()
@@ -1674,6 +1791,16 @@
                             this.recentActivity = data.activity;
                         }
                     } catch (e) { console.error('loadRecentActivity error:', e); }
+                },
+
+                async loadFavoriteTemplates() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/favorite-templates?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.favoriteTemplates = data.templates;
+                        }
+                    } catch (e) { console.error('loadFavoriteTemplates error:', e); }
                 },
 
                 async loadHourlyActivity() {
