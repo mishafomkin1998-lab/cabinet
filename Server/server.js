@@ -700,13 +700,6 @@ app.post('/api/heartbeat', async (req, res) => {
             timestamp || new Date()
         ]);
 
-        // Опционально: обновляем last_seen в таблице allowed_profiles
-        await pool.query(`
-            UPDATE allowed_profiles
-            SET note = COALESCE(note, '') || ' [Last seen: ' || $1 || ']'
-            WHERE profile_id = $2
-        `, [new Date(timestamp).toISOString(), accountDisplayId]);
-
         console.log(`❤️ Heartbeat от ${accountDisplayId}: ${status}`);
 
         res.json({ status: 'ok' });

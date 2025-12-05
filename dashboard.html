@@ -254,13 +254,13 @@
             border-radius: 3px;
         }
         
-        /* Календарь */
+        /* Календарь - ФИКСИРОВАННАЯ позиция поверх всего */
         .calendar-popup {
             background: white !important;
             border: 1px solid #e5e7eb;
             box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
-            z-index: 99999 !important;
-            position: absolute !important;
+            z-index: 999999 !important;
+            position: fixed !important;
         }
 
         .calendar-popup .grid > div {
@@ -282,6 +282,127 @@
         table th {
             padding-top: 0.5rem !important;
             padding-bottom: 0.5rem !important;
+        }
+
+        /* ============================================ */
+        /* ТЁМНАЯ ТЕМА */
+        /* ============================================ */
+        .dark body,
+        body.dark {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #1e293b 100%) !important;
+            color: #e2e8f0;
+        }
+
+        .dark .glass,
+        body.dark .glass {
+            background: rgba(30, 41, 59, 0.95) !important;
+            border-color: rgba(71, 85, 105, 0.5) !important;
+            color: #e2e8f0;
+        }
+
+        .dark .glass-sidebar,
+        body.dark .glass-sidebar {
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.98) 0%, rgba(15, 23, 42, 0.95) 100%) !important;
+            border-color: rgba(71, 85, 105, 0.4) !important;
+        }
+
+        .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6,
+        body.dark h1, body.dark h2, body.dark h3, body.dark h4, body.dark h5, body.dark h6 {
+            color: #f1f5f9 !important;
+        }
+
+        .dark .text-gray-500,
+        body.dark .text-gray-500 {
+            color: #94a3b8 !important;
+        }
+
+        .dark .text-gray-600,
+        body.dark .text-gray-600 {
+            color: #94a3b8 !important;
+        }
+
+        .dark .text-gray-800,
+        body.dark .text-gray-800 {
+            color: #e2e8f0 !important;
+        }
+
+        .dark .border-gray-100,
+        body.dark .border-gray-100 {
+            border-color: rgba(71, 85, 105, 0.3) !important;
+        }
+
+        .dark .hover\:bg-gray-50:hover,
+        body.dark .hover\:bg-gray-50:hover {
+            background-color: rgba(51, 65, 85, 0.5) !important;
+        }
+
+        .dark table th,
+        body.dark table th {
+            background: rgba(30, 41, 59, 0.8) !important;
+            color: #94a3b8 !important;
+        }
+
+        .dark table tbody tr:hover,
+        body.dark table tbody tr:hover {
+            background-color: rgba(99, 102, 241, 0.1) !important;
+        }
+
+        .dark .menu-item:hover,
+        body.dark .menu-item:hover {
+            background: rgba(99, 102, 241, 0.15) !important;
+        }
+
+        .dark .menu-item.active,
+        body.dark .menu-item.active {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%) !important;
+        }
+
+        .dark .calendar-popup,
+        body.dark .calendar-popup {
+            background: #1e293b !important;
+            border-color: #475569 !important;
+        }
+
+        .dark .calendar-popup .text-gray-400,
+        body.dark .calendar-popup .text-gray-400 {
+            color: #64748b !important;
+        }
+
+        .dark .bg-gray-100,
+        body.dark .bg-gray-100 {
+            background-color: rgba(51, 65, 85, 0.5) !important;
+        }
+
+        .dark select,
+        body.dark select {
+            background-color: rgba(30, 41, 59, 0.95) !important;
+            color: #e2e8f0 !important;
+            border-color: rgba(71, 85, 105, 0.5) !important;
+        }
+
+        .dark input,
+        .dark textarea,
+        body.dark input,
+        body.dark textarea {
+            background-color: rgba(30, 41, 59, 0.95) !important;
+            color: #e2e8f0 !important;
+            border-color: rgba(71, 85, 105, 0.5) !important;
+        }
+
+        .dark input::placeholder,
+        .dark textarea::placeholder,
+        body.dark input::placeholder,
+        body.dark textarea::placeholder {
+            color: #64748b !important;
+        }
+
+        /* Кнопка переключения темы */
+        .theme-toggle {
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.1);
         }
 
         .chat-bubble {
@@ -316,17 +437,17 @@
         }
     </style>
 </head>
-<body x-data="dashboard()" x-init="init()" class="text-gray-800">
+<body x-data="dashboard()" x-init="init()" :class="{ 'dark': darkMode }" class="text-gray-800">
     <div class="flex h-screen">
         <!-- Сайдбар -->
         <aside class="glass-sidebar w-64 flex-shrink-0 flex flex-col p-5">
             <!-- Логотип -->
-            <div class="flex items-center justify-center mb-10">
-                <a href="index.html" class="flex items-center justify-center w-full">
-                    <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg">
-                        <i class="fas fa-robot text-white text-lg"></i>
+            <div class="mb-10">
+                <a href="index.html" class="flex items-center">
+                    <div class="w-11 h-11 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg">
+                        <i class="fas fa-robot text-white text-base"></i>
                     </div>
-                    <h1 class="text-2xl font-bold ml-3 gradient-text">Nova</h1>
+                    <h1 class="text-xl font-bold ml-3 gradient-text">Nova</h1>
                 </a>
             </div>
             
@@ -419,6 +540,11 @@
                 </div>
 
                 <div class="flex items-center space-x-3">
+                    <!-- Theme toggle -->
+                    <button @click="toggleDarkMode()" class="theme-toggle glass w-10 h-10 rounded-xl flex items-center justify-center hover:bg-gray-50 transition-all">
+                        <i class="fas" :class="darkMode ? 'fa-sun text-yellow-500' : 'fa-moon text-indigo-500'"></i>
+                    </button>
+
                     <!-- Language selector -->
                     <select class="glass px-3 py-2 rounded-xl text-sm font-bold focus:outline-none cursor-pointer hover:bg-gray-50 transition-colors" x-model="language" @change="changeLanguage">
                         <option value="ru">RU</option>
@@ -1516,9 +1642,7 @@
                                            :value="account.id"
                                            x-model="selectedAccountIds"
                                            class="rounded mr-3">
-                                    <span class="font-mono text-sm">#<span x-text="account.id"></span></span>
-                                    <span class="ml-2 text-gray-500 text-sm" x-text="account.login || ''"></span>
-                                    <span class="ml-auto text-xs text-gray-400" x-text="account.comment || ''"></span>
+                                    <span class="font-mono text-sm font-medium">#<span x-text="account.id"></span></span>
                                 </label>
                             </template>
                             <div x-show="accounts.filter(a => !a.admin || a.admin === '').length === 0" class="text-center text-gray-500 py-4">
@@ -1612,6 +1736,15 @@
 
                 // Localization
                 language: savedLanguage,
+
+                // Dark mode
+                darkMode: localStorage.getItem('novaDarkMode') === 'true',
+
+                // Toggle dark mode
+                toggleDarkMode() {
+                    this.darkMode = !this.darkMode;
+                    localStorage.setItem('novaDarkMode', this.darkMode);
+                },
 
                 // Translation function
                 t(key) {
@@ -1851,7 +1984,7 @@
                                 admin: p.admin_name || '',
                                 translator: p.trans_name || '',
                                 addedDate: new Date(p.added_at).toLocaleDateString('ru-RU'),
-                                comment: p.note || '',
+                                comment: p.note ? p.note.replace(/\s*\[Last seen:.*?\]/g, '').trim() : '',
                                 paused: p.paused || false
                             }));
                         }
