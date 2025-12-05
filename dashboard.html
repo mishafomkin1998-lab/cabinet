@@ -361,28 +361,75 @@
             <!-- Контент -->
             <!-- Статистика -->
             <div x-show="activeMenu === 'stats'" class="fade-in">
-                <!-- Фильтр по датам -->
+                <!-- Фильтры: Админы, Переводчики, Календарь -->
                 <div class="glass rounded-2xl p-5 mb-6">
-                    <div class="flex items-center gap-4">
-                        <div class="flex items-center gap-2">
-                            <span class="text-gray-600 font-medium">С:</span>
-                            <input type="date"
-                                   x-model="statsFilter.dateFrom"
-                                   class="glass px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                                   @change="applyDateFilter()">
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <!-- Выбор админа -->
+                        <div>
+                            <select class="glass px-4 py-2.5 rounded-xl" x-model="statsFilter.admin" @change="statsFilter.translator = ''">
+                                <option value="">Все Админы</option>
+                                <template x-for="admin in admins" :key="admin.id">
+                                    <option :value="admin.id" x-text="admin.name"></option>
+                                </template>
+                            </select>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-gray-600 font-medium">По:</span>
-                            <input type="date"
-                                   x-model="statsFilter.dateTo"
-                                   class="glass px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                                   @change="applyDateFilter()">
+
+                        <!-- Выбор переводчика (показывается при выборе админа) -->
+                        <div x-show="statsFilter.admin">
+                            <select class="glass px-4 py-2.5 rounded-xl" x-model="statsFilter.translator">
+                                <option value="">Все Переводчики</option>
+                                <template x-for="translator in admins.find(a => a.id == statsFilter.admin)?.translators || []" :key="translator.id">
+                                    <option :value="translator.id" x-text="translator.name"></option>
+                                </template>
+                            </select>
                         </div>
-                        <div class="flex gap-2 ml-4">
-                            <button @click="setQuickDateRange('today')" class="px-3 py-2 rounded-lg text-sm" :class="statsFilter.quickRange === 'today' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">Сегодня</button>
-                            <button @click="setQuickDateRange('week')" class="px-3 py-2 rounded-lg text-sm" :class="statsFilter.quickRange === 'week' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">Неделя</button>
-                            <button @click="setQuickDateRange('month')" class="px-3 py-2 rounded-lg text-sm" :class="statsFilter.quickRange === 'month' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">Месяц</button>
+
+                        <!-- Календарь выбора диапазона -->
+                        <div class="relative">
+                            <div class="glass px-4 py-2.5 rounded-xl flex items-center cursor-pointer" @click="showStatsCalendar = !showStatsCalendar">
+                                <i class="fas fa-calendar mr-2 text-gray-400"></i>
+                                <span x-text="getDateRangeText()"></span>
+                                <i class="fas fa-chevron-down ml-2 text-gray-400"></i>
+                            </div>
+
+                            <!-- Всплывающий календарь -->
+                            <div x-show="showStatsCalendar" @click.outside="showStatsCalendar = false" class="absolute mt-2 glass rounded-xl p-4 shadow-xl z-50 w-72">
+                                <div class="flex justify-between items-center mb-4">
+                                    <button @click="calendarMonth--" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-left"></i></button>
+                                    <span class="font-medium" x-text="getCalendarMonthName()"></span>
+                                    <button @click="calendarMonth++" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-right"></i></button>
+                                </div>
+                                <div class="grid grid-cols-7 gap-1 text-center text-sm mb-2">
+                                    <div class="text-gray-400">Пн</div>
+                                    <div class="text-gray-400">Вт</div>
+                                    <div class="text-gray-400">Ср</div>
+                                    <div class="text-gray-400">Чт</div>
+                                    <div class="text-gray-400">Пт</div>
+                                    <div class="text-gray-400">Сб</div>
+                                    <div class="text-gray-400">Вс</div>
+                                </div>
+                                <div class="grid grid-cols-7 gap-1 text-center text-sm">
+                                    <template x-for="day in getCalendarDays()" :key="day.date">
+                                        <div @click="selectCalendarDate(day.date)"
+                                             class="p-2 rounded cursor-pointer"
+                                             :class="{
+                                                 'bg-indigo-500 text-white': isDateSelected(day.date),
+                                                 'bg-indigo-100': isDateInRange(day.date),
+                                                 'text-gray-300': !day.currentMonth,
+                                                 'hover:bg-gray-100': !isDateSelected(day.date)
+                                             }"
+                                             x-text="day.day">
+                                        </div>
+                                    </template>
+                                </div>
+                                <div class="flex gap-2 mt-4">
+                                    <button @click="setQuickDateRange('month')" class="flex-1 px-2 py-1 rounded-lg text-sm" :class="statsFilter.quickRange === 'month' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100'">Этот месяц</button>
+                                    <button @click="setQuickDateRange('week')" class="flex-1 px-2 py-1 rounded-lg text-sm" :class="statsFilter.quickRange === 'week' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100'">Неделя</button>
+                                    <button @click="setQuickDateRange('today')" class="flex-1 px-2 py-1 rounded-lg text-sm" :class="statsFilter.quickRange === 'today' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100'">Сегодня</button>
+                                </div>
+                            </div>
                         </div>
+
                         <button @click="loadDashboardStats()" class="ml-auto px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600">
                             <i class="fas fa-sync-alt mr-2"></i>Обновить
                         </button>
@@ -405,18 +452,18 @@
                         <div class="text-sm text-gray-500" x-text="'Загружено: ' + accounts.length"></div>
                     </div>
 
-                    <!-- Ответы сегодня (письма + чаты) -->
+                    <!-- Входящие письма от мужчин -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 flex items-center justify-center mr-4">
-                                <i class="fas fa-envelope text-purple-500"></i>
+                                <i class="fas fa-envelope-open text-purple-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold" x-text="stats.today.letters">0</div>
-                                <div class="text-gray-500">Писем сегодня</div>
+                                <div class="text-3xl font-bold" x-text="stats.today.incomingLetters || 0">0</div>
+                                <div class="text-gray-500">Входящих писем</div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500" x-text="'Чатов: ' + stats.today.chats + ' | За месяц: ' + stats.month.letters"></div>
+                        <div class="text-sm text-gray-500" x-text="'Чатов: ' + stats.today.chats + ' | За месяц: ' + (stats.month.incomingLetters || 0)"></div>
                     </div>
 
                     <!-- Медианное время ответа -->
@@ -460,9 +507,9 @@
                     </div>
 
                     <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6">Доход</h3>
-                        <div class="text-3xl font-bold mb-2 text-green-600" x-text="'$' + stats.today.income">$0</div>
-                        <div class="text-sm text-gray-500" x-text="'За месяц: $' + stats.month.income"></div>
+                        <h3 class="text-lg font-bold mb-6">Время работы</h3>
+                        <div class="text-3xl font-bold mb-2 text-purple-600" x-text="stats.metrics.workTime || '0ч 0м'">0ч 0м</div>
+                        <div class="text-sm text-gray-500" x-text="'За месяц: ' + (stats.metrics.workTimeMonth || '0ч 0м')"></div>
                     </div>
                 </div>
                 
@@ -834,36 +881,70 @@
             <div x-show="activeMenu === 'monitoring'" x-cloak class="fade-in">
                 <!-- Фильтры для мониторинга -->
                 <div class="glass rounded-2xl p-5 mb-6">
-                    <div class="grid grid-cols-4 gap-4">
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <!-- Выбор админа -->
                         <div>
-                            <select class="glass px-4 py-2.5 rounded-xl w-full" x-model="monitoringFilter.admin">
+                            <select class="glass px-4 py-2.5 rounded-xl" x-model="monitoringFilter.admin" @change="monitoringFilter.translator = ''">
                                 <option value="">Все Админы</option>
-                                <option value="admin1">Иван А.</option>
-                                <option value="admin2">Петр С.</option>
+                                <template x-for="admin in admins" :key="admin.id">
+                                    <option :value="admin.id" x-text="admin.name"></option>
+                                </template>
                             </select>
                         </div>
+
+                        <!-- Выбор переводчика (показывается при выборе админа) -->
                         <div x-show="monitoringFilter.admin">
-                            <select class="glass px-4 py-2.5 rounded-xl w-full" x-model="monitoringFilter.translator">
+                            <select class="glass px-4 py-2.5 rounded-xl" x-model="monitoringFilter.translator">
                                 <option value="">Все Переводчики</option>
-                                <option value="translator1">Переводчик 1</option>
-                                <option value="translator2">Переводчик 2</option>
+                                <template x-for="translator in admins.find(a => a.id == monitoringFilter.admin)?.translators || []" :key="translator.id">
+                                    <option :value="translator.id" x-text="translator.name"></option>
+                                </template>
                             </select>
                         </div>
-                        <div class="col-span-2">
-                            <div class="glass px-4 py-2.5 rounded-xl flex items-center justify-between cursor-pointer" @click="showMonitoringCalendar = !showMonitoringCalendar">
-                                <div class="flex items-center">
-                                    <i class="fas fa-calendar mr-2 text-gray-400"></i>
-                                    <span x-text="monitoringFilter.dateRange"></span>
-                                </div>
-                                <i class="fas fa-chevron-down text-gray-400"></i>
+
+                        <!-- Календарь выбора диапазона -->
+                        <div class="relative">
+                            <div class="glass px-4 py-2.5 rounded-xl flex items-center cursor-pointer" @click="showMonitoringCalendar = !showMonitoringCalendar">
+                                <i class="fas fa-calendar mr-2 text-gray-400"></i>
+                                <span x-text="getMonitoringDateRangeText()"></span>
+                                <i class="fas fa-chevron-down ml-2 text-gray-400"></i>
                             </div>
-                            <div x-show="showMonitoringCalendar" @click.outside="showMonitoringCalendar = false" class="absolute mt-1 glass rounded-xl p-4 shadow-xl z-10">
-                                <div class="text-center mb-4">
-                                    <button @click="setMonitoringDateRange('month')" class="px-3 py-1 rounded-lg bg-indigo-50 text-indigo-600 mr-2">Текущий месяц</button>
-                                    <button @click="setMonitoringDateRange('week')" class="px-3 py-1 rounded-lg bg-gray-100 text-gray-700 mr-2">Текущая неделя</button>
-                                    <button @click="setMonitoringDateRange('custom')" class="px-3 py-1 rounded-lg bg-gray-100 text-gray-700">Выбрать период</button>
+
+                            <!-- Всплывающий календарь -->
+                            <div x-show="showMonitoringCalendar" @click.outside="showMonitoringCalendar = false" class="absolute mt-2 glass rounded-xl p-4 shadow-xl z-50 w-72">
+                                <div class="flex justify-between items-center mb-4">
+                                    <button @click="calendarMonth--" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-left"></i></button>
+                                    <span class="font-medium" x-text="getCalendarMonthName()"></span>
+                                    <button @click="calendarMonth++" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-right"></i></button>
                                 </div>
-                                <div class="text-sm text-gray-500">Выберите период мониторинга</div>
+                                <div class="grid grid-cols-7 gap-1 text-center text-sm mb-2">
+                                    <div class="text-gray-400">Пн</div>
+                                    <div class="text-gray-400">Вт</div>
+                                    <div class="text-gray-400">Ср</div>
+                                    <div class="text-gray-400">Чт</div>
+                                    <div class="text-gray-400">Пт</div>
+                                    <div class="text-gray-400">Сб</div>
+                                    <div class="text-gray-400">Вс</div>
+                                </div>
+                                <div class="grid grid-cols-7 gap-1 text-center text-sm">
+                                    <template x-for="day in getCalendarDays()" :key="day.date">
+                                        <div @click="selectMonitoringCalendarDate(day.date)"
+                                             class="p-2 rounded cursor-pointer"
+                                             :class="{
+                                                 'bg-indigo-500 text-white': isMonitoringDateSelected(day.date),
+                                                 'bg-indigo-100': isMonitoringDateInRange(day.date),
+                                                 'text-gray-300': !day.currentMonth,
+                                                 'hover:bg-gray-100': !isMonitoringDateSelected(day.date)
+                                             }"
+                                             x-text="day.day">
+                                        </div>
+                                    </template>
+                                </div>
+                                <div class="flex gap-2 mt-4">
+                                    <button @click="setMonitoringQuickRange('month')" class="flex-1 px-2 py-1 rounded-lg text-sm bg-indigo-100 text-indigo-700">Этот месяц</button>
+                                    <button @click="setMonitoringQuickRange('week')" class="flex-1 px-2 py-1 rounded-lg text-sm bg-gray-100">Неделя</button>
+                                    <button @click="setMonitoringQuickRange('today')" class="flex-1 px-2 py-1 rounded-lg text-sm bg-gray-100">Сегодня</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -937,13 +1018,22 @@
                         
                         <!-- Отправленные письма -->
                         <div x-show="monitoringFunction === 'sentLetters'" class="space-y-4 max-h-96 overflow-y-auto scrollbar-thin">
-                            <div class="flex items-start p-3 rounded-xl border border-gray-100">
-                                <i class="fas fa-envelope text-green-500 mt-1 mr-3"></i>
-                                <div class="flex-1">
-                                    <div class="font-medium">Отправлено письмо получателю #3812</div>
-                                    <div class="text-sm text-gray-600 mt-1">"Привет! Я увидела твой профиль и решила написать. Ты выглядишь интересным человеком..."</div>
-                                    <div class="text-xs text-gray-400 mt-1">5 минут назад</div>
+                            <template x-for="activity in recentActivity.filter(a => a.action_type === 'letter')" :key="activity.id">
+                                <div class="flex items-start p-3 rounded-xl border border-gray-100">
+                                    <i class="fas fa-envelope text-green-500 mt-1 mr-3"></i>
+                                    <div class="flex-1">
+                                        <div class="font-medium">
+                                            <span x-text="'Анкета #' + activity.profile_id"></span>
+                                            <span class="text-gray-500">→</span>
+                                            <span x-text="'Мужчина #' + activity.man_id"></span>
+                                        </div>
+                                        <div class="text-sm text-gray-600 mt-1" x-text="activity.message_text ? '\"' + activity.message_text + '\"' : '(текст не сохранён)'"></div>
+                                        <div class="text-xs text-gray-400 mt-1" x-text="formatActivityTime(activity.created_at)"></div>
+                                    </div>
                                 </div>
+                            </template>
+                            <div x-show="recentActivity.filter(a => a.action_type === 'letter').length === 0" class="text-center text-gray-500 py-8">
+                                Нет отправленных писем за выбранный период
                             </div>
                         </div>
                         
@@ -1370,10 +1460,24 @@
                     quickRange: 'month'
                 },
 
+                // Календарь
+                showStatsCalendar: false,
+                showAccountsCalendar: false,
+                showMonitoringCalendar: false,
+                calendarMonth: new Date().getMonth(),
+                calendarYear: new Date().getFullYear(),
+                calendarSelectingStart: true,
+
                 monitoringFilter: {
                     admin: '',
                     translator: '',
-                    dateRange: 'Текущий месяц'
+                    dateFrom: '',
+                    dateTo: ''
+                },
+
+                accountsFilter: {
+                    dateFrom: '',
+                    dateTo: ''
                 },
 
                 monitoringFunction: 'lastResponses',
@@ -1408,9 +1512,28 @@
                 // Инициализация - загрузка данных с сервера
                 async init() {
                     console.log('Dashboard init, user:', this.currentUser);
+                    // Устанавливаем период по умолчанию - текущий месяц
+                    this.setDefaultDateRange();
                     await this.loadAllData();
                     // Автообновление каждые 30 секунд
                     setInterval(() => this.loadDashboardStats(), 30000);
+                },
+
+                // Установить период по умолчанию - с 1 числа текущего месяца до сегодня
+                setDefaultDateRange() {
+                    const now = new Date();
+                    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                    const formatDate = (d) => d.toISOString().split('T')[0];
+
+                    this.statsFilter.dateFrom = formatDate(firstDay);
+                    this.statsFilter.dateTo = formatDate(now);
+                    this.statsFilter.quickRange = 'month';
+
+                    this.monitoringFilter.dateFrom = formatDate(firstDay);
+                    this.monitoringFilter.dateTo = formatDate(now);
+
+                    this.accountsFilter.dateFrom = formatDate(firstDay);
+                    this.accountsFilter.dateTo = formatDate(now);
                 },
 
                 async loadAllData() {
@@ -1480,35 +1603,46 @@
                             // Группируем по botId чтобы получить уникальные боты
                             const botsMap = {};
                             data.bots.forEach(b => {
-                                if (b.botId && b.botId !== 'null') {
-                                    if (!botsMap[b.botId]) {
-                                        botsMap[b.botId] = {
-                                            id: b.botId,
-                                            name: `Бот ${b.botId}`,
+                                const botId = b.botId || b.bot_id;
+                                if (botId && botId !== 'null' && botId !== 'undefined') {
+                                    // Определяем активность бота
+                                    const isActive = b.status === 'online' || b.status === 'active' || b.status === 'idle';
+
+                                    if (!botsMap[botId]) {
+                                        botsMap[botId] = {
+                                            id: botId,
+                                            name: b.name || `Бот ${botId}`,
                                             icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
-                                            status: b.status === 'online' ? 'active' : 'inactive',
+                                            status: isActive ? 'active' : 'inactive',
                                             os: b.platform || 'Unknown',
                                             ip: b.ip || '-',
                                             version: b.version || '-',
                                             lastHeartbeat: b.lastHeartbeat,
-                                            profilesCount: 1
+                                            profilesCount: b.profilesCount || 1
                                         };
                                     } else {
-                                        botsMap[b.botId].profilesCount++;
+                                        botsMap[botId].profilesCount = (botsMap[botId].profilesCount || 0) + 1;
                                         // Обновляем статус если хоть одна анкета online
-                                        if (b.status === 'online') {
-                                            botsMap[b.botId].status = 'active';
+                                        if (isActive) {
+                                            botsMap[botId].status = 'active';
                                         }
                                     }
                                 }
                             });
                             this.bots = Object.values(botsMap);
 
+                            // Если ботов нет, но есть данные - показываем их
+                            if (this.bots.length === 0 && data.bots.length > 0) {
+                                console.log('Bot data received but not parsed:', data.bots);
+                            }
+
                             // Также обновляем статусы анкет
                             data.bots.forEach(b => {
-                                const acc = this.accounts.find(a => a.id === b.profileId);
+                                const profileId = b.profileId || b.profile_id;
+                                const acc = this.accounts.find(a => a.id === profileId);
                                 if (acc) {
-                                    acc.status = b.status === 'online' ? 'online' : (b.status === 'idle' ? 'working' : 'offline');
+                                    const isOnline = b.status === 'online' || b.status === 'active';
+                                    acc.status = isOnline ? 'online' : (b.status === 'idle' ? 'working' : 'offline');
                                     acc.lastOnline = b.lastHeartbeat ? new Date(b.lastHeartbeat).toLocaleString('ru-RU') : '-';
                                 }
                             });
@@ -1649,34 +1783,160 @@
                         this.statsFilter.dateFrom = formatDate(weekAgo);
                         this.statsFilter.dateTo = formatDate(now);
                     } else if (range === 'month') {
-                        const monthAgo = new Date(now);
-                        monthAgo.setMonth(now.getMonth() - 1);
-                        this.statsFilter.dateFrom = formatDate(monthAgo);
+                        // Текущий месяц: с 1 числа до сегодня
+                        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                        this.statsFilter.dateFrom = formatDate(firstDay);
                         this.statsFilter.dateTo = formatDate(now);
                     }
 
+                    this.showStatsCalendar = false;
                     this.applyDateFilter();
                 },
 
                 applyDateFilter() {
-                    // Сбрасываем quickRange при ручном изменении дат
-                    if (this.statsFilter.dateFrom || this.statsFilter.dateTo) {
-                        this.statsFilter.quickRange = '';
-                    }
                     // Перезагружаем статистику с новым фильтром
                     this.loadDashboardStats();
                 },
-                
-                setMonitoringDateRange(range) {
-                    const ranges = {
-                        'month': 'Текущий месяц',
-                        'week': 'Текущая неделя',
-                        'custom': 'Выберите период'
-                    };
-                    this.monitoringFilter.dateRange = ranges[range];
+
+                // Функции календаря
+                getDateRangeText() {
+                    if (!this.statsFilter.dateFrom || !this.statsFilter.dateTo) {
+                        return 'Выберите период';
+                    }
+                    const from = new Date(this.statsFilter.dateFrom);
+                    const to = new Date(this.statsFilter.dateTo);
+                    const formatShort = (d) => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+
+                    if (this.statsFilter.dateFrom === this.statsFilter.dateTo) {
+                        return formatShort(from);
+                    }
+                    return `${formatShort(from)} - ${formatShort(to)}`;
+                },
+
+                getCalendarMonthName() {
+                    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                                        'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+                    return `${monthNames[this.calendarMonth]} ${this.calendarYear}`;
+                },
+
+                getCalendarDays() {
+                    const days = [];
+                    const firstDay = new Date(this.calendarYear, this.calendarMonth, 1);
+                    const lastDay = new Date(this.calendarYear, this.calendarMonth + 1, 0);
+
+                    // Дни предыдущего месяца
+                    let startDay = firstDay.getDay() || 7; // Понедельник = 1
+                    for (let i = startDay - 1; i > 0; i--) {
+                        const d = new Date(this.calendarYear, this.calendarMonth, 1 - i);
+                        days.push({ day: d.getDate(), date: d.toISOString().split('T')[0], currentMonth: false });
+                    }
+
+                    // Дни текущего месяца
+                    for (let i = 1; i <= lastDay.getDate(); i++) {
+                        const d = new Date(this.calendarYear, this.calendarMonth, i);
+                        days.push({ day: i, date: d.toISOString().split('T')[0], currentMonth: true });
+                    }
+
+                    // Дни следующего месяца (до 42 дней = 6 недель)
+                    const remaining = 42 - days.length;
+                    for (let i = 1; i <= remaining; i++) {
+                        const d = new Date(this.calendarYear, this.calendarMonth + 1, i);
+                        days.push({ day: i, date: d.toISOString().split('T')[0], currentMonth: false });
+                    }
+
+                    return days;
+                },
+
+                selectCalendarDate(date) {
+                    if (this.calendarSelectingStart || !this.statsFilter.dateFrom) {
+                        this.statsFilter.dateFrom = date;
+                        this.statsFilter.dateTo = date;
+                        this.calendarSelectingStart = false;
+                    } else {
+                        if (date < this.statsFilter.dateFrom) {
+                            this.statsFilter.dateTo = this.statsFilter.dateFrom;
+                            this.statsFilter.dateFrom = date;
+                        } else {
+                            this.statsFilter.dateTo = date;
+                        }
+                        this.calendarSelectingStart = true;
+                        this.statsFilter.quickRange = '';
+                        this.showStatsCalendar = false;
+                        this.applyDateFilter();
+                    }
+                },
+
+                isDateSelected(date) {
+                    return date === this.statsFilter.dateFrom || date === this.statsFilter.dateTo;
+                },
+
+                isDateInRange(date) {
+                    if (!this.statsFilter.dateFrom || !this.statsFilter.dateTo) return false;
+                    return date > this.statsFilter.dateFrom && date < this.statsFilter.dateTo;
+                },
+
+                // Функции календаря мониторинга
+                getMonitoringDateRangeText() {
+                    if (!this.monitoringFilter.dateFrom || !this.monitoringFilter.dateTo) {
+                        return 'Выберите период';
+                    }
+                    const from = new Date(this.monitoringFilter.dateFrom);
+                    const to = new Date(this.monitoringFilter.dateTo);
+                    const formatShort = (d) => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+
+                    if (this.monitoringFilter.dateFrom === this.monitoringFilter.dateTo) {
+                        return formatShort(from);
+                    }
+                    return `${formatShort(from)} - ${formatShort(to)}`;
+                },
+
+                selectMonitoringCalendarDate(date) {
+                    if (this.calendarSelectingStart || !this.monitoringFilter.dateFrom) {
+                        this.monitoringFilter.dateFrom = date;
+                        this.monitoringFilter.dateTo = date;
+                        this.calendarSelectingStart = false;
+                    } else {
+                        if (date < this.monitoringFilter.dateFrom) {
+                            this.monitoringFilter.dateTo = this.monitoringFilter.dateFrom;
+                            this.monitoringFilter.dateFrom = date;
+                        } else {
+                            this.monitoringFilter.dateTo = date;
+                        }
+                        this.calendarSelectingStart = true;
+                        this.showMonitoringCalendar = false;
+                    }
+                },
+
+                isMonitoringDateSelected(date) {
+                    return date === this.monitoringFilter.dateFrom || date === this.monitoringFilter.dateTo;
+                },
+
+                isMonitoringDateInRange(date) {
+                    if (!this.monitoringFilter.dateFrom || !this.monitoringFilter.dateTo) return false;
+                    return date > this.monitoringFilter.dateFrom && date < this.monitoringFilter.dateTo;
+                },
+
+                setMonitoringQuickRange(range) {
+                    const now = new Date();
+                    const formatDate = (d) => d.toISOString().split('T')[0];
+
+                    if (range === 'today') {
+                        this.monitoringFilter.dateFrom = formatDate(now);
+                        this.monitoringFilter.dateTo = formatDate(now);
+                    } else if (range === 'week') {
+                        const weekAgo = new Date(now);
+                        weekAgo.setDate(now.getDate() - 7);
+                        this.monitoringFilter.dateFrom = formatDate(weekAgo);
+                        this.monitoringFilter.dateTo = formatDate(now);
+                    } else if (range === 'month') {
+                        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                        this.monitoringFilter.dateFrom = formatDate(firstDay);
+                        this.monitoringFilter.dateTo = formatDate(now);
+                    }
+
                     this.showMonitoringCalendar = false;
                 },
-                
+
                 setMonitoringFunction(func) {
                     this.monitoringFunction = func;
                 },
@@ -1690,6 +1950,20 @@
                         'aiUsage': 'Использование ИИ'
                     };
                     return titles[this.monitoringFunction];
+                },
+
+                formatActivityTime(timestamp) {
+                    if (!timestamp) return '';
+                    const date = new Date(timestamp);
+                    const now = new Date();
+                    const diffMs = now - date;
+                    const diffMins = Math.floor(diffMs / 60000);
+                    const diffHours = Math.floor(diffMs / 3600000);
+
+                    if (diffMins < 1) return 'только что';
+                    if (diffMins < 60) return `${diffMins} мин. назад`;
+                    if (diffHours < 24) return `${diffHours} ч. назад`;
+                    return date.toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
                 },
                 
                 changeLanguage() {
