@@ -260,17 +260,14 @@
             z-index: 999999;
         }
 
-        /* Календарь - компактный, открывается ВНИЗ поверх всего */
+        /* Календарь - открывается ВНИЗ поверх ВСЕГО через fixed */
         .calendar-popup {
             background: white !important;
             border: 1px solid #d1d5db;
             border-radius: 8px;
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
             z-index: 999999 !important;
-            position: absolute !important;
-            top: 100% !important;
-            left: 0 !important;
-            margin-top: 4px;
+            position: fixed !important;
             width: 280px !important;
             padding: 12px !important;
             font-size: 12px !important;
@@ -627,14 +624,14 @@
 
                         <!-- Календарь выбора диапазона -->
                         <div class="calendar-container">
-                            <div class="glass px-4 py-2.5 rounded-xl flex items-center cursor-pointer" @click="showStatsCalendar = !showStatsCalendar">
+                            <div class="glass px-4 py-2.5 rounded-xl flex items-center cursor-pointer calendar-trigger" @click="openCalendar($event, 'stats')">
                                 <i class="fas fa-calendar mr-2 text-gray-400"></i>
                                 <span x-text="getDateRangeText()"></span>
                                 <i class="fas fa-chevron-down ml-2 text-gray-400"></i>
                             </div>
 
                             <!-- Всплывающий календарь -->
-                            <div x-show="showStatsCalendar" @click.outside="showStatsCalendar = false" class="rounded-lg calendar-popup">
+                            <div x-show="showStatsCalendar" @click.outside="showStatsCalendar = false" class="rounded-lg calendar-popup" :style="calendarPosition">
                                 <div class="flex justify-between items-center mb-4">
                                     <button @click="calendarMonth--" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-left"></i></button>
                                     <span class="font-medium" x-text="getCalendarMonthName()"></span>
@@ -1144,14 +1141,14 @@
 
                         <!-- Календарь выбора диапазона -->
                         <div class="calendar-container">
-                            <div class="glass px-4 py-2.5 rounded-xl flex items-center cursor-pointer" @click="showMonitoringCalendar = !showMonitoringCalendar">
+                            <div class="glass px-4 py-2.5 rounded-xl flex items-center cursor-pointer" @click="openCalendar($event, 'monitoring')">
                                 <i class="fas fa-calendar mr-2 text-gray-400"></i>
                                 <span x-text="getMonitoringDateRangeText()"></span>
                                 <i class="fas fa-chevron-down ml-2 text-gray-400"></i>
                             </div>
 
                             <!-- Всплывающий календарь -->
-                            <div x-show="showMonitoringCalendar" @click.outside="showMonitoringCalendar = false" class="rounded-lg calendar-popup">
+                            <div x-show="showMonitoringCalendar" @click.outside="showMonitoringCalendar = false" class="rounded-lg calendar-popup" :style="calendarPosition">
                                 <div class="flex justify-between items-center mb-4">
                                     <button @click="calendarMonth--" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-left"></i></button>
                                     <span class="font-medium" x-text="getCalendarMonthName()"></span>
@@ -1428,14 +1425,14 @@
 
                         <!-- Календарь -->
                         <div class="calendar-container">
-                            <div class="glass px-4 py-2.5 rounded-xl flex items-center cursor-pointer" @click="showHistoryCalendar = !showHistoryCalendar">
+                            <div class="glass px-4 py-2.5 rounded-xl flex items-center cursor-pointer" @click="openCalendar($event, 'history')">
                                 <i class="fas fa-calendar mr-2 text-gray-400"></i>
                                 <span x-text="getHistoryDateRangeText()"></span>
                                 <i class="fas fa-chevron-down ml-2 text-gray-400"></i>
                             </div>
 
                             <!-- Всплывающий календарь -->
-                            <div x-show="showHistoryCalendar" @click.outside="showHistoryCalendar = false" class="rounded-lg calendar-popup">
+                            <div x-show="showHistoryCalendar" @click.outside="showHistoryCalendar = false" class="rounded-lg calendar-popup" :style="calendarPosition">
                                 <div class="flex justify-between items-center mb-4">
                                     <button @click="calendarMonth--" class="p-1 hover:bg-gray-100 rounded"><i class="fas fa-chevron-left"></i></button>
                                     <span class="font-medium" x-text="getCalendarMonthName()"></span>
@@ -1869,6 +1866,28 @@
                 calendarMonth: new Date().getMonth(),
                 calendarYear: new Date().getFullYear(),
                 calendarSelectingStart: true,
+                calendarPosition: '',
+
+                // Открыть календарь с позиционированием
+                openCalendar(event, type) {
+                    const btn = event.currentTarget;
+                    const rect = btn.getBoundingClientRect();
+                    this.calendarPosition = `top: ${rect.bottom + 4}px; left: ${rect.left}px;`;
+
+                    if (type === 'stats') {
+                        this.showStatsCalendar = !this.showStatsCalendar;
+                        this.showMonitoringCalendar = false;
+                        this.showHistoryCalendar = false;
+                    } else if (type === 'monitoring') {
+                        this.showMonitoringCalendar = !this.showMonitoringCalendar;
+                        this.showStatsCalendar = false;
+                        this.showHistoryCalendar = false;
+                    } else if (type === 'history') {
+                        this.showHistoryCalendar = !this.showHistoryCalendar;
+                        this.showStatsCalendar = false;
+                        this.showMonitoringCalendar = false;
+                    }
+                },
 
                 monitoringFilter: {
                     admin: '',
