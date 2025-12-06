@@ -52,6 +52,12 @@ app.use('/api/favorite-templates', favoriteTemplatesRoutes);
 app.use('/api', activityRoutes);
 app.use('/api/activity', activityRoutes);
 
+// Profile history (alias для совместимости)
+app.get('/api/profile-history', (req, res, next) => {
+    req.url = '/history';
+    profilesRoutes(req, res, next);
+});
+
 // Heartbeat маршруты
 app.post('/api/heartbeat', (req, res, next) => {
     req.url = '/heartbeat';

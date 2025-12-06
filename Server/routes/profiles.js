@@ -8,6 +8,21 @@ const pool = require('../config/database');
 
 const router = express.Router();
 
+/**
+ * Логирование действий с анкетами
+ */
+async function logProfileAction(profileId, actionType, performedById, performedByName, details = null, oldValue = null, newValue = null) {
+    try {
+        await pool.query(
+            `INSERT INTO profile_actions (profile_id, action_type, performed_by_id, performed_by_name, details, old_value, new_value)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [profileId, actionType, performedById, performedByName, details, oldValue, newValue]
+        );
+    } catch (e) {
+        console.error('Ошибка логирования действия:', e.message);
+    }
+}
+
 // Получение анкет
 router.get('/', async (req, res) => {
     const { userId, role } = req.query;
@@ -120,7 +135,7 @@ router.get('/', async (req, res) => {
 
 // Массовое добавление анкет
 router.post('/bulk', async (req, res) => {
-    const { profiles, note, adminId } = req.body;
+    const { profiles, note, adminId, userId, userName } = req.body;
     try {
         for (const id of profiles) {
             if (id.trim().length > 2) {
@@ -131,6 +146,8 @@ router.post('/bulk', async (req, res) => {
                         `INSERT INTO allowed_profiles (profile_id, note, assigned_admin_id) VALUES ($1, $2, $3)`,
                         [profileId, note, adminId || null]
                     );
+                    // Логируем добавление
+                    await logProfileAction(profileId, 'add', userId, userName, note || 'Добавлена новая анкета');
                 } else {
                     await pool.query(
                         `UPDATE allowed_profiles SET assigned_admin_id = $1 WHERE profile_id = $2`,
@@ -145,12 +162,29 @@ router.post('/bulk', async (req, res) => {
 
 // Назначение анкет
 router.post('/assign', async (req, res) => {
-    const { profileIds, targetUserId, roleTarget } = req.body;
+    const { profileIds, targetUserId, roleTarget, targetUserName, userId, userName } = req.body;
     try {
         let field = roleTarget === 'admin' ? 'assigned_admin_id' : 'assigned_translator_id';
         const placeholders = profileIds.map((_, i) => `$${i + 2}`).join(',');
         const query = `UPDATE allowed_profiles SET ${field} = $1 WHERE id IN (${placeholders})`;
         await pool.query(query, [targetUserId, ...profileIds]);
+
+        // Логируем назначение для каждой анкеты
+        const profilesResult = await pool.query(
+            `SELECT profile_id FROM allowed_profiles WHERE id IN (${placeholders})`,
+            profileIds
+        );
+        for (const row of profilesResult.rows) {
+            const actionType = roleTarget === 'admin' ? 'assign_admin' : 'assign_translator';
+            await logProfileAction(
+                row.profile_id,
+                actionType,
+                userId,
+                userName,
+                `Назначен ${roleTarget === 'admin' ? 'админ' : 'переводчик'}: ${targetUserName || targetUserId}`
+            );
+        }
+
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -200,7 +234,11 @@ router.post('/toggle-access', async (req, res) => {
  */
 router.delete('/:profileId', async (req, res) => {
     const { profileId } = req.params;
+    const { userId, userName } = req.query;
     try {
+        // Логируем удаление перед удалением
+        await logProfileAction(profileId, 'delete', userId, userName, 'Анкета удалена');
+
         // Удаляем анкету из allowed_profiles
         await pool.query(`DELETE FROM allowed_profiles WHERE profile_id = $1`, [profileId]);
         // Также удаляем связи с ботами
@@ -208,6 +246,80 @@ router.delete('/:profileId', async (req, res) => {
         res.json({ success: true });
     } catch (e) {
         console.error('Delete profile error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
+ * GET /api/profile-history
+ * История действий с анкетами
+ */
+router.get('/history', async (req, res) => {
+    const { userId, role, adminId, dateFrom, dateTo, limit = 100 } = req.query;
+    try {
+        let filter = 'WHERE 1=1';
+        let params = [limit];
+        let paramIndex = 2;
+
+        // Фильтр по роли
+        if (role === 'admin') {
+            filter += ` AND pa.performed_by_id = $${paramIndex++}`;
+            params.push(userId);
+        } else if (role === 'translator') {
+            filter += ` AND pa.performed_by_id = $${paramIndex++}`;
+            params.push(userId);
+        }
+
+        // Фильтр по админу (для директора)
+        if (adminId) {
+            filter += ` AND pa.performed_by_id = $${paramIndex++}`;
+            params.push(adminId);
+        }
+
+        // Фильтр по датам
+        if (dateFrom) {
+            filter += ` AND DATE(pa.created_at) >= $${paramIndex++}`;
+            params.push(dateFrom);
+        }
+        if (dateTo) {
+            filter += ` AND DATE(pa.created_at) <= $${paramIndex++}`;
+            params.push(dateTo);
+        }
+
+        const query = `
+            SELECT
+                pa.id,
+                pa.profile_id,
+                pa.action_type,
+                pa.performed_by_id,
+                pa.performed_by_name,
+                pa.details,
+                pa.old_value,
+                pa.new_value,
+                pa.created_at
+            FROM profile_actions pa
+            ${filter}
+            ORDER BY pa.created_at DESC
+            LIMIT $1
+        `;
+
+        const result = await pool.query(query, params);
+
+        res.json({
+            success: true,
+            history: result.rows.map(row => ({
+                id: row.id,
+                profile_id: row.profile_id,
+                action_type: row.action_type,
+                performed_by: row.performed_by_name || `User #${row.performed_by_id}`,
+                details: row.details,
+                old_value: row.old_value,
+                new_value: row.new_value,
+                created_at: row.created_at
+            }))
+        });
+    } catch (e) {
+        console.error('Profile history error:', e.message);
         res.status(500).json({ error: e.message });
     }
 });

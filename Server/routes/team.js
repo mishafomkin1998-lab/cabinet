@@ -104,15 +104,19 @@ router.get('/', async (req, res) => {
 
 // Создание пользователя
 router.post('/', async (req, res) => {
-    const { username, password, role, ownerId } = req.body;
+    const { username, password, role, ownerId, salary, isRestricted, aiEnabled } = req.body;
     try {
         const hash = await bcrypt.hash(password, 10);
-        await pool.query(
-            `INSERT INTO users (username, password_hash, role, owner_id) VALUES ($1, $2, $3, $4)`,
-            [username, hash, role, ownerId]
+        const result = await pool.query(
+            `INSERT INTO users (username, password_hash, role, owner_id, salary, ai_enabled)
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+            [username, hash, role, ownerId, isRestricted ? null : salary, aiEnabled || false]
         );
-        res.json({ success: true });
-    } catch (e) { res.json({ success: false, error: 'Логин занят' }); }
+        res.json({ success: true, id: result.rows[0].id });
+    } catch (e) {
+        console.error('Create user error:', e.message);
+        res.json({ success: false, error: 'Логин занят' });
+    }
 });
 
 // Удаление пользователя

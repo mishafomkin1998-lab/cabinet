@@ -270,6 +270,28 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_fav_tpl_translator ON favorite_templates(translator_id)`);
         await fixSerialSequence('favorite_templates');
 
+        // 14. Таблица истории действий с анкетами
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS profile_actions (
+                id SERIAL PRIMARY KEY,
+                profile_id VARCHAR(100) NOT NULL,
+                action_type VARCHAR(50) NOT NULL,
+                performed_by_id INTEGER,
+                performed_by_name VARCHAR(100),
+                details TEXT,
+                old_value TEXT,
+                new_value TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_profile_actions_profile ON profile_actions(profile_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_profile_actions_date ON profile_actions(created_at)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_profile_actions_type ON profile_actions(action_type)`);
+        await fixSerialSequence('profile_actions');
+
+        // 15. Добавляем поле ai_enabled для пользователей
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT FALSE`);
+
         // Очистка старых данных
         await cleanupOldData();
 

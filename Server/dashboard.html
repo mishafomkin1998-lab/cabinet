@@ -635,11 +635,11 @@
                             </div>
                         </div>
 
-                        <button @click="refreshAllStats()" class="w-10 h-10 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 flex items-center justify-center" :class="{'opacity-50 cursor-wait': loading}" :title="t('common.refresh')">
-                            <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i>
+                        <button @click="refreshAllStats()" class="px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600" :class="{'opacity-50 cursor-wait': loading}">
+                            <i class="fas fa-sync-alt mr-2" :class="{'fa-spin': loading}"></i><span x-text="t('common.refresh')"></span>
                         </button>
-                        <button @click="exportStats()" class="ml-auto w-10 h-10 rounded-xl bg-green-500 text-white hover:bg-green-600 flex items-center justify-center" :title="t('common.export')">
-                            <i class="fas fa-download"></i>
+                        <button @click="exportStats()" class="ml-auto px-4 py-2.5 rounded-xl bg-green-500 text-white hover:bg-green-600">
+                            <i class="fas fa-download mr-2"></i><span x-text="t('common.export')"></span>
                         </button>
                     </div>
                 </div>
@@ -786,9 +786,16 @@
                 <div class="glass rounded-2xl p-5 mb-6">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-bold" x-text="t('team.teamManagement')"></h3>
-                        <button @click="showAddAdminModal = true" class="glow-button px-4 py-2 rounded-xl text-white text-sm font-medium">
-                            <i class="fas fa-user-plus mr-2"></i><span x-text="t('team.addAdmin')"></span>
-                        </button>
+                        <div class="flex gap-2">
+                            <!-- Кнопка добавить переводчика (видна админам) -->
+                            <button @click="openAddTranslatorModal()" class="px-4 py-2 rounded-xl text-sm font-medium bg-purple-500 hover:bg-purple-600 text-white">
+                                <i class="fas fa-language mr-2"></i>Добавить переводчика
+                            </button>
+                            <!-- Кнопка добавить админа (видна директорам) -->
+                            <button x-show="currentUser.role === 'director'" @click="showAddAdminModal = true" class="glow-button px-4 py-2 rounded-xl text-white text-sm font-medium">
+                                <i class="fas fa-user-plus mr-2"></i><span x-text="t('team.addAdmin')"></span>
+                            </button>
+                        </div>
                     </div>
                     <div class="flex flex-wrap gap-3">
                         <template x-for="admin in admins" :key="admin.id">
@@ -1500,6 +1507,72 @@
         </div>
     </div>
     
+    <!-- Модальное окно добавления переводчика -->
+    <div x-show="showAddTranslatorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-md" @click.outside="showAddTranslatorModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold" x-text="newTranslator.id ? 'Редактировать переводчика' : 'Добавление переводчика'"></h3>
+                <button @click="showAddTranslatorModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Имя</label>
+                    <input type="text"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Введите имя"
+                           x-model="newTranslator.name">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">Логин</label>
+                    <input type="text"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Введите логин"
+                           x-model="newTranslator.login">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">Пароль</label>
+                    <input type="password"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Введите пароль"
+                           x-model="newTranslator.password">
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox"
+                           id="translatorAiEnabledCheckbox"
+                           class="rounded"
+                           x-model="newTranslator.aiEnabled">
+                    <label for="translatorAiEnabledCheckbox" class="ml-2 text-sm">
+                        <i class="fas fa-brain text-orange-500 mr-1"></i>
+                        Расширить AI
+                    </label>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">Ставка</label>
+                    <input type="number"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Введите ставку"
+                           x-model="newTranslator.salary">
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showAddTranslatorModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
+                        Отмена
+                    </button>
+                    <button @click="saveTranslator" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                        Сохранить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Модальное окно распределения анкет админу -->
     <div x-show="showAssignAccountsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div class="glass rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" @click.outside="showAssignAccountsModal = false">
@@ -1777,6 +1850,16 @@
                     aiEnabled: false
                 },
 
+                newTranslator: {
+                    id: null,
+                    name: '',
+                    login: '',
+                    password: '',
+                    salary: '',
+                    aiEnabled: false
+                },
+
+                showAddTranslatorModal: false,
                 selectedAdmin: null,
                 accountsToAssign: '',
                 assignComment: '',
@@ -2691,7 +2774,65 @@
                         alert('Ошибка сохранения администратора');
                     }
                 },
-                
+
+                openAddTranslatorModal() {
+                    this.newTranslator = {
+                        id: null,
+                        name: '',
+                        login: '',
+                        password: '',
+                        salary: '',
+                        aiEnabled: false
+                    };
+                    this.showAddTranslatorModal = true;
+                },
+
+                async saveTranslator() {
+                    if (!this.newTranslator.name || !this.newTranslator.login || !this.newTranslator.password) {
+                        alert('Заполните все обязательные поля');
+                        return;
+                    }
+
+                    try {
+                        // Создание нового переводчика
+                        const res = await fetch(`${API_BASE}/api/users`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                username: this.newTranslator.login,
+                                password: this.newTranslator.password,
+                                role: 'translator',
+                                ownerId: this.currentUser.id,
+                                salary: this.newTranslator.salary ? parseFloat(this.newTranslator.salary) : null,
+                                aiEnabled: this.newTranslator.aiEnabled
+                            })
+                        });
+                        const data = await res.json();
+                        if (!data.success) {
+                            alert('Ошибка создания: ' + (data.error || 'Неизвестная ошибка'));
+                            return;
+                        }
+
+                        // Перезагружаем команду
+                        await this.loadTeam();
+
+                        this.newTranslator = {
+                            id: null,
+                            name: '',
+                            login: '',
+                            password: '',
+                            salary: '',
+                            aiEnabled: false
+                        };
+                        this.showAddTranslatorModal = false;
+
+                        alert('Переводчик добавлен');
+                    } catch (e) {
+                        console.error('saveTranslator error:', e);
+                        alert('Ошибка сохранения переводчика');
+                    }
+                },
+
                 async toggleBotStatus(bot) {
                     const newActive = bot.status !== 'active';
                     try {
