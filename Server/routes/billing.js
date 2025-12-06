@@ -55,7 +55,7 @@ router.get('/balance/:userId', asyncHandler(async (req, res) => {
  * Пополнить баланс пользователя (директор -> админ)
  */
 router.post('/topup', asyncHandler(async (req, res) => {
-    const { userId, amount, byUserId } = req.body;
+    const { userId, amount, byUserId, note } = req.body;
 
     if (!userId || !amount || amount <= 0) {
         return res.status(400).json({ success: false, error: 'Неверные параметры' });
@@ -73,12 +73,101 @@ router.post('/topup', asyncHandler(async (req, res) => {
         [amount, userId]
     );
 
+    // Сохраняем в историю пополнений
+    await pool.query(
+        `INSERT INTO billing_history (admin_id, amount, by_user_id, note) VALUES ($1, $2, $3, $4)`,
+        [userId, amount, byUserId, note || null]
+    );
+
     // Получаем новый баланс
     const newBalance = await pool.query(`SELECT balance FROM users WHERE id = $1`, [userId]);
 
     res.json({
         success: true,
         newBalance: parseFloat(newBalance.rows[0].balance) || 0
+    });
+}));
+
+/**
+ * GET /api/billing/history
+ * Получить историю пополнений (только для директора)
+ */
+router.get('/history', asyncHandler(async (req, res) => {
+    const { userId, limit = 100 } = req.query;
+
+    // Проверяем права
+    const user = await pool.query(`SELECT role FROM users WHERE id = $1`, [userId]);
+    if (user.rows.length === 0 || user.rows[0].role !== 'director') {
+        return res.status(403).json({ success: false, error: 'Нет доступа' });
+    }
+
+    // Получаем историю с именами пользователей
+    const result = await pool.query(`
+        SELECT
+            bh.id,
+            bh.admin_id,
+            bh.amount,
+            bh.note,
+            bh.created_at,
+            u.username as admin_name,
+            u.balance as admin_balance
+        FROM billing_history bh
+        JOIN users u ON bh.admin_id = u.id
+        ORDER BY bh.created_at DESC
+        LIMIT $1
+    `, [limit]);
+
+    // Считаем общую сумму пополнений
+    const totalResult = await pool.query(`SELECT COALESCE(SUM(amount), 0) as total FROM billing_history`);
+    const totalSum = parseFloat(totalResult.rows[0].total) || 0;
+
+    res.json({
+        success: true,
+        history: result.rows.map(row => ({
+            id: row.id,
+            adminId: row.admin_id,
+            adminName: row.admin_name,
+            adminBalance: parseFloat(row.admin_balance) || 0,
+            amount: parseFloat(row.amount),
+            note: row.note,
+            createdAt: row.created_at
+        })),
+        totalSum: totalSum
+    });
+}));
+
+/**
+ * GET /api/billing/admins
+ * Получить список админов для пополнения (только не "мой админ")
+ */
+router.get('/admins', asyncHandler(async (req, res) => {
+    const { userId } = req.query;
+
+    // Проверяем права
+    const user = await pool.query(`SELECT role FROM users WHERE id = $1`, [userId]);
+    if (user.rows.length === 0 || user.rows[0].role !== 'director') {
+        return res.status(403).json({ success: false, error: 'Нет доступа' });
+    }
+
+    // Получаем админов без флага is_restricted (не "мой админ")
+    const result = await pool.query(`
+        SELECT
+            id,
+            username,
+            balance,
+            is_restricted
+        FROM users
+        WHERE role = 'admin' AND (is_restricted = FALSE OR is_restricted IS NULL)
+        ORDER BY username
+    `);
+
+    res.json({
+        success: true,
+        admins: result.rows.map(row => ({
+            id: row.id,
+            name: row.username,
+            balance: parseFloat(row.balance) || 0
+        }))
     });
 }));
 

@@ -303,10 +303,25 @@ async function initDatabase() {
         await pool.query(`ALTER TABLE allowed_profiles ADD COLUMN IF NOT EXISTS is_trial BOOLEAN DEFAULT FALSE`);
         await pool.query(`ALTER TABLE allowed_profiles ADD COLUMN IF NOT EXISTS trial_started_at TIMESTAMP`);
 
+        // 17. История пополнений баланса
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS billing_history (
+                id SERIAL PRIMARY KEY,
+                admin_id INTEGER NOT NULL REFERENCES users(id),
+                amount DECIMAL(10,2) NOT NULL,
+                by_user_id INTEGER REFERENCES users(id),
+                note TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_billing_history_admin ON billing_history(admin_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_billing_history_date ON billing_history(created_at)`);
+        await fixSerialSequence('billing_history');
+
         // Очистка старых данных
         await cleanupOldData();
 
-        console.log('✅ База данных готова к работе (v7.0 - система оплаты анкет)');
+        console.log('✅ База данных готова к работе (v8.0 - история пополнений)');
     } catch (e) {
         console.error('❌ Ошибка инициализации БД:', e.message);
     }

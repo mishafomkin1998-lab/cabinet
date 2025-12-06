@@ -516,6 +516,13 @@
                             <span class="ml-3 font-medium" x-text="t('menu.training')"></span>
                         </div>
                     </div>
+                    <!-- Финансы (только для директора) -->
+                    <div x-show="currentUser.role === 'director'">
+                        <div @click="setActiveMenu('finances')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'finances' ? 'active' : ''">
+                            <i class="fas fa-wallet w-5 text-gray-600"></i>
+                            <span class="ml-3 font-medium">Финансы</span>
+                        </div>
+                    </div>
                 </div>
             </nav>
 
@@ -1449,9 +1456,141 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Финансы (только для директора) -->
+            <div x-show="activeMenu === 'finances' && currentUser.role === 'director'" x-cloak class="fade-in">
+                <!-- Форма пополнения -->
+                <div class="glass rounded-2xl p-6 mb-6">
+                    <h3 class="text-lg font-bold mb-6">
+                        <i class="fas fa-plus-circle text-green-500 mr-2"></i>
+                        Пополнить баланс админа
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Выбор админа -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Выберите админа</label>
+                            <select class="glass w-full px-4 py-3 rounded-xl" x-model="financeTopup.adminId">
+                                <option value="">-- Выберите админа --</option>
+                                <template x-for="admin in financeAdmins" :key="admin.id">
+                                    <option :value="admin.id">
+                                        <span x-text="admin.name"></span> (баланс: $<span x-text="admin.balance.toFixed(2)"></span>)
+                                    </option>
+                                </template>
+                            </select>
+                            <p x-show="financeAdmins.length === 0" class="text-sm text-gray-500 mt-1">
+                                Нет админов для пополнения (только админы без галочки "мой админ")
+                            </p>
+                        </div>
+
+                        <!-- Сумма -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Сумма ($)</label>
+                            <input type="number"
+                                   class="glass w-full px-4 py-3 rounded-xl"
+                                   min="1"
+                                   step="1"
+                                   placeholder="Введите сумму"
+                                   x-model.number="financeTopup.amount">
+                            <div class="flex gap-2 mt-2">
+                                <button @click="financeTopup.amount = 5" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$5</button>
+                                <button @click="financeTopup.amount = 10" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$10</button>
+                                <button @click="financeTopup.amount = 20" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$20</button>
+                                <button @click="financeTopup.amount = 50" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$50</button>
+                                <button @click="financeTopup.amount = 100" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$100</button>
+                            </div>
+                        </div>
+
+                        <!-- Примечание -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Примечание (опционально)</label>
+                            <input type="text"
+                                   class="glass w-full px-4 py-3 rounded-xl"
+                                   placeholder="Комментарий к пополнению"
+                                   x-model="financeTopup.note">
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end mt-6">
+                        <button @click="submitFinanceTopup()"
+                                :disabled="!financeTopup.adminId || !financeTopup.amount || financeTopup.amount <= 0"
+                                class="glow-button px-6 py-3 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-wallet mr-2"></i>
+                            Пополнить баланс
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Статистика и история -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-green-600">$<span x-text="financeTotalSum.toFixed(2)"></span></div>
+                        <div class="text-sm text-gray-500 mt-1">Всего пополнено</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-blue-600" x-text="financeHistory.length"></div>
+                        <div class="text-sm text-gray-500 mt-1">Транзакций</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-purple-600" x-text="financeAdmins.length"></div>
+                        <div class="text-sm text-gray-500 mt-1">Админов с балансом</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-orange-600">$<span x-text="financeAdminsTotalBalance.toFixed(2)"></span></div>
+                        <div class="text-sm text-gray-500 mt-1">Общий баланс админов</div>
+                    </div>
+                </div>
+
+                <!-- Таблица истории пополнений -->
+                <div class="glass rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-bold">
+                            <i class="fas fa-history text-gray-500 mr-2"></i>
+                            История пополнений
+                        </h3>
+                        <button @click="loadFinanceData()" class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm">
+                            <i class="fas fa-sync-alt mr-1"></i> Обновить
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-100">
+                                    <th class="text-left py-3 px-4">Дата</th>
+                                    <th class="text-left py-3 px-4">Админ</th>
+                                    <th class="text-left py-3 px-4">Сумма</th>
+                                    <th class="text-left py-3 px-4">Текущий баланс</th>
+                                    <th class="text-left py-3 px-4">Примечание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="item in financeHistory" :key="item.id">
+                                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                        <td class="py-3 px-4 text-sm" x-text="formatDateTime(item.createdAt)"></td>
+                                        <td class="py-3 px-4 font-medium" x-text="item.adminName"></td>
+                                        <td class="py-3 px-4">
+                                            <span class="text-green-600 font-semibold">+$<span x-text="item.amount.toFixed(2)"></span></span>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <span class="text-blue-600">$<span x-text="item.adminBalance.toFixed(2)"></span></span>
+                                        </td>
+                                        <td class="py-3 px-4 text-sm text-gray-500" x-text="item.note || '-'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="financeHistory.length === 0">
+                                    <td colspan="5" class="py-8 px-4 text-center text-gray-500">
+                                        <i class="fas fa-wallet text-3xl mb-2 opacity-30"></i>
+                                        <p>История пополнений пуста</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
-    
+
     <!-- Модальное окно добавления анкеты -->
     <div x-show="showAddAccountModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div class="glass rounded-2xl p-6 w-full max-w-2xl" @click.outside="showAddAccountModal = false">
@@ -2075,6 +2214,16 @@
                 topupUserId: null,
                 topupAmount: 10,
 
+                // Финансы (только для директора)
+                financeAdmins: [],
+                financeHistory: [],
+                financeTotalSum: 0,
+                financeTopup: {
+                    adminId: '',
+                    amount: 10,
+                    note: ''
+                },
+
                 // Инициализация - загрузка данных с сервера
                 async init() {
                     console.log('Dashboard init, user:', this.currentUser);
@@ -2161,7 +2310,7 @@
                 async loadAllData() {
                     this.loading = true;
                     try {
-                        await Promise.all([
+                        const loadPromises = [
                             this.loadDashboardStats(),
                             this.loadAccounts(),
                             this.loadBotsStatus(),
@@ -2175,7 +2324,14 @@
                             this.loadSavedPrompt(),
                             this.loadUserBalance(),
                             this.loadPricing()
-                        ]);
+                        ];
+
+                        // Загружаем финансовые данные только для директора
+                        if (this.currentUser.role === 'director') {
+                            loadPromises.push(this.loadFinanceData());
+                        }
+
+                        await Promise.all(loadPromises);
                     } catch (e) {
                         console.error('Error loading data:', e);
                         this.error = 'Ошибка загрузки данных';
@@ -3437,6 +3593,76 @@
                     }
                     if (account.isTrial) return `Trial: ${account.daysLeft} дн.`;
                     return `${account.daysLeft} дн.`;
+                },
+
+                // ========== FINANCE FUNCTIONS (только для директора) ==========
+
+                // Загрузить данные финансов
+                async loadFinanceData() {
+                    if (this.currentUser.role !== 'director') return;
+
+                    try {
+                        // Загружаем список админов для пополнения
+                        const adminsRes = await fetch(`${API_BASE}/api/billing/admins?userId=${this.currentUser.id}`);
+                        const adminsData = await adminsRes.json();
+                        if (adminsData.success) {
+                            this.financeAdmins = adminsData.admins;
+                        }
+
+                        // Загружаем историю пополнений
+                        const historyRes = await fetch(`${API_BASE}/api/billing/history?userId=${this.currentUser.id}&limit=100`);
+                        const historyData = await historyRes.json();
+                        if (historyData.success) {
+                            this.financeHistory = historyData.history;
+                            this.financeTotalSum = historyData.totalSum;
+                        }
+                    } catch (e) {
+                        console.error('loadFinanceData error:', e);
+                    }
+                },
+
+                // Вычисляемое свойство: общий баланс всех админов
+                get financeAdminsTotalBalance() {
+                    return this.financeAdmins.reduce((sum, admin) => sum + admin.balance, 0);
+                },
+
+                // Отправить пополнение
+                async submitFinanceTopup() {
+                    if (!this.financeTopup.adminId || !this.financeTopup.amount || this.financeTopup.amount <= 0) {
+                        alert('Выберите админа и введите сумму');
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/billing/topup`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                userId: this.financeTopup.adminId,
+                                amount: this.financeTopup.amount,
+                                byUserId: this.currentUser.id,
+                                note: this.financeTopup.note || null
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            const admin = this.financeAdmins.find(a => a.id == this.financeTopup.adminId);
+                            const adminName = admin ? admin.name : 'Админ';
+                            alert(`Баланс ${adminName} пополнен на $${this.financeTopup.amount}.\nНовый баланс: $${data.newBalance.toFixed(2)}`);
+
+                            // Сбрасываем форму
+                            this.financeTopup = { adminId: '', amount: 10, note: '' };
+
+                            // Обновляем данные
+                            await this.loadFinanceData();
+                            await this.loadTeam();
+                        } else {
+                            alert(data.error || 'Ошибка пополнения');
+                        }
+                    } catch (e) {
+                        console.error('submitFinanceTopup error:', e);
+                        alert('Ошибка соединения');
+                    }
                 },
 
                 // ========== END BILLING FUNCTIONS ==========
