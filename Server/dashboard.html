@@ -519,6 +519,18 @@
                 </div>
             </nav>
 
+            <!-- Balance (visible for admin who is not "мой админ") -->
+            <template x-if="currentUser.role === 'admin' && !isRestricted">
+                <div class="pt-3 border-t border-gray-100 mb-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm text-gray-600">Баланс:</span>
+                        <span class="font-semibold text-lg" :class="userBalance > 0 ? 'text-green-600' : 'text-red-500'">
+                            $<span x-text="userBalance.toFixed(2)"></span>
+                        </span>
+                    </div>
+                </div>
+            </template>
+
             <!-- Status -->
             <div class="pt-3 border-t border-gray-100">
                 <div class="flex items-center">
@@ -816,6 +828,13 @@
                                     <button @click="viewAdminDetails(admin)" class="w-8 h-8 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center" :title="t('team.viewBtn')">
                                         <i class="fas fa-eye text-blue-600 text-xs"></i>
                                     </button>
+                                    <!-- Кнопка пополнения баланса (только для директора и не "мой админ") -->
+                                    <button x-show="currentUser.role === 'director' && !admin.isMyAdmin"
+                                            @click="openTopupModal(admin.id)"
+                                            class="w-8 h-8 rounded-lg bg-green-100 hover:bg-green-200 flex items-center justify-center"
+                                            title="Пополнить баланс">
+                                        <i class="fas fa-dollar-sign text-green-600 text-xs"></i>
+                                    </button>
                                 </div>
                                 <!-- Переводчики -->
                                 <div x-show="admin.translators.length > 0" class="flex items-center -space-x-2">
@@ -885,6 +904,7 @@
                                         <i class="fas ml-1" :class="sortBy === 'date' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
                                     <th class="text-left py-2 px-3" x-text="t('profiles.commentCol')"></th>
+                                    <th class="text-left py-2 px-3">Оплата</th>
                                     <th class="text-left py-2 px-3" x-text="t('common.actions')"></th>
                                 </tr>
                             </thead>
@@ -920,6 +940,30 @@
                                         <td class="py-2 px-3 text-gray-500" x-text="account.addedDate"></td>
                                         <td class="py-2 px-3 max-w-xs">
                                             <div class="truncate text-gray-600" :title="account.comment" x-text="account.comment"></div>
+                                        </td>
+                                        <!-- Оплата -->
+                                        <td class="py-2 px-3">
+                                            <div class="flex items-center space-x-2">
+                                                <span class="text-xs font-medium" :class="getPaymentStatusClass(account)" x-text="getPaymentStatusText(account)"></span>
+                                                <!-- Кнопки оплаты (только для admin не "мой админ") -->
+                                                <template x-if="currentUser.role === 'admin' && !isRestricted && !account.isFree">
+                                                    <div class="flex items-center space-x-1">
+                                                        <!-- Кнопка trial если не использован -->
+                                                        <button x-show="!account.trialUsed && !account.isPaid"
+                                                                @click="startTrial(account)"
+                                                                class="px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
+                                                                title="Активировать тестовый период (2 дня)">
+                                                            Trial
+                                                        </button>
+                                                        <!-- Кнопка продлить -->
+                                                        <button @click="openExtendModal(account)"
+                                                                class="px-2 py-0.5 text-xs bg-green-100 text-green-600 rounded hover:bg-green-200"
+                                                                title="Продлить анкету">
+                                                            <i class="fas fa-plus"></i>
+                                                        </button>
+                                                    </div>
+                                                </template>
+                                            </div>
                                         </td>
                                         <td class="py-2 px-3">
                                             <div class="flex items-center space-x-2">
@@ -1698,7 +1742,124 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- Модальное окно продления анкеты -->
+    <div x-show="showExtendModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-md" @click.outside="showExtendModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">Продлить анкету</h3>
+                <button @click="showExtendModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div class="text-center mb-4">
+                    <div class="text-lg font-medium text-gray-700">
+                        Анкета: <span class="text-indigo-600 font-mono" x-text="extendingProfile?.profile_id"></span>
+                    </div>
+                    <div class="text-sm text-gray-500 mt-1">
+                        Текущий статус: <span :class="getPaymentStatusClass(extendingProfile || {})" x-text="getPaymentStatusText(extendingProfile || {})"></span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-3">Выберите период:</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button @click="selectedDays = 15"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="selectedDays === 15 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">15 дней</div>
+                            <div class="text-green-600 font-medium">$1</div>
+                        </button>
+                        <button @click="selectedDays = 30"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="selectedDays === 30 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">30 дней</div>
+                            <div class="text-green-600 font-medium">$2</div>
+                        </button>
+                        <button @click="selectedDays = 45"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="selectedDays === 45 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">45 дней</div>
+                            <div class="text-green-600 font-medium">$3</div>
+                        </button>
+                        <button @click="selectedDays = 60"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="selectedDays === 60 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">60 дней</div>
+                            <div class="text-green-600 font-medium">$4</div>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 rounded-xl p-4 mt-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">К оплате:</span>
+                        <span class="text-2xl font-bold text-green-600">$<span x-text="pricing[selectedDays] || 0"></span></span>
+                    </div>
+                    <div class="flex justify-between items-center mt-2 text-sm">
+                        <span class="text-gray-500">Ваш баланс:</span>
+                        <span :class="userBalance >= (pricing[selectedDays] || 0) ? 'text-green-600' : 'text-red-500'">
+                            $<span x-text="userBalance.toFixed(2)"></span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showExtendModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
+                        Отмена
+                    </button>
+                    <button @click="extendProfile"
+                            :disabled="userBalance < (pricing[selectedDays] || 0)"
+                            class="glow-button px-5 py-2.5 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                        Оплатить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно пополнения баланса (для директора) -->
+    <div x-show="showTopupModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-md" @click.outside="showTopupModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">Пополнить баланс</h3>
+                <button @click="showTopupModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Сумма пополнения ($)</label>
+                    <input type="number"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           min="1"
+                           step="1"
+                           placeholder="Введите сумму"
+                           x-model.number="topupAmount">
+                </div>
+
+                <div class="grid grid-cols-4 gap-2">
+                    <button @click="topupAmount = 5" class="py-2 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm">$5</button>
+                    <button @click="topupAmount = 10" class="py-2 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm">$10</button>
+                    <button @click="topupAmount = 20" class="py-2 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm">$20</button>
+                    <button @click="topupAmount = 50" class="py-2 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm">$50</button>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showTopupModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
+                        Отмена
+                    </button>
+                    <button @click="topupBalance" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                        Пополнить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         function dashboard() {
             return {
@@ -1903,6 +2064,17 @@
                 translatorStats: [],
                 historyActions: [],
 
+                // Система оплаты
+                userBalance: 0,
+                isRestricted: false, // "мой админ" - бесплатные анкеты
+                pricing: { 15: 1, 30: 2, 45: 3, 60: 4 },
+                showExtendModal: false,
+                extendingProfile: null,
+                selectedDays: 30,
+                showTopupModal: false,
+                topupUserId: null,
+                topupAmount: 10,
+
                 // Инициализация - загрузка данных с сервера
                 async init() {
                     console.log('Dashboard init, user:', this.currentUser);
@@ -2000,7 +2172,9 @@
                             this.loadTranslatorStats(),
                             this.loadHistoryActions(),
                             this.loadProfileHistory(),
-                            this.loadSavedPrompt()
+                            this.loadSavedPrompt(),
+                            this.loadUserBalance(),
+                            this.loadPricing()
                         ]);
                     } catch (e) {
                         console.error('Error loading data:', e);
@@ -2050,20 +2224,45 @@
                         const res = await fetch(`${API_BASE}/api/profiles?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
                         const data = await res.json();
                         if (data.success) {
-                            this.accounts = data.list.map(p => ({
-                                id: p.profile_id,
-                                profile_id: p.profile_id,
-                                login: p.login || p.profile_id,
-                                password: p.password || '',
-                                status: p.status || 'offline',
-                                lastOnline: p.last_online ? new Date(p.last_online).toLocaleString('ru-RU') : '-',
-                                incoming: p.incoming_today || 0,
-                                admin: p.admin_name || '',
-                                translator: p.trans_name || '',
-                                addedDate: new Date(p.added_at).toLocaleDateString('ru-RU'),
-                                comment: p.note ? p.note.replace(/\s*\[Last seen:.*?\]/g, '').trim() : '',
-                                paused: p.paused || false
+                            // Загружаем статус оплаты для каждой анкеты
+                            const accountsWithPayment = await Promise.all(data.list.map(async p => {
+                                let paymentStatus = { isPaid: true, isFree: false, daysLeft: 999, isTrial: false, trialUsed: false };
+                                try {
+                                    const payRes = await fetch(`${API_BASE}/api/billing/profile-status/${encodeURIComponent(p.profile_id)}`);
+                                    const payData = await payRes.json();
+                                    if (payData.success) {
+                                        paymentStatus = {
+                                            isPaid: payData.isPaid,
+                                            isFree: payData.isFree,
+                                            daysLeft: payData.daysLeft || 0,
+                                            isTrial: payData.isTrial,
+                                            trialUsed: payData.trialUsed
+                                        };
+                                    }
+                                } catch (e) { /* ignore */ }
+
+                                return {
+                                    id: p.profile_id,
+                                    profile_id: p.profile_id,
+                                    login: p.login || p.profile_id,
+                                    password: p.password || '',
+                                    status: p.status || 'offline',
+                                    lastOnline: p.last_online ? new Date(p.last_online).toLocaleString('ru-RU') : '-',
+                                    incoming: p.incoming_today || 0,
+                                    admin: p.admin_name || '',
+                                    translator: p.trans_name || '',
+                                    addedDate: new Date(p.added_at).toLocaleDateString('ru-RU'),
+                                    comment: p.note ? p.note.replace(/\s*\[Last seen:.*?\]/g, '').trim() : '',
+                                    paused: p.paused || false,
+                                    // Payment status
+                                    isPaid: paymentStatus.isPaid,
+                                    isFree: paymentStatus.isFree,
+                                    daysLeft: paymentStatus.daysLeft,
+                                    isTrial: paymentStatus.isTrial,
+                                    trialUsed: paymentStatus.trialUsed
+                                };
                             }));
+                            this.accounts = accountsWithPayment;
                         }
                     } catch (e) { console.error('loadAccounts error:', e); }
                 },
@@ -2145,6 +2344,7 @@
                                 conversion: a.conversion || 0,
                                 isMyAdmin: a.is_restricted || false,
                                 salary: a.salary || null,
+                                balance: a.balance || 0,
                                 translators: translatorsList.filter(t => t.owner_id === a.id).map(t => ({
                                     id: t.id,
                                     name: t.username,
@@ -3090,6 +3290,156 @@
                     const actions = this.t('history.actions');
                     return actions[actionType] || actionType;
                 },
+
+                // ========== BILLING FUNCTIONS ==========
+
+                async loadUserBalance() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/billing/balance/${this.currentUser.id}`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.userBalance = data.balance || 0;
+                            this.isRestricted = data.isRestricted || false;
+                        }
+                    } catch (e) {
+                        console.error('loadUserBalance error:', e);
+                    }
+                },
+
+                async loadPricing() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/billing/pricing`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.pricing = data.pricing;
+                        }
+                    } catch (e) {
+                        console.error('loadPricing error:', e);
+                    }
+                },
+
+                // Открыть модал продления анкеты
+                openExtendModal(account) {
+                    this.extendingProfile = account;
+                    this.selectedDays = 30;
+                    this.showExtendModal = true;
+                },
+
+                // Продлить анкету
+                async extendProfile() {
+                    if (!this.extendingProfile) return;
+
+                    const cost = this.pricing[this.selectedDays] || 0;
+
+                    if (this.userBalance < cost && !this.isRestricted) {
+                        alert(`Недостаточно средств. Нужно: $${cost}, на балансе: $${this.userBalance.toFixed(2)}`);
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/billing/extend-profile`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileId: this.extendingProfile.profile_id,
+                                days: this.selectedDays,
+                                userId: this.currentUser.id
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.userBalance = data.newBalance;
+                            alert(`Анкета продлена на ${this.selectedDays} дней. Списано: $${data.cost}`);
+                            this.showExtendModal = false;
+                            await this.loadAccounts();
+                        } else {
+                            alert(data.error || 'Ошибка продления');
+                        }
+                    } catch (e) {
+                        console.error('extendProfile error:', e);
+                        alert('Ошибка соединения');
+                    }
+                },
+
+                // Активировать тестовый период
+                async startTrial(account) {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/billing/start-trial`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileId: account.profile_id,
+                                userId: this.currentUser.id
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert(`Тестовый период активирован (${data.trialDays || 2} дня)`);
+                            await this.loadAccounts();
+                        } else {
+                            alert(data.error || 'Ошибка активации');
+                        }
+                    } catch (e) {
+                        console.error('startTrial error:', e);
+                        alert('Ошибка соединения');
+                    }
+                },
+
+                // Открыть модал пополнения баланса (для директора)
+                openTopupModal(userId) {
+                    this.topupUserId = userId;
+                    this.topupAmount = 10;
+                    this.showTopupModal = true;
+                },
+
+                // Пополнить баланс пользователя
+                async topupBalance() {
+                    if (!this.topupUserId || !this.topupAmount || this.topupAmount <= 0) return;
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/billing/topup`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                userId: this.topupUserId,
+                                amount: this.topupAmount,
+                                byUserId: this.currentUser.id
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert(`Баланс пополнен. Новый баланс: $${data.newBalance.toFixed(2)}`);
+                            this.showTopupModal = false;
+                            await this.loadTeam();
+                        } else {
+                            alert(data.error || 'Ошибка пополнения');
+                        }
+                    } catch (e) {
+                        console.error('topupBalance error:', e);
+                        alert('Ошибка соединения');
+                    }
+                },
+
+                // Получить класс для статуса оплаты
+                getPaymentStatusClass(account) {
+                    if (account.isFree) return 'text-green-600';
+                    if (!account.isPaid) return 'text-red-600';
+                    if (account.daysLeft <= 3) return 'text-orange-500';
+                    return 'text-green-600';
+                },
+
+                // Получить текст статуса оплаты
+                getPaymentStatusText(account) {
+                    if (account.isFree) return 'Бесплатно';
+                    if (!account.isPaid) {
+                        if (account.trialUsed) return 'Истёк';
+                        return 'Не оплачено';
+                    }
+                    if (account.isTrial) return `Trial: ${account.daysLeft} дн.`;
+                    return `${account.daysLeft} дн.`;
+                },
+
+                // ========== END BILLING FUNCTIONS ==========
 
                 logout() {
                     // Очищаем данные авторизации

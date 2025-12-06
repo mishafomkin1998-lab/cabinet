@@ -292,10 +292,21 @@ async function initDatabase() {
         // 15. Добавляем поле ai_enabled для пользователей
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT FALSE`);
 
+        // 16. Система оплаты анкет
+        // Баланс пользователя (директор/админ)
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS balance DECIMAL(10,2) DEFAULT 0`);
+        // is_restricted = true означает "мой админ" (анкеты бесплатно)
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_restricted BOOLEAN DEFAULT FALSE`);
+
+        // Оплата анкет
+        await pool.query(`ALTER TABLE allowed_profiles ADD COLUMN IF NOT EXISTS paid_until TIMESTAMP`);
+        await pool.query(`ALTER TABLE allowed_profiles ADD COLUMN IF NOT EXISTS is_trial BOOLEAN DEFAULT FALSE`);
+        await pool.query(`ALTER TABLE allowed_profiles ADD COLUMN IF NOT EXISTS trial_started_at TIMESTAMP`);
+
         // Очистка старых данных
         await cleanupOldData();
 
-        console.log('✅ База данных готова к работе (v6.0 - полная схема для личного кабинета)');
+        console.log('✅ База данных готова к работе (v7.0 - система оплаты анкет)');
     } catch (e) {
         console.error('❌ Ошибка инициализации БД:', e.message);
     }

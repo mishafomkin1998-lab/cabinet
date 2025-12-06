@@ -868,6 +868,26 @@
             return status.paused;
         }
 
+        // 6. Функция проверки оплаты профиля
+        async function checkProfilePaymentStatus(profileId) {
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/billing/profile-status/${encodeURIComponent(profileId)}`);
+                const data = await response.json();
+                return {
+                    isPaid: data.isPaid === true,
+                    isFree: data.isFree === true, // "мой админ" - бесплатно
+                    isTrial: data.isTrial === true,
+                    trialUsed: data.trialUsed === true,
+                    daysLeft: data.daysLeft || 0,
+                    reason: data.reason || 'unknown'
+                };
+            } catch (error) {
+                console.error(`❌ Ошибка проверки оплаты профиля:`, error);
+                // При ошибке разрешаем работу
+                return { isPaid: true, isFree: false, isTrial: false, trialUsed: false, daysLeft: 999 };
+            }
+        }
+
         // === КРИТИЧЕСКИ ВАЖНО: Скрипт "Анти-сон" ===
         const KEEP_ALIVE_SCRIPT = `
             console.log("%c[Lababot] Анти-сон активирован", "color: green; font-weight: bold");
@@ -1903,6 +1923,21 @@
                     return;
                 }
 
+                // Проверяем оплату анкеты
+                const paymentStatus = await checkProfilePaymentStatus(this.displayId);
+                if (!paymentStatus.isPaid && !paymentStatus.isFree) {
+                    this.log(`⛔ Рассылка заблокирована - анкета не оплачена`);
+                    let msg = `Анкета ${this.displayId} не оплачена.`;
+                    if (paymentStatus.reason === 'trial_expired') {
+                        msg += ' Тестовый период истёк.';
+                    } else if (paymentStatus.reason === 'not_paid') {
+                        msg += ' Требуется оплата.';
+                    }
+                    msg += '\n\nОбратитесь к администратору для пополнения баланса.';
+                    alert(msg);
+                    return;
+                }
+
                 this.isMailRunning = true;
                 this.updateUI();
                 this.log(`🚀 MAIL Started`);
@@ -2120,6 +2155,21 @@
                 if (profileStatus.paused) {
                     this.log(`⛔ Чат заблокирован - анкета приостановлена в личном кабинете`);
                     alert(`Анкета ${this.displayId} приостановлена в личном кабинете. Чат невозможен.`);
+                    return;
+                }
+
+                // Проверяем оплату анкеты
+                const paymentStatus = await checkProfilePaymentStatus(this.displayId);
+                if (!paymentStatus.isPaid && !paymentStatus.isFree) {
+                    this.log(`⛔ Чат заблокирован - анкета не оплачена`);
+                    let msg = `Анкета ${this.displayId} не оплачена.`;
+                    if (paymentStatus.reason === 'trial_expired') {
+                        msg += ' Тестовый период истёк.';
+                    } else if (paymentStatus.reason === 'not_paid') {
+                        msg += ' Требуется оплата.';
+                    }
+                    msg += '\n\nОбратитесь к администратору для пополнения баланса.';
+                    alert(msg);
                     return;
                 }
 
