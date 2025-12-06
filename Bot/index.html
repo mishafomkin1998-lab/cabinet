@@ -1923,8 +1923,14 @@
                     }
                     
                     const user = users[Math.floor(Math.random() * users.length)];
-                    if (this.mailSettings.blacklist.includes(user.AccountId.toString())) return;
-                    if (this.mailSettings.photoOnly && !user.ProfilePhoto) return;
+                    if (this.mailSettings.blacklist.includes(user.AccountId.toString())) {
+                        this.log(`⛔ Пользователь ${user.AccountId} в черном списке`);
+                        return;
+                    }
+                    if (this.mailSettings.photoOnly && !user.ProfilePhoto) {
+                        this.log(`⛔ У пользователя ${user.AccountId} нет фото (режим photoOnly)`);
+                        return;
+                    }
 
                     let msgBody = this.replaceMacros(msgTemplate, user);
                     const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
@@ -1980,6 +1986,8 @@
                         this.mailStats.sent++;
                         this.mailHistory.sent.push(`${user.AccountId} (${user.Name})`);
                         this.log(`✅ Письмо отправлено: ${user.Name}`);
+                    } else {
+                        this.log(`⚠️ Не могу отправить письмо пользователю ${user.AccountId}: ${checkRes.data?.Message || checkRes.data?.Error || 'нет CheckId'}`);
                     }
                 } catch (e) {
                     if(e.message === "Network Error" || !e.response) {
