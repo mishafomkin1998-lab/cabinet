@@ -768,6 +768,11 @@ app.post('/api/message_sent', async (req, res) => {
     const { botId, accountDisplayId, recipientId, type, responseTime, isFirst, isLast, convId, length,
             status, textContent, mediaUrl, fileName, translatorId, errorReason, usedAi } = req.body;
 
+    // Логируем usedAi для отладки
+    if (usedAi) {
+        console.log(`🤖 Получено сообщение с AI от ${accountDisplayId}, usedAi=${usedAi}`);
+    }
+
     let contentId = null;
     let errorLogId = null;
 
