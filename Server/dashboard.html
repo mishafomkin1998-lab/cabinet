@@ -845,11 +845,11 @@
                         <h3 class="text-lg font-bold" x-text="t('team.teamManagement')"></h3>
                         <div class="flex gap-3">
                             <!-- Кнопка добавить переводчика (видна админам) -->
-                            <button @click="openAddTranslatorModal()" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-purple-500 hover:bg-purple-600 text-white transition-all">
+                            <button @click="openAddTranslatorModal()" class="w-52 px-5 py-2.5 rounded-xl text-sm font-medium bg-purple-500 hover:bg-purple-600 text-white transition-all text-center">
                                 <i class="fas fa-language mr-2"></i>Добавить переводчика
                             </button>
                             <!-- Кнопка добавить админа (видна директорам) -->
-                            <button x-show="currentUser.role === 'director'" @click="showAddAdminModal = true" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white transition-all">
+                            <button x-show="currentUser.role === 'director'" @click="showAddAdminModal = true" class="w-52 px-5 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white transition-all text-center">
                                 <i class="fas fa-user-plus mr-2"></i><span x-text="t('team.addAdmin')"></span>
                             </button>
                         </div>
@@ -942,7 +942,7 @@
                     <div class="overflow-x-auto">
                         <table class="w-full resizable-table" id="profiles-table">
                             <thead>
-                                <tr class="border-b border-gray-100 text-sm">
+                                <tr class="border-b border-gray-200 text-xs text-gray-600 uppercase tracking-wide">
                                     <!-- Чекбокс для выбора (если не "мой админ") -->
                                     <th x-show="!isRestricted" class="text-left py-2 px-3 w-10">
                                         <input type="checkbox"
@@ -950,43 +950,43 @@
                                                @change="toggleSelectAllProfiles($event.target.checked)"
                                                :checked="selectedProfileIds.length > 0 && selectedProfileIds.length === filteredAccounts.filter(a => !a.isPaid && !a.isFree).length">
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" style="width: 100px;" @click="sortAccounts('id')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 100px;" @click="sortAccounts('id')">
                                         <span x-text="t('profiles.id')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'id' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" style="width: 100px;" @click="sortAccounts('status')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 100px;" @click="sortAccounts('status')">
                                         <span x-text="t('profiles.statusCol')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'status' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" style="width: 120px;" @click="sortAccounts('lastOnline')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('lastOnline')">
                                         <span x-text="t('profiles.lastOnline')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'lastOnline' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" style="width: 100px;" @click="sortAccounts('incoming')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 100px;" @click="sortAccounts('incoming')">
                                         <span x-text="t('profiles.incoming')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'incoming' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th x-show="currentUser.role === 'director'" class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" style="width: 120px;" @click="sortAccounts('admin')">
+                                    <th x-show="currentUser.role === 'director'" class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('admin')">
                                         <span x-text="t('profiles.admin')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'admin' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" style="width: 120px;" @click="sortAccounts('date')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('date')">
                                         <span x-text="t('profiles.addedDate')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'date' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3" style="width: 150px;" x-text="t('profiles.commentCol')">
+                                    <th class="text-left py-2 px-3 font-medium" style="width: 150px;" x-text="t('profiles.commentCol')">
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3" style="width: 100px;">Оплата
+                                    <th class="text-left py-2 px-3 font-medium" style="width: 100px;">Оплата
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3" x-text="t('common.actions')"></th>
+                                    <th class="text-left py-2 px-3 font-medium" x-text="t('common.actions')"></th>
                                 </tr>
                             </thead>
                             <tbody>
