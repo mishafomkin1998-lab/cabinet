@@ -913,9 +913,9 @@
                         <!-- Фильтр по типу админа (только для директора) -->
                         <template x-if="currentUser.role === 'director'">
                             <select class="glass px-4 py-2.5 rounded-xl text-sm font-medium" x-model="adminTypeFilter">
+                                <option value="all">Все анкеты</option>
                                 <option value="our">Наш админ</option>
                                 <option value="other">Другие</option>
-                                <option value="all">Все анкеты</option>
                             </select>
                         </template>
                         <!-- Поиск -->
@@ -2364,7 +2364,7 @@
                 sortBy: 'date',
                 sortDirection: 'desc',
                 searchQuery: '',
-                adminTypeFilter: 'our', // 'our' = наши админы, 'other' = другие, 'all' = все
+                adminTypeFilter: 'all', // 'our' = наши админы, 'other' = другие, 'all' = все (по умолчанию)
                 loading: true,
                 error: null,
 
