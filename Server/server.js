@@ -9,7 +9,7 @@ const path = require('path');
 
 // Модули
 const pool = require('./config/database');
-const { initDatabase, PRICE_LETTER, PRICE_CHAT } = require('./migrations');
+const { initDatabase } = require('./migrations');
 const {
     authRoutes,
     teamRoutes,
@@ -106,15 +106,13 @@ app.get('/recalculate-stats', async (req, res) => {
         `);
 
         await pool.query(`
-            INSERT INTO daily_stats (user_id, date, letters_count, chats_count, unique_men, total_income, avg_response_time)
+            INSERT INTO daily_stats (user_id, date, letters_count, chats_count, unique_men, avg_response_time)
             SELECT
                 p.assigned_translator_id as user_id,
                 DATE(m.timestamp) as date,
                 COUNT(*) FILTER (WHERE m.type = 'outgoing') as letters_count,
                 COUNT(*) FILTER (WHERE m.type = 'chat_msg') as chats_count,
                 COUNT(DISTINCT m.sender_id) as unique_men,
-                (COUNT(*) FILTER (WHERE m.type = 'outgoing') * ${PRICE_LETTER} +
-                 COUNT(*) FILTER (WHERE m.type = 'chat_msg') * ${PRICE_CHAT}) as total_income,
                 AVG(m.response_time) as avg_response_time
             FROM messages m
             JOIN allowed_profiles p ON m.account_id = p.profile_id

@@ -759,7 +759,6 @@
                                     <th class="text-left py-4 px-6" x-text="t('stats.letters')"></th>
                                     <th class="text-left py-4 px-6" x-text="t('stats.chats')"></th>
                                     <th class="text-left py-4 px-6" x-text="t('stats.avgTime')"></th>
-                                    <th class="text-left py-4 px-6" x-text="t('stats.income')"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -769,13 +768,10 @@
                                         <td class="py-4 px-6" x-text="translator.letters"></td>
                                         <td class="py-4 px-6" x-text="translator.chats"></td>
                                         <td class="py-4 px-6" x-text="translator.avgResponseTime + ' мин'"></td>
-                                        <td class="py-4 px-6">
-                                            <span class="text-green-600 font-bold" x-text="'$' + translator.totalIncome"></span>
-                                        </td>
                                     </tr>
                                 </template>
                                 <tr x-show="translatorStats.length === 0">
-                                    <td colspan="5" class="py-4 px-6 text-center text-gray-500" x-text="t('common.noData')"></td>
+                                    <td colspan="4" class="py-4 px-6 text-center text-gray-500" x-text="t('common.noData')"></td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1272,9 +1268,6 @@
                                             <span x-show="activity.action_type !== 'incoming' && activity.used_ai" class="text-purple-500">
                                                 <i class="fas fa-robot"></i> AI
                                             </span>
-                                            <span x-show="activity.action_type !== 'incoming' && activity.income > 0" class="text-green-500">
-                                                +$<span x-text="activity.income.toFixed(2)"></span>
-                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -1704,11 +1697,11 @@
 
                 // Статистика с сервера
                 stats: {
-                    today: { letters: 0, chats: 0, uniqueMen: 0, income: '0.00', errors: 0 },
-                    yesterday: { letters: 0, chats: 0, income: '0.00' },
-                    week: { letters: 0, chats: 0, uniqueMen: 0, income: '0.00', errors: 0 },
-                    month: { letters: 0, chats: 0, uniqueMen: 0, income: '0.00' },
-                    metrics: { totalProfiles: 0, avgResponseTime: 0, growthPercent: 0, avgDailyIncome: '0.00' }
+                    today: { letters: 0, chats: 0, uniqueMen: 0, errors: 0 },
+                    yesterday: { letters: 0, chats: 0 },
+                    week: { letters: 0, chats: 0, uniqueMen: 0, errors: 0 },
+                    month: { letters: 0, chats: 0, uniqueMen: 0 },
+                    metrics: { totalProfiles: 0, avgResponseTime: 0, growthPercent: 0 }
                 },
 
                 // Статус ботов
@@ -2765,7 +2758,6 @@
                     csv += `Письма,${this.stats.today.letters || 0},${this.stats.month.letters || 0}\n`;
                     csv += `Чаты,${this.stats.today.chats || 0},${this.stats.month.chats || 0}\n`;
                     csv += `Уникальные мужчины,${this.stats.today.uniqueMen || 0},${this.stats.month.uniqueMen || 0}\n`;
-                    csv += `Доход,$${this.stats.today.income || '0.00'},$${this.stats.month.income || '0.00'}\n`;
                     csv += `\nВремя работы сегодня: ${this.stats.metrics.workTime || '0ч 0м'}\n`;
                     csv += `Время работы за месяц: ${this.stats.metrics.workTimeMonth || '0ч 0м'}\n`;
 

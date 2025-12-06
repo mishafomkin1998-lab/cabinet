@@ -6,7 +6,6 @@
 const express = require('express');
 const pool = require('../config/database');
 const { logError } = require('../utils/helpers');
-const { PRICE_LETTER, PRICE_CHAT } = require('../migrations');
 
 const router = express.Router();
 
@@ -50,7 +49,6 @@ router.get('/detailed', async (req, res) => {
         const result = await pool.query(query, params);
         const stats = result.rows[0];
 
-        const earnings = (parseFloat(stats.letters_count) * PRICE_LETTER) + (parseFloat(stats.chats_count) * PRICE_CHAT);
         const totalSent = parseFloat(stats.first_messages);
         const totalConv = parseFloat(stats.total_conversations);
         const replyRate = totalSent > 0 ? ((totalConv / totalSent) * 100).toFixed(1) : 0;
@@ -65,7 +63,6 @@ router.get('/detailed', async (req, res) => {
                 successMessages: parseInt(stats.success_messages_count) || 0,
                 uniqueMenMonth: parseInt(stats.unique_men_month) || 0,
                 uniqueMenTotal: parseInt(stats.unique_men_total) || 0,
-                money: earnings.toFixed(2),
                 avgResponseTime: Math.round(stats.avg_response_seconds / 60) || 0,
                 totalConversations: parseInt(stats.total_conversations) || 0,
                 replyRate: replyRate,
@@ -148,15 +145,15 @@ router.get('/top-profiles', async (req, res) => {
                 COUNT(*) FILTER (WHERE m.type = 'outgoing') as letters,
                 COUNT(*) FILTER (WHERE m.type = 'chat_msg') as chats,
                 COUNT(DISTINCT m.sender_id) as unique_men,
-                (COUNT(*) FILTER (WHERE m.type = 'outgoing') * ${PRICE_LETTER} +
-                 COUNT(*) FILTER (WHERE m.type = 'chat_msg') * ${PRICE_CHAT}) as income,
+                (COUNT(*) FILTER (WHERE m.type = 'outgoing') +
+                 COUNT(*) FILTER (WHERE m.type = 'chat_msg')) as total_messages,
                 MAX(m.timestamp) as last_activity
             FROM messages m
             JOIN allowed_profiles p ON m.account_id = p.profile_id
             WHERE m.timestamp >= CURRENT_DATE - INTERVAL '30 days'
             ${filter}
             GROUP BY p.profile_id, p.id
-            ORDER BY income DESC
+            ORDER BY total_messages DESC
             LIMIT $1
         `;
 
@@ -190,8 +187,8 @@ router.get('/translators', async (req, res) => {
                 COUNT(DISTINCT CASE WHEN m.type = 'chat_msg' THEN m.id END) as chats,
                 COUNT(DISTINCT m.sender_id) as unique_men,
                 COALESCE(AVG(m.response_time), 0) as avg_response_seconds,
-                (COUNT(DISTINCT CASE WHEN m.type = 'outgoing' THEN m.id END) * ${PRICE_LETTER} +
-                 COUNT(DISTINCT CASE WHEN m.type = 'chat_msg' THEN m.id END) * ${PRICE_CHAT}) as total_income,
+                (COUNT(DISTINCT CASE WHEN m.type = 'outgoing' THEN m.id END) +
+                 COUNT(DISTINCT CASE WHEN m.type = 'chat_msg' THEN m.id END)) as total_messages,
                 MAX(m.timestamp) as last_activity
             FROM users u
             LEFT JOIN allowed_profiles p ON u.id = p.assigned_translator_id
@@ -199,7 +196,7 @@ router.get('/translators', async (req, res) => {
                 AND m.timestamp >= CURRENT_DATE - INTERVAL '30 days'
             ${filter}
             GROUP BY u.id, u.username
-            ORDER BY total_income DESC NULLS LAST
+            ORDER BY total_messages DESC NULLS LAST
         `;
 
         const result = await pool.query(query, params);
@@ -212,9 +209,9 @@ router.get('/translators', async (req, res) => {
             chats: t.chats || 0,
             uniqueMen: t.unique_men || 0,
             avgResponseTime: Math.round(t.avg_response_seconds / 60) || 0,
-            totalIncome: parseFloat(t.total_income || 0).toFixed(2),
+            totalMessages: parseInt(t.total_messages || 0),
             lastActivity: t.last_activity,
-            efficiency: t.profiles_count > 0 ? ((parseFloat(t.total_income || 0) / t.profiles_count) * 100).toFixed(1) : 0
+            efficiency: t.profiles_count > 0 ? ((parseInt(t.total_messages || 0) / t.profiles_count)).toFixed(1) : 0
         }));
 
         res.json({ success: true, translators });
@@ -238,7 +235,7 @@ router.get('/admins', async (req, res) => {
                 COUNT(DISTINCT p.id) as total_profiles,
                 SUM(stats.letters) as total_letters,
                 SUM(stats.chats) as total_chats,
-                SUM(stats.income) as team_income,
+                SUM(stats.total_messages) as team_messages,
                 COALESCE(AVG(stats.avg_response), 0) as avg_team_response
             FROM users u
             LEFT JOIN users t ON u.id = t.owner_id AND t.role = 'translator'
@@ -247,8 +244,7 @@ router.get('/admins', async (req, res) => {
                 SELECT
                     COUNT(*) FILTER (WHERE m.type = 'outgoing') as letters,
                     COUNT(*) FILTER (WHERE m.type = 'chat_msg') as chats,
-                    (COUNT(*) FILTER (WHERE m.type = 'outgoing') * ${PRICE_LETTER} +
-                     COUNT(*) FILTER (WHERE m.type = 'chat_msg') * ${PRICE_CHAT}) as income,
+                    COUNT(*) as total_messages,
                     COALESCE(AVG(m.response_time), 0) as avg_response
                 FROM messages m
                 WHERE m.account_id = p.profile_id
@@ -256,7 +252,7 @@ router.get('/admins', async (req, res) => {
             ) stats ON true
             WHERE u.role = 'admin'
             GROUP BY u.id, u.username
-            ORDER BY team_income DESC NULLS LAST
+            ORDER BY team_messages DESC NULLS LAST
         `;
 
         const result = await pool.query(query);
@@ -268,10 +264,10 @@ router.get('/admins', async (req, res) => {
             totalProfiles: a.total_profiles || 0,
             totalLetters: a.total_letters || 0,
             totalChats: a.total_chats || 0,
-            teamIncome: parseFloat(a.team_income || 0).toFixed(2),
+            teamMessages: parseInt(a.team_messages || 0),
             avgTeamResponse: Math.round(a.avg_team_response / 60) || 0,
             efficiencyPerTranslator: a.translators_count > 0
-                ? (parseFloat(a.team_income || 0) / a.translators_count).toFixed(2)
+                ? (parseInt(a.team_messages || 0) / a.translators_count).toFixed(2)
                 : 0
         }));
 
@@ -311,8 +307,8 @@ router.get('/profile/:profileId', async (req, res) => {
                 COUNT(*) FILTER (WHERE m.type = 'chat_msg') as total_chats,
                 COUNT(DISTINCT m.sender_id) as total_men,
                 COUNT(DISTINCT m.conversation_id) as total_conversations,
-                (COUNT(*) FILTER (WHERE m.type = 'outgoing') * ${PRICE_LETTER} +
-                 COUNT(*) FILTER (WHERE m.type = 'chat_msg') * ${PRICE_CHAT}) as total_income,
+                (COUNT(*) FILTER (WHERE m.type = 'outgoing') +
+                 COUNT(*) FILTER (WHERE m.type = 'chat_msg')) as total_messages,
                 COALESCE(AVG(m.response_time), 0) as avg_response_seconds,
                 MAX(m.timestamp) as last_activity,
                 MIN(m.timestamp) as first_activity,
@@ -343,7 +339,7 @@ router.get('/profile/:profileId', async (req, res) => {
             totalChats: profile.total_chats || 0,
             totalMen: profile.total_men || 0,
             totalConversations: profile.total_conversations || 0,
-            totalIncome: parseFloat(profile.total_income || 0).toFixed(2),
+            totalMessages: parseInt(profile.total_messages || 0),
             avgResponseTime: Math.round(profile.avg_response_seconds / 60) || 0,
             lastActivity: profile.last_activity,
             firstActivity: profile.first_activity,
@@ -352,8 +348,8 @@ router.get('/profile/:profileId', async (req, res) => {
             replyRate: profile.first_messages_sent > 0
                 ? ((profile.total_conversations / profile.first_messages_sent) * 100).toFixed(1)
                 : 0,
-            avgIncomePerMan: profile.total_men > 0
-                ? (parseFloat(profile.total_income || 0) / profile.total_men).toFixed(2)
+            avgMessagesPerMan: profile.total_men > 0
+                ? (parseInt(profile.total_messages || 0) / profile.total_men).toFixed(2)
                 : 0
         };
 
@@ -361,7 +357,7 @@ router.get('/profile/:profileId', async (req, res) => {
     } catch (e) { await logError(`/api/stats/profile/${profileId}`, 'QueryError', e.message, req.query, userId); res.status(500).json({ error: e.message }); }
 });
 
-// Прогноз дохода
+// Прогноз активности (без финансов)
 router.get('/forecast', async (req, res) => {
     const { userId, role } = req.query;
     try {
@@ -378,22 +374,12 @@ router.get('/forecast', async (req, res) => {
 
         const query = `
             SELECT
-                SUM(CASE WHEN m.timestamp >= CURRENT_DATE - INTERVAL '7 days'
-                    THEN CASE WHEN m.type = 'outgoing' THEN ${PRICE_LETTER} ELSE ${PRICE_CHAT} END
-                    ELSE 0 END) as week_income,
-                SUM(CASE WHEN m.timestamp >= CURRENT_DATE - INTERVAL '30 days'
-                    THEN CASE WHEN m.type = 'outgoing' THEN ${PRICE_LETTER} ELSE ${PRICE_CHAT} END
-                    ELSE 0 END) as month_income,
-                COALESCE(SUM(CASE WHEN m.timestamp >= CURRENT_DATE - INTERVAL '7 days'
-                    THEN CASE WHEN m.type = 'outgoing' THEN ${PRICE_LETTER} ELSE ${PRICE_CHAT} END
-                    ELSE 0 END) / 7, 0) as avg_daily_income_7d,
-                (SUM(CASE WHEN m.timestamp >= CURRENT_DATE - INTERVAL '7 days'
-                    THEN CASE WHEN m.type = 'outgoing' THEN ${PRICE_LETTER} ELSE ${PRICE_CHAT} END
-                    ELSE 0 END) /
+                SUM(CASE WHEN m.timestamp >= CURRENT_DATE - INTERVAL '7 days' THEN 1 ELSE 0 END) as week_messages,
+                SUM(CASE WHEN m.timestamp >= CURRENT_DATE - INTERVAL '30 days' THEN 1 ELSE 0 END) as month_messages,
+                COALESCE(SUM(CASE WHEN m.timestamp >= CURRENT_DATE - INTERVAL '7 days' THEN 1 ELSE 0 END) / 7.0, 0) as avg_daily_messages_7d,
+                (SUM(CASE WHEN m.timestamp >= CURRENT_DATE - INTERVAL '7 days' THEN 1 ELSE 0 END)::numeric /
                  NULLIF(SUM(CASE WHEN m.timestamp >= CURRENT_DATE - INTERVAL '14 days'
-                                 AND m.timestamp < CURRENT_DATE - INTERVAL '7 days'
-                    THEN CASE WHEN m.type = 'outgoing' THEN ${PRICE_LETTER} ELSE ${PRICE_CHAT} END
-                    ELSE 0 END), 0) - 1) * 100 as growth_percent
+                                 AND m.timestamp < CURRENT_DATE - INTERVAL '7 days' THEN 1 ELSE 0 END), 0) - 1) * 100 as growth_percent
             FROM messages m
             JOIN allowed_profiles p ON m.account_id = p.profile_id
             ${filter}
@@ -403,12 +389,12 @@ router.get('/forecast', async (req, res) => {
         const data = result.rows[0];
 
         const forecast = {
-            weekIncome: parseFloat(data.week_income || 0).toFixed(2),
-            monthIncome: parseFloat(data.month_income || 0).toFixed(2),
-            avgDailyIncome: parseFloat(data.avg_daily_income_7d || 0).toFixed(2),
+            weekMessages: parseInt(data.week_messages || 0),
+            monthMessages: parseInt(data.month_messages || 0),
+            avgDailyMessages: parseFloat(data.avg_daily_messages_7d || 0).toFixed(1),
             growthPercent: data.growth_percent ? parseFloat(data.growth_percent).toFixed(1) : 0,
-            monthForecast: (parseFloat(data.avg_daily_income_7d || 0) * 30).toFixed(2),
-            weekForecast: (parseFloat(data.avg_daily_income_7d || 0) * 7).toFixed(2)
+            monthForecast: Math.round(parseFloat(data.avg_daily_messages_7d || 0) * 30),
+            weekForecast: Math.round(parseFloat(data.avg_daily_messages_7d || 0) * 7)
         };
 
         res.json({ success: true, forecast });
@@ -505,7 +491,7 @@ router.get('/by-admin', async (req, res) => {
                 u.username as admin_name,
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter'), 0) as letters,
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat'), 0) as chats,
-                COALESCE(SUM(a.income), 0) as income,
+                COALESCE(COUNT(*), 0) as total_messages,
                 COALESCE(AVG(a.response_time_sec), 0) as avg_response_time,
                 CASE
                     WHEN COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter'), 0) > 0
@@ -516,7 +502,7 @@ router.get('/by-admin', async (req, res) => {
             LEFT JOIN activity_log a ON a.admin_id = u.id ${dateFilter}
             WHERE u.role = 'admin'
             GROUP BY u.id, u.username
-            ORDER BY income DESC NULLS LAST
+            ORDER BY total_messages DESC NULLS LAST
         `;
 
         const result = await pool.query(query, params);
@@ -526,7 +512,7 @@ router.get('/by-admin', async (req, res) => {
             admin_name: row.admin_name,
             letters: parseInt(row.letters) || 0,
             chats: parseInt(row.chats) || 0,
-            income: parseFloat(row.income || 0).toFixed(2),
+            total_messages: parseInt(row.total_messages) || 0,
             avg_response_time: Math.round((parseFloat(row.avg_response_time) || 0) / 60),
             conversion: parseFloat(row.conversion) || 0
         }));
@@ -571,7 +557,7 @@ router.get('/by-translator', async (req, res) => {
                 u.username as translator_name,
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter'), 0) as letters,
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat'), 0) as chats,
-                COALESCE(SUM(a.income), 0) as income,
+                COALESCE(COUNT(*), 0) as total_messages,
                 COALESCE(AVG(a.response_time_sec), 0) as avg_response_time,
                 CASE
                     WHEN COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter'), 0) > 0
@@ -587,7 +573,7 @@ router.get('/by-translator', async (req, res) => {
             LEFT JOIN activity_log a ON a.translator_id = u.id ${dateFilter}
             WHERE u.role = 'translator' ${filter}
             GROUP BY u.id, u.username
-            ORDER BY income DESC NULLS LAST
+            ORDER BY total_messages DESC NULLS LAST
         `;
 
         const result = await pool.query(query, params);
@@ -597,7 +583,7 @@ router.get('/by-translator', async (req, res) => {
             translator_name: row.translator_name,
             letters: parseInt(row.letters) || 0,
             chats: parseInt(row.chats) || 0,
-            income: parseFloat(row.income || 0).toFixed(2),
+            total_messages: parseInt(row.total_messages) || 0,
             avg_response_time: Math.round((parseFloat(row.avg_response_time) || 0) / 60),
             conversion: parseFloat(row.conversion) || 0,
             ai_usage_percent: parseFloat(row.ai_usage_percent) || 0

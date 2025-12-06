@@ -6,7 +6,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const pool = require('../config/database');
-const { PRICE_LETTER, PRICE_CHAT } = require('../migrations');
 
 const router = express.Router();
 
@@ -38,7 +37,6 @@ router.get('/', async (req, res) => {
                 COALESCE(profiles.accounts_count, 0) as accounts_count,
                 COALESCE(stats.letters_today, 0) as letters_today,
                 COALESCE(stats.chats_today, 0) as chats_today,
-                COALESCE(stats.income_today, 0) as income_today,
                 CASE
                     WHEN COALESCE(stats.letters_today, 0) > 0
                     THEN ROUND((COALESCE(stats.unique_men_today, 0)::numeric / stats.letters_today) * 100, 1)
@@ -60,7 +58,6 @@ router.get('/', async (req, res) => {
                 SELECT
                     COUNT(*) FILTER (WHERE a.action_type = 'letter' AND DATE(a.created_at) = CURRENT_DATE) as letters_today,
                     COUNT(*) FILTER (WHERE a.action_type = 'chat' AND DATE(a.created_at) = CURRENT_DATE) as chats_today,
-                    COALESCE(SUM(a.income) FILTER (WHERE DATE(a.created_at) = CURRENT_DATE), 0) as income_today,
                     COUNT(DISTINCT CASE WHEN DATE(a.created_at) = CURRENT_DATE THEN a.man_id END) as unique_men_today
                 FROM activity_log a
                 WHERE
@@ -77,32 +74,9 @@ router.get('/', async (req, res) => {
 
         const result = await pool.query(query, params);
 
-        // Также получаем данные из messages для совместимости
-        const msgQuery = `
-            SELECT
-                CASE
-                    WHEN p.assigned_admin_id IS NOT NULL THEN p.assigned_admin_id
-                    ELSE p.assigned_translator_id
-                END as user_id,
-                COUNT(*) FILTER (WHERE m.type = 'outgoing' AND DATE(m.timestamp) = CURRENT_DATE) as letters_today,
-                COUNT(*) FILTER (WHERE m.type = 'chat_msg' AND DATE(m.timestamp) = CURRENT_DATE) as chats_today,
-                COUNT(DISTINCT CASE WHEN DATE(m.timestamp) = CURRENT_DATE THEN m.sender_id END) as unique_men_today
-            FROM allowed_profiles p
-            LEFT JOIN messages m ON p.profile_id = m.account_id
-            GROUP BY CASE WHEN p.assigned_admin_id IS NOT NULL THEN p.assigned_admin_id ELSE p.assigned_translator_id END
-        `;
-        const msgResult = await pool.query(msgQuery);
-        const msgStatsMap = {};
-        msgResult.rows.forEach(r => {
-            if (r.user_id) msgStatsMap[r.user_id] = r;
-        });
-
         const list = result.rows.map(row => {
-            const msgStats = msgStatsMap[row.id] || {};
-            const lettersToday = parseInt(row.letters_today) || parseInt(msgStats.letters_today) || 0;
-            const chatsToday = parseInt(row.chats_today) || parseInt(msgStats.chats_today) || 0;
-            const incomeToday = parseFloat(row.income_today) || (lettersToday * PRICE_LETTER + chatsToday * PRICE_CHAT);
-            const uniqueMen = parseInt(msgStats.unique_men_today) || 0;
+            const lettersToday = parseInt(row.letters_today) || 0;
+            const uniqueMen = parseInt(row.unique_men_today) || 0;
             const conversion = lettersToday > 0 ? ((uniqueMen / lettersToday) * 100).toFixed(1) : 0;
 
             return {
@@ -114,6 +88,7 @@ router.get('/', async (req, res) => {
                 salary: row.salary,
                 accounts_count: parseInt(row.accounts_count) || 0,
                 letters_today: lettersToday,
+                chats_today: parseInt(row.chats_today) || 0,
                 conversion: parseFloat(row.conversion) || parseFloat(conversion),
                 is_my_admin: row.is_my_admin,
                 accounts: row.accounts || []

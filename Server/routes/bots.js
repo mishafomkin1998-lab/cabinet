@@ -6,7 +6,6 @@
 const express = require('express');
 const pool = require('../config/database');
 const { logError } = require('../utils/helpers');
-const { PRICE_LETTER, PRICE_CHAT } = require('../migrations');
 
 const router = express.Router();
 
@@ -280,8 +279,6 @@ router.get('/:botId/stats', async (req, res) => {
         const heartbeatResult = await pool.query(heartbeatQuery, [botId]);
         const lastHeartbeat = heartbeatResult.rows[0];
 
-        const income = (parseFloat(stats.letters || 0) * PRICE_LETTER) + (parseFloat(stats.chats || 0) * PRICE_CHAT);
-
         res.json({
             success: true,
             bot: {
@@ -299,7 +296,6 @@ router.get('/:botId/stats', async (req, res) => {
                     errors: parseInt(stats.errors) || 0,
                     uniqueMen: parseInt(stats.unique_men) || 0,
                     avgResponseTime: Math.round(stats.avg_response_seconds / 60) || 0,
-                    income: income.toFixed(2),
                     firstMessage: stats.first_message,
                     lastMessage: stats.last_message
                 }

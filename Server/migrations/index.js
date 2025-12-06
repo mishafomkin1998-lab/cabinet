@@ -5,10 +5,6 @@
 
 const pool = require('../config/database');
 
-// Цены для расчёта дохода
-const PRICE_LETTER = 1.5;
-const PRICE_CHAT = 0.15;
-
 async function initDatabase() {
     try {
         console.log('⚙️ Проверка таблиц базы данных v6.0 (полная схема для личного кабинета)...');
@@ -355,7 +351,5 @@ module.exports = {
     initDatabase,
     migrateBotsTable,
     fixSerialSequence,
-    cleanupOldData,
-    PRICE_LETTER,
-    PRICE_CHAT
+    cleanupOldData
 };

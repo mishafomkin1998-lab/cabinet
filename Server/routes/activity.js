@@ -6,7 +6,6 @@
 const express = require('express');
 const pool = require('../config/database');
 const { logError } = require('../utils/helpers');
-const { PRICE_LETTER, PRICE_CHAT } = require('../migrations');
 
 const router = express.Router();
 
@@ -71,12 +70,11 @@ router.post('/message_sent', async (req, res) => {
 
         // 4. ВАЖНО: Записываем в activity_log для отображения в dashboard
         const actionType = (msgType === 'chat_msg' || msgType === 'chat') ? 'chat' : 'letter';
-        const income = actionType === 'letter' ? PRICE_LETTER : PRICE_CHAT;
 
         await pool.query(
-            `INSERT INTO activity_log (profile_id, bot_id, admin_id, translator_id, action_type, man_id, message_text, response_time_sec, used_ai, income, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
-            [accountDisplayId, botId, adminId, assignedTranslatorId, actionType, recipientId, textContent || null, responseTime || null, usedAi || false, income]
+            `INSERT INTO activity_log (profile_id, bot_id, admin_id, translator_id, action_type, man_id, message_text, response_time_sec, used_ai, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+            [accountDisplayId, botId, adminId, assignedTranslatorId, actionType, recipientId, textContent || null, responseTime || null, usedAi || false]
         );
 
         console.log(`✅ Сообщение от бота ${botId} для анкеты ${accountDisplayId} сохранено + activity_log (contentId: ${contentId})`);
@@ -92,7 +90,7 @@ router.post('/message_sent', async (req, res) => {
 
 // Логирование активности
 router.post('/log', async (req, res) => {
-    const { botId, profileId, actionType, manId, messageText, responseTimeSec, usedAi, income } = req.body;
+    const { botId, profileId, actionType, manId, messageText, responseTimeSec, usedAi } = req.body;
 
     try {
         const profileResult = await pool.query(
@@ -106,22 +104,10 @@ router.post('/log', async (req, res) => {
 
         const profile = profileResult.rows[0] || {};
 
-        // Расчёт дохода если не передан
-        let calculatedIncome = income;
-        if (calculatedIncome === undefined || calculatedIncome === null) {
-            if (actionType === 'letter') {
-                calculatedIncome = PRICE_LETTER;
-            } else if (actionType === 'chat') {
-                calculatedIncome = PRICE_CHAT;
-            } else {
-                calculatedIncome = 0;
-            }
-        }
-
         // Записываем в activity_log
         await pool.query(`
-            INSERT INTO activity_log (profile_id, bot_id, admin_id, translator_id, action_type, man_id, message_text, response_time_sec, used_ai, income)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            INSERT INTO activity_log (profile_id, bot_id, admin_id, translator_id, action_type, man_id, message_text, response_time_sec, used_ai)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         `, [
             profileId,
             botId || null,
@@ -131,8 +117,7 @@ router.post('/log', async (req, res) => {
             manId || null,
             messageText || null,
             responseTimeSec || null,
-            usedAi || false,
-            calculatedIncome
+            usedAi || false
         ]);
 
         // Также записываем в messages для совместимости
@@ -142,9 +127,9 @@ router.post('/log', async (req, res) => {
             VALUES ($1, $2, $3, $4, $5, 'success')
         `, [botId || null, profileId, msgType, manId || null, responseTimeSec || null]);
 
-        console.log(`📝 Активность: ${actionType} от ${profileId} (бот: ${botId || 'N/A'}), доход: $${calculatedIncome}`);
+        console.log(`📝 Активность: ${actionType} от ${profileId} (бот: ${botId || 'N/A'})`);
 
-        res.json({ status: 'ok', income: calculatedIncome });
+        res.json({ status: 'ok' });
 
     } catch (error) {
         console.error('❌ Ошибка записи активности:', error.message);
@@ -208,8 +193,7 @@ router.get('/recent', async (req, res) => {
                     m.type as action_type,
                     m.status,
                     m.response_time as response_time_sec,
-                    mc.text_content as message_text,
-                    CASE WHEN m.type = 'outgoing' THEN ${PRICE_LETTER} ELSE ${PRICE_CHAT} END as income
+                    mc.text_content as message_text
                 FROM messages m
                 JOIN allowed_profiles p ON m.account_id = p.profile_id
                 LEFT JOIN message_content mc ON m.message_content_id = mc.id
@@ -228,7 +212,6 @@ router.get('/recent', async (req, res) => {
                 message_text: row.message_text ? row.message_text.substring(0, 200) : null,
                 response_time_sec: row.response_time_sec,
                 used_ai: false,
-                income: row.status === 'success' ? parseFloat(row.income) : 0,
                 created_at: row.timestamp
             }));
 
@@ -244,7 +227,6 @@ router.get('/recent', async (req, res) => {
             message_text: row.message_text ? row.message_text.substring(0, 200) : null,
             response_time_sec: row.response_time_sec,
             used_ai: row.used_ai,
-            income: parseFloat(row.income) || 0,
             created_at: row.timestamp,
             admin_name: row.admin_name,
             translator_name: row.translator_name
