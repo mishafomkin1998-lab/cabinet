@@ -504,24 +504,25 @@
                             <span class="ml-3 font-medium" x-text="t('menu.monitoring')"></span>
                         </div>
                     </div>
-                    <div>
-                        <div @click="setActiveMenu('history')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'history' ? 'active' : ''">
-                            <i class="fas fa-history w-5 text-gray-600"></i>
-                            <span class="ml-3 font-medium" x-text="t('menu.history')"></span>
-                        </div>
-                    </div>
-                    <div>
-                        <div @click="setActiveMenu('training')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'training' ? 'active' : ''">
-                            <i class="fas fa-graduation-cap w-5 text-gray-600"></i>
-                            <span class="ml-3 font-medium" x-text="t('menu.training')"></span>
-                        </div>
-                    </div>
                     <!-- Финансы (только для директора) -->
                     <div x-show="currentUser.role === 'director'">
                         <div @click="setActiveMenu('finances')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'finances' ? 'active' : ''">
                             <i class="fas fa-wallet w-5 text-gray-600"></i>
                             <span class="ml-3 font-medium">Финансы</span>
                         </div>
+                    </div>
+                    <div>
+                        <div @click="setActiveMenu('history')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'history' ? 'active' : ''">
+                            <i class="fas fa-history w-5 text-gray-600"></i>
+                            <span class="ml-3 font-medium" x-text="t('menu.history')"></span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Обучение внизу отдельно -->
+                <div class="mt-4 pt-4 border-t border-gray-200">
+                    <div @click="setActiveMenu('training')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'training' ? 'active' : ''">
+                        <i class="fas fa-graduation-cap w-5 text-gray-600"></i>
+                        <span class="ml-3 font-medium" x-text="t('menu.training')"></span>
                     </div>
                 </div>
             </nav>
@@ -580,8 +581,8 @@
 
                 <div class="flex items-center space-x-3">
                     <!-- Theme toggle -->
-                    <button @click="toggleDarkMode()" class="theme-toggle glass w-10 h-10 rounded-xl flex items-center justify-center hover:bg-gray-50 transition-all">
-                        <i class="fas" :class="darkMode ? 'fa-sun text-yellow-500' : 'fa-moon text-indigo-500'"></i>
+                    <button @click="toggleDarkMode()" class="theme-toggle glass px-3 py-2 rounded-xl flex items-center justify-center hover:bg-gray-50 transition-all">
+                        <i class="fas text-sm" :class="darkMode ? 'fa-sun text-yellow-500' : 'fa-moon text-indigo-500'"></i>
                     </button>
 
                     <!-- Language selector -->
@@ -841,6 +842,13 @@
                                             class="w-8 h-8 rounded-lg bg-green-100 hover:bg-green-200 flex items-center justify-center"
                                             title="Пополнить баланс">
                                         <i class="fas fa-dollar-sign text-green-600 text-xs"></i>
+                                    </button>
+                                    <!-- Кнопка удаления админа (только для директора) -->
+                                    <button x-show="currentUser.role === 'director'"
+                                            @click="deleteAdmin(admin)"
+                                            class="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center"
+                                            title="Удалить админа">
+                                        <i class="fas fa-trash text-red-600 text-xs"></i>
                                     </button>
                                 </div>
                                 <!-- Переводчики -->
@@ -3031,7 +3039,24 @@
                     };
                     this.showAddAdminModal = true;
                 },
-                
+
+                async deleteAdmin(admin) {
+                    if (!confirm(`Удалить админа "${admin.name}"? Все его анкеты будут откреплены.`)) return;
+                    try {
+                        const response = await fetch(`/api/team/${admin.id}`, { method: 'DELETE' });
+                        const data = await response.json();
+                        if (data.success) {
+                            await this.loadTeam();
+                            await this.loadAccounts();
+                            alert('Админ удалён');
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось удалить'));
+                        }
+                    } catch (e) {
+                        alert('Ошибка: ' + e.message);
+                    }
+                },
+
                 assignAccountsToAdmin(admin) {
                     this.selectedAdmin = admin;
                     this.accountsToAssign = '';
