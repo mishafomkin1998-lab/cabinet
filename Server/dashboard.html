@@ -635,10 +635,10 @@
                             </div>
                         </div>
 
-                        <button @click="loadDashboardStats()" class="w-10 h-10 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 flex items-center justify-center" :title="t('common.refresh')">
-                            <i class="fas fa-sync-alt"></i>
+                        <button @click="refreshAllStats()" class="w-10 h-10 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 flex items-center justify-center" :class="{'opacity-50 cursor-wait': loading}" :title="t('common.refresh')">
+                            <i class="fas fa-sync-alt" :class="{'fa-spin': loading}"></i>
                         </button>
-                        <button @click="exportStats()" class="ml-2 w-10 h-10 rounded-xl bg-green-500 text-white hover:bg-green-600 flex items-center justify-center" :title="t('common.export')">
+                        <button @click="exportStats()" class="ml-auto w-10 h-10 rounded-xl bg-green-500 text-white hover:bg-green-600 flex items-center justify-center" :title="t('common.export')">
                             <i class="fas fa-download"></i>
                         </button>
                     </div>
@@ -719,8 +719,8 @@
 
                     <div class="glass rounded-2xl p-6">
                         <h3 class="text-lg font-bold mb-6" x-text="t('stats.workTime')"></h3>
-                        <div class="text-3xl font-bold mb-2 text-purple-600" x-text="stats.metrics.workTime || '0h 0m'"></div>
-                        <div class="text-sm text-gray-500"><span x-text="t('stats.forMonth')"></span>: <span x-text="stats.metrics.workTimeMonth || '0h 0m'"></span></div>
+                        <div class="text-3xl font-bold mb-2 text-purple-600" x-text="stats.metrics.workTime || '0ч 0м'"></div>
+                        <div class="text-sm text-gray-500"><span x-text="t('stats.forMonth')"></span>: <span x-text="stats.metrics.workTimeMonth || '0ч 0м'"></span></div>
                     </div>
                 </div>
                 
@@ -731,20 +731,21 @@
                         <button class="text-sm text-indigo-600 hover:text-indigo-800" x-text="t('stats.advancedStats') + ' →'">
                         </button>
                     </div>
-                    <div class="grid grid-cols-12 gap-1 mb-2">
-                        <template x-for="hour in 12" :key="hour">
+                    <div class="grid grid-cols-24 gap-0.5 mb-2">
+                        <template x-for="hour in 24" :key="hour">
                             <div class="text-center">
-                                <div class="text-xs text-gray-500 mb-1" x-text="hour-1"></div>
-                                <div class="h-6 rounded bg-gradient-to-b" 
-                                     :class="getActivityColor(hour)"
-                                     :style="'height:' + (getActivityLevel(hour) * 30) + 'px'">
+                                <div class="text-[10px] text-gray-500 mb-1" x-text="(hour-1) + 'ч'"></div>
+                                <div class="h-6 rounded bg-gradient-to-b"
+                                     :class="getActivityColor(hour-1)"
+                                     :style="'height:' + (getActivityLevel(hour-1) * 30) + 'px'">
                                 </div>
                             </div>
                         </template>
                     </div>
                     <div class="flex justify-between text-xs text-gray-500">
-                        <span>00:00</span>
-                        <span>12:00</span>
+                        <span>0ч</span>
+                        <span>12ч</span>
+                        <span>23ч</span>
                     </div>
                 </div>
                 
@@ -1930,6 +1931,25 @@
                             this.stats = data.dashboard;
                         }
                     } catch (e) { console.error('loadDashboardStats error:', e); }
+                },
+
+                // Полное обновление всей статистики
+                async refreshAllStats() {
+                    this.loading = true;
+                    try {
+                        await Promise.all([
+                            this.loadDashboardStats(),
+                            this.loadHourlyActivity(),
+                            this.loadTranslatorStats(),
+                            this.loadRecentActivity(),
+                            this.loadAccounts(),
+                            this.loadBotsStatus()
+                        ]);
+                        console.log('✅ Статистика обновлена');
+                    } catch (e) {
+                        console.error('refreshAllStats error:', e);
+                    }
+                    this.loading = false;
                 },
 
                 async loadAccounts() {
