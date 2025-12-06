@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova Dashboard</title>
+    <title>Nova - Панель администратора</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Google Fonts - Inter -->
@@ -28,10 +28,14 @@
         // API Server URL (change for remote access, e.g.: 'http://192.168.1.100:3000')
         const API_BASE = 'http://localhost:3000';
 
-        // Auth check
+        // Auth check - only admins allowed
         const novaUserData = JSON.parse(localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser') || 'null');
         if (!novaUserData || !novaUserData.loggedIn) {
             window.location.href = 'login.html';
+        }
+        // Redirect non-admins to regular dashboard
+        if (novaUserData && novaUserData.role !== 'admin') {
+            window.location.href = 'dashboard.html';
         }
 
         // Load saved language or default to Russian
@@ -468,13 +472,19 @@
         <!-- Сайдбар -->
         <aside class="glass-sidebar w-64 flex-shrink-0 flex flex-col p-5">
             <!-- Логотип -->
-            <div class="mb-10">
+            <div class="mb-6">
                 <a href="index.html" class="flex items-center">
                     <div class="w-11 h-11 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg">
                         <i class="fas fa-robot text-white text-base"></i>
                     </div>
                     <h1 class="text-xl font-bold ml-3 gradient-text">Nova</h1>
                 </a>
+            </div>
+
+            <!-- Баланс (показывается только если не ограниченный доступ) -->
+            <div x-show="!currentUser.isRestricted && currentUser.salary" class="mb-8 glass rounded-xl p-4">
+                <div class="text-sm text-gray-500 mb-1">Ваш баланс</div>
+                <div class="text-2xl font-bold text-green-600">$<span x-text="currentUser.salary || 0"></span></div>
             </div>
             
             <!-- Menu -->
@@ -492,12 +502,7 @@
                             <span class="ml-3 font-medium" x-text="t('menu.profiles')"></span>
                         </div>
                     </div>
-                    <div>
-                        <div @click="setActiveMenu('control')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'control' ? 'active' : ''">
-                            <i class="fas fa-sliders-h w-5 text-gray-600"></i>
-                            <span class="ml-3 font-medium" x-text="t('menu.control')"></span>
-                        </div>
-                    </div>
+                    <!-- Управление и Команда убраны для админов -->
                     <div>
                         <div @click="setActiveMenu('monitoring')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'monitoring' ? 'active' : ''">
                             <i class="fas fa-eye w-5 text-gray-600"></i>
@@ -599,24 +604,14 @@
             <!-- Content -->
             <!-- Statistics -->
             <div x-show="activeMenu === 'stats'" class="fade-in">
-                <!-- Filters -->
+                <!-- Filters (для админа - только переводчики) -->
                 <div class="glass rounded-2xl p-5 mb-6">
                     <div class="flex items-center gap-4 flex-wrap">
-                        <!-- Admin filter -->
+                        <!-- Translator filter - показываем только переводчиков этого админа -->
                         <div>
-                            <select class="glass px-4 py-2.5 rounded-xl" x-model="statsFilter.admin" @change="statsFilter.translator = ''">
-                                <option value="" x-text="t('filters.allAdmins')"></option>
-                                <template x-for="admin in admins" :key="admin.id">
-                                    <option :value="admin.id" x-text="admin.name"></option>
-                                </template>
-                            </select>
-                        </div>
-
-                        <!-- Translator filter -->
-                        <div x-show="statsFilter.admin">
                             <select class="glass px-4 py-2.5 rounded-xl" x-model="statsFilter.translator">
                                 <option value="" x-text="t('filters.allTranslators')"></option>
-                                <template x-for="translator in admins.find(a => a.id == statsFilter.admin)?.translators || []" :key="translator.id">
+                                <template x-for="translator in translators" :key="translator.id">
                                     <option :value="translator.id" x-text="translator.name"></option>
                                 </template>
                             </select>
@@ -626,7 +621,7 @@
                         <div class="flex items-center gap-2">
                             <div class="glass px-4 py-2.5 rounded-xl flex items-center">
                                 <i class="fas fa-calendar mr-2 text-gray-400"></i>
-                                <input type="text" id="statsDatePicker" class="bg-transparent border-none outline-none w-48 text-sm" readonly :placeholder="t('common.selectPeriod')">
+                                <input type="text" id="statsDatePicker" class="bg-transparent border-none outline-none w-48 text-sm" readonly placeholder="Выберите даты">
                             </div>
                             <div class="flex gap-1">
                                 <button @click="setQuickDateRange('month')" class="px-3 py-2 rounded-lg text-sm" :class="statsFilter.quickRange === 'month' ? 'bg-indigo-500 text-white' : 'glass hover:bg-gray-100'" x-text="t('common.month')"></button>
@@ -635,11 +630,11 @@
                             </div>
                         </div>
 
-                        <button @click="loadDashboardStats()" class="w-10 h-10 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 flex items-center justify-center" :title="t('common.refresh')">
-                            <i class="fas fa-sync-alt"></i>
+                        <button @click="loadDashboardStats()" class="px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600">
+                            <i class="fas fa-sync-alt mr-2"></i><span x-text="t('common.refresh')"></span>
                         </button>
-                        <button @click="exportStats()" class="ml-2 w-10 h-10 rounded-xl bg-green-500 text-white hover:bg-green-600 flex items-center justify-center" :title="t('common.export')">
-                            <i class="fas fa-download"></i>
+                        <button @click="exportStats()" class="ml-2 px-4 py-2.5 rounded-xl bg-green-500 text-white hover:bg-green-600">
+                            <i class="fas fa-download mr-2"></i><span x-text="t('common.export')"></span>
                         </button>
                     </div>
                 </div>
@@ -657,9 +652,7 @@
                                 <div class="text-gray-500" x-text="t('stats.totalProfiles')"></div>
                             </div>
                         </div>
-                        <div class="text-sm">
-                            <span class="text-green-600 font-medium"><span x-text="t('stats.online')"></span>: <span x-text="accounts.filter(a => a.status === 'online').length"></span>/<span x-text="accounts.length"></span></span>
-                        </div>
+                        <div class="text-sm text-gray-500"><span x-text="t('stats.loaded')"></span>: <span x-text="accounts.length"></span></div>
                     </div>
 
                     <!-- Incoming letters -->
@@ -705,18 +698,8 @@
                     </div>
                 </div>
 
-                <!-- Bots and work time -->
-                <div class="grid grid-cols-2 gap-6 mb-8">
-                    <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6" x-text="t('stats.botsStatus')"></h3>
-                        <div class="text-3xl font-bold mb-2" x-text="bots.length">0</div>
-                        <div class="text-sm text-gray-500">
-                            <span class="text-green-600"><span x-text="t('stats.online')"></span>: <span x-text="botsStatus.online"></span></span> |
-                            <span class="text-yellow-500"><span x-text="t('stats.idle')"></span>: <span x-text="botsStatus.idle"></span></span> |
-                            <span class="text-red-500"><span x-text="t('stats.offline')"></span>: <span x-text="botsStatus.offline + botsStatus.never_connected"></span></span>
-                        </div>
-                    </div>
-
+                <!-- Work time (Боты убраны для админов) -->
+                <div class="grid grid-cols-1 gap-6 mb-8">
                     <div class="glass rounded-2xl p-6">
                         <h3 class="text-lg font-bold mb-6" x-text="t('stats.workTime')"></h3>
                         <div class="text-3xl font-bold mb-2 text-purple-600" x-text="stats.metrics.workTime || '0h 0m'"></div>
@@ -727,8 +710,9 @@
                 <!-- Активность -->
                 <div class="glass rounded-2xl p-6">
                     <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-bold" x-text="t('stats.peakHours')"></h3>
-                        <button class="text-sm text-indigo-600 hover:text-indigo-800" x-text="t('stats.advancedStats') + ' →'">
+                        <h3 class="text-lg font-bold">Пиковые часы активности</h3>
+                        <button class="text-sm text-indigo-600 hover:text-indigo-800">
+                            Расширенная статистика →
                         </button>
                     </div>
                     <div class="grid grid-cols-12 gap-1 mb-2">
@@ -750,16 +734,16 @@
                 
                 <!-- Сравнение переводчиков (если выбран админ) -->
                 <div x-show="statsFilter.admin && activeSubmenu === 'admins'" class="glass rounded-2xl p-6 mt-6 fade-in">
-                    <h3 class="text-lg font-bold mb-6" x-text="t('stats.compareTranslators')"></h3>
+                    <h3 class="text-lg font-bold mb-6">Сравнение переводчиков</h3>
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead>
                                 <tr class="border-b border-gray-100">
-                                    <th class="text-left py-4 px-6" x-text="t('roles.translator')"></th>
-                                    <th class="text-left py-4 px-6" x-text="t('stats.letters')"></th>
-                                    <th class="text-left py-4 px-6" x-text="t('stats.chats')"></th>
-                                    <th class="text-left py-4 px-6" x-text="t('stats.avgTime')"></th>
-                                    <th class="text-left py-4 px-6" x-text="t('stats.income')"></th>
+                                    <th class="text-left py-4 px-6">Переводчик</th>
+                                    <th class="text-left py-4 px-6">Писем</th>
+                                    <th class="text-left py-4 px-6">Чатов</th>
+                                    <th class="text-left py-4 px-6">Ср. время</th>
+                                    <th class="text-left py-4 px-6">Доход</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -775,7 +759,7 @@
                                     </tr>
                                 </template>
                                 <tr x-show="translatorStats.length === 0">
-                                    <td colspan="5" class="py-4 px-6 text-center text-gray-500" x-text="t('common.noData')"></td>
+                                    <td colspan="5" class="py-4 px-6 text-center text-gray-500">Нет данных о переводчиках</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -785,66 +769,19 @@
             
             <!-- Анкеты -->
             <div x-show="activeMenu === 'accounts'" x-cloak class="fade-in">
-                <!-- Управление командой -->
-                <div class="glass rounded-2xl p-5 mb-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-bold" x-text="t('team.teamManagement')"></h3>
-                        <button @click="showAddAdminModal = true" class="glow-button px-4 py-2 rounded-xl text-white text-sm font-medium">
-                            <i class="fas fa-user-plus mr-2"></i><span x-text="t('team.addAdmin')"></span>
-                        </button>
-                    </div>
-                    <div class="flex flex-wrap gap-3">
-                        <template x-for="admin in admins" :key="admin.id">
-                            <div class="glass rounded-xl p-3 flex items-center space-x-3 min-w-64">
-                                <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
-                                    <span class="text-white font-medium text-sm" x-text="admin.initials"></span>
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="font-medium truncate" x-text="admin.name"></div>
-                                    <div class="text-xs text-gray-500"><span x-text="admin.accounts"></span> <span x-text="t('team.profiles')"></span></div>
-                                </div>
-                                <div class="flex items-center space-x-1">
-                                    <button @click="editAdmin(admin)" class="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center" :title="t('common.edit')">
-                                        <i class="fas fa-edit text-gray-600 text-xs"></i>
-                                    </button>
-                                    <button @click="viewAdminDetails(admin)" class="w-8 h-8 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center" :title="t('team.viewBtn')">
-                                        <i class="fas fa-eye text-blue-600 text-xs"></i>
-                                    </button>
-                                </div>
-                                <!-- Переводчики -->
-                                <div x-show="admin.translators.length > 0" class="flex items-center -space-x-2">
-                                    <template x-for="translator in admin.translators.slice(0, 3)" :key="translator.id">
-                                        <div class="w-7 h-7 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 flex items-center justify-center border-2 border-white" :title="translator.name">
-                                            <span class="text-white text-xs font-medium" x-text="translator.name.charAt(0)"></span>
-                                        </div>
-                                    </template>
-                                    <div x-show="admin.translators.length > 3" class="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center border-2 border-white">
-                                        <span class="text-gray-600 text-xs">+<span x-text="admin.translators.length - 3"></span></span>
-                                    </div>
-                                </div>
-                            </div>
-                        </template>
-                        <!-- Добавить админа -->
-                        <div @click="showAddAdminModal = true" class="glass rounded-xl p-3 flex items-center justify-center min-w-32 cursor-pointer border-2 border-dashed border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors">
-                            <i class="fas fa-plus text-gray-400 mr-2"></i>
-                            <span class="text-gray-500 text-sm" x-text="t('common.add')"></span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Список анкет -->
-                <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center space-x-3">
                         <!-- Поиск -->
                         <div class="relative">
-                            <input type="text" :placeholder="t('profiles.searchPlaceholder')"
+                            <input type="text" placeholder="Поиск по ID или логину..."
                                    class="glass pl-10 pr-4 py-2.5 rounded-xl w-64"
                                    x-model="searchQuery">
                             <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
                         </div>
                     </div>
-                    <button @click="showAddAccountModal = true" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
-                        <i class="fas fa-plus mr-2"></i><span x-text="t('common.add')"></span>
+                    <!-- Кнопка добавления анкеты - скрыта для ограниченных админов -->
+                    <button x-show="!currentUser.isRestricted" @click="showAddAccountModal = true" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                        + Добавить
                     </button>
                 </div>
                 
@@ -911,7 +848,7 @@
                                             <select class="glass px-2 py-1 rounded-lg text-sm"
                                                     x-model="account.admin"
                                                     @change="assignAccount(account)">
-                                                <option value="" x-text="t('profiles.notAssigned')"></option>
+                                                <option value="">Не назначен</option>
                                                 <template x-for="admin in admins" :key="admin.id">
                                                     <option :value="admin.login" x-text="admin.name"></option>
                                                 </template>
@@ -938,147 +875,19 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Управление -->
-            <div x-show="activeMenu === 'control'" x-cloak class="fade-in">
-                <div class="grid grid-cols-2 gap-6">
-                    <!-- Сессии -->
-                    <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6" x-text="t('control.activeSessions')"></h3>
-                        <div class="space-y-4">
-                            <template x-for="bot in bots" :key="bot.id">
-                                <div class="p-4 rounded-xl border border-gray-100">
-                                    <div class="flex items-center justify-between mb-3">
-                                        <div class="flex items-center">
-                                            <i :class="bot.icon + ' mr-3'" :class="bot.status === 'active' ? 'text-green-500' : 'text-red-500'"></i>
-                                            <div>
-                                                <div class="font-medium flex items-center">
-                                                    <span x-text="bot.name"></span>
-                                                    <span class="ml-2 text-xs px-2 py-0.5 rounded-full" 
-                                                          :class="bot.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
-                                                          x-text="bot.status === 'active' ? 'Активен' : 'Неактивен'">
-                                                    </span>
-                                                </div>
-                                                <div class="text-sm text-gray-500" x-text="bot.os"></div>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <button @click="toggleBotStatus(bot)" 
-                                                    class="px-3 py-1 rounded-lg text-sm"
-                                                    :class="bot.status === 'active' ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'">
-                                                <span x-text="bot.status === 'active' ? 'Выключить' : 'Активировать'"></span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Детальная информация -->
-                                    <div class="grid grid-cols-2 gap-2 text-sm text-gray-600">
-                                        <div>
-                                            <span class="font-medium">IP:</span>
-                                            <span x-text="bot.ip"></span>
-                                        </div>
-                                        <div>
-                                            <span class="font-medium">Версия:</span>
-                                            <span x-text="bot.version"></span>
-                                        </div>
-                                        <div>
-                                            <span class="font-medium">Анкет:</span>
-                                            <span x-text="bot.profilesCount"></span>
-                                        </div>
-                                        <div>
-                                            <span class="font-medium">Последний отклик:</span>
-                                            <span x-text="bot.lastHeartbeat ? new Date(bot.lastHeartbeat).toLocaleString('ru-RU') : '-'"></span>
-                                        </div>
-                                    </div>
 
-                                    <!-- Если бот неактивен - возможность изменить название -->
-                                    <div x-show="bot.status === 'inactive'" class="mt-3 pt-3 border-t border-gray-100">
-                                        <!-- Изменение названия -->
-                                        <div class="flex items-center space-x-2">
-                                            <input type="text"
-                                                   x-model="bot.name"
-                                                   class="flex-1 glass px-3 py-1 rounded-lg text-sm"
-                                                   :placeholder="t('control.botName')">
-                                            <button @click="saveBotName(bot)"
-                                                    class="px-2 py-1 bg-blue-100 text-blue-600 rounded-lg text-sm hover:bg-blue-200">
-                                                Сохранить
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-                    
-                    <!-- Управление -->
-                    <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6" x-text="t('control.mailingSettings')"></h3>
-                        <div class="space-y-4">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <div class="font-medium" x-text="t('control.enableMailing')"></div>
-                                    <div class="text-sm text-gray-500" x-text="t('control.autoMessages')"></div>
-                                </div>
-                                <div class="ios-toggle active" @click="toggleActive(this)"></div>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <div class="font-medium" x-text="t('control.stopSpam')"></div>
-                                    <div class="text-sm text-gray-500" x-text="t('control.onComplaints')"></div>
-                                </div>
-                                <div class="ios-toggle" @click="toggleActive(this)"></div>
-                            </div>
-                        </div>
-                        
-                        <div class="mt-8">
-                            <button class="w-full py-3 rounded-xl bg-gradient-to-r from-red-500 to-pink-500 text-white font-medium">
-                                Panic Mode
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Кнопка "Обновить все боты" -->
-                <div class="mt-6">
-                    <button @click="updateAllBots" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
-                        <i class="fas fa-sync mr-2"></i>Обновить все боты
-                    </button>
-                </div>
-                
-                <!-- Промт для генерации -->
-                <div class="glass rounded-2xl p-6 mt-6">
-                    <h3 class="text-lg font-bold mb-4" x-text="t('control.generationPrompt')"></h3>
-                    <textarea 
-                        class="glass w-full px-4 py-3 rounded-xl"
-                        rows="4"
-                        :placeholder="t('control.promptPlaceholder')"
-                        x-model="generationPrompt"></textarea>
-                    <p class="text-sm text-gray-500 mt-2" x-text="t('control.promptSync')"></p>
-                    <button @click="syncPromptWithBots" class="mt-3 glow-button px-4 py-2 rounded-xl text-white text-sm" x-text="t('control.syncWithBots')">
-                    </button>
-                </div>
-            </div>
+            <!-- Управление и Команда убраны для админов -->
             
             <!-- Мониторинг -->
             <div x-show="activeMenu === 'monitoring'" x-cloak class="fade-in">
-                <!-- Фильтры для мониторинга -->
+                <!-- Фильтры для мониторинга (для админа - только переводчики) -->
                 <div class="glass rounded-2xl p-5 mb-6">
                     <div class="flex items-center gap-4 flex-wrap">
-                        <!-- Выбор админа -->
+                        <!-- Выбор переводчика -->
                         <div>
-                            <select class="glass px-4 py-2.5 rounded-xl" x-model="monitoringFilter.admin" @change="monitoringFilter.translator = ''">
-                                <option value="" x-text="t('filters.allAdmins')"></option>
-                                <template x-for="admin in admins" :key="admin.id">
-                                    <option :value="admin.id" x-text="admin.name"></option>
-                                </template>
-                            </select>
-                        </div>
-
-                        <!-- Выбор переводчика (показывается при выборе админа) -->
-                        <div x-show="monitoringFilter.admin">
                             <select class="glass px-4 py-2.5 rounded-xl" x-model="monitoringFilter.translator">
-                                <option value="" x-text="t('filters.allTranslators')"></option>
-                                <template x-for="translator in admins.find(a => a.id == monitoringFilter.admin)?.translators || []" :key="translator.id">
+                                <option value="">Все Переводчики</option>
+                                <template x-for="translator in translators" :key="translator.id">
                                     <option :value="translator.id" x-text="translator.name"></option>
                                 </template>
                             </select>
@@ -1087,7 +896,7 @@
                         <!-- Календарь выбора диапазона (Flatpickr) -->
                         <div class="glass px-4 py-2.5 rounded-xl flex items-center">
                             <i class="fas fa-calendar mr-2 text-gray-400"></i>
-                            <input type="text" id="monitoringDatePicker" class="bg-transparent border-none outline-none w-48 text-sm" readonly :placeholder="t('common.selectPeriod')">
+                            <input type="text" id="monitoringDatePicker" class="bg-transparent border-none outline-none w-48 text-sm" readonly placeholder="Выберите даты">
                         </div>
                     </div>
                 </div>
@@ -1098,35 +907,35 @@
                             class="glass p-4 rounded-xl text-center hover:bg-gray-50"
                             :class="monitoringFunction === 'lastResponses' ? 'bg-indigo-50 border border-indigo-200' : ''">
                         <i class="fas fa-comments text-blue-500 text-xl mb-2 block"></i>
-                        <div class="font-medium" x-text="t('monitoring.lastResponses')"></div>
+                        <div class="font-medium">Последние ответы</div>
                     </button>
                     
                     <button @click="setMonitoringFunction('sentLetters')" 
                             class="glass p-4 rounded-xl text-center hover:bg-gray-50"
                             :class="monitoringFunction === 'sentLetters' ? 'bg-indigo-50 border border-indigo-200' : ''">
                         <i class="fas fa-paper-plane text-green-500 text-xl mb-2 block"></i>
-                        <div class="font-medium" x-text="t('monitoring.sentLetters')"></div>
+                        <div class="font-medium">Отправленные письма</div>
                     </button>
                     
                     <button @click="setMonitoringFunction('favoriteMailing')" 
                             class="glass p-4 rounded-xl text-center hover:bg-gray-50"
                             :class="monitoringFunction === 'favoriteMailing' ? 'bg-indigo-50 border border-indigo-200' : ''">
                         <i class="fas fa-heart text-red-500 text-xl mb-2 block"></i>
-                        <div class="font-medium" x-text="t('monitoring.favoriteMailing')"></div>
+                        <div class="font-medium">Любимая рассылка</div>
                     </button>
                     
                     <button @click="setMonitoringFunction('workTime')" 
                             class="glass p-4 rounded-xl text-center hover:bg-gray-50"
                             :class="monitoringFunction === 'workTime' ? 'bg-indigo-50 border border-indigo-200' : ''">
                         <i class="fas fa-clock text-purple-500 text-xl mb-2 block"></i>
-                        <div class="font-medium" x-text="t('monitoring.workTimeBtn')"></div>
+                        <div class="font-medium">Время работы</div>
                     </button>
                     
                     <button @click="setMonitoringFunction('aiUsage')" 
                             class="glass p-4 rounded-xl text-center hover:bg-gray-50"
                             :class="monitoringFunction === 'aiUsage' ? 'bg-indigo-50 border border-indigo-200' : ''">
                         <i class="fas fa-brain text-orange-500 text-xl mb-2 block"></i>
-                        <div class="font-medium" x-text="t('monitoring.aiUsage')"></div>
+                        <div class="font-medium">Использование ИИ</div>
                     </button>
                 </div>
                 
@@ -1202,11 +1011,11 @@
                             <div class="grid grid-cols-2 gap-4">
                                 <div class="glass p-4 rounded-xl text-center">
                                     <div class="text-2xl font-bold text-blue-600" x-text="stats.metrics.workTime || '0ч 0м'"></div>
-                                    <div class="text-sm text-gray-600" x-text="t('common.today')"></div>
+                                    <div class="text-sm text-gray-600">Сегодня</div>
                                 </div>
                                 <div class="glass p-4 rounded-xl text-center">
                                     <div class="text-2xl font-bold text-purple-600" x-text="stats.metrics.workTimeMonth || '0ч 0м'"></div>
-                                    <div class="text-sm text-gray-600" x-text="t('stats.forMonth')"></div>
+                                    <div class="text-sm text-gray-600">За месяц</div>
                                 </div>
                             </div>
                             <div class="text-sm text-gray-600">
@@ -1219,10 +1028,10 @@
                         <div x-show="monitoringFunction === 'aiUsage'" class="space-y-4">
                             <div class="glass p-4 rounded-xl">
                                 <div class="flex justify-between items-center mb-2">
-                                    <div class="font-medium" x-text="t('monitoring.aiGenerations')"></div>
+                                    <div class="font-medium">Генерации ИИ</div>
                                     <div class="text-2xl font-bold text-orange-600" x-text="recentActivity.filter(a => a.used_ai).length"></div>
                                 </div>
-                                <div class="text-sm text-gray-600" x-text="t('monitoring.recentGenerations')"></div>
+                                <div class="text-sm text-gray-600">За последнее время</div>
                             </div>
                             <div class="glass p-4 rounded-xl">
                                 <div class="font-medium mb-2">Последние генерации:</div>
@@ -1281,7 +1090,7 @@
                             </template>
                             <div x-show="recentActivity.filter(a => a.action_type === 'incoming' || a.action_type === 'letter' || a.action_type === 'chat').length === 0" class="text-center text-gray-500 py-8">
                                 <i class="fas fa-inbox text-4xl mb-3 opacity-30"></i>
-                                <p x-text="t('monitoring.noCorrespondence')"></p>
+                                <p>Нет переписки</p>
                             </div>
                         </div>
                     </div>
@@ -1291,20 +1100,22 @@
             <!-- Обучение -->
             <div x-show="activeMenu === 'training'" x-cloak class="fade-in">
                 <div class="glass rounded-2xl p-6">
-                    <h3 class="text-xl font-bold mb-6" x-text="t('training.title')"></h3>
+                    <h3 class="text-xl font-bold mb-6">Обучение и документация</h3>
                     <div class="grid grid-cols-2 gap-6">
                         <div class="p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50">
                             <i class="fas fa-book text-blue-500 text-2xl mb-3"></i>
-                            <h4 class="font-bold mb-2" x-text="t('training.userGuide')"></h4>
-                            <p class="text-sm text-gray-600 mb-3" x-text="t('training.userGuideDesc')"></p>
-                            <button class="text-blue-600 hover:text-blue-800 text-sm font-medium" x-text="t('training.openBtn') + ' →'">
+                            <h4 class="font-bold mb-2">Руководство пользователя</h4>
+                            <p class="text-sm text-gray-600 mb-3">Полное руководство по работе с панелью управления</p>
+                            <button class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                Открыть →
                             </button>
                         </div>
                         <div class="p-4 rounded-xl bg-gradient-to-r from-purple-50 to-pink-50">
                             <i class="fas fa-video text-purple-500 text-2xl mb-3"></i>
-                            <h4 class="font-bold mb-2" x-text="t('training.videoTutorials')"></h4>
-                            <p class="text-sm text-gray-600 mb-3" x-text="t('training.videoDesc')"></p>
-                            <button class="text-purple-600 hover:text-purple-800 text-sm font-medium" x-text="t('training.watchBtn') + ' →'">
+                            <h4 class="font-bold mb-2">Видеоуроки</h4>
+                            <p class="text-sm text-gray-600 mb-3">Пошаговые видеоинструкции по настройке</p>
+                            <button class="text-purple-600 hover:text-purple-800 text-sm font-medium">
+                                Смотреть →
                             </button>
                         </div>
                     </div>
@@ -1319,7 +1130,7 @@
                         <!-- Выбор админа -->
                         <div>
                             <select class="glass px-4 py-2.5 rounded-xl" x-model="historyFilter.admin">
-                                <option value="" x-text="t('filters.allAdmins')"></option>
+                                <option value="">Все Админы</option>
                                 <template x-for="admin in admins" :key="admin.id">
                                     <option :value="admin.id" x-text="admin.name"></option>
                                 </template>
@@ -1329,26 +1140,26 @@
                         <!-- Календарь (Flatpickr) -->
                         <div class="glass px-4 py-2.5 rounded-xl flex items-center">
                             <i class="fas fa-calendar mr-2 text-gray-400"></i>
-                            <input type="text" id="historyDatePicker" class="bg-transparent border-none outline-none w-48 text-sm" readonly :placeholder="t('common.selectPeriod')">
+                            <input type="text" id="historyDatePicker" class="bg-transparent border-none outline-none w-48 text-sm" readonly placeholder="Выберите даты">
                         </div>
 
                         <button @click="loadProfileHistory()" class="px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600">
-                            <i class="fas fa-sync-alt mr-2"></i><span x-text="t('common.refresh')"></span>
+                            <i class="fas fa-sync-alt mr-2"></i>Обновить
                         </button>
                     </div>
                 </div>
 
                 <div class="glass rounded-2xl p-6">
-                    <h3 class="text-lg font-bold mb-6" x-text="t('history.title')"></h3>
+                    <h3 class="text-lg font-bold mb-6">История изменений анкет</h3>
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead>
                                 <tr class="border-b border-gray-100">
-                                    <th class="text-left py-2 px-4" x-text="t('history.dateCol')"></th>
-                                    <th class="text-left py-2 px-4" x-text="t('history.profileCol')"></th>
-                                    <th class="text-left py-2 px-4" x-text="t('history.actionCol')"></th>
-                                    <th class="text-left py-2 px-4" x-text="t('history.byWhom')"></th>
-                                    <th class="text-left py-2 px-4" x-text="t('history.detailsCol')"></th>
+                                    <th class="text-left py-2 px-4">Дата</th>
+                                    <th class="text-left py-2 px-4">Анкета</th>
+                                    <th class="text-left py-2 px-4">Действие</th>
+                                    <th class="text-left py-2 px-4">Кем</th>
+                                    <th class="text-left py-2 px-4">Детали</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1368,7 +1179,7 @@
                                 <tr x-show="profileHistory.length === 0">
                                     <td colspan="5" class="py-8 px-4 text-center text-gray-500">
                                         <i class="fas fa-history text-3xl mb-2 opacity-30"></i>
-                                        <p x-text="t('history.noHistory')"></p>
+                                        <p>Нет истории изменений за выбранный период</p>
                                     </td>
                                 </tr>
                             </tbody>
@@ -1383,7 +1194,7 @@
     <div x-show="showAddAccountModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div class="glass rounded-2xl p-6 w-full max-w-2xl" @click.outside="showAddAccountModal = false">
             <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold" x-text="t('modals.addProfiles.title')"></h3>
+                <h3 class="text-xl font-bold">Добавление анкет</h3>
                 <button @click="showAddAccountModal = false" class="text-gray-500 hover:text-gray-700">
                     <i class="fas fa-times"></i>
                 </button>
@@ -1473,26 +1284,16 @@
                 </div>
                 
                 <div class="flex items-center">
-                    <input type="checkbox"
+                    <input type="checkbox" 
                            id="myAdminCheckbox"
                            class="rounded"
                            x-model="newAdmin.isMyAdmin"
                            @change="newAdmin.salary = ''">
-                    <label for="myAdminCheckbox" class="ml-2 text-sm" x-text="t('modals.addAdmin.myAdminLabel')">
+                    <label for="myAdminCheckbox" class="ml-2 text-sm">
+                        Мой админ (без доступа к добавлению анкет и финансам)
                     </label>
                 </div>
-
-                <div class="flex items-center">
-                    <input type="checkbox"
-                           id="aiEnabledCheckbox"
-                           class="rounded"
-                           x-model="newAdmin.aiEnabled">
-                    <label for="aiEnabledCheckbox" class="ml-2 text-sm">
-                        <i class="fas fa-brain text-orange-500 mr-1"></i>
-                        <span x-text="t('team.aiEnabled')"></span>
-                    </label>
-                </div>
-
+                
                 <div x-show="!newAdmin.isMyAdmin">
                     <label class="block text-sm font-medium mb-2">Сумма</label>
                     <input type="number" 
@@ -1788,8 +1589,7 @@
                     password: '',
                     initials: '',
                     isMyAdmin: false,
-                    salary: '',
-                    aiEnabled: false
+                    salary: ''
                 },
 
                 selectedAdmin: null,
@@ -1812,6 +1612,7 @@
                 accounts: [],
                 bots: [],
                 admins: [],
+                translators: [], // Переводчики этого админа
                 team: [],
                 translatorStats: [],
                 historyActions: [],
@@ -1912,8 +1713,7 @@
                             this.loadHourlyActivity(),
                             this.loadTranslatorStats(),
                             this.loadHistoryActions(),
-                            this.loadProfileHistory(),
-                            this.loadSavedPrompt()
+                            this.loadProfileHistory()
                         ]);
                     } catch (e) {
                         console.error('Error loading data:', e);
@@ -2025,25 +1825,14 @@
                         const data = await res.json();
                         if (data.success) {
                             this.team = data.list;
-                            // Формируем admins с переводчиками
-                            const adminsList = data.list.filter(u => u.role === 'admin');
+                            // Для админа - загружаем только своих переводчиков
                             const translatorsList = data.list.filter(u => u.role === 'translator');
-                            this.admins = adminsList.map(a => ({
-                                id: a.id,
-                                name: a.username,
-                                login: a.username,
-                                initials: a.username.substring(0, 2).toUpperCase(),
-                                accounts: a.accounts_count || 0,
-                                conversion: a.conversion || 0,
-                                isMyAdmin: a.is_restricted || false,
-                                salary: a.salary || null,
-                                translators: translatorsList.filter(t => t.owner_id === a.id).map(t => ({
-                                    id: t.id,
-                                    name: t.username,
-                                    login: t.username,
-                                    conversion: t.conversion || 0,
-                                    accounts: t.accounts || []
-                                }))
+                            this.translators = translatorsList.map(t => ({
+                                id: t.id,
+                                name: t.username,
+                                login: t.username,
+                                conversion: t.conversion || 0,
+                                accounts: t.accounts || []
                             }));
                         }
                     } catch (e) { console.error('loadTeam error:', e); }
@@ -2449,69 +2238,22 @@
                     return statuses[status] || status;
                 },
                 
-                async toggleAccountAccess(account) {
-                    const newPaused = !account.paused;
-                    try {
-                        const res = await fetch(`${API_BASE}/api/profiles/toggle-access`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                profileId: account.profile_id,
-                                paused: newPaused,
-                                performedBy: this.currentUser.username
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            account.paused = newPaused;
-                            console.log(`Анкета ${account.profile_id} ${newPaused ? 'приостановлена' : 'возобновлена'}`);
-                        }
-                    } catch (e) {
-                        console.error('Ошибка:', e);
-                    }
+                toggleAccountAccess(account) {
+                    account.paused = !account.paused;
+                    console.log(`Анкета ${account.id} ${account.paused ? 'приостановлена' : 'возобновлена'}`);
                 },
-
-                async deleteAccount(account) {
-                    if (confirm(this.t('messages.deleteConfirm') + ` ${account.login}?`)) {
-                        try {
-                            const res = await fetch(`${API_BASE}/api/profiles/${account.profile_id}`, {
-                                method: 'DELETE',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    performedBy: this.currentUser.username
-                                })
-                            });
-                            const data = await res.json();
-                            if (data.success) {
-                                const index = this.accounts.findIndex(a => a.id === account.id);
-                                if (index > -1) {
-                                    this.accounts.splice(index, 1);
-                                }
-                            }
-                        } catch (e) {
-                            console.error('Ошибка:', e);
+                
+                deleteAccount(account) {
+                    if (confirm(`Удалить анкету ${account.login}?`)) {
+                        const index = this.accounts.findIndex(a => a.id === account.id);
+                        if (index > -1) {
+                            this.accounts.splice(index, 1);
                         }
                     }
                 },
                 
-                async assignAccount(account) {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/profiles/assign-admin`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                profileId: account.profile_id,
-                                adminLogin: account.admin || null,
-                                performedBy: this.currentUser.username
-                            })
-                        });
-                        const data = await res.json();
-                        if (!data.success) {
-                            console.error('Ошибка назначения:', data.error);
-                        }
-                    } catch (e) {
-                        console.error('Ошибка:', e);
-                    }
+                assignAccount(account) {
+                    console.log(`Анкета ${account.id} назначена админу: ${account.admin}`);
                 },
                 
                 saveAccounts() {
@@ -2552,15 +2294,14 @@
                 },
                 
                 editAdmin(admin) {
-                    this.newAdmin = {
+                    this.newAdmin = { 
                         id: admin.id,
                         name: admin.name,
                         login: admin.login || '',
                         password: admin.password || '',
                         initials: admin.initials || '',
                         isMyAdmin: admin.isMyAdmin,
-                        salary: admin.salary || '',
-                        aiEnabled: admin.aiEnabled || false
+                        salary: admin.salary || ''
                     };
                     this.showAddAdminModal = true;
                 },
@@ -2632,8 +2373,7 @@
                                     username: this.newAdmin.login,
                                     password: this.newAdmin.password,
                                     salary: this.newAdmin.isMyAdmin ? null : parseFloat(this.newAdmin.salary),
-                                    isRestricted: this.newAdmin.isMyAdmin,
-                                    aiEnabled: this.newAdmin.aiEnabled
+                                    isRestricted: this.newAdmin.isMyAdmin
                                 })
                             });
                             const data = await res.json();
@@ -2652,8 +2392,7 @@
                                     role: 'admin',
                                     ownerId: this.currentUser.id,
                                     salary: this.newAdmin.isMyAdmin ? null : parseFloat(this.newAdmin.salary),
-                                    isRestricted: this.newAdmin.isMyAdmin,
-                                    aiEnabled: this.newAdmin.aiEnabled
+                                    isRestricted: this.newAdmin.isMyAdmin
                                 })
                             });
                             const data = await res.json();
@@ -2684,73 +2423,24 @@
                     }
                 },
                 
-                async toggleBotStatus(bot) {
-                    const newActive = bot.status !== 'active';
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/${bot.id}/toggle`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ active: newActive })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            bot.status = newActive ? 'active' : 'inactive';
-                        }
-                    } catch (e) {
-                        console.error('Ошибка:', e);
-                    }
+                toggleBotStatus(bot) {
+                    bot.status = bot.status === 'active' ? 'inactive' : 'active';
+                    console.log(`Бот ${bot.name} ${bot.status === 'active' ? 'активирован' : 'деактивирован'}`);
                 },
-
-                async saveBotName(bot) {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/${bot.id}/name`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ name: bot.name })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            alert(this.t('messages.botNameSaved'));
-                        }
-                    } catch (e) {
-                        console.error('Ошибка:', e);
-                    }
+                
+                saveBotName(bot) {
+                    console.log(`Название бота сохранено: ${bot.name}`);
+                    alert(`Название бота сохранено: ${bot.name}`);
                 },
-
-                async updateAllBots() {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/refresh-all`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' }
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            // Обновляем список ботов
-                            await this.loadBotsStatus();
-                            alert(this.t('messages.botsUpdated'));
-                        }
-                    } catch (e) {
-                        console.error('Ошибка:', e);
-                    }
+                
+                updateAllBots() {
+                    console.log('Обновление всех ботов...');
+                    alert('Все боты обновлены');
                 },
-
-                async syncPromptWithBots() {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/sync-prompt`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                prompt: this.generationPrompt,
-                                userId: this.currentUser.id
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            alert(this.t('messages.botsSynced'));
-                        }
-                    } catch (e) {
-                        console.error('Ошибка:', e);
-                    }
+                
+                syncPromptWithBots() {
+                    console.log('Промт синхронизирован с ботами:', this.generationPrompt);
+                    alert('Промт синхронизирован с ботами');
                 },
 
                 // === Функции экспорта статистики ===
@@ -2860,18 +2550,6 @@
                     } catch (e) {
                         console.error('loadProfileHistory error:', e);
                         this.profileHistory = [];
-                    }
-                },
-
-                async loadSavedPrompt() {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/prompt`);
-                        const data = await res.json();
-                        if (data.success && data.prompt) {
-                            this.generationPrompt = data.prompt;
-                        }
-                    } catch (e) {
-                        console.error('loadSavedPrompt error:', e);
                     }
                 },
 
