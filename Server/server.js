@@ -118,7 +118,7 @@ async function initDatabase() {
         await pool.query(`
             CREATE TABLE IF NOT EXISTS bots (
                 id SERIAL PRIMARY KEY,
-                bot_id VARCHAR(100) UNIQUE NOT NULL,
+                bot_id VARCHAR(100) UNIQUE,
                 name VARCHAR(100),
                 platform VARCHAR(100),
                 ip VARCHAR(50),
@@ -128,6 +128,16 @@ async function initDatabase() {
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+
+        // Миграция: добавляем bot_id если его нет
+        await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS bot_id VARCHAR(100)`);
+
+        // Создаём уникальный индекс если его нет (игнорируем ошибку если существует)
+        try {
+            await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS bots_bot_id_unique ON bots(bot_id) WHERE bot_id IS NOT NULL`);
+        } catch (e) {
+            // Индекс уже существует - игнорируем
+        }
 
         // 4. Связь бота с анкетами
         await pool.query(`
