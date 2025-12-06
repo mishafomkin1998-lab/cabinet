@@ -292,6 +292,9 @@ async function initDatabase() {
         // 15. Добавляем поле ai_enabled для пользователей
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT FALSE`);
 
+        // Добавляем поле avatar_url для аватара пользователя
+        await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500)`);
+
         // 16. Система оплаты анкет
         // Баланс пользователя (директор/админ)
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS balance DECIMAL(10,2) DEFAULT 0`);

@@ -68,7 +68,12 @@ router.post('/api/login', async (req, res) => {
 
         if (isMatch) {
             console.log(`✅ [LOGIN] Успешный вход: ${username} (${user.role})`);
-            res.json({ success: true, user: { id: user.id, username: user.username, role: user.role } });
+            res.json({ success: true, user: {
+                id: user.id,
+                username: user.username,
+                role: user.role,
+                avatar_url: user.avatar_url || null
+            } });
         } else {
             console.log(`❌ [LOGIN] Неверный пароль для "${username}"`);
             res.json({ success: false, error: 'Неверный пароль' });
@@ -76,6 +81,59 @@ router.post('/api/login', async (req, res) => {
     } catch (e) {
         console.error('💥 [LOGIN] Ошибка сервера/БД:', e.message);
         res.status(500).json({ error: e.message });
+    }
+});
+
+// Обновление профиля пользователя
+router.put('/api/user/profile', async (req, res) => {
+    const { userId, username, password, avatarUrl } = req.body;
+
+    if (!userId) {
+        return res.json({ success: false, error: 'userId обязателен' });
+    }
+
+    try {
+        const updates = [];
+        const values = [];
+        let paramIndex = 1;
+
+        if (username) {
+            // Проверяем, не занят ли username
+            const exists = await pool.query(
+                'SELECT id FROM users WHERE username = $1 AND id != $2',
+                [username, userId]
+            );
+            if (exists.rows.length > 0) {
+                return res.json({ success: false, error: 'Это имя уже занято' });
+            }
+            updates.push(`username = $${paramIndex++}`);
+            values.push(username);
+        }
+
+        if (password) {
+            const hash = await bcrypt.hash(password, 10);
+            updates.push(`password_hash = $${paramIndex++}`);
+            values.push(hash);
+        }
+
+        if (avatarUrl !== undefined) {
+            updates.push(`avatar_url = $${paramIndex++}`);
+            values.push(avatarUrl || null);
+        }
+
+        if (updates.length === 0) {
+            return res.json({ success: true, message: 'Нет изменений' });
+        }
+
+        values.push(userId);
+        const query = `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIndex}`;
+        await pool.query(query, values);
+
+        console.log(`✅ [PROFILE] Профиль пользователя ${userId} обновлён`);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('💥 [PROFILE] Ошибка обновления профиля:', e.message);
+        res.status(500).json({ success: false, error: e.message });
     }
 });
 

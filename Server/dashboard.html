@@ -567,6 +567,15 @@
                 </div>
             </template>
 
+            <!-- Кнопка поддержки -->
+            <div class="pt-3 border-t border-gray-100 mb-3">
+                <a href="https://t.me/S_Shevil" target="_blank"
+                   class="flex items-center p-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600 transition-all">
+                    <i class="fab fa-telegram w-5"></i>
+                    <span class="ml-3 font-medium">Поддержка</span>
+                </a>
+            </div>
+
             <!-- Status -->
             <div class="pt-3 border-t border-gray-100">
                 <div class="flex items-center">
@@ -608,23 +617,16 @@
                 </div>
 
                 <div class="flex items-center space-x-3">
-                    <!-- Theme toggle -->
-                    <button @click="toggleDarkMode()" class="theme-toggle glass px-3 py-2 rounded-xl flex items-center justify-center hover:bg-gray-50 transition-all">
-                        <i class="fas text-sm" :class="darkMode ? 'fa-sun text-yellow-500' : 'fa-moon text-indigo-500'"></i>
-                    </button>
-
-                    <!-- Language selector -->
-                    <select class="glass px-3 py-2 rounded-xl text-sm font-bold focus:outline-none cursor-pointer hover:bg-gray-50 transition-colors" x-model="language" @change="changeLanguage">
-                        <option value="ru">RU</option>
-                        <option value="en">EN</option>
-                        <option value="uk">UK</option>
-                    </select>
-
                     <!-- Profile -->
                     <div class="relative" x-data="{open: false}">
                         <button @click="open = !open" class="flex items-center glass px-4 py-2 rounded-xl hover:bg-gray-50">
-                            <div class="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center">
-                                <span class="text-white text-sm font-medium" x-text="currentUser.username ? currentUser.username.substring(0,1).toUpperCase() : 'U'">U</span>
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center overflow-hidden">
+                                <template x-if="currentUser.avatar_url">
+                                    <img :src="currentUser.avatar_url" class="w-full h-full object-cover">
+                                </template>
+                                <template x-if="!currentUser.avatar_url">
+                                    <span class="text-white text-sm font-medium" x-text="currentUser.username ? currentUser.username.substring(0,1).toUpperCase() : 'U'">U</span>
+                                </template>
                             </div>
                             <span class="ml-2 text-sm font-medium hidden md:block" x-text="currentUser.username"></span>
                             <i class="fas fa-chevron-down ml-2 text-gray-400 text-xs"></i>
@@ -635,6 +637,10 @@
                                 <div class="font-medium" x-text="currentUser.username"></div>
                                 <div class="text-xs text-gray-500" x-text="t('roles.' + currentUser.role)"></div>
                             </div>
+                            <a href="#" @click.prevent="showSettingsModal = true; open = false" class="flex items-center p-3 rounded-lg hover:bg-gray-100 text-gray-700 mb-1">
+                                <i class="fas fa-cog mr-3"></i>
+                                <span>Настройки</span>
+                            </a>
                             <a href="#" @click="logout()" class="flex items-center p-3 rounded-lg hover:bg-red-50 text-red-500">
                                 <i class="fas fa-sign-out-alt mr-3"></i>
                                 <span x-text="t('userMenu.logout')"></span>
@@ -2173,6 +2179,105 @@
         </div>
     </div>
 
+    <!-- Модальное окно настроек -->
+    <div x-show="showSettingsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-lg" @click.outside="showSettingsModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">Настройки профиля</h3>
+                <button @click="showSettingsModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-5">
+                <!-- Аватар -->
+                <div class="flex items-center space-x-4">
+                    <div class="w-16 h-16 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center overflow-hidden">
+                        <template x-if="userSettings.avatarUrl || currentUser.avatar_url">
+                            <img :src="userSettings.avatarUrl || currentUser.avatar_url" class="w-full h-full object-cover">
+                        </template>
+                        <template x-if="!userSettings.avatarUrl && !currentUser.avatar_url">
+                            <span class="text-white text-2xl font-medium" x-text="currentUser.username ? currentUser.username.substring(0,1).toUpperCase() : 'U'"></span>
+                        </template>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium mb-1">URL фото профиля</label>
+                        <input type="url"
+                               class="glass w-full px-4 py-2 rounded-xl text-sm"
+                               placeholder="https://example.com/photo.jpg"
+                               x-model="userSettings.avatarUrl">
+                    </div>
+                </div>
+
+                <!-- Никнейм -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Никнейм</label>
+                    <input type="text"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           :placeholder="currentUser.username"
+                           x-model="userSettings.newUsername">
+                </div>
+
+                <!-- Новый пароль -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Новый пароль</label>
+                    <input type="password"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Оставьте пустым, если не хотите менять"
+                           x-model="userSettings.newPassword">
+                </div>
+
+                <!-- Подтверждение пароля -->
+                <div x-show="userSettings.newPassword">
+                    <label class="block text-sm font-medium mb-2">Подтвердите пароль</label>
+                    <input type="password"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Повторите новый пароль"
+                           x-model="userSettings.newPasswordConfirm">
+                </div>
+
+                <!-- Разделитель -->
+                <div class="border-t border-gray-200 pt-4">
+                    <h4 class="text-sm font-semibold text-gray-600 mb-3">Настройки интерфейса</h4>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Язык -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Язык</label>
+                            <select class="glass w-full px-4 py-3 rounded-xl" x-model="language" @change="changeLanguage">
+                                <option value="ru">Русский</option>
+                                <option value="en">English</option>
+                                <option value="uk">Українська</option>
+                            </select>
+                        </div>
+
+                        <!-- Тема -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Тема</label>
+                            <button @click="toggleDarkMode()"
+                                    class="glass w-full px-4 py-3 rounded-xl flex items-center justify-between hover:bg-gray-50 transition-all">
+                                <span x-text="darkMode ? 'Тёмная' : 'Светлая'"></span>
+                                <i class="fas" :class="darkMode ? 'fa-moon text-indigo-500' : 'fa-sun text-yellow-500'"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showSettingsModal = false; resetUserSettings()" class="px-4 py-2 rounded-xl hover:bg-gray-100">
+                        Отмена
+                    </button>
+                    <button @click="saveUserSettings()"
+                            :disabled="settingsSaving || (userSettings.newPassword && userSettings.newPassword !== userSettings.newPasswordConfirm)"
+                            class="glow-button px-5 py-2.5 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span x-show="!settingsSaving">Сохранить</span>
+                        <span x-show="settingsSaving"><i class="fas fa-spinner fa-spin mr-2"></i>Сохранение...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         function dashboard() {
             return {
@@ -2253,6 +2358,16 @@
                 searchQuery: '',
                 loading: true,
                 error: null,
+
+                // Settings modal
+                showSettingsModal: false,
+                userSettings: {
+                    newUsername: '',
+                    newPassword: '',
+                    newPasswordConfirm: '',
+                    avatarUrl: ''
+                },
+                settingsSaving: false,
 
                 // Статистика с сервера
                 stats: {
@@ -3931,6 +4046,73 @@
                     } catch (e) {
                         console.error('topupBalance error:', e);
                         alert('Ошибка соединения');
+                    }
+                },
+
+                // Сбросить настройки пользователя
+                resetUserSettings() {
+                    this.userSettings = {
+                        newUsername: '',
+                        newPassword: '',
+                        newPasswordConfirm: '',
+                        avatarUrl: ''
+                    };
+                },
+
+                // Сохранить настройки пользователя
+                async saveUserSettings() {
+                    if (this.userSettings.newPassword && this.userSettings.newPassword !== this.userSettings.newPasswordConfirm) {
+                        alert('Пароли не совпадают');
+                        return;
+                    }
+
+                    this.settingsSaving = true;
+                    try {
+                        const updateData = {
+                            userId: this.currentUser.id
+                        };
+
+                        if (this.userSettings.newUsername) {
+                            updateData.username = this.userSettings.newUsername;
+                        }
+                        if (this.userSettings.newPassword) {
+                            updateData.password = this.userSettings.newPassword;
+                        }
+                        if (this.userSettings.avatarUrl) {
+                            updateData.avatarUrl = this.userSettings.avatarUrl;
+                        }
+
+                        const res = await fetch(`${API_BASE}/api/user/profile`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(updateData)
+                        });
+
+                        const data = await res.json();
+                        if (data.success) {
+                            // Обновляем локальные данные пользователя
+                            if (updateData.username) {
+                                this.currentUser.username = updateData.username;
+                            }
+                            if (updateData.avatarUrl) {
+                                this.currentUser.avatar_url = updateData.avatarUrl;
+                            }
+
+                            // Сохраняем в localStorage/sessionStorage
+                            const storage = localStorage.getItem('novaUser') ? localStorage : sessionStorage;
+                            storage.setItem('novaUser', JSON.stringify(this.currentUser));
+
+                            alert('Настройки сохранены');
+                            this.showSettingsModal = false;
+                            this.resetUserSettings();
+                        } else {
+                            alert(data.error || 'Ошибка сохранения');
+                        }
+                    } catch (e) {
+                        console.error('saveUserSettings error:', e);
+                        alert('Ошибка соединения');
+                    } finally {
+                        this.settingsSaving = false;
                     }
                 },
 
