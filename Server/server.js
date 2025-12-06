@@ -695,6 +695,41 @@ app.post('/api/profiles/assign', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Назначение анкеты админу (упрощённый вариант для dropdown)
+app.post('/api/profiles/assign-admin', async (req, res) => {
+    const { profileId, adminLogin, performedBy } = req.body;
+    try {
+        // Находим admin_id по логину
+        let adminId = null;
+        let adminName = null;
+        if (adminLogin) {
+            const adminResult = await pool.query(
+                `SELECT id, username FROM users WHERE username = $1 OR login = $1`,
+                [adminLogin]
+            );
+            if (adminResult.rows.length > 0) {
+                adminId = adminResult.rows[0].id;
+                adminName = adminResult.rows[0].username;
+            }
+        }
+
+        // Обновляем assigned_admin_id
+        await pool.query(
+            `UPDATE allowed_profiles SET assigned_admin_id = $1 WHERE profile_id = $2`,
+            [adminId, profileId]
+        );
+
+        // Логируем в историю
+        await pool.query(
+            `INSERT INTO profile_history (profile_id, action_type, performed_by, details)
+             VALUES ($1, $2, $3, $4)`,
+            [profileId, adminId ? 'assigned_admin' : 'unassigned_admin', performedBy || 'Система', adminName || 'Снято назначение']
+        );
+
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Удаление профиля
 app.delete('/api/profiles/:profileId', async (req, res) => {
     const { profileId } = req.params;
@@ -2280,6 +2315,105 @@ app.get('/api/dashboard', async (req, res) => {
         await logError('/api/dashboard', 'QueryError', e.message, req.query, userId);
         res.status(500).json({ error: e.message });
     }
+});
+
+// ==========================================
+// 10.1.1. УПРАВЛЕНИЕ БОТАМИ
+// ==========================================
+
+// Переключение статуса бота (active/inactive)
+app.post('/api/bots/:botId/toggle', async (req, res) => {
+    const { botId } = req.params;
+    const { active } = req.body;
+    try {
+        // Добавляем колонку active если не существует
+        await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT true`);
+
+        await pool.query(
+            `UPDATE bots SET active = $1 WHERE bot_id = $2`,
+            [active, botId]
+        );
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Сохранение названия бота
+app.put('/api/bots/:botId/name', async (req, res) => {
+    const { botId } = req.params;
+    const { name } = req.body;
+    try {
+        await pool.query(
+            `UPDATE bots SET name = $1 WHERE bot_id = $2`,
+            [name, botId]
+        );
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Обновить все боты (рефреш heartbeat статуса)
+app.post('/api/bots/refresh-all', async (req, res) => {
+    try {
+        // Помечаем ботов offline если не было heartbeat более 2 минут
+        await pool.query(`
+            UPDATE bots SET status = 'offline'
+            WHERE last_heartbeat < NOW() - INTERVAL '2 minutes'
+        `);
+
+        // Получаем обновлённый список
+        const result = await pool.query(`
+            SELECT bot_id, name, status, last_heartbeat
+            FROM bots
+            ORDER BY last_heartbeat DESC
+        `);
+
+        res.json({
+            success: true,
+            bots: result.rows,
+            message: 'Статус ботов обновлён'
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Синхронизировать промт с ботами
+app.post('/api/bots/sync-prompt', async (req, res) => {
+    const { prompt, userId } = req.body;
+    try {
+        // Создаём таблицу настроек если не существует
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS bot_settings (
+                id SERIAL PRIMARY KEY,
+                key VARCHAR(100) UNIQUE NOT NULL,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT NOW(),
+                updated_by INTEGER
+            )
+        `);
+
+        // Сохраняем промт в настройках
+        await pool.query(`
+            INSERT INTO bot_settings (key, value, updated_by, updated_at)
+            VALUES ('generation_prompt', $1, $2, NOW())
+            ON CONFLICT (key) DO UPDATE SET
+                value = EXCLUDED.value,
+                updated_by = EXCLUDED.updated_by,
+                updated_at = NOW()
+        `, [prompt, userId]);
+
+        res.json({ success: true, message: 'Промт сохранён' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Получить промт из настроек
+app.get('/api/bots/prompt', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT value FROM bot_settings WHERE key = 'generation_prompt'
+        `);
+        res.json({
+            success: true,
+            prompt: result.rows.length > 0 ? result.rows[0].value : ''
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // 10.2. Статус ботов (онлайн/офлайн) - ОБНОВЛЕНО v6.0

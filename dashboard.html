@@ -1910,7 +1910,8 @@
                             this.loadHourlyActivity(),
                             this.loadTranslatorStats(),
                             this.loadHistoryActions(),
-                            this.loadProfileHistory()
+                            this.loadProfileHistory(),
+                            this.loadSavedPrompt()
                         ]);
                     } catch (e) {
                         console.error('Error loading data:', e);
@@ -2491,8 +2492,24 @@
                     }
                 },
                 
-                assignAccount(account) {
-                    console.log(`Анкета ${account.id} назначена админу: ${account.admin}`);
+                async assignAccount(account) {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/profiles/assign-admin`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileId: account.profile_id,
+                                adminLogin: account.admin || null,
+                                performedBy: this.currentUser.username
+                            })
+                        });
+                        const data = await res.json();
+                        if (!data.success) {
+                            console.error('Ошибка назначения:', data.error);
+                        }
+                    } catch (e) {
+                        console.error('Ошибка:', e);
+                    }
                 },
                 
                 saveAccounts() {
@@ -2665,24 +2682,73 @@
                     }
                 },
                 
-                toggleBotStatus(bot) {
-                    bot.status = bot.status === 'active' ? 'inactive' : 'active';
-                    console.log(`Бот ${bot.name} ${bot.status === 'active' ? 'активирован' : 'деактивирован'}`);
+                async toggleBotStatus(bot) {
+                    const newActive = bot.status !== 'active';
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/${bot.id}/toggle`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ active: newActive })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            bot.status = newActive ? 'active' : 'inactive';
+                        }
+                    } catch (e) {
+                        console.error('Ошибка:', e);
+                    }
                 },
-                
-                saveBotName(bot) {
-                    console.log(`Название бота сохранено: ${bot.name}`);
-                    alert(`Название бота сохранено: ${bot.name}`);
+
+                async saveBotName(bot) {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/${bot.id}/name`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: bot.name })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert(this.t('messages.botNameSaved'));
+                        }
+                    } catch (e) {
+                        console.error('Ошибка:', e);
+                    }
                 },
-                
-                updateAllBots() {
-                    console.log('Обновление всех ботов...');
-                    alert('Все боты обновлены');
+
+                async updateAllBots() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/refresh-all`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            // Обновляем список ботов
+                            await this.loadBotsStatus();
+                            alert(this.t('messages.botsUpdated'));
+                        }
+                    } catch (e) {
+                        console.error('Ошибка:', e);
+                    }
                 },
-                
-                syncPromptWithBots() {
-                    console.log('Промт синхронизирован с ботами:', this.generationPrompt);
-                    alert('Промт синхронизирован с ботами');
+
+                async syncPromptWithBots() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/sync-prompt`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                prompt: this.generationPrompt,
+                                userId: this.currentUser.id
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert(this.t('messages.botsSynced'));
+                        }
+                    } catch (e) {
+                        console.error('Ошибка:', e);
+                    }
                 },
 
                 // === Функции экспорта статистики ===
@@ -2792,6 +2858,18 @@
                     } catch (e) {
                         console.error('loadProfileHistory error:', e);
                         this.profileHistory = [];
+                    }
+                },
+
+                async loadSavedPrompt() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/prompt`);
+                        const data = await res.json();
+                        if (data.success && data.prompt) {
+                            this.generationPrompt = data.prompt;
+                        }
+                    } catch (e) {
+                        console.error('loadSavedPrompt error:', e);
                     }
                 },
 
