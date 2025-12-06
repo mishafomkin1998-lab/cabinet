@@ -306,6 +306,7 @@ router.get('/:profileId/ai-status', async (req, res) => {
 /**
  * GET /api/profile-history
  * История действий с анкетами
+ * Для админов/переводчиков показывает только историю назначенных им анкет
  */
 router.get('/history', async (req, res) => {
     const { userId, role, adminId, profileId, dateFrom, dateTo, limit = 100 } = req.query;
@@ -313,19 +314,25 @@ router.get('/history', async (req, res) => {
         let filter = 'WHERE 1=1';
         let params = [limit];
         let paramIndex = 2;
+        let joinClause = '';
 
-        // Фильтр по роли
+        // Фильтр по роли - показывать только историю назначенных анкет
         if (role === 'admin') {
-            filter += ` AND pa.performed_by_id = $${paramIndex++}`;
+            // Для админа показываем только анкеты, назначенные ему
+            joinClause = `INNER JOIN allowed_profiles ap ON pa.profile_id = ap.profile_id`;
+            filter += ` AND ap.assigned_admin_id = $${paramIndex++}`;
             params.push(userId);
         } else if (role === 'translator') {
-            filter += ` AND pa.performed_by_id = $${paramIndex++}`;
+            // Для переводчика показываем только анкеты, назначенные ему
+            joinClause = `INNER JOIN allowed_profiles ap ON pa.profile_id = ap.profile_id`;
+            filter += ` AND ap.assigned_translator_id = $${paramIndex++}`;
             params.push(userId);
         }
 
         // Фильтр по админу (для директора)
-        if (adminId) {
-            filter += ` AND pa.performed_by_id = $${paramIndex++}`;
+        if (adminId && role === 'director') {
+            joinClause = joinClause || `LEFT JOIN allowed_profiles ap ON pa.profile_id = ap.profile_id`;
+            filter += ` AND ap.assigned_admin_id = $${paramIndex++}`;
             params.push(adminId);
         }
 
@@ -346,7 +353,7 @@ router.get('/history', async (req, res) => {
         }
 
         const query = `
-            SELECT
+            SELECT DISTINCT
                 pa.id,
                 pa.profile_id,
                 pa.action_type,
@@ -357,6 +364,7 @@ router.get('/history', async (req, res) => {
                 pa.new_value,
                 pa.created_at
             FROM profile_actions pa
+            ${joinClause}
             ${filter}
             ORDER BY pa.created_at DESC
             LIMIT $1

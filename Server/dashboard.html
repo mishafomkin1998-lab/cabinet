@@ -882,6 +882,12 @@
                                    x-model="searchQuery">
                             <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
                         </div>
+                        <!-- Кнопка оплаты выбранных анкет (если не "мой админ") -->
+                        <template x-if="!isRestricted && selectedProfileIds.length > 0">
+                            <button @click="paySelectedProfiles()" class="px-4 py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white font-medium">
+                                <i class="fas fa-credit-card mr-2"></i>Оплатить (<span x-text="selectedProfileIds.length"></span>)
+                            </button>
+                        </template>
                     </div>
                     <button @click="showAddAccountModal = true" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
                         <i class="fas fa-plus mr-2"></i><span x-text="t('common.add')"></span>
@@ -894,6 +900,13 @@
                         <table class="w-full">
                             <thead>
                                 <tr class="border-b border-gray-100 text-sm">
+                                    <!-- Чекбокс для выбора (если не "мой админ") -->
+                                    <th x-show="!isRestricted" class="text-left py-2 px-3 w-10">
+                                        <input type="checkbox"
+                                               class="w-4 h-4 rounded"
+                                               @change="toggleSelectAllProfiles($event.target.checked)"
+                                               :checked="selectedProfileIds.length > 0 && selectedProfileIds.length === filteredAccounts.filter(a => !a.isPaid && !a.isFree).length">
+                                    </th>
                                     <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('id')">
                                         <span x-text="t('profiles.id')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'id' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
@@ -929,6 +942,15 @@
                                         :class="{'bg-red-50': account.paused,
                                                 'account-online': account.status === 'online' && !account.paused,
                                                 'account-offline': account.status === 'offline' && !account.paused}">
+                                        <!-- Чекбокс для выбора (если не "мой админ") -->
+                                        <td x-show="!isRestricted" class="py-2 px-3">
+                                            <input type="checkbox"
+                                                   class="w-4 h-4 rounded"
+                                                   :value="account.id"
+                                                   :checked="selectedProfileIds.includes(account.id)"
+                                                   :disabled="account.isPaid || account.isFree"
+                                                   @change="toggleProfileSelection(account.id, $event.target.checked)">
+                                        </td>
                                         <td class="py-2 px-3 font-mono" x-text="'#' + account.id"></td>
                                         <td class="py-2 px-3">
                                             <span class="px-2 py-0.5 rounded-full text-xs"
@@ -2190,6 +2212,7 @@
                 accountsToAssign: '',
                 assignComment: '',
                 selectedAccountIds: [],
+                selectedProfileIds: [], // Выбранные анкеты для оплаты
 
                 generationPrompt: '',
 
@@ -2507,7 +2530,7 @@
                                 accounts: a.accounts_count || 0,
                                 conversion: a.conversion || 0,
                                 isMyAdmin: a.is_restricted || false,
-                                salary: a.salary || null,
+                                salary: a.salary !== null && a.salary !== undefined ? a.salary : null,
                                 balance: a.balance || 0,
                                 translators: translatorsList.filter(t => t.owner_id === a.id).map(t => ({
                                     id: t.id,
@@ -3034,7 +3057,7 @@
                         password: admin.password || '',
                         initials: admin.initials || '',
                         isMyAdmin: admin.isMyAdmin,
-                        salary: admin.salary || '',
+                        salary: admin.salary !== null && admin.salary !== undefined ? admin.salary : '',
                         aiEnabled: admin.aiEnabled || false
                     };
                     this.showAddAdminModal = true;
@@ -3109,7 +3132,7 @@
                         return;
                     }
 
-                    if (!this.newAdmin.isMyAdmin && !this.newAdmin.salary) {
+                    if (!this.newAdmin.isMyAdmin && this.newAdmin.salary === '') {
                         alert('Для не "моего админа" укажите сумму');
                         return;
                     }
@@ -3563,6 +3586,70 @@
                     } catch (e) {
                         console.error('startTrial error:', e);
                         alert('Ошибка соединения');
+                    }
+                },
+
+                // Выбор анкет для оплаты
+                toggleProfileSelection(profileId, checked) {
+                    if (checked) {
+                        if (!this.selectedProfileIds.includes(profileId)) {
+                            this.selectedProfileIds.push(profileId);
+                        }
+                    } else {
+                        this.selectedProfileIds = this.selectedProfileIds.filter(id => id !== profileId);
+                    }
+                },
+
+                toggleSelectAllProfiles(checked) {
+                    if (checked) {
+                        this.selectedProfileIds = this.filteredAccounts
+                            .filter(a => !a.isPaid && !a.isFree)
+                            .map(a => a.id);
+                    } else {
+                        this.selectedProfileIds = [];
+                    }
+                },
+
+                async paySelectedProfiles() {
+                    if (this.selectedProfileIds.length === 0) return;
+
+                    const selectedAccounts = this.accounts.filter(a => this.selectedProfileIds.includes(a.id));
+                    let totalCost = 0;
+                    for (const acc of selectedAccounts) {
+                        const cost = this.pricing[30] || 2; // Стоимость за 30 дней по умолчанию
+                        totalCost += cost;
+                    }
+
+                    if (this.userBalance < totalCost) {
+                        alert(`Недостаточно средств. Нужно: $${totalCost}, на балансе: $${this.userBalance.toFixed(2)}`);
+                        return;
+                    }
+
+                    if (!confirm(`Оплатить ${this.selectedProfileIds.length} анкет на 30 дней за $${totalCost}?`)) return;
+
+                    try {
+                        let successCount = 0;
+                        for (const profileId of this.selectedProfileIds) {
+                            const res = await fetch(`${API_BASE}/api/billing/pay`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    profileId: profileId,
+                                    days: 30,
+                                    userId: this.currentUser.id
+                                })
+                            });
+                            const data = await res.json();
+                            if (data.success) successCount++;
+                        }
+
+                        alert(`Оплачено ${successCount} из ${this.selectedProfileIds.length} анкет`);
+                        this.selectedProfileIds = [];
+                        await this.loadAccounts();
+                        await this.loadUserBalance();
+                    } catch (e) {
+                        console.error('paySelectedProfiles error:', e);
+                        alert('Ошибка оплаты');
                     }
                 },
 
