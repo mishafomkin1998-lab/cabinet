@@ -1897,9 +1897,12 @@
                             });
                         }
                     } else {
-                        let apiPath = `/api/users/${target}`; 
+                        let apiPath = `/api/users/${target}`;
                         const usersRes = await makeApiRequest(this, 'GET', apiPath);
                         users = usersRes.data.Users || [];
+                        if (target === 'online') {
+                            this.log(`📊 Online users: ${users.length}`);
+                        }
                     }
 
                     if(users.length === 0) {
@@ -1913,7 +1916,10 @@
                             this.mailSettings.target = newTarget;
                             if(activeTabId === this.id) document.getElementById(`target-select-${this.id}`).value = newTarget;
                             return this.processMailUser(msgTemplate);
-                        } else return;
+                        } else {
+                            this.log(`⏳ Нет онлайн пользователей. Ожидание...`);
+                            return;
+                        }
                     }
                     
                     const user = users[Math.floor(Math.random() * users.length)];
