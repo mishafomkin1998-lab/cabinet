@@ -1847,6 +1847,10 @@
                     await this.loadAllData();
                     // Автообновление каждые 30 секунд
                     setInterval(() => this.loadDashboardStats(), 30000);
+                    // Автообновление статуса анкет каждые 15 секунд
+                    setInterval(() => this.loadBotsStatus(), 15000);
+                    // Автообновление последней активности каждые 20 секунд
+                    setInterval(() => this.loadRecentActivity(), 20000);
                 },
 
                 // Инициализация Flatpickr календарей

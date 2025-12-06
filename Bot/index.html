@@ -1291,7 +1291,11 @@
                 if(response.data && response.data.choices && response.data.choices.length > 0) {
                     const result = response.data.choices[0].message.content.replace(/^"|"$/g, '');
                     txtArea.value = result;
-                    txtArea.dataset.usedAi = 'true'; // Отмечаем что использовался AI
+                    // Устанавливаем флаг на объекте bot чтобы передать при отправке
+                    if (bots[botId]) {
+                        bots[botId].usedAi = true;
+                        console.log(`🤖 AI генерация для бота ${botId} - флаг usedAi установлен`);
+                    }
                     validateInput(txtArea);
                 }
             } catch (e) {
@@ -1882,8 +1886,14 @@
                         if (!lababotResult.success) {
                             console.warn(`⚠️ Не удалось отправить статистику на Lababot: ${lababotResult.error}`);
                         }
-                        
-                        this.mailStats.sent++; 
+
+                        // Сбрасываем флаг AI после отправки
+                        if (this.usedAi) {
+                            console.log(`🤖 Сообщение с AI отправлено, сбрасываем флаг`);
+                            this.usedAi = false;
+                        }
+
+                        this.mailStats.sent++;
                         this.mailHistory.sent.push(`${user.AccountId} (${user.Name})`);
                         this.log(`✅ Письмо отправлено: ${user.Name}`);
                     }
@@ -2041,8 +2051,14 @@
                         if (!lababotResult.success) {
                             console.warn(`⚠️ Не удалось отправить статистику чата на Lababot: ${lababotResult.error}`);
                         }
-                        
-                        this.chatStats.sent++; 
+
+                        // Сбрасываем флаг AI после отправки
+                        if (this.usedAi) {
+                            console.log(`🤖 Чат с AI отправлен, сбрасываем флаг`);
+                            this.usedAi = false;
+                        }
+
+                        this.chatStats.sent++;
                         this.chatHistory.sent.push(`${user.AccountId} (${user.Name})`);
                         this.log(`💬 Сообщение чата отправлено: ${user.Name}`);
                         

@@ -192,6 +192,33 @@ async function initDatabase() {
             // Индекс уже существует - игнорируем
         }
 
+        // Очистка: удаляем записи из bots которые не имели heartbeat более 24 часов
+        try {
+            const cleanupResult = await pool.query(`
+                DELETE FROM bots
+                WHERE last_heartbeat < NOW() - INTERVAL '24 hours'
+                   OR last_heartbeat IS NULL
+            `);
+            if (cleanupResult.rowCount > 0) {
+                console.log(`🧹 Очищено ${cleanupResult.rowCount} старых записей из таблицы bots`);
+            }
+        } catch (e) {
+            console.log('Очистка bots:', e.message);
+        }
+
+        // Очистка: удаляем старые heartbeats (старше 7 дней)
+        try {
+            const heartbeatCleanup = await pool.query(`
+                DELETE FROM heartbeats
+                WHERE timestamp < NOW() - INTERVAL '7 days'
+            `);
+            if (heartbeatCleanup.rowCount > 0) {
+                console.log(`🧹 Очищено ${heartbeatCleanup.rowCount} старых heartbeats`);
+            }
+        } catch (e) {
+            console.log('Очистка heartbeats:', e.message);
+        }
+
         // 4. Связь бота с анкетами
         await pool.query(`
             CREATE TABLE IF NOT EXISTS bot_profiles (
