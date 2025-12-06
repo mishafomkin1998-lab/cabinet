@@ -1885,7 +1885,7 @@ app.get('/api/dashboard', async (req, res) => {
             paramIndex++;
         }
 
-        // Количество анкет
+        // Количество анкет (всего и онлайн)
         const profilesQuery = `
             SELECT COUNT(*) as total_profiles
             FROM allowed_profiles p
@@ -1893,6 +1893,31 @@ app.get('/api/dashboard', async (req, res) => {
         `;
         const profilesResult = await pool.query(profilesQuery, params);
         const totalProfiles = parseInt(profilesResult.rows[0]?.total_profiles) || 0;
+
+        // Онлайн анкеты (heartbeat за последние 2 минуты)
+        const onlineQuery = `
+            SELECT COUNT(DISTINCT h.account_display_id) as online_count
+            FROM heartbeats h
+            JOIN allowed_profiles p ON h.account_display_id = p.profile_id
+            WHERE h.timestamp > NOW() - INTERVAL '2 minutes'
+            ${profileFilter ? profileFilter.replace('WHERE', 'AND') : ''}
+        `;
+        const onlineResult = await pool.query(onlineQuery, params);
+        const profilesOnline = parseInt(onlineResult.rows[0]?.online_count) || 0;
+
+        // Генерации ИИ (из activity_log)
+        const aiQuery = `
+            SELECT
+                COUNT(*) FILTER (WHERE used_ai = true AND DATE(created_at) = CURRENT_DATE) as ai_today,
+                COUNT(*) FILTER (WHERE used_ai = true AND created_at >= CURRENT_DATE - INTERVAL '7 days') as ai_week,
+                COUNT(*) FILTER (WHERE used_ai = true AND created_at >= CURRENT_DATE - INTERVAL '30 days') as ai_month,
+                COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as total_today,
+                COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') as total_week
+            FROM activity_log a
+            WHERE 1=1 ${activityFilter}
+        `;
+        const aiResult = await pool.query(aiQuery, params);
+        const aiStats = aiResult.rows[0] || {};
 
         // Статистика из activity_log (основная таблица) + messages (для совместимости)
         const statsQuery = `
@@ -2021,10 +2046,23 @@ app.get('/api/dashboard', async (req, res) => {
                 // Метрики
                 metrics: {
                     totalProfiles: totalProfiles,
+                    profilesOnline: profilesOnline,
                     avgResponseTime: Math.round(avgResponseSec / 60),
                     medianResponseTime: Math.round(medianResponseSec / 60),
                     growthPercent: parseFloat(growthPercent) || 0,
                     avgDailyIncome: (incomeWeek / 7).toFixed(2)
+                },
+                // Генерации ИИ
+                ai: {
+                    today: parseInt(aiStats.ai_today) || 0,
+                    week: parseInt(aiStats.ai_week) || 0,
+                    month: parseInt(aiStats.ai_month) || 0,
+                    percentToday: aiStats.total_today > 0
+                        ? Math.round((aiStats.ai_today / aiStats.total_today) * 100)
+                        : 0,
+                    percentWeek: aiStats.total_week > 0
+                        ? Math.round((aiStats.ai_week / aiStats.total_week) * 100)
+                        : 0
                 }
             }
         });
@@ -2036,41 +2074,12 @@ app.get('/api/dashboard', async (req, res) => {
     }
 });
 
-// 10.2. Статус ботов (онлайн/офлайн) - ОБНОВЛЕНО v6.0
+// 10.2. Статус анкет (онлайн/офлайн) - ИСПРАВЛЕНО: считаем анкеты из allowed_profiles
 app.get('/api/bots/status', async (req, res) => {
     const { userId, role } = req.query;
 
     try {
-        // Получаем список ботов из таблицы bots с количеством профилей
-        const botsQuery = `
-            SELECT
-                b.bot_id,
-                b.name,
-                b.platform,
-                b.ip,
-                b.version,
-                b.status,
-                b.last_heartbeat,
-                CASE
-                    WHEN b.last_heartbeat > NOW() - INTERVAL '2 minutes' THEN 'online'
-                    WHEN b.last_heartbeat > NOW() - INTERVAL '10 minutes' THEN 'idle'
-                    ELSE 'offline'
-                END as connection_status,
-                COALESCE(bp.profiles_count, 0) as profiles_count,
-                bp.profiles
-            FROM bots b
-            LEFT JOIN LATERAL (
-                SELECT
-                    COUNT(*) as profiles_count,
-                    ARRAY_AGG(bp2.profile_id) as profiles
-                FROM bot_profiles bp2
-                WHERE bp2.bot_id = b.bot_id
-            ) bp ON true
-            ORDER BY b.last_heartbeat DESC NULLS LAST
-        `;
-        const botsResult = await pool.query(botsQuery);
-
-        // Также получаем по старой схеме для совместимости
+        // Фильтр по роли
         let profileFilter = "";
         let params = [];
 
@@ -2082,12 +2091,13 @@ app.get('/api/bots/status', async (req, res) => {
             params.push(userId);
         }
 
+        // Получаем ВСЕ анкеты из allowed_profiles с последним heartbeat
         const profilesQuery = `
             SELECT DISTINCT ON (p.profile_id)
                 p.profile_id,
                 p.note,
                 h.bot_id,
-                h.status,
+                h.status as heartbeat_status,
                 h.ip,
                 h.version,
                 h.platform,
@@ -2100,11 +2110,11 @@ app.get('/api/bots/status', async (req, res) => {
             FROM allowed_profiles p
             LEFT JOIN heartbeats h ON p.profile_id = h.account_display_id
             ${profileFilter}
-            ORDER BY p.profile_id, h.timestamp DESC
+            ORDER BY p.profile_id, h.timestamp DESC NULLS LAST
         `;
         const profilesResult = await pool.query(profilesQuery, params);
 
-        // Подсчёт статусов
+        // Подсчёт статусов анкет
         const statusCounts = {
             online: 0,
             idle: 0,
@@ -2112,44 +2122,40 @@ app.get('/api/bots/status', async (req, res) => {
             never_connected: 0
         };
 
-        // Формируем список ботов
-        const bots = botsResult.rows.length > 0
-            ? botsResult.rows.map(row => {
-                const status = row.last_heartbeat ? row.connection_status : 'never_connected';
-                statusCounts[status]++;
+        // Формируем список анкет с их статусами
+        const profiles = profilesResult.rows.map(row => {
+            let status;
+            if (!row.last_heartbeat) {
+                status = 'never_connected';
+            } else {
+                status = row.connection_status;
+            }
+            statusCounts[status]++;
 
-                return {
-                    botId: row.bot_id,
-                    name: row.name,
-                    platform: row.platform,
-                    ip: row.ip,
-                    version: row.version,
-                    status: status,
-                    lastHeartbeat: row.last_heartbeat,
-                    profilesCount: parseInt(row.profiles_count) || 0,
-                    profiles: row.profiles || []
-                };
-            })
-            : profilesResult.rows.map(row => {
-                const status = row.last_heartbeat ? row.connection_status : 'never_connected';
-                statusCounts[status]++;
+            return {
+                profileId: row.profile_id,
+                botId: row.bot_id,
+                note: row.note,
+                platform: row.platform,
+                ip: row.ip,
+                version: row.version,
+                status: status,
+                lastHeartbeat: row.last_heartbeat
+            };
+        });
 
-                return {
-                    botId: row.bot_id,
-                    profileId: row.profile_id,
-                    note: row.note,
-                    platform: row.platform,
-                    ip: row.ip,
-                    version: row.version,
-                    status: status,
-                    lastHeartbeat: row.last_heartbeat
-                };
-            });
+        // Общее количество анкет
+        const total = profiles.length;
 
         res.json({
             success: true,
-            summary: statusCounts,
-            bots: bots
+            summary: {
+                ...statusCounts,
+                total: total
+            },
+            // Для совместимости оставляем bots, но это анкеты
+            bots: profiles,
+            profiles: profiles
         });
 
     } catch (e) {

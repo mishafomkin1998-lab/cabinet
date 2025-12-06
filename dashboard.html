@@ -705,11 +705,15 @@
                     </div>
                 </div>
 
-                <!-- Bots and work time -->
+                <!-- Статус анкет и генерации ИИ -->
                 <div class="grid grid-cols-2 gap-6 mb-8">
                     <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6" x-text="t('stats.botsStatus')"></h3>
-                        <div class="text-3xl font-bold mb-2" x-text="bots.length">0</div>
+                        <h3 class="text-lg font-bold mb-6">Статус анкет</h3>
+                        <div class="text-3xl font-bold mb-2">
+                            <span class="text-green-600" x-text="botsStatus.online"></span>
+                            <span class="text-gray-400 text-xl">из</span>
+                            <span x-text="botsStatus.total || stats.metrics.totalProfiles || 0"></span>
+                        </div>
                         <div class="text-sm text-gray-500">
                             <span class="text-green-600"><span x-text="t('stats.online')"></span>: <span x-text="botsStatus.online"></span></span> |
                             <span class="text-yellow-500"><span x-text="t('stats.idle')"></span>: <span x-text="botsStatus.idle"></span></span> |
@@ -1217,12 +1221,28 @@
                         
                         <!-- Использование ИИ -->
                         <div x-show="monitoringFunction === 'aiUsage'" class="space-y-4">
+                            <div class="grid grid-cols-3 gap-4 mb-4">
+                                <div class="glass p-4 rounded-xl text-center">
+                                    <div class="text-3xl font-bold text-orange-600" x-text="stats.ai.today"></div>
+                                    <div class="text-sm text-gray-600">Сегодня</div>
+                                </div>
+                                <div class="glass p-4 rounded-xl text-center">
+                                    <div class="text-3xl font-bold text-orange-500" x-text="stats.ai.week"></div>
+                                    <div class="text-sm text-gray-600">За неделю</div>
+                                </div>
+                                <div class="glass p-4 rounded-xl text-center">
+                                    <div class="text-3xl font-bold text-orange-400" x-text="stats.ai.month"></div>
+                                    <div class="text-sm text-gray-600">За месяц</div>
+                                </div>
+                            </div>
                             <div class="glass p-4 rounded-xl">
                                 <div class="flex justify-between items-center mb-2">
-                                    <div class="font-medium" x-text="t('monitoring.aiGenerations')"></div>
-                                    <div class="text-2xl font-bold text-orange-600" x-text="recentActivity.filter(a => a.used_ai).length"></div>
+                                    <div class="font-medium">Процент ИИ генераций</div>
+                                    <div class="text-xl font-bold text-orange-600"><span x-text="stats.ai.percentToday"></span>% сегодня</div>
                                 </div>
-                                <div class="text-sm text-gray-600" x-text="t('monitoring.recentGenerations')"></div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-orange-500 h-2 rounded-full" :style="'width: ' + stats.ai.percentToday + '%'"></div>
+                                </div>
                             </div>
                             <div class="glass p-4 rounded-xl">
                                 <div class="font-medium mb-2">Последние генерации:</div>
@@ -1708,11 +1728,12 @@
                     yesterday: { letters: 0, chats: 0, income: '0.00' },
                     week: { letters: 0, chats: 0, uniqueMen: 0, income: '0.00', errors: 0 },
                     month: { letters: 0, chats: 0, uniqueMen: 0, income: '0.00' },
-                    metrics: { totalProfiles: 0, avgResponseTime: 0, growthPercent: 0, avgDailyIncome: '0.00' }
+                    metrics: { totalProfiles: 0, profilesOnline: 0, avgResponseTime: 0, growthPercent: 0, avgDailyIncome: '0.00' },
+                    ai: { today: 0, week: 0, month: 0, percentToday: 0, percentWeek: 0 }
                 },
 
-                // Статус ботов
-                botsStatus: { online: 0, idle: 0, offline: 0, never_connected: 0 },
+                // Статус анкет
+                botsStatus: { online: 0, idle: 0, offline: 0, never_connected: 0, total: 0 },
 
                 // Последняя активность
                 recentActivity: [],
