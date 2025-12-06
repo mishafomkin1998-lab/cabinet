@@ -457,9 +457,36 @@
         .account-online {
             border-left: 3px solid #10b981;
         }
-        
+
         .account-offline {
             border-left: 3px solid #6b7280;
+        }
+
+        /* Resizable table columns */
+        .resizable-table th {
+            position: relative;
+            min-width: 50px;
+        }
+
+        .resizable-table th .resize-handle {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            cursor: col-resize;
+            background: transparent;
+            transition: background 0.2s;
+        }
+
+        .resizable-table th .resize-handle:hover,
+        .resizable-table th .resize-handle.resizing {
+            background: rgba(99, 102, 241, 0.5);
+        }
+
+        .resizable-table.resizing {
+            user-select: none;
+            cursor: col-resize;
         }
     </style>
 </head>
@@ -752,15 +779,15 @@
                 <div class="glass rounded-2xl p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-bold" x-text="t('stats.peakHours')"></h3>
-                        <button class="text-sm text-indigo-600 hover:text-indigo-800" x-text="t('stats.advancedStats') + ' →'">
+                        <button @click="alert('Эта функция пока в разработке')" class="text-sm text-indigo-600 hover:text-indigo-800" x-text="t('stats.advancedStats') + ' →'">
                         </button>
                     </div>
-                    <div class="flex items-end h-16 gap-[2px]">
+                    <div class="flex items-end h-20 gap-1">
                         <template x-for="hour in 24" :key="hour">
-                            <div class="flex-1 rounded-t transition-all"
+                            <div class="flex-1 rounded-t transition-all bg-gradient-to-t"
                                  :class="getActivityColor(hour-1)"
-                                 :style="'height:' + Math.max(getActivityLevel(hour-1) * 100, 4) + '%'"
-                                 :title="(hour-1) + 'ч'">
+                                 :style="'height:' + Math.max(getActivityLevel(hour-1) * 100, 8) + '%'"
+                                 :title="(hour-1) + ':00 - активность ' + Math.round(getActivityLevel(hour-1) * 100) + '%'">
                             </div>
                         </template>
                     </div>
@@ -899,7 +926,7 @@
                 <!-- Сортировка -->
                 <div class="glass rounded-2xl overflow-hidden">
                     <div class="overflow-x-auto">
-                        <table class="w-full">
+                        <table class="w-full resizable-table" id="profiles-table">
                             <thead>
                                 <tr class="border-b border-gray-100 text-sm">
                                     <!-- Чекбокс для выбора (если не "мой админ") -->
@@ -909,32 +936,42 @@
                                                @change="toggleSelectAllProfiles($event.target.checked)"
                                                :checked="selectedProfileIds.length > 0 && selectedProfileIds.length === filteredAccounts.filter(a => !a.isPaid && !a.isFree).length">
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('id')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" style="width: 100px;" @click="sortAccounts('id')">
                                         <span x-text="t('profiles.id')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'id' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('status')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" style="width: 100px;" @click="sortAccounts('status')">
                                         <span x-text="t('profiles.statusCol')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'status' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('lastOnline')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" style="width: 120px;" @click="sortAccounts('lastOnline')">
                                         <span x-text="t('profiles.lastOnline')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'lastOnline' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('incoming')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" style="width: 100px;" @click="sortAccounts('incoming')">
                                         <span x-text="t('profiles.incoming')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'incoming' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th x-show="currentUser.role === 'director'" class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('admin')">
+                                    <th x-show="currentUser.role === 'director'" class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" style="width: 120px;" @click="sortAccounts('admin')">
                                         <span x-text="t('profiles.admin')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'admin' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('date')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" style="width: 120px;" @click="sortAccounts('date')">
                                         <span x-text="t('profiles.addedDate')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'date' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3" x-text="t('profiles.commentCol')"></th>
-                                    <th class="text-left py-2 px-3">Оплата</th>
+                                    <th class="text-left py-2 px-3" style="width: 150px;" x-text="t('profiles.commentCol')">
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
+                                    </th>
+                                    <th class="text-left py-2 px-3" style="width: 100px;">Оплата
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
+                                    </th>
                                     <th class="text-left py-2 px-3" x-text="t('common.actions')"></th>
                                 </tr>
                             </thead>
@@ -1641,12 +1678,12 @@
                     </div>
                 </div>
 
-                <!-- Таблица истории пополнений -->
+                <!-- Объединенная таблица истории -->
                 <div class="glass rounded-2xl p-6">
                     <div class="flex items-center justify-between mb-6">
                         <h3 class="text-lg font-bold">
                             <i class="fas fa-history text-gray-500 mr-2"></i>
-                            История пополнений
+                            История операций
                         </h3>
                         <button @click="loadFinanceData()" class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm">
                             <i class="fas fa-sync-alt mr-1"></i> Обновить
@@ -1658,75 +1695,57 @@
                             <thead>
                                 <tr class="border-b border-gray-100">
                                     <th class="text-left py-3 px-4">Дата</th>
-                                    <th class="text-left py-3 px-4">Админ</th>
-                                    <th class="text-left py-3 px-4">Сумма</th>
-                                    <th class="text-left py-3 px-4">Текущий баланс</th>
+                                    <th class="text-left py-3 px-4">Тип</th>
+                                    <th class="text-left py-3 px-4">Объект</th>
+                                    <th class="text-left py-3 px-4">Детали</th>
                                     <th class="text-left py-3 px-4">Примечание</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <template x-for="item in financeHistory" :key="item.id">
+                                <template x-for="item in combinedFinanceHistory" :key="item.uniqueId">
                                     <tr class="border-b border-gray-100 hover:bg-gray-50">
                                         <td class="py-3 px-4 text-sm" x-text="formatDateTime(item.createdAt)"></td>
-                                        <td class="py-3 px-4 font-medium" x-text="item.adminName"></td>
                                         <td class="py-3 px-4">
-                                            <span class="text-green-600 font-semibold">+$<span x-text="item.amount.toFixed(2)"></span></span>
+                                            <span x-show="item.type === 'topup'" class="px-2 py-1 bg-green-100 text-green-600 rounded text-xs font-medium">
+                                                <i class="fas fa-wallet mr-1"></i>Пополнение
+                                            </span>
+                                            <span x-show="item.type === 'profile_payment'" class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs font-medium">
+                                                <i class="fas fa-id-card mr-1"></i>Оплата анкеты
+                                            </span>
+                                            <span x-show="item.type === 'profile_removal'" class="px-2 py-1 bg-red-100 text-red-600 rounded text-xs font-medium">
+                                                <i class="fas fa-times mr-1"></i>Снятие оплаты
+                                            </span>
                                         </td>
                                         <td class="py-3 px-4">
-                                            <span class="text-blue-600">$<span x-text="item.adminBalance.toFixed(2)"></span></span>
+                                            <!-- Для пополнения - имя админа -->
+                                            <span x-show="item.type === 'topup'" class="font-medium" x-text="item.adminName"></span>
+                                            <!-- Для оплаты анкеты - ID анкеты -->
+                                            <span x-show="item.type !== 'topup'" class="font-mono font-medium">#<span x-text="item.profileId"></span></span>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <!-- Для пополнения - сумма и баланс -->
+                                            <template x-if="item.type === 'topup'">
+                                                <div>
+                                                    <span class="text-green-600 font-semibold">+$<span x-text="item.amount?.toFixed(2)"></span></span>
+                                                    <span class="text-gray-400 mx-1">→</span>
+                                                    <span class="text-blue-600">$<span x-text="item.adminBalance?.toFixed(2)"></span></span>
+                                                </div>
+                                            </template>
+                                            <!-- Для оплаты анкеты - количество дней -->
+                                            <template x-if="item.type === 'profile_payment'">
+                                                <span class="text-blue-600 font-semibold" x-text="item.days + ' дней'"></span>
+                                            </template>
+                                            <template x-if="item.type === 'profile_removal'">
+                                                <span class="text-gray-400">Оплата снята</span>
+                                            </template>
                                         </td>
                                         <td class="py-3 px-4 text-sm text-gray-500" x-text="item.note || '-'"></td>
                                     </tr>
                                 </template>
-                                <tr x-show="financeHistory.length === 0">
+                                <tr x-show="combinedFinanceHistory.length === 0">
                                     <td colspan="5" class="py-8 px-4 text-center text-gray-500">
-                                        <i class="fas fa-wallet text-3xl mb-2 opacity-30"></i>
-                                        <p>История пополнений пуста</p>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Таблица истории оплаты анкет -->
-                <div class="glass rounded-2xl p-6 mt-6">
-                    <h3 class="text-lg font-bold mb-6">
-                        <i class="fas fa-id-card text-blue-500 mr-2"></i>
-                        История оплаты анкет
-                    </h3>
-
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead>
-                                <tr class="border-b border-gray-100">
-                                    <th class="text-left py-3 px-4">Дата</th>
-                                    <th class="text-left py-3 px-4">Анкета</th>
-                                    <th class="text-left py-3 px-4">Действие</th>
-                                    <th class="text-left py-3 px-4">Период</th>
-                                    <th class="text-left py-3 px-4">Примечание</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <template x-for="item in profilePaymentHistory" :key="item.id">
-                                    <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                        <td class="py-3 px-4 text-sm" x-text="formatDateTime(item.createdAt)"></td>
-                                        <td class="py-3 px-4 font-mono font-medium">#<span x-text="item.profileId"></span></td>
-                                        <td class="py-3 px-4">
-                                            <span x-show="item.actionType === 'payment'" class="px-2 py-1 bg-green-100 text-green-600 rounded text-xs">Оплата</span>
-                                            <span x-show="item.actionType === 'removal'" class="px-2 py-1 bg-red-100 text-red-600 rounded text-xs">Снятие</span>
-                                        </td>
-                                        <td class="py-3 px-4">
-                                            <span x-show="item.days > 0" class="text-blue-600 font-semibold" x-text="item.days + ' дней'"></span>
-                                            <span x-show="item.days === 0" class="text-gray-400">-</span>
-                                        </td>
-                                        <td class="py-3 px-4 text-sm text-gray-500" x-text="item.note || '-'"></td>
-                                    </tr>
-                                </template>
-                                <tr x-show="profilePaymentHistory.length === 0">
-                                    <td colspan="5" class="py-8 px-4 text-center text-gray-500">
-                                        <i class="fas fa-id-card text-3xl mb-2 opacity-30"></i>
-                                        <p>История оплаты анкет пуста</p>
+                                        <i class="fas fa-history text-3xl mb-2 opacity-30"></i>
+                                        <p>История операций пуста</p>
                                     </td>
                                 </tr>
                             </tbody>
@@ -1836,12 +1855,21 @@
 
                 <div x-show="!newAdmin.isMyAdmin">
                     <label class="block text-sm font-medium mb-2">Сумма</label>
-                    <input type="number" 
+                    <input type="number"
                            class="glass w-full px-4 py-3 rounded-xl"
                            placeholder="Введите сумму"
                            x-model="newAdmin.salary">
                 </div>
-                
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">ID анкет (через запятую или с новой строки)</label>
+                    <textarea class="glass w-full px-4 py-3 rounded-xl resize-none"
+                              rows="3"
+                              placeholder="Например: 123456, 789012&#10;или каждый ID с новой строки"
+                              x-model="newAdmin.profileIds"></textarea>
+                    <p class="text-xs text-gray-500 mt-1">Оставьте пустым, чтобы не назначать анкеты сейчас</p>
+                </div>
+
                 <div class="flex justify-end space-x-3 pt-4">
                     <button @click="showAddAdminModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
                         Отмена
@@ -2311,7 +2339,8 @@
                     initials: '',
                     isMyAdmin: false,
                     salary: '',
-                    aiEnabled: false
+                    aiEnabled: false,
+                    profileIds: '' // Список ID анкет через запятую или с новой строки
                 },
 
                 newTranslator: {
@@ -2997,6 +3026,34 @@
                     return date.toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
                 },
                 
+                // Объединенная история финансов (пополнения + оплата анкет)
+                get combinedFinanceHistory() {
+                    const combined = [];
+
+                    // Добавляем пополнения
+                    this.financeHistory.forEach((item, idx) => {
+                        combined.push({
+                            ...item,
+                            uniqueId: 'topup_' + (item.id || idx),
+                            type: 'topup'
+                        });
+                    });
+
+                    // Добавляем оплаты анкет
+                    this.profilePaymentHistory.forEach((item, idx) => {
+                        combined.push({
+                            ...item,
+                            uniqueId: 'profile_' + (item.id || idx),
+                            type: item.actionType === 'removal' ? 'profile_removal' : 'profile_payment'
+                        });
+                    });
+
+                    // Сортируем по дате (новые сверху)
+                    combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+                    return combined;
+                },
+
                 get filteredAccounts() {
                     let filtered = this.accounts;
                     
@@ -3047,7 +3104,34 @@
                         this.sortDirection = 'asc';
                     }
                 },
-                
+
+                // Изменение ширины колонок таблицы
+                initResize(e) {
+                    const th = e.target.parentElement;
+                    const table = th.closest('table');
+                    const handle = e.target;
+                    const startX = e.pageX;
+                    const startWidth = th.offsetWidth;
+
+                    handle.classList.add('resizing');
+                    table.classList.add('resizing');
+
+                    const doResize = (e) => {
+                        const newWidth = Math.max(50, startWidth + (e.pageX - startX));
+                        th.style.width = newWidth + 'px';
+                    };
+
+                    const stopResize = () => {
+                        handle.classList.remove('resizing');
+                        table.classList.remove('resizing');
+                        document.removeEventListener('mousemove', doResize);
+                        document.removeEventListener('mouseup', stopResize);
+                    };
+
+                    document.addEventListener('mousemove', doResize);
+                    document.addEventListener('mouseup', stopResize);
+                },
+
                 getStatusClass(status) {
                     const classes = {
                         'online': 'bg-green-100 text-green-800',
@@ -3171,7 +3255,19 @@
                     alert(`Добавлено ${ids.length} анкет`);
                 },
                 
-                editAdmin(admin) {
+                async editAdmin(admin) {
+                    // Загружаем список назначенных анкет для этого админа
+                    let assignedIds = '';
+                    try {
+                        const res = await fetch(`/api/team/${admin.id}/profiles`);
+                        const data = await res.json();
+                        if (data.success && data.profileIds) {
+                            assignedIds = data.profileIds.join(', ');
+                        }
+                    } catch (e) {
+                        console.error('Error loading admin profiles:', e);
+                    }
+
                     this.newAdmin = {
                         id: admin.id,
                         name: admin.name,
@@ -3180,7 +3276,8 @@
                         initials: admin.initials || '',
                         isMyAdmin: admin.isMyAdmin,
                         salary: admin.salary !== null && admin.salary !== undefined ? admin.salary : '',
-                        aiEnabled: admin.aiEnabled || false
+                        aiEnabled: admin.aiEnabled || false,
+                        profileIds: assignedIds
                     };
                     this.showAddAdminModal = true;
                 },
@@ -3259,7 +3356,14 @@
                         return;
                     }
 
+                    // Парсим список ID анкет
+                    const profileIds = this.newAdmin.profileIds
+                        ? this.newAdmin.profileIds.split(/[\s,]+/).map(id => id.trim()).filter(id => id)
+                        : [];
+
                     try {
+                        let adminId = this.newAdmin.id;
+
                         if (this.newAdmin.id) {
                             // Редактирование существующего админа
                             const res = await fetch(`${API_BASE}/api/users/${this.newAdmin.id}`, {
@@ -3298,10 +3402,28 @@
                                 alert('Ошибка создания: ' + (data.error || 'Неизвестная ошибка'));
                                 return;
                             }
+                            adminId = data.userId;
                         }
 
-                        // Перезагружаем команду
+                        // Назначаем анкеты админу (если указаны)
+                        if (adminId && profileIds.length > 0) {
+                            await fetch(`${API_BASE}/api/team/${adminId}/profiles`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ profileIds })
+                            });
+                        } else if (adminId && this.newAdmin.id) {
+                            // При редактировании обновляем список (может быть пустым)
+                            await fetch(`${API_BASE}/api/team/${adminId}/profiles`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ profileIds })
+                            });
+                        }
+
+                        // Перезагружаем команду и анкеты
                         await this.loadTeam();
+                        await this.loadAccounts();
 
                         this.newAdmin = {
                             id: null,
@@ -3310,7 +3432,9 @@
                             password: '',
                             initials: '',
                             isMyAdmin: false,
-                            salary: ''
+                            salary: '',
+                            aiEnabled: false,
+                            profileIds: ''
                         };
                         this.showAddAdminModal = false;
 

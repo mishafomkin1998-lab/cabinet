@@ -134,4 +134,70 @@ router.delete('/:id', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Получение списка ID анкет, назначенных админу
+router.get('/:id/profiles', async (req, res) => {
+    const adminId = req.params.id;
+    try {
+        const result = await pool.query(
+            `SELECT profile_id FROM allowed_profiles WHERE assigned_admin_id = $1 ORDER BY profile_id`,
+            [adminId]
+        );
+        const profileIds = result.rows.map(row => row.profile_id);
+        res.json({ success: true, profileIds });
+    } catch (e) {
+        console.error('Get admin profiles error:', e.message);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// Обновление списка анкет админа (полная замена)
+router.put('/:id/profiles', async (req, res) => {
+    const adminId = req.params.id;
+    const { profileIds } = req.body;
+
+    try {
+        // Начинаем транзакцию
+        await pool.query('BEGIN');
+
+        // Убираем все текущие назначения этого админа
+        await pool.query(
+            `UPDATE allowed_profiles SET assigned_admin_id = NULL WHERE assigned_admin_id = $1`,
+            [adminId]
+        );
+
+        // Назначаем новые анкеты (если есть)
+        if (profileIds && profileIds.length > 0) {
+            for (const profileId of profileIds) {
+                // Проверяем, существует ли анкета
+                const exists = await pool.query(
+                    `SELECT profile_id FROM allowed_profiles WHERE profile_id = $1`,
+                    [profileId]
+                );
+
+                if (exists.rows.length > 0) {
+                    // Обновляем существующую
+                    await pool.query(
+                        `UPDATE allowed_profiles SET assigned_admin_id = $1 WHERE profile_id = $2`,
+                        [adminId, profileId]
+                    );
+                } else {
+                    // Создаем новую запись
+                    await pool.query(
+                        `INSERT INTO allowed_profiles (profile_id, assigned_admin_id, comment)
+                         VALUES ($1, $2, 'Добавлено при создании/редактировании админа')`,
+                        [profileId, adminId]
+                    );
+                }
+            }
+        }
+
+        await pool.query('COMMIT');
+        res.json({ success: true, count: profileIds ? profileIds.length : 0 });
+    } catch (e) {
+        await pool.query('ROLLBACK');
+        console.error('Update admin profiles error:', e.message);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 module.exports = router;
