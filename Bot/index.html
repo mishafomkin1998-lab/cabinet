@@ -685,7 +685,7 @@
         // 1. Функция отправки сообщения на Lababot сервер (ПОЛНАЯ СПЕЦИФИКАЦИЯ)
         async function sendMessageToLababot(params) {
             // Параметры: botId, accountDisplayId, recipientId, type, textContent, status,
-            // responseTime, errorReason, isFirst, isLast, convId, mediaUrl, fileName, translatorId
+            // responseTime, errorReason, isFirst, isLast, convId, mediaUrl, fileName, translatorId, usedAi
 
             const {
                 botId,
@@ -701,7 +701,8 @@
                 convId = null,
                 mediaUrl = null,
                 fileName = null,
-                translatorId = null
+                translatorId = null,
+                usedAi = false
             } = params;
 
             console.log(`📤 Отправляю сообщение на Lababot сервер: ${botId}, ${accountDisplayId}, ${recipientId}, ${type}`);
@@ -722,7 +723,8 @@
                     mediaUrl: mediaUrl,
                     fileName: fileName,
                     translatorId: translatorId,
-                    errorReason: errorReason
+                    errorReason: errorReason,
+                    usedAi: usedAi // Флаг использования ИИ генерации
                 };
 
                 console.log('📦 Payload:', JSON.stringify(payload, null, 2));
@@ -1289,6 +1291,7 @@
                 if(response.data && response.data.choices && response.data.choices.length > 0) {
                     const result = response.data.choices[0].message.content.replace(/^"|"$/g, '');
                     txtArea.value = result;
+                    txtArea.dataset.usedAi = 'true'; // Отмечаем что использовался AI
                     validateInput(txtArea);
                 }
             } catch (e) {
@@ -1872,7 +1875,8 @@
                             mediaUrl: this.photoName ? `attached_photo_${this.photoName}` : null,
                             fileName: this.photoName || null,
                             translatorId: this.translatorId,
-                            errorReason: null
+                            errorReason: null,
+                            usedAi: this.usedAi || false
                         });
 
                         if (!lababotResult.success) {
@@ -1918,7 +1922,8 @@
                                 mediaUrl: this.photoName ? `attached_photo_${this.photoName}` : null,
                                 fileName: this.photoName || null,
                                 translatorId: this.translatorId,
-                                errorReason: e.response?.data?.Error || e.message
+                                errorReason: e.response?.data?.Error || e.message,
+                                usedAi: false
                             });
                         }
                     }
@@ -2029,7 +2034,8 @@
                             mediaUrl: null,
                             fileName: null,
                             translatorId: this.translatorId,
-                            errorReason: null
+                            errorReason: null,
+                            usedAi: this.usedAi || false
                         });
 
                         if (!lababotResult.success) {
@@ -2075,7 +2081,8 @@
                                     mediaUrl: null,
                                     fileName: null,
                                     translatorId: this.translatorId,
-                                    errorReason: null
+                                    errorReason: null,
+                                    usedAi: this.usedAi || false
                                 });
 
                                 if (!lababotResult.success) {
