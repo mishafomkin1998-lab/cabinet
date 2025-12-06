@@ -234,11 +234,41 @@ router.get('/', asyncHandler(async (req, res) => {
 /**
  * GET /api/favorite-templates
  * Возвращает избранные шаблоны сообщений пользователя
- * TODO: Реализовать хранение и получение шаблонов из БД
  */
 router.get('/favorite-templates', asyncHandler(async (req, res) => {
-    // Заглушка - пока возвращаем пустой массив
-    res.json({ success: true, templates: [] });
+    const { userId, role } = req.query;
+
+    let query = `
+        SELECT ft.*, ap.login as profile_login
+        FROM favorite_templates ft
+        LEFT JOIN allowed_profiles ap ON ft.profile_id = ap.profile_id
+    `;
+    let params = [];
+
+    if (role === 'admin' && userId) {
+        query += ` WHERE ft.admin_id = $1`;
+        params.push(userId);
+    } else if (role === 'translator' && userId) {
+        query += ` WHERE ft.translator_id = $1`;
+        params.push(userId);
+    }
+
+    query += ` ORDER BY ft.created_at DESC`;
+
+    const result = await pool.query(query, params);
+
+    res.json({
+        success: true,
+        templates: result.rows.map(t => ({
+            id: t.id,
+            profileId: t.profile_id,
+            profileLogin: t.profile_login,
+            templateName: t.template_name,
+            templateText: t.template_text,
+            type: t.type,
+            createdAt: t.created_at
+        }))
+    });
 }));
 
 module.exports = router;

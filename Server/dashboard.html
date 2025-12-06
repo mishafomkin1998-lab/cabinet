@@ -2066,7 +2066,7 @@
 
                 async loadFavoriteTemplates() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/favorite_templates?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const res = await fetch(`${API_BASE}/api/favorite-templates?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
                         const data = await res.json();
                         if (data.success) {
                             this.favoriteTemplates = data.templates;
