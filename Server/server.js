@@ -623,22 +623,32 @@ app.post('/api/profiles/assign', async (req, res) => {
 // ==========================================
 app.post('/api/message_sent', async (req, res) => {
     const { botId, accountDisplayId, recipientId, type, responseTime, isFirst, isLast, convId, length,
-            status, textContent, mediaUrl, fileName, translatorId, errorReason } = req.body;
+            status, textContent, mediaUrl, fileName, translatorId, errorReason, usedAi } = req.body;
 
     let contentId = null;
     let errorLogId = null;
 
     try {
-        // Проверяем анкету (поддерживаем оба поля: profile_id и account_display_id)
-        const check = await pool.query(
+        // Проверяем/создаём анкету в allowed_profiles (автосоздание если нет)
+        let profileData = await pool.query(
             'SELECT * FROM allowed_profiles WHERE profile_id = $1',
             [accountDisplayId]
         );
 
-        if (check.rows.length === 0) {
-            console.log(`⚠️ Анкета ${accountDisplayId} не найдена в allowed_profiles - игнорируем`);
-            return res.json({ status: 'ignored' });
+        if (profileData.rows.length === 0) {
+            // Автоматически создаём анкету
+            await pool.query(
+                `INSERT INTO allowed_profiles (profile_id, note, added_at)
+                 VALUES ($1, $2, NOW()) ON CONFLICT (profile_id) DO NOTHING`,
+                [accountDisplayId, 'Автодобавлено ботом']
+            );
+            console.log(`📝 Анкета ${accountDisplayId} автоматически добавлена в allowed_profiles`);
+            profileData = await pool.query('SELECT * FROM allowed_profiles WHERE profile_id = $1', [accountDisplayId]);
         }
+
+        const profile = profileData.rows[0];
+        const adminId = profile?.assigned_admin_id || null;
+        const assignedTranslatorId = profile?.assigned_translator_id || translatorId || null;
 
         // 1. Сохранение контента сообщения
         const contentRes = await pool.query(
@@ -653,7 +663,7 @@ app.post('/api/message_sent', async (req, res) => {
              const logRes = await pool.query(
                 `INSERT INTO error_logs (endpoint, error_type, message, user_id, raw_data)
                  VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-                ['/api/message_sent', 'SendingFailed', errorReason, translatorId || null, JSON.stringify(req.body)]
+                ['/api/message_sent', 'SendingFailed', errorReason, assignedTranslatorId, JSON.stringify(req.body)]
             );
             errorLogId = logRes.rows[0].id;
         }
@@ -666,7 +676,17 @@ app.post('/api/message_sent', async (req, res) => {
             [botId, accountDisplayId, msgType, recipientId, responseTime || null, isFirst || false, isLast || false, convId || null, length || 0, status || 'success', contentId, errorLogId]
         );
 
-        console.log(`✅ Сообщение от бота ${botId} для анкеты ${accountDisplayId} сохранено (contentId: ${contentId})`);
+        // 4. ВАЖНО: Записываем в activity_log для отображения в dashboard
+        const actionType = (msgType === 'chat_msg' || msgType === 'chat') ? 'chat' : 'letter';
+        const income = actionType === 'letter' ? PRICE_LETTER : PRICE_CHAT;
+
+        await pool.query(
+            `INSERT INTO activity_log (profile_id, bot_id, admin_id, translator_id, action_type, man_id, message_text, response_time_sec, used_ai, income, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+            [accountDisplayId, botId, adminId, assignedTranslatorId, actionType, recipientId, textContent || null, responseTime || null, usedAi || false, income]
+        );
+
+        console.log(`✅ Сообщение от бота ${botId} для анкеты ${accountDisplayId} сохранено + activity_log (contentId: ${contentId})`);
 
         res.json({ status: 'ok', contentId: contentId });
 
@@ -682,31 +702,55 @@ app.post('/api/message_sent', async (req, res) => {
 // ==========================================
 app.post('/api/heartbeat', async (req, res) => {
     const { botId, accountDisplayId, status, timestamp, ip, systemInfo } = req.body;
+    const profileStatus = status || 'online';
+    const version = systemInfo?.version || null;
+    const platform = systemInfo?.platform || null;
 
     try {
+        // 1. Записываем heartbeat
         await pool.query(`
             INSERT INTO heartbeats (
                 bot_id, account_display_id, status,
                 ip, version, platform, timestamp
             ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `, [
-            botId,
-            accountDisplayId,
-            status || 'online',
-            ip || null,
-            systemInfo?.version || null,
-            systemInfo?.platform || null,
-            timestamp || new Date()
-        ]);
+        `, [botId, accountDisplayId, profileStatus, ip || null, version, platform, timestamp || new Date()]);
 
-        // Опционально: обновляем last_seen в таблице allowed_profiles
+        // 2. Автосоздание анкеты в allowed_profiles если нет
         await pool.query(`
-            UPDATE allowed_profiles
-            SET note = COALESCE(note, '') || ' [Last seen: ' || $1 || ']'
-            WHERE profile_id = $2
-        `, [new Date(timestamp).toISOString(), accountDisplayId]);
+            INSERT INTO allowed_profiles (profile_id, note, added_at)
+            VALUES ($1, 'Автодобавлено ботом', NOW())
+            ON CONFLICT (profile_id) DO NOTHING
+        `, [accountDisplayId]);
 
-        console.log(`❤️ Heartbeat от ${accountDisplayId}: ${status}`);
+        // 3. Обновляем/создаём запись в profiles для dashboard
+        await pool.query(`
+            INSERT INTO profiles (profile_id, status, last_online, added_at)
+            VALUES ($1, $2, NOW(), NOW())
+            ON CONFLICT (profile_id) DO UPDATE SET
+                status = $2,
+                last_online = NOW()
+        `, [accountDisplayId, profileStatus]);
+
+        // 4. Обновляем/создаём запись бота в bots для dashboard
+        await pool.query(`
+            INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat)
+            VALUES ($1, $2, $3, $4, $5, NOW())
+            ON CONFLICT (bot_id) DO UPDATE SET
+                platform = COALESCE($2, bots.platform),
+                ip = COALESCE($3, bots.ip),
+                version = COALESCE($4, bots.version),
+                status = $5,
+                last_heartbeat = NOW()
+        `, [botId, platform, ip || null, version, profileStatus]);
+
+        // 5. Связываем бота с анкетой
+        await pool.query(`
+            INSERT INTO bot_profiles (bot_id, profile_id, created_at)
+            VALUES ($1, $2, NOW())
+            ON CONFLICT (bot_id, profile_id) DO NOTHING
+        `, [botId, accountDisplayId]);
+
+        console.log(`❤️ Heartbeat от ${accountDisplayId} (бот ${botId}): ${profileStatus}`);
 
         res.json({ status: 'ok' });
 
