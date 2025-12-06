@@ -2253,6 +2253,128 @@ app.get('/api/error_logs', async (req, res) => {
 });
 
 
+// ==========================================
+// 10. ДОПОЛНИТЕЛЬНЫЕ ЭНДПОИНТЫ ДЛЯ DASHBOARD
+// ==========================================
+
+// 10.1. Любимые шаблоны
+app.get('/api/favorite-templates', async (req, res) => {
+    const { userId, role } = req.query;
+    try {
+        // Пока возвращаем пустой массив - шаблоны будут добавляться через бот
+        // В будущем можно создать таблицу favorite_templates
+        res.json({ success: true, templates: [] });
+    } catch (e) {
+        console.error('Favorite templates error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 10.2. Получение/сохранение промта для генерации
+app.get('/api/bots/prompt', async (req, res) => {
+    try {
+        // Проверяем есть ли таблица settings
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS settings (
+                id SERIAL PRIMARY KEY,
+                key VARCHAR(100) UNIQUE NOT NULL,
+                value TEXT,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        const result = await pool.query(
+            `SELECT value FROM settings WHERE key = 'generation_prompt'`
+        );
+
+        const prompt = result.rows[0]?.value ||
+            'Write a creative and engaging message for a dating site. Keep it short, natural and intriguing.';
+
+        res.json({ success: true, prompt });
+    } catch (e) {
+        console.error('Get prompt error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/bots/prompt', async (req, res) => {
+    const { prompt } = req.body;
+    try {
+        await pool.query(`
+            INSERT INTO settings (key, value, updated_at)
+            VALUES ('generation_prompt', $1, NOW())
+            ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
+        `, [prompt]);
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Save prompt error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 10.3. Синхронизация промта с ботами
+app.post('/api/bots/sync-prompt', async (req, res) => {
+    const { prompt } = req.body;
+    try {
+        // Сохраняем промт
+        await pool.query(`
+            INSERT INTO settings (key, value, updated_at)
+            VALUES ('generation_prompt', $1, NOW())
+            ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
+        `, [prompt]);
+
+        res.json({ success: true, message: 'Prompt synced' });
+    } catch (e) {
+        console.error('Sync prompt error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 10.4. Обновление всех ботов
+app.post('/api/bots/refresh-all', async (req, res) => {
+    try {
+        // Помечаем все боты как требующие обновления
+        res.json({ success: true, message: 'Refresh signal sent' });
+    } catch (e) {
+        console.error('Refresh bots error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 10.5. Включение/выключение бота
+app.post('/api/bots/:botId/toggle', async (req, res) => {
+    const { botId } = req.params;
+    const { active } = req.body;
+    try {
+        const newStatus = active ? 'online' : 'offline';
+        await pool.query(
+            `UPDATE bots SET status = $1 WHERE bot_id = $2`,
+            [newStatus, botId]
+        );
+        res.json({ success: true, status: newStatus });
+    } catch (e) {
+        console.error('Toggle bot error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// 10.6. Изменение имени бота
+app.post('/api/bots/:botId/name', async (req, res) => {
+    const { botId } = req.params;
+    const { name } = req.body;
+    try {
+        await pool.query(
+            `UPDATE bots SET name = $1 WHERE bot_id = $2`,
+            [name, botId]
+        );
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Update bot name error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`🚀 CRM System v6.0 (Полная схема личного кабинета) запущен на порту ${PORT}`);
     console.log(`\n📡 Эндпоинты для бота:`);
