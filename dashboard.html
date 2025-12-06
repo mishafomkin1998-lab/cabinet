@@ -199,8 +199,46 @@
         }
     </style>
 </head>
-<body x-data="dashboard()" class="text-gray-800">
-    <div class="flex h-screen">
+<body x-data="dashboard()" x-init="init()" class="text-gray-800">
+    <!-- Экран авторизации -->
+    <div x-show="!currentUser" class="min-h-screen flex items-center justify-center p-4">
+        <div class="glass rounded-2xl p-8 w-full max-w-md">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center mx-auto mb-4 shadow-lg">
+                    <i class="fas fa-robot text-white text-2xl"></i>
+                </div>
+                <h1 class="text-2xl font-bold gradient-text">Nova</h1>
+                <p class="text-gray-500 mt-2">Вход в личный кабинет</p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <input type="text"
+                           x-model="loginForm.username"
+                           @keyup.enter="login()"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Логин">
+                </div>
+                <div>
+                    <input type="password"
+                           x-model="loginForm.password"
+                           @keyup.enter="login()"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Пароль">
+                </div>
+                <button @click="login()"
+                        class="glow-button w-full py-3 rounded-xl text-white font-medium"
+                        :disabled="isLoading">
+                    <span x-show="!isLoading">Войти</span>
+                    <span x-show="isLoading"><i class="fas fa-spinner fa-spin"></i> Загрузка...</span>
+                </button>
+                <div x-show="loginError" class="text-red-500 text-center text-sm" x-text="loginError"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Основной интерфейс -->
+    <div x-show="currentUser" class="flex h-screen">
         <!-- Сайдбар -->
         <aside class="glass-sidebar w-64 flex-shrink-0 flex flex-col p-5">
             <!-- Логотип -->
@@ -321,10 +359,14 @@
                         </button>
                         
                         <div x-show="open" @click.outside="open = false" class="absolute right-0 mt-2 w-48 glass rounded-xl p-2 shadow-xl">
-                            <a href="login.html" class="flex items-center p-3 rounded-lg hover:bg-red-50 text-red-500">
+                            <div class="p-3 border-b border-gray-100 mb-2">
+                                <div class="font-medium" x-text="currentUser?.username"></div>
+                                <div class="text-xs text-gray-500" x-text="currentUser?.role === 'director' ? 'Директор' : currentUser?.role === 'admin' ? 'Админ' : 'Переводчик'"></div>
+                            </div>
+                            <button @click="logout()" class="flex items-center w-full p-3 rounded-lg hover:bg-red-50 text-red-500">
                                 <i class="fas fa-sign-out-alt mr-3"></i>
                                 <span>Выход</span>
-                            </a>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -380,53 +422,49 @@
                                 <i class="fas fa-user text-blue-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold">120/150</div>
+                                <div class="text-3xl font-bold" x-text="stats.profilesOnline + '/' + stats.profilesTotal">0/0</div>
                                 <div class="text-gray-500">Анкеты онлайн</div>
                             </div>
                         </div>
-                        <div class="text-sm text-green-600">+5 за сегодня</div>
                     </div>
-                    
-                    <!-- Ответы -->
+
+                    <!-- Письма сегодня -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 flex items-center justify-center mr-4">
-                                <i class="fas fa-comment-alt text-purple-500"></i>
+                                <i class="fas fa-envelope text-purple-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold">1,450</div>
-                                <div class="text-gray-500">Ответов сегодня</div>
+                                <div class="text-3xl font-bold" x-text="stats.lettersToday">0</div>
+                                <div class="text-gray-500">Писем сегодня</div>
                             </div>
                         </div>
-                        <div class="text-sm text-green-600">+12% к вчера</div>
                     </div>
-                    
-                    <!-- Среднее время -->
+
+                    <!-- Чатов сегодня -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-green-50 to-green-100 flex items-center justify-center mr-4">
-                                <i class="fas fa-clock text-green-500"></i>
+                                <i class="fas fa-comments text-green-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold">45с</div>
-                                <div class="text-gray-500">Среднее время</div>
+                                <div class="text-3xl font-bold" x-text="stats.chatsToday">0</div>
+                                <div class="text-gray-500">Чатов сегодня</div>
                             </div>
                         </div>
-                        <div class="text-sm text-green-600">-3с к вчера</div>
                     </div>
-                    
-                    <!-- Медианное время -->
+
+                    <!-- Среднее время ответа -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 flex items-center justify-center mr-4">
-                                <i class="fas fa-chart-median text-orange-500"></i>
+                                <i class="fas fa-clock text-orange-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold">38с</div>
-                                <div class="text-gray-500">Медианное время</div>
+                                <div class="text-3xl font-bold" x-text="stats.avgResponseTime + ' мин'">0 мин</div>
+                                <div class="text-gray-500">Среднее время</div>
                             </div>
                         </div>
-                        <div class="text-sm text-green-600">-5с к вчера</div>
                     </div>
                 </div>
                 
@@ -1086,7 +1124,8 @@
             </div>
         </main>
     </div>
-    
+    </div>
+
     <!-- Модальное окно добавления анкеты -->
     <div x-show="showAddAccountModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div class="glass rounded-2xl p-6 w-full max-w-2xl" @click.outside="showAddAccountModal = false">
@@ -1299,8 +1338,26 @@
     </div>
     
     <script>
+        const API_BASE = window.location.origin + '/api';
+
         function dashboard() {
             return {
+                // Авторизация
+                currentUser: null,
+                loginForm: { username: '', password: '' },
+                loginError: '',
+                isLoading: false,
+
+                // Статистика из API
+                stats: {
+                    profilesOnline: 0,
+                    profilesTotal: 0,
+                    lettersToday: 0,
+                    chatsToday: 0,
+                    avgResponseTime: 0,
+                    uniqueMen: 0
+                },
+
                 language: 'ru',
                 activeMenu: 'stats',
                 activeSubmenu: 'general',
@@ -1313,26 +1370,26 @@
                 sortBy: 'date',
                 sortDirection: 'desc',
                 searchQuery: '',
-                
+
                 statsFilter: {
                     admin: '',
                     translator: '',
                     dateRange: 'Декабрь 2025'
                 },
-                
+
                 monitoringFilter: {
                     admin: '',
                     translator: '',
                     dateRange: 'Текущий месяц'
                 },
-                
+
                 monitoringFunction: 'lastResponses',
-                
+
                 newAccountIds: '',
                 newAccountComment: '',
                 newAccountLogin: '',
                 newAccountPassword: '',
-                
+
                 newAdmin: {
                     id: null,
                     name: '',
@@ -1342,13 +1399,13 @@
                     isMyAdmin: false,
                     salary: ''
                 },
-                
+
                 selectedAdmin: null,
                 accountsToAssign: '',
                 assignComment: '',
-                
+
                 generationPrompt: '',
-                
+
                 accounts: [
                     {
                         id: '456123',
@@ -1792,6 +1849,142 @@
                 syncPromptWithBots() {
                     console.log('Промт синхронизирован с ботами:', this.generationPrompt);
                     alert('Промт синхронизирован с ботами');
+                },
+
+                // ==================
+                // API ФУНКЦИИ
+                // ==================
+
+                async init() {
+                    // Проверяем сохранённого пользователя
+                    const saved = localStorage.getItem('nova_user');
+                    if (saved) {
+                        try {
+                            this.currentUser = JSON.parse(saved);
+                            await this.loadDashboardData();
+                        } catch (e) {
+                            localStorage.removeItem('nova_user');
+                        }
+                    }
+                },
+
+                async login() {
+                    if (!this.loginForm.username || !this.loginForm.password) {
+                        this.loginError = 'Введите логин и пароль';
+                        return;
+                    }
+
+                    this.isLoading = true;
+                    this.loginError = '';
+
+                    try {
+                        const response = await fetch(`${API_BASE}/login`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                username: this.loginForm.username,
+                                password: this.loginForm.password
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            this.currentUser = data.user;
+                            localStorage.setItem('nova_user', JSON.stringify(this.currentUser));
+                            this.loginForm = { username: '', password: '' };
+                            await this.loadDashboardData();
+                        } else {
+                            this.loginError = data.error || 'Ошибка авторизации';
+                        }
+                    } catch (error) {
+                        console.error('Login error:', error);
+                        this.loginError = 'Ошибка подключения к серверу';
+                    }
+
+                    this.isLoading = false;
+                },
+
+                logout() {
+                    this.currentUser = null;
+                    localStorage.removeItem('nova_user');
+                    this.accounts = [];
+                    this.admins = [];
+                },
+
+                async loadDashboardData() {
+                    if (!this.currentUser) return;
+
+                    try {
+                        // Загружаем статистику
+                        const statsRes = await fetch(`${API_BASE}/dashboard?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const statsData = await statsRes.json();
+                        if (statsData.success && statsData.stats) {
+                            this.stats = statsData.stats;
+                        }
+
+                        // Загружаем анкеты
+                        await this.loadAccounts();
+
+                        // Загружаем команду
+                        await this.loadTeam();
+
+                    } catch (error) {
+                        console.error('Load data error:', error);
+                    }
+                },
+
+                async loadAccounts() {
+                    try {
+                        const res = await fetch(`${API_BASE}/profiles?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const data = await res.json();
+                        if (data.success && data.list) {
+                            this.accounts = data.list.map(p => ({
+                                id: p.profile_id,
+                                login: p.login || '',
+                                password: p.password || '',
+                                status: p.status || 'offline',
+                                lastOnline: p.last_online ? new Date(p.last_online).toLocaleString('ru-RU') : '-',
+                                letters: p.letters_today || 0,
+                                admin: p.admin_name || '',
+                                addedDate: p.created_at ? new Date(p.created_at).toLocaleDateString('ru-RU') : '-',
+                                comment: p.note || '',
+                                paused: false
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('Load accounts error:', error);
+                    }
+                },
+
+                async loadTeam() {
+                    try {
+                        const res = await fetch(`${API_BASE}/team?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const data = await res.json();
+                        if (data.success && data.list) {
+                            this.admins = data.list.filter(m => m.role === 'admin').map(a => ({
+                                id: a.id,
+                                name: a.username,
+                                login: a.username,
+                                password: '***',
+                                initials: a.username.substring(0, 2).toUpperCase(),
+                                accounts: a.accounts_count || 0,
+                                conversion: a.conversion || 0,
+                                isMyAdmin: false,
+                                salary: null,
+                                translators: data.list.filter(t => t.role === 'translator' && t.owner_id === a.id).map(t => ({
+                                    id: t.id,
+                                    name: t.username,
+                                    login: t.username,
+                                    password: '***',
+                                    conversion: t.conversion || 0,
+                                    accounts: []
+                                }))
+                            }));
+                        }
+                    } catch (error) {
+                        console.error('Load team error:', error);
+                    }
                 }
             }
         }
