@@ -726,25 +726,25 @@
                 
                 <!-- Активность -->
                 <div class="glass rounded-2xl p-6">
-                    <div class="flex justify-between items-center mb-6">
+                    <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-bold" x-text="t('stats.peakHours')"></h3>
                         <button class="text-sm text-indigo-600 hover:text-indigo-800" x-text="t('stats.advancedStats') + ' →'">
                         </button>
                     </div>
-                    <div class="grid grid-cols-24 gap-0.5 mb-2">
+                    <div class="flex items-end h-16 gap-[2px]">
                         <template x-for="hour in 24" :key="hour">
-                            <div class="text-center">
-                                <div class="text-[10px] text-gray-500 mb-1" x-text="(hour-1) + 'ч'"></div>
-                                <div class="h-6 rounded bg-gradient-to-b"
-                                     :class="getActivityColor(hour-1)"
-                                     :style="'height:' + (getActivityLevel(hour-1) * 30) + 'px'">
-                                </div>
+                            <div class="flex-1 rounded-t transition-all"
+                                 :class="getActivityColor(hour-1)"
+                                 :style="'height:' + Math.max(getActivityLevel(hour-1) * 100, 4) + '%'"
+                                 :title="(hour-1) + 'ч'">
                             </div>
                         </template>
                     </div>
-                    <div class="flex justify-between text-xs text-gray-500">
+                    <div class="flex justify-between text-[10px] text-gray-400 mt-1">
                         <span>0ч</span>
+                        <span>6ч</span>
                         <span>12ч</span>
+                        <span>18ч</span>
                         <span>23ч</span>
                     </div>
                 </div>
@@ -850,62 +850,56 @@
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead>
-                                <tr class="border-b border-gray-100">
-                                    <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('id')">
+                                <tr class="border-b border-gray-100 text-sm">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('id')">
                                         <span x-text="t('profiles.id')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'id' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
-                                    <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('login')">
-                                        <span x-text="t('profiles.loginCol')"></span>
-                                        <i class="fas ml-1" :class="sortBy === 'login' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
-                                    </th>
-                                    <th class="text-left py-4 px-6" x-text="t('profiles.passwordCol')"></th>
-                                    <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('status')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('status')">
                                         <span x-text="t('profiles.statusCol')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'status' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
-                                    <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('lastOnline')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('lastOnline')">
                                         <span x-text="t('profiles.lastOnline')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'lastOnline' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
-                                    <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('letters')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('incoming')">
                                         <span x-text="t('profiles.incoming')"></span>
-                                        <i class="fas ml-1" :class="sortBy === 'letters' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        <i class="fas ml-1" :class="sortBy === 'incoming' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
-                                    <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('admin')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('admin')">
                                         <span x-text="t('profiles.admin')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'admin' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
-                                    <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('date')">
+                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('date')">
                                         <span x-text="t('profiles.addedDate')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'date' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
-                                    <th class="text-left py-4 px-6" x-text="t('profiles.commentCol')"></th>
-                                    <th class="text-left py-4 px-6" x-text="t('common.actions')"></th>
+                                    <th class="text-left py-2 px-3" x-text="t('profiles.commentCol')"></th>
+                                    <th class="text-left py-2 px-3" x-text="t('common.actions')"></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <template x-for="account in filteredAccounts" :key="account.id">
-                                    <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                                        :class="{'account-no-letters': account.letters === 0, 
-                                                'account-online': account.status === 'online',
-                                                'account-offline': account.status === 'offline'}">
-                                        <td class="py-4 px-6 font-mono" x-text="'#' + account.id"></td>
-                                        <td class="py-4 px-6" x-text="account.login"></td>
-                                        <td class="py-4 px-6 font-mono text-gray-500" x-text="account.password"></td>
-                                        <td class="py-4 px-6">
-                                            <span class="px-3 py-1 rounded-full text-xs" 
+                                    <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors text-sm"
+                                        :class="{'bg-red-50': account.paused,
+                                                'account-online': account.status === 'online' && !account.paused,
+                                                'account-offline': account.status === 'offline' && !account.paused}">
+                                        <td class="py-2 px-3 font-mono" x-text="'#' + account.id"></td>
+                                        <td class="py-2 px-3">
+                                            <span class="px-2 py-0.5 rounded-full text-xs"
                                                   :class="getStatusClass(account.status)"
                                                   x-text="getStatusText(account.status)">
                                             </span>
                                         </td>
-                                        <td class="py-4 px-6" x-text="account.lastOnline"></td>
-                                        <td class="py-4 px-6">
-                                            <span :class="account.letters === 0 ? 'text-red-500 font-bold' : 'text-green-600'"
-                                                  x-text="account.letters"></span>
+                                        <td class="py-2 px-3 text-gray-500" x-text="account.lastOnline"></td>
+                                        <td class="py-2 px-3">
+                                            <span class="px-2 py-0.5 rounded text-xs"
+                                                  :class="account.incoming > 0 ? 'bg-white text-green-600 font-medium shadow-sm' : 'bg-gray-100 text-gray-400'"
+                                                  x-text="account.incoming || 0"></span>
                                         </td>
-                                        <td class="py-4 px-6">
-                                            <select class="glass px-2 py-1 rounded-lg text-sm"
+                                        <td class="py-2 px-3">
+                                            <select class="glass px-2 py-1 rounded-lg text-xs"
                                                     x-model="account.admin"
                                                     @change="assignAccount(account)">
                                                 <option value="" x-text="t('profiles.notAssigned')"></option>
@@ -914,16 +908,21 @@
                                                 </template>
                                             </select>
                                         </td>
-                                        <td class="py-4 px-6" x-text="account.addedDate"></td>
-                                        <td class="py-4 px-6 max-w-xs">
-                                            <div class="truncate" :title="account.comment" x-text="account.comment"></div>
+                                        <td class="py-2 px-3 text-gray-500" x-text="account.addedDate"></td>
+                                        <td class="py-2 px-3 max-w-xs">
+                                            <div class="truncate text-gray-600" :title="account.comment" x-text="account.comment"></div>
                                         </td>
-                                        <td class="py-4 px-6">
+                                        <td class="py-2 px-3">
                                             <div class="flex items-center space-x-2">
-                                                <button @click="toggleAccountAccess(account)" class="text-gray-500 hover:text-gray-700">
+                                                <button @click="toggleAccountAccess(account)"
+                                                        class="p-1 rounded hover:bg-gray-100"
+                                                        :class="account.paused ? 'text-green-500 hover:text-green-700' : 'text-gray-500 hover:text-gray-700'"
+                                                        :title="account.paused ? 'Запустить' : 'Остановить'">
                                                     <i class="fas" :class="account.paused ? 'fa-play' : 'fa-pause'"></i>
                                                 </button>
-                                                <button @click="deleteAccount(account)" class="text-red-500 hover:text-red-700">
+                                                <button @click="deleteAccount(account)"
+                                                        class="p-1 rounded text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                        title="Удалить">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
                                             </div>
@@ -1402,23 +1401,6 @@
                            x-model="newAccountComment">
                 </div>
                 
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium mb-2">Логин</label>
-                        <input type="text" 
-                               class="glass w-full px-4 py-3 rounded-xl"
-                               placeholder="Общий логин"
-                               x-model="newAccountLogin">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium mb-2">Пароль</label>
-                        <input type="text" 
-                               class="glass w-full px-4 py-3 rounded-xl"
-                               placeholder="Общий пароль"
-                               x-model="newAccountPassword">
-                    </div>
-                </div>
-                
                 <div class="flex justify-end space-x-3 pt-4">
                     <button @click="showAddAccountModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
                         Отмена
@@ -1772,8 +1754,6 @@
 
                 newAccountIds: '',
                 newAccountComment: '',
-                newAccountLogin: '',
-                newAccountPassword: '',
 
                 newAdmin: {
                     id: null,
@@ -1959,11 +1939,12 @@
                         if (data.success) {
                             this.accounts = data.list.map(p => ({
                                 id: p.profile_id,
+                                profile_id: p.profile_id,
                                 login: p.login || p.profile_id,
                                 password: p.password || '',
                                 status: p.status || 'offline',
                                 lastOnline: p.last_online ? new Date(p.last_online).toLocaleString('ru-RU') : '-',
-                                letters: p.letters_today || 0,
+                                incoming: p.incoming_today || 0,
                                 admin: p.admin_name || '',
                                 translator: p.trans_name || '',
                                 addedDate: new Date(p.added_at).toLocaleDateString('ru-RU'),
@@ -2410,9 +2391,6 @@
                             case 'id':
                                 result = (a.id || '').localeCompare(b.id || '');
                                 break;
-                            case 'login':
-                                result = (a.login || '').localeCompare(b.login || '');
-                                break;
                             case 'status':
                                 const statusOrder = { 'online': 1, 'working': 2, 'offline': 3, 'inactive': 4 };
                                 result = (statusOrder[a.status] || 5) - (statusOrder[b.status] || 5);
@@ -2420,8 +2398,8 @@
                             case 'lastOnline':
                                 result = new Date(a.lastOnline || 0) - new Date(b.lastOnline || 0);
                                 break;
-                            case 'letters':
-                                result = (a.letters || 0) - (b.letters || 0);
+                            case 'incoming':
+                                result = (a.incoming || 0) - (b.incoming || 0);
                                 break;
                             case 'admin':
                                 result = (a.admin || '').localeCompare(b.admin || '');
@@ -2543,22 +2521,20 @@
                     ids.forEach(id => {
                         this.accounts.unshift({
                             id: id,
-                            login: this.newAccountLogin || `user_${id.substring(0, 3)}`,
-                            password: this.newAccountPassword || `pass${id.substring(0, 3)}`,
-                            status: 'online',
-                            lastOnline: 'только что',
-                            letters: 0,
+                            profile_id: id,
+                            login: id,
+                            status: 'offline',
+                            lastOnline: '-',
+                            incoming: 0,
                             admin: '',
                             addedDate: new Date().toLocaleDateString('ru-RU'),
                             comment: this.newAccountComment,
                             paused: false
                         });
                     });
-                    
+
                     this.newAccountIds = '';
                     this.newAccountComment = '';
-                    this.newAccountLogin = '';
-                    this.newAccountPassword = '';
                     this.showAddAccountModal = false;
                     
                     alert(`Добавлено ${ids.length} анкет`);

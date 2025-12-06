@@ -41,7 +41,9 @@ router.get('/', async (req, res) => {
                 COALESCE(stats.letters_today, 0) as letters_today,
                 COALESCE(stats.chats_today, 0) as chats_today,
                 COALESCE(stats.letters_total, 0) as letters_total,
-                COALESCE(stats.chats_total, 0) as chats_total
+                COALESCE(stats.chats_total, 0) as chats_total,
+                COALESCE(incoming.incoming_today, 0) as incoming_today,
+                COALESCE(incoming.incoming_total, 0) as incoming_total
             FROM allowed_profiles p
             LEFT JOIN users u_admin ON p.assigned_admin_id = u_admin.id
             LEFT JOIN users u_trans ON p.assigned_translator_id = u_trans.id
@@ -54,6 +56,13 @@ router.get('/', async (req, res) => {
                 FROM activity_log a
                 WHERE a.profile_id = p.profile_id
             ) stats ON true
+            LEFT JOIN LATERAL (
+                SELECT
+                    COUNT(*) FILTER (WHERE DATE(i.created_at) = CURRENT_DATE) as incoming_today,
+                    COUNT(*) as incoming_total
+                FROM incoming_messages i
+                WHERE i.profile_id = p.profile_id
+            ) incoming ON true
             ${filter}
             ORDER BY p.id DESC
         `;
@@ -90,6 +99,8 @@ router.get('/', async (req, res) => {
                 letters_today: parseInt(row.letters_today) || parseInt(msgStats.letters_today) || 0,
                 letters_total: parseInt(row.letters_total) || parseInt(msgStats.letters_total) || 0,
                 chats_today: parseInt(row.chats_today) || parseInt(msgStats.chats_today) || 0,
+                incoming_today: parseInt(row.incoming_today) || 0,
+                incoming_total: parseInt(row.incoming_total) || 0,
                 admin_id: row.admin_id,
                 admin_name: row.admin_name,
                 translator_id: row.translator_id,
@@ -142,6 +153,42 @@ router.post('/assign', async (req, res) => {
         await pool.query(query, [targetUserId, ...profileIds]);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+/**
+ * POST /api/profiles/toggle-access
+ * Переключает статус paused для анкеты (остановить/запустить)
+ */
+router.post('/toggle-access', async (req, res) => {
+    const { profileId, paused } = req.body;
+    try {
+        await pool.query(
+            `UPDATE allowed_profiles SET paused = $1 WHERE profile_id = $2`,
+            [paused, profileId]
+        );
+        res.json({ success: true, paused });
+    } catch (e) {
+        console.error('Toggle access error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
+ * DELETE /api/profiles/:profileId
+ * Удаляет анкету из базы данных
+ */
+router.delete('/:profileId', async (req, res) => {
+    const { profileId } = req.params;
+    try {
+        // Удаляем анкету из allowed_profiles
+        await pool.query(`DELETE FROM allowed_profiles WHERE profile_id = $1`, [profileId]);
+        // Также удаляем связи с ботами
+        await pool.query(`DELETE FROM bot_profiles WHERE profile_id = $1`, [profileId]);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Delete profile error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 module.exports = router;
