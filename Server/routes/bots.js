@@ -69,15 +69,10 @@ router.post('/heartbeat', async (req, res) => {
         }
 
         // 5. Связываем бота с анкетой
-        const existsBotProfile = await pool.query(
-            `SELECT 1 FROM bot_profiles WHERE bot_id = $1 AND profile_id = $2`, [botId, accountDisplayId]
+        await pool.query(
+            `INSERT INTO bot_profiles (bot_id, profile_id, created_at) VALUES ($1, $2, NOW()) ON CONFLICT DO NOTHING`,
+            [botId, accountDisplayId]
         );
-        if (existsBotProfile.rows.length === 0) {
-            await pool.query(
-                `INSERT INTO bot_profiles (bot_id, profile_id, created_at) VALUES ($1, $2, NOW())`,
-                [botId, accountDisplayId]
-            );
-        }
 
         console.log(`❤️ Heartbeat от ${accountDisplayId} (бот ${botId}): ${profileStatus}`);
 
@@ -110,15 +105,10 @@ router.post('/bot/heartbeat', async (req, res) => {
 
         // 2. Связываем бота с профилем
         if (profileId) {
-            const existsBotProfile = await pool.query(
-                `SELECT 1 FROM bot_profiles WHERE bot_id = $1 AND profile_id = $2`, [botId, profileId]
+            await pool.query(
+                `INSERT INTO bot_profiles (bot_id, profile_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+                [botId, profileId]
             );
-            if (existsBotProfile.rows.length === 0) {
-                await pool.query(
-                    `INSERT INTO bot_profiles (bot_id, profile_id) VALUES ($1, $2)`,
-                    [botId, profileId]
-                );
-            }
 
             // 3. Обновляем статус профиля
             await pool.query(`

@@ -253,15 +253,10 @@ router.post('/profile/status', async (req, res) => {
         `, [status || 'online', lastOnline || new Date(), profileId]);
 
         if (botId) {
-            const existsBotProfile = await pool.query(
-                `SELECT 1 FROM bot_profiles WHERE bot_id = $1 AND profile_id = $2`, [botId, profileId]
+            await pool.query(
+                `INSERT INTO bot_profiles (bot_id, profile_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+                [botId, profileId]
             );
-            if (existsBotProfile.rows.length === 0) {
-                await pool.query(
-                    `INSERT INTO bot_profiles (bot_id, profile_id) VALUES ($1, $2)`,
-                    [botId, profileId]
-                );
-            }
         }
 
         console.log(`👤 Статус профиля ${profileId}: ${status || 'online'}`);
