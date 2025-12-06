@@ -603,7 +603,7 @@
                         <div class="font-bold text-red-700" x-text="t('messages.connectionError')"></div>
                         <div class="text-sm text-gray-600" x-text="error"></div>
                     </div>
-                    <button @click="loadAllData()" class="ml-auto px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200">
+                    <button @click="loadAllData()" class="ml-auto px-5 py-2.5 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 font-medium transition-all">
                         <i class="fas fa-redo mr-1"></i> <span x-text="t('messages.retry')"></span>
                     </button>
                 </div>
@@ -843,13 +843,13 @@
                 <div x-show="currentUser.role !== 'translator'" class="glass rounded-2xl p-5 mb-6">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-bold" x-text="t('team.teamManagement')"></h3>
-                        <div class="flex gap-2">
+                        <div class="flex gap-3">
                             <!-- Кнопка добавить переводчика (видна админам) -->
-                            <button @click="openAddTranslatorModal()" class="px-4 py-2 rounded-xl text-sm font-medium bg-purple-500 hover:bg-purple-600 text-white">
+                            <button @click="openAddTranslatorModal()" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-purple-500 hover:bg-purple-600 text-white transition-all">
                                 <i class="fas fa-language mr-2"></i>Добавить переводчика
                             </button>
                             <!-- Кнопка добавить админа (видна директорам) -->
-                            <button x-show="currentUser.role === 'director'" @click="showAddAdminModal = true" class="glow-button px-4 py-2 rounded-xl text-white text-sm font-medium">
+                            <button x-show="currentUser.role === 'director'" @click="showAddAdminModal = true" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white transition-all">
                                 <i class="fas fa-user-plus mr-2"></i><span x-text="t('team.addAdmin')"></span>
                             </button>
                         </div>
@@ -910,6 +910,14 @@
                 <!-- Список анкет -->
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center space-x-3">
+                        <!-- Фильтр по типу админа (только для директора) -->
+                        <template x-if="currentUser.role === 'director'">
+                            <select class="glass px-4 py-2.5 rounded-xl text-sm font-medium" x-model="adminTypeFilter">
+                                <option value="our">Наш админ</option>
+                                <option value="other">Другие</option>
+                                <option value="all">Все анкеты</option>
+                            </select>
+                        </template>
                         <!-- Поиск -->
                         <div class="relative">
                             <input type="text" :placeholder="t('profiles.searchPlaceholder')"
@@ -919,7 +927,7 @@
                         </div>
                         <!-- Кнопка оплаты выбранных анкет (если не "мой админ") -->
                         <template x-if="!isRestricted && selectedProfileIds.length > 0">
-                            <button @click="paySelectedProfiles()" class="px-4 py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white font-medium">
+                            <button @click="paySelectedProfiles()" class="px-5 py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white font-medium transition-all">
                                 <i class="fas fa-credit-card mr-2"></i>Оплатить (<span x-text="selectedProfileIds.length"></span>)
                             </button>
                         </template>
@@ -1191,7 +1199,7 @@
                         :placeholder="t('control.promptPlaceholder')"
                         x-model="generationPrompt"></textarea>
                     <p class="text-sm text-gray-500 mt-2" x-text="t('control.promptSync')"></p>
-                    <button @click="syncPromptWithBots" class="mt-3 glow-button px-4 py-2 rounded-xl text-white text-sm" x-text="t('control.syncWithBots')">
+                    <button @click="syncPromptWithBots" class="mt-3 glow-button px-5 py-2.5 rounded-xl text-white text-sm font-medium" x-text="t('control.syncWithBots')">
                     </button>
                 </div>
             </div>
@@ -1320,7 +1328,7 @@
                         <div x-show="monitoringFunction === 'favoriteMailing'" class="space-y-4">
                             <!-- Кнопка экспорта -->
                             <div class="flex justify-end mb-2" x-show="favoriteTemplates.length > 0">
-                                <button @click="exportFavoriteTemplates()" class="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors text-sm">
+                                <button @click="exportFavoriteTemplates()" class="px-5 py-2.5 bg-pink-500 text-white rounded-xl hover:bg-pink-600 font-medium transition-all text-sm">
                                     <i class="fas fa-download mr-2"></i>Выгрузить все
                                 </button>
                             </div>
@@ -1487,7 +1495,7 @@
                             <input type="text" id="historyDatePicker" class="bg-transparent border-none outline-none w-48 text-sm" readonly :placeholder="t('common.selectPeriod')">
                         </div>
 
-                        <button @click="loadProfileHistory()" class="px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600">
+                        <button @click="loadProfileHistory()" class="px-5 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 font-medium transition-all">
                             <i class="fas fa-sync-alt mr-2"></i><span x-text="t('common.refresh')"></span>
                         </button>
                     </div>
@@ -1691,7 +1699,7 @@
                             <i class="fas fa-history text-gray-500 mr-2"></i>
                             История операций
                         </h3>
-                        <button @click="loadFinanceData()" class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm">
+                        <button @click="loadFinanceData()" class="px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm font-medium transition-all">
                             <i class="fas fa-sync-alt mr-1"></i> Обновить
                         </button>
                     </div>
@@ -1792,7 +1800,7 @@
                 </div>
                 
                 <div class="flex justify-end space-x-3 pt-4">
-                    <button @click="showAddAccountModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
+                    <button @click="showAddAccountModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
                         Отмена
                     </button>
                     <button @click="saveAccounts" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
@@ -1877,7 +1885,7 @@
                 </div>
 
                 <div class="flex justify-end space-x-3 pt-4">
-                    <button @click="showAddAdminModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
+                    <button @click="showAddAdminModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
                         Отмена
                     </button>
                     <button @click="saveAdmin" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
@@ -1943,7 +1951,7 @@
                 </div>
 
                 <div class="flex justify-end space-x-3 pt-4">
-                    <button @click="showAddTranslatorModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
+                    <button @click="showAddTranslatorModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
                         Отмена
                     </button>
                     <button @click="saveTranslator" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
@@ -1976,7 +1984,7 @@
                                            :value="account.id"
                                            x-model="selectedAccountIds"
                                            class="rounded mr-3">
-                                    <span class="font-mono text-sm font-medium">#<span x-text="account.id"></span></span>
+                                    <span class="font-mono text-sm font-medium" x-text="account.id"></span>
                                 </label>
                             </template>
                             <div x-show="accounts.filter(a => !a.admin || a.admin === '').length === 0" class="text-center text-gray-500 py-4">
@@ -2005,7 +2013,7 @@
                 </div>
 
                 <div class="flex justify-end space-x-3 pt-4">
-                    <button @click="showAssignAccountsModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
+                    <button @click="showAssignAccountsModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
                         Отмена
                     </button>
                     <button @click="assignAccountsToAdminConfirm" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
@@ -2126,7 +2134,7 @@
                 </div>
 
                 <div class="flex justify-end space-x-3 pt-4">
-                    <button @click="showExtendModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
+                    <button @click="showExtendModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
                         Отмена
                     </button>
                     <button @click="extendProfile"
@@ -2168,7 +2176,7 @@
                 </div>
 
                 <div class="flex justify-end space-x-3 pt-4">
-                    <button @click="showTopupModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
+                    <button @click="showTopupModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
                         Отмена
                     </button>
                     <button @click="topupBalance" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
@@ -2264,7 +2272,7 @@
                 </div>
 
                 <div class="flex justify-end space-x-3 pt-4">
-                    <button @click="showSettingsModal = false; resetUserSettings()" class="px-4 py-2 rounded-xl hover:bg-gray-100">
+                    <button @click="showSettingsModal = false; resetUserSettings()" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
                         Отмена
                     </button>
                     <button @click="saveUserSettings()"
@@ -2356,6 +2364,7 @@
                 sortBy: 'date',
                 sortDirection: 'desc',
                 searchQuery: '',
+                adminTypeFilter: 'our', // 'our' = наши админы, 'other' = другие, 'all' = все
                 loading: true,
                 error: null,
 
@@ -2703,6 +2712,7 @@
                                     lastOnline: p.last_online ? new Date(p.last_online).toLocaleString('ru-RU') : '-',
                                     incoming: p.incoming_today || 0,
                                     admin: p.admin_name || '',
+                                    adminIsRestricted: p.admin_is_restricted || false,
                                     translator: p.trans_name || '',
                                     addedDate: new Date(p.added_at).toLocaleDateString('ru-RU'),
                                     comment: p.note ? p.note.replace(/\s*\[Last seen:.*?\]/g, '').trim() : '',
@@ -3171,10 +3181,21 @@
 
                 get filteredAccounts() {
                     let filtered = this.accounts;
-                    
+
+                    // Фильтр по типу админа (только для директора)
+                    if (this.currentUser.role === 'director' && this.adminTypeFilter !== 'all') {
+                        if (this.adminTypeFilter === 'our') {
+                            // Наш админ - показываем анкеты где админ is_restricted = true
+                            filtered = filtered.filter(account => account.adminIsRestricted === true);
+                        } else if (this.adminTypeFilter === 'other') {
+                            // Другие - показываем анкеты где админ is_restricted = false или нет админа
+                            filtered = filtered.filter(account => account.adminIsRestricted === false);
+                        }
+                    }
+
                     if (this.searchQuery) {
                         const query = this.searchQuery.toLowerCase();
-                        filtered = filtered.filter(account => 
+                        filtered = filtered.filter(account =>
                             account.id.toLowerCase().includes(query) ||
                             account.login.toLowerCase().includes(query)
                         );
