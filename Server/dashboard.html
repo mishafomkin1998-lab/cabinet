@@ -703,61 +703,61 @@
                 <!-- Stats cards -->
                 <div class="grid grid-cols-4 gap-6 mb-8">
                     <!-- Total profiles -->
-                    <div class="glass rounded-2xl p-6 cursor-pointer" @click="setActiveMenu('accounts')">
-                        <div class="flex items-center mb-6">
-                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-50 to-blue-100 flex items-center justify-center mr-4">
+                    <div class="glass rounded-2xl p-6 cursor-pointer flex flex-col" @click="setActiveMenu('accounts')">
+                        <div class="flex items-center flex-1">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-50 to-blue-100 flex items-center justify-center mr-4 flex-shrink-0">
                                 <i class="fas fa-user text-blue-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold" x-text="stats.metrics.totalProfiles">0</div>
-                                <div class="text-gray-500" x-text="t('stats.totalProfiles')"></div>
+                                <div class="text-3xl font-bold leading-tight" x-text="stats.metrics.totalProfiles">0</div>
+                                <div class="text-sm text-gray-500" x-text="t('stats.totalProfiles')"></div>
                             </div>
                         </div>
-                        <div class="text-sm">
+                        <div class="text-sm mt-4 pt-4 border-t border-gray-100">
                             <span class="text-green-600 font-medium"><span x-text="t('stats.online')"></span>: <span x-text="accounts.filter(a => a.status === 'online').length"></span>/<span x-text="accounts.length"></span></span>
                         </div>
                     </div>
 
                     <!-- Incoming letters -->
-                    <div class="glass rounded-2xl p-6">
-                        <div class="flex items-center mb-6">
-                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 flex items-center justify-center mr-4">
+                    <div class="glass rounded-2xl p-6 flex flex-col">
+                        <div class="flex items-center flex-1">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 flex items-center justify-center mr-4 flex-shrink-0">
                                 <i class="fas fa-envelope-open text-purple-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold" x-text="stats.today.incomingLetters || 0">0</div>
-                                <div class="text-gray-500" x-text="t('stats.incomingLetters')"></div>
+                                <div class="text-3xl font-bold leading-tight" x-text="stats.today.incomingLetters || 0">0</div>
+                                <div class="text-sm text-gray-500" x-text="t('stats.incomingLetters')"></div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500"><span x-text="t('stats.chats')"></span>: <span x-text="stats.today.chats"></span> | <span x-text="t('stats.forMonth')"></span>: <span x-text="stats.month.incomingLetters || 0"></span></div>
+                        <div class="text-sm text-gray-500 mt-4 pt-4 border-t border-gray-100"><span x-text="t('stats.chats')"></span>: <span x-text="stats.today.chats"></span> | <span x-text="t('stats.forMonth')"></span>: <span x-text="stats.month.incomingLetters || 0"></span></div>
                     </div>
 
                     <!-- Median response time -->
-                    <div class="glass rounded-2xl p-6">
-                        <div class="flex items-center mb-6">
-                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-green-50 to-green-100 flex items-center justify-center mr-4">
+                    <div class="glass rounded-2xl p-6 flex flex-col">
+                        <div class="flex items-center flex-1">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-green-50 to-green-100 flex items-center justify-center mr-4 flex-shrink-0">
                                 <i class="fas fa-stopwatch text-green-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold"><span x-text="stats.metrics.medianResponseTime || 0"></span> <span x-text="t('time.min')"></span></div>
-                                <div class="text-gray-500" x-text="t('stats.medianTime')"></div>
+                                <div class="text-3xl font-bold leading-tight"><span x-text="stats.metrics.medianResponseTime || 0"></span> <span class="text-lg font-medium" x-text="t('time.min')"></span></div>
+                                <div class="text-sm text-gray-500" x-text="t('stats.medianTime')"></div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500" x-text="t('stats.medianResponseTime')"></div>
+                        <div class="text-sm text-gray-500 mt-4 pt-4 border-t border-gray-100" x-text="t('stats.medianResponseTime')"></div>
                     </div>
 
                     <!-- Average response time -->
-                    <div class="glass rounded-2xl p-6">
-                        <div class="flex items-center mb-6">
-                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 flex items-center justify-center mr-4">
+                    <div class="glass rounded-2xl p-6 flex flex-col">
+                        <div class="flex items-center flex-1">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 flex items-center justify-center mr-4 flex-shrink-0">
                                 <i class="fas fa-clock text-orange-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold"><span x-text="stats.metrics.avgResponseTime"></span> <span x-text="t('time.min')"></span></div>
-                                <div class="text-gray-500" x-text="t('stats.avgTime')"></div>
+                                <div class="text-3xl font-bold leading-tight"><span x-text="stats.metrics.avgResponseTime"></span> <span class="text-lg font-medium" x-text="t('time.min')"></span></div>
+                                <div class="text-sm text-gray-500" x-text="t('stats.avgTime')"></div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500"><span x-text="t('stats.uniqueMen')"></span>: <span x-text="stats.today.uniqueMen"></span></div>
+                        <div class="text-sm text-gray-500 mt-4 pt-4 border-t border-gray-100"><span x-text="t('stats.uniqueMen')"></span>: <span x-text="stats.today.uniqueMen"></span></div>
                     </div>
                 </div>
 
@@ -765,18 +765,18 @@
                 <div class="grid gap-6 mb-8" :class="currentUser.role === 'translator' ? 'grid-cols-1' : 'grid-cols-2'">
                     <!-- Статус ботов - скрыт для переводчиков -->
                     <div x-show="currentUser.role !== 'translator'" class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6" x-text="t('stats.botsStatus')"></h3>
-                        <div class="text-3xl font-bold mb-2" x-text="bots.length">0</div>
-                        <div class="text-sm text-gray-500">
-                            <span class="text-green-600"><span x-text="t('stats.online')"></span>: <span x-text="botsStatus.online"></span></span> |
-                            <span class="text-yellow-500"><span x-text="t('stats.idle')"></span>: <span x-text="botsStatus.idle"></span></span> |
+                        <h3 class="text-lg font-bold mb-4" x-text="t('stats.botsStatus')"></h3>
+                        <div class="text-3xl font-bold leading-tight mb-3" x-text="bots.length">0</div>
+                        <div class="text-sm text-gray-500 flex gap-3 flex-wrap">
+                            <span class="text-green-600"><span x-text="t('stats.online')"></span>: <span x-text="botsStatus.online"></span></span>
+                            <span class="text-yellow-500"><span x-text="t('stats.idle')"></span>: <span x-text="botsStatus.idle"></span></span>
                             <span class="text-red-500"><span x-text="t('stats.offline')"></span>: <span x-text="botsStatus.offline + botsStatus.never_connected"></span></span>
                         </div>
                     </div>
 
                     <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6" x-text="t('stats.workTime')"></h3>
-                        <div class="text-3xl font-bold mb-2 text-purple-600" x-text="stats.metrics.workTime || '0ч 0м'"></div>
+                        <h3 class="text-lg font-bold mb-4" x-text="t('stats.workTime')"></h3>
+                        <div class="text-3xl font-bold leading-tight mb-3 text-purple-600" x-text="stats.metrics.workTime || '0ч 0м'"></div>
                         <div class="text-sm text-gray-500"><span x-text="t('stats.forMonth')"></span>: <span x-text="stats.metrics.workTimeMonth || '0ч 0м'"></span></div>
                     </div>
                 </div>
@@ -996,7 +996,7 @@
                                                    :disabled="account.isPaid || account.isFree"
                                                    @change="toggleProfileSelection(account.id, $event.target.checked)">
                                         </td>
-                                        <td class="py-2 px-3 font-mono" x-text="'#' + account.id"></td>
+                                        <td class="py-2 px-3 font-mono" x-text="account.id"></td>
                                         <td class="py-2 px-3">
                                             <span class="px-2 py-0.5 rounded-full text-xs"
                                                   :class="getStatusClass(account.status)"
@@ -1278,8 +1278,8 @@
                             <template x-for="activity in recentActivity.filter(a => (a.action_type === 'chat' || a.action_type === 'letter') && a.is_reply).slice(0, 10)" :key="activity.id">
                                 <div class="p-3 rounded-xl border border-gray-100 bg-blue-50">
                                     <div class="font-medium mb-2">
-                                        <span class="text-blue-600">↩️ Ответ</span> | Анкета #<span x-text="activity.profile_id"></span> →
-                                        Мужчина #<span x-text="activity.man_id"></span>
+                                        <span class="text-blue-600">↩️ Ответ</span> | Анкета <span x-text="activity.profile_id"></span> →
+                                        Мужчина <span x-text="activity.man_id"></span>
                                     </div>
                                     <div class="space-y-2 text-sm">
                                         <div class="bg-blue-50 p-2 rounded-lg">
@@ -1302,9 +1302,9 @@
                                     <i class="fas fa-envelope text-green-500 mt-1 mr-3"></i>
                                     <div class="flex-1">
                                         <div class="font-medium">
-                                            <span x-text="'Анкета #' + activity.profile_id"></span>
+                                            <span x-text="'Анкета ' + activity.profile_id"></span>
                                             <span class="text-gray-500">→</span>
-                                            <span x-text="'Мужчина #' + activity.man_id"></span>
+                                            <span x-text="'Мужчина ' + activity.man_id"></span>
                                         </div>
                                         <div class="text-sm text-gray-600 mt-1" x-text="activity.message_text ? '\"' + activity.message_text + '\"' : '(текст не сохранён)'"></div>
                                         <div class="text-xs text-gray-400 mt-1" x-text="formatActivityTime(activity.created_at)"></div>
@@ -1407,8 +1407,8 @@
                                     <div class="max-w-[75%]">
                                         <div class="text-xs mb-1 flex items-center gap-2"
                                              :class="activity.action_type === 'incoming' ? 'text-gray-500' : 'text-pink-600 justify-end'">
-                                            <span x-show="activity.action_type === 'incoming'" x-text="'Мужчина #' + activity.man_id"></span>
-                                            <span x-show="activity.action_type !== 'incoming'" x-text="'Анкета #' + activity.profile_id"></span>
+                                            <span x-show="activity.action_type === 'incoming'" x-text="'Мужчина ' + activity.man_id"></span>
+                                            <span x-show="activity.action_type !== 'incoming'" x-text="'Анкета ' + activity.profile_id"></span>
                                             <span class="opacity-60" x-text="formatActivityTime(activity.created_at)"></span>
                                         </div>
                                         <div class="p-3 rounded-2xl text-sm leading-relaxed"
@@ -1510,7 +1510,7 @@
                                 <template x-for="action in profileHistory" :key="action.id">
                                     <tr class="border-b border-gray-100 hover:bg-gray-50">
                                         <td class="py-3 px-4 text-sm" x-text="formatHistoryTime(action.created_at)"></td>
-                                        <td class="py-3 px-4 font-mono" x-text="'#' + action.profile_id"></td>
+                                        <td class="py-3 px-4 font-mono" x-text="action.profile_id"></td>
                                         <td class="py-3 px-4">
                                             <span class="px-2 py-1 rounded-full text-xs"
                                                   :class="getProfileActionClass(action.action_type)"
@@ -1726,7 +1726,7 @@
                                             <!-- Для пополнения - имя админа -->
                                             <span x-show="item.type === 'topup'" class="font-medium" x-text="item.adminName"></span>
                                             <!-- Для оплаты анкеты - ID анкеты -->
-                                            <span x-show="item.type !== 'topup'" class="font-mono font-medium">#<span x-text="item.profileId"></span></span>
+                                            <span x-show="item.type !== 'topup'" class="font-mono font-medium"><span x-text="item.profileId"></span></span>
                                         </td>
                                         <td class="py-3 px-4">
                                             <!-- Для пополнения - сумма и баланс -->
@@ -4232,7 +4232,7 @@
                         });
                         const data = await res.json();
                         if (data.success) {
-                            alert(`Анкета #${this.profilePayment.profileId} оплачена на ${this.profilePayment.days} дней`);
+                            alert(`Анкета ${this.profilePayment.profileId} оплачена на ${this.profilePayment.days} дней`);
                             this.profilePayment = { profileId: '', days: 30, note: '' };
                             await this.loadFinanceData();
                             await this.loadAccounts();
@@ -4252,7 +4252,7 @@
                         return;
                     }
 
-                    if (!confirm(`Убрать оплату с анкеты #${this.profilePayment.profileId}?`)) return;
+                    if (!confirm(`Убрать оплату с анкеты ${this.profilePayment.profileId}?`)) return;
 
                     try {
                         const res = await fetch(`${API_BASE}/api/billing/remove-payment`, {
@@ -4265,7 +4265,7 @@
                         });
                         const data = await res.json();
                         if (data.success) {
-                            alert(`Оплата с анкеты #${this.profilePayment.profileId} снята`);
+                            alert(`Оплата с анкеты ${this.profilePayment.profileId} снята`);
                             this.profilePayment = { profileId: '', days: 30, note: '' };
                             await this.loadFinanceData();
                             await this.loadAccounts();
