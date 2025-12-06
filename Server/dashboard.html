@@ -703,61 +703,61 @@
                 <!-- Stats cards -->
                 <div class="grid grid-cols-4 gap-6 mb-8">
                     <!-- Total profiles -->
-                    <div class="glass rounded-2xl p-6 cursor-pointer flex flex-col" @click="setActiveMenu('accounts')">
-                        <div class="flex items-center flex-1">
+                    <div class="glass rounded-2xl p-6 cursor-pointer flex flex-col h-40" @click="setActiveMenu('accounts')">
+                        <div class="flex items-start flex-1">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-50 to-blue-100 flex items-center justify-center mr-4 flex-shrink-0">
-                                <i class="fas fa-user text-blue-500"></i>
+                                <i class="fas fa-user text-blue-500 text-lg"></i>
                             </div>
-                            <div>
-                                <div class="text-3xl font-bold leading-tight" x-text="stats.metrics.totalProfiles">0</div>
-                                <div class="text-sm text-gray-500" x-text="t('stats.totalProfiles')"></div>
+                            <div class="min-w-0">
+                                <div class="text-3xl font-bold" x-text="stats.metrics.totalProfiles">0</div>
+                                <div class="text-sm text-gray-500 truncate" x-text="t('stats.totalProfiles')"></div>
                             </div>
                         </div>
-                        <div class="text-sm mt-4 pt-4 border-t border-gray-100">
+                        <div class="text-sm pt-3 border-t border-gray-100 truncate">
                             <span class="text-green-600 font-medium"><span x-text="t('stats.online')"></span>: <span x-text="accounts.filter(a => a.status === 'online').length"></span>/<span x-text="accounts.length"></span></span>
                         </div>
                     </div>
 
                     <!-- Incoming letters -->
-                    <div class="glass rounded-2xl p-6 flex flex-col">
-                        <div class="flex items-center flex-1">
+                    <div class="glass rounded-2xl p-6 flex flex-col h-40">
+                        <div class="flex items-start flex-1">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 flex items-center justify-center mr-4 flex-shrink-0">
-                                <i class="fas fa-envelope-open text-purple-500"></i>
+                                <i class="fas fa-envelope-open text-purple-500 text-lg"></i>
                             </div>
-                            <div>
-                                <div class="text-3xl font-bold leading-tight" x-text="stats.today.incomingLetters || 0">0</div>
-                                <div class="text-sm text-gray-500" x-text="t('stats.incomingLetters')"></div>
+                            <div class="min-w-0">
+                                <div class="text-3xl font-bold" x-text="stats.today.incomingLetters || 0">0</div>
+                                <div class="text-sm text-gray-500 truncate" x-text="t('stats.incomingLetters')"></div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500 mt-4 pt-4 border-t border-gray-100"><span x-text="t('stats.chats')"></span>: <span x-text="stats.today.chats"></span> | <span x-text="t('stats.forMonth')"></span>: <span x-text="stats.month.incomingLetters || 0"></span></div>
+                        <div class="text-sm text-gray-500 pt-3 border-t border-gray-100 truncate"><span x-text="t('stats.chats')"></span>: <span x-text="stats.today.chats"></span> | <span x-text="t('stats.forMonth')"></span>: <span x-text="stats.month.incomingLetters || 0"></span></div>
                     </div>
 
                     <!-- Median response time -->
-                    <div class="glass rounded-2xl p-6 flex flex-col">
-                        <div class="flex items-center flex-1">
+                    <div class="glass rounded-2xl p-6 flex flex-col h-40">
+                        <div class="flex items-start flex-1">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-green-50 to-green-100 flex items-center justify-center mr-4 flex-shrink-0">
-                                <i class="fas fa-stopwatch text-green-500"></i>
+                                <i class="fas fa-stopwatch text-green-500 text-lg"></i>
                             </div>
-                            <div>
-                                <div class="text-3xl font-bold leading-tight"><span x-text="stats.metrics.medianResponseTime || 0"></span> <span class="text-lg font-medium" x-text="t('time.min')"></span></div>
-                                <div class="text-sm text-gray-500" x-text="t('stats.medianTime')"></div>
+                            <div class="min-w-0">
+                                <div class="text-3xl font-bold"><span x-text="stats.metrics.medianResponseTime || 0"></span> <span class="text-base" x-text="t('time.min')"></span></div>
+                                <div class="text-sm text-gray-500 truncate" x-text="t('stats.medianTime')"></div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500 mt-4 pt-4 border-t border-gray-100" x-text="t('stats.medianResponseTime')"></div>
+                        <div class="text-sm text-gray-500 pt-3 border-t border-gray-100 truncate" x-text="t('stats.medianResponseTime')"></div>
                     </div>
 
                     <!-- Average response time -->
-                    <div class="glass rounded-2xl p-6 flex flex-col">
-                        <div class="flex items-center flex-1">
+                    <div class="glass rounded-2xl p-6 flex flex-col h-40">
+                        <div class="flex items-start flex-1">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 flex items-center justify-center mr-4 flex-shrink-0">
-                                <i class="fas fa-clock text-orange-500"></i>
+                                <i class="fas fa-clock text-orange-500 text-lg"></i>
                             </div>
-                            <div>
-                                <div class="text-3xl font-bold leading-tight"><span x-text="stats.metrics.avgResponseTime"></span> <span class="text-lg font-medium" x-text="t('time.min')"></span></div>
-                                <div class="text-sm text-gray-500" x-text="t('stats.avgTime')"></div>
+                            <div class="min-w-0">
+                                <div class="text-3xl font-bold"><span x-text="stats.metrics.avgResponseTime"></span> <span class="text-base" x-text="t('time.min')"></span></div>
+                                <div class="text-sm text-gray-500 truncate" x-text="t('stats.avgTime')"></div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500 mt-4 pt-4 border-t border-gray-100"><span x-text="t('stats.uniqueMen')"></span>: <span x-text="stats.today.uniqueMen"></span></div>
+                        <div class="text-sm text-gray-500 pt-3 border-t border-gray-100 truncate"><span x-text="t('stats.uniqueMen')"></span>: <span x-text="stats.today.uniqueMen"></span></div>
                     </div>
                 </div>
 
