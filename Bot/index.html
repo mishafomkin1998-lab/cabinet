@@ -844,16 +844,28 @@
             }
         }
 
-        // 5. Функция проверки статуса профиля (paused)
-        async function checkProfilePaused(profileId) {
+        // 5. Функция проверки статуса профиля (paused и allowed)
+        async function checkProfileStatus(profileId) {
             try {
                 const response = await fetch(`${LABABOT_SERVER}/api/profiles/${encodeURIComponent(profileId)}/status`);
                 const data = await response.json();
-                return data.paused === true;
+                return {
+                    paused: data.paused === true,
+                    exists: data.exists === true,
+                    allowed: data.allowed === true,
+                    reason: data.reason || null
+                };
             } catch (error) {
                 console.error(`❌ Ошибка проверки статуса профиля:`, error);
-                return false; // В случае ошибки разрешаем рассылку
+                // При ошибке разрешаем работу чтобы не блокировать
+                return { paused: false, exists: true, allowed: true };
             }
+        }
+
+        // Обратная совместимость
+        async function checkProfilePaused(profileId) {
+            const status = await checkProfileStatus(profileId);
+            return status.paused;
         }
 
         // === КРИТИЧЕСКИ ВАЖНО: Скрипт "Анти-сон" ===
@@ -1875,8 +1887,17 @@
                 if(!this.token) return;
 
                 // Проверяем статус профиля на сервере
-                const isPaused = await checkProfilePaused(this.displayId);
-                if (isPaused) {
+                const profileStatus = await checkProfileStatus(this.displayId);
+
+                // Проверяем, есть ли анкета в системе
+                if (!profileStatus.allowed || !profileStatus.exists) {
+                    this.log(`⛔ Анкета не найдена в системе личного кабинета`);
+                    alert(`Анкета ${this.displayId} не добавлена в личный кабинет. Добавьте её в систему для работы.`);
+                    return;
+                }
+
+                // Проверяем, приостановлена ли анкета
+                if (profileStatus.paused) {
                     this.log(`⛔ Рассылка заблокирована - анкета приостановлена в личном кабинете`);
                     alert(`Анкета ${this.displayId} приостановлена в личном кабинете. Рассылка невозможна.`);
                     return;
@@ -2086,8 +2107,17 @@
                 if(!this.token) return;
 
                 // Проверяем статус профиля на сервере
-                const isPaused = await checkProfilePaused(this.displayId);
-                if (isPaused) {
+                const profileStatus = await checkProfileStatus(this.displayId);
+
+                // Проверяем, есть ли анкета в системе
+                if (!profileStatus.allowed || !profileStatus.exists) {
+                    this.log(`⛔ Анкета не найдена в системе личного кабинета`);
+                    alert(`Анкета ${this.displayId} не добавлена в личный кабинет. Добавьте её в систему для работы.`);
+                    return;
+                }
+
+                // Проверяем, приостановлена ли анкета
+                if (profileStatus.paused) {
                     this.log(`⛔ Чат заблокирован - анкета приостановлена в личном кабинете`);
                     alert(`Анкета ${this.displayId} приостановлена в личном кабинете. Чат невозможен.`);
                     return;

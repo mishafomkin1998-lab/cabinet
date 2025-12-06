@@ -197,13 +197,22 @@ router.get('/:profileId/status', async (req, res) => {
     const { profileId } = req.params;
     try {
         const result = await pool.query(
-            `SELECT paused FROM allowed_profiles WHERE profile_id = $1`,
+            `SELECT paused, assigned_admin_id, assigned_translator_id FROM allowed_profiles WHERE profile_id = $1`,
             [profileId]
         );
         if (result.rows.length === 0) {
-            return res.json({ success: true, paused: false, exists: false });
+            // Анкета не в системе - запрещаем работу
+            return res.json({ success: true, paused: false, exists: false, allowed: false, reason: 'not_in_system' });
         }
-        res.json({ success: true, paused: result.rows[0].paused || false, exists: true });
+        const row = result.rows[0];
+        res.json({
+            success: true,
+            paused: row.paused || false,
+            exists: true,
+            allowed: true,
+            hasAdmin: !!row.assigned_admin_id,
+            hasTranslator: !!row.assigned_translator_id
+        });
     } catch (e) {
         console.error('Profile status error:', e.message);
         res.status(500).json({ error: e.message });

@@ -635,12 +635,14 @@
                             </div>
                         </div>
 
-                        <button @click="refreshAllStats()" class="px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600" :class="{'opacity-50 cursor-wait': loading}">
-                            <i class="fas fa-sync-alt mr-2" :class="{'fa-spin': loading}"></i><span x-text="t('common.refresh')"></span>
-                        </button>
-                        <button @click="exportStats()" class="ml-auto px-4 py-2.5 rounded-xl bg-green-500 text-white hover:bg-green-600">
-                            <i class="fas fa-download mr-2"></i><span x-text="t('common.export')"></span>
-                        </button>
+                        <div class="ml-auto flex gap-2">
+                            <button @click="refreshAllStats()" class="w-9 h-9 rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 flex items-center justify-center" :class="{'opacity-50 cursor-wait': loading}" :title="t('common.refresh')">
+                                <i class="fas fa-sync-alt text-sm" :class="{'fa-spin': loading}"></i>
+                            </button>
+                            <button @click="exportStats()" class="w-9 h-9 rounded-lg bg-green-500 text-white hover:bg-green-600 flex items-center justify-center" :title="t('common.export')">
+                                <i class="fas fa-download text-sm"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -2074,12 +2076,19 @@
                             this.botsStatus = data.summary;
 
                             // Группируем по botId чтобы получить уникальные боты
+                            // Показываем только активные боты (heartbeat за последний час)
                             const botsMap = {};
+                            const oneHourAgo = Date.now() - 60 * 60 * 1000;
+
                             data.bots.forEach(b => {
-                                // Используем botId или profileId как ключ
                                 const botId = b.botId || b.bot_id || b.profileId || b.profile_id;
                                 if (botId && botId !== 'null' && botId !== 'undefined') {
-                                    // Определяем активность бота
+                                    const lastHeartbeat = b.lastHeartbeat ? new Date(b.lastHeartbeat).getTime() : 0;
+                                    const isRecentlyActive = lastHeartbeat > oneHourAgo;
+
+                                    // Показываем только недавно активные боты
+                                    if (!isRecentlyActive) return;
+
                                     const isActive = b.status === 'online' || b.status === 'active' || b.status === 'idle';
 
                                     if (!botsMap[botId]) {
@@ -2096,7 +2105,6 @@
                                         };
                                     } else {
                                         botsMap[botId].profilesCount = (botsMap[botId].profilesCount || 0) + 1;
-                                        // Обновляем статус если хоть одна анкета online
                                         if (isActive) {
                                             botsMap[botId].status = 'active';
                                         }
@@ -2104,11 +2112,6 @@
                                 }
                             });
                             this.bots = Object.values(botsMap);
-
-                            // Если ботов нет, но есть данные - показываем их
-                            if (this.bots.length === 0 && data.bots.length > 0) {
-                                console.log('Bot data received but not parsed:', data.bots);
-                            }
 
                             // Также обновляем статусы анкет
                             data.bots.forEach(b => {
