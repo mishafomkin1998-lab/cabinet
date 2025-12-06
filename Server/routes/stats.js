@@ -1,6 +1,18 @@
 /**
  * Statistics Routes
  * Маршруты статистики
+ *
+ * Эндпоинты:
+ * - GET /detailed - детальная статистика за 30 дней
+ * - GET /daily - статистика по дням
+ * - GET /top-profiles - топ анкет по активности
+ * - GET /translators - статистика переводчиков
+ * - GET /admins - статистика админов (только для director)
+ * - GET /profile/:profileId - детали по конкретной анкете
+ * - GET /forecast - прогноз активности
+ * - GET /hourly-activity - активность по часам
+ * - GET /by-admin - статистика в разрезе админов
+ * - GET /by-translator - статистика в разрезе переводчиков
  */
 
 const express = require('express');
@@ -9,11 +21,26 @@ const { logError } = require('../utils/helpers');
 
 const router = express.Router();
 
-// Детальная статистика
+/**
+ * GET /api/stats/detailed
+ * Возвращает агрегированную статистику за последние 30 дней
+ *
+ * @query {string} userId - ID пользователя
+ * @query {string} role - Роль (translator/admin/director)
+ * @returns {Object} stats - Объект со статистикой:
+ *   - letters: количество отправленных писем
+ *   - chats: количество чат-сообщений
+ *   - uniqueMenMonth: уникальные мужчины за текущий месяц
+ *   - avgResponseTime: среднее время ответа в минутах
+ *   - replyRate: процент ответов на первые сообщения
+ */
 router.get('/detailed', async (req, res) => {
     const { userId, role } = req.query;
 
     try {
+        // Формируем фильтр в зависимости от роли пользователя
+        // translator видит только свои анкеты, admin - анкеты своей команды
+        // director видит всё (фильтр пустой)
         let filter = "";
         let params = [];
 
@@ -25,6 +52,16 @@ router.get('/detailed', async (req, res) => {
             params.push(userId);
         }
 
+        /**
+         * Агрегированный запрос статистики сообщений:
+         * - letters_count: успешные исходящие письма (type='outgoing')
+         * - chats_count: успешные чат-сообщения (type='chat_msg')
+         * - unique_men_month: уникальные получатели в текущем месяце
+         * - unique_men_total: всего уникальных получателей за 30 дней
+         * - avg_response_seconds: среднее время ответа в секундах
+         * - first_messages: количество первых сообщений в диалогах
+         * - last_messages: количество завершающих сообщений
+         */
         const query = `
             SELECT
                 COUNT(*) FILTER (WHERE m.type = 'outgoing' AND m.status = 'success') as letters_count,
@@ -49,9 +86,12 @@ router.get('/detailed', async (req, res) => {
         const result = await pool.query(query, params);
         const stats = result.rows[0];
 
+        // Расчёт производных метрик
         const totalSent = parseFloat(stats.first_messages);
         const totalConv = parseFloat(stats.total_conversations);
+        // replyRate = % диалогов от первых сообщений (конверсия)
         const replyRate = totalSent > 0 ? ((totalConv / totalSent) * 100).toFixed(1) : 0;
+        // avgConvLength = среднее количество сообщений в диалоге
         const avgConvLength = totalConv > 0 ? ((parseFloat(stats.letters_count) + parseFloat(stats.chats_count)) / totalConv).toFixed(1) : 0;
 
         res.json({
@@ -63,7 +103,7 @@ router.get('/detailed', async (req, res) => {
                 successMessages: parseInt(stats.success_messages_count) || 0,
                 uniqueMenMonth: parseInt(stats.unique_men_month) || 0,
                 uniqueMenTotal: parseInt(stats.unique_men_total) || 0,
-                avgResponseTime: Math.round(stats.avg_response_seconds / 60) || 0,
+                avgResponseTime: Math.round(stats.avg_response_seconds / 60) || 0, // конвертируем в минуты
                 totalConversations: parseInt(stats.total_conversations) || 0,
                 replyRate: replyRate,
                 avgConvLength: avgConvLength,
@@ -78,7 +118,14 @@ router.get('/detailed', async (req, res) => {
     }
 });
 
-// Статистика по дням
+
+/**
+ * GET /api/stats/daily
+ * Возвращает статистику по дням для построения графиков
+ *
+ * @query {number} days - Количество дней (по умолчанию 30)
+ * @returns {Array} data - Массив объектов {date, letters, chats, unique_men, avg_response}
+ */
 router.get('/daily', async (req, res) => {
     const { userId, role } = req.query;
     const days = parseInt(req.query.days) || 30;
@@ -95,6 +142,12 @@ router.get('/daily', async (req, res) => {
             params.push(userId);
         }
 
+        /**
+         * Запрос использует CTE (WITH) для генерации последовательности дат,
+         * чтобы показать все дни, даже если в какой-то день не было активности.
+         * generate_series создаёт ряд дат от (сегодня - N дней) до сегодня.
+         * LEFT JOIN гарантирует, что дни без сообщений тоже попадут в результат.
+         */
         const query = `
             WITH date_series AS (
                 SELECT generate_series(
@@ -124,7 +177,13 @@ router.get('/daily', async (req, res) => {
     }
 });
 
-// Топ анкет
+/**
+ * GET /api/stats/top-profiles
+ * Возвращает топ анкет по количеству сообщений за 30 дней
+ *
+ * @query {number} limit - Количество анкет (по умолчанию 10)
+ * @returns {Array} profiles - Массив анкет с их статистикой
+ */
 router.get('/top-profiles', async (req, res) => {
     const { userId, role, limit = 10 } = req.query;
     try {
@@ -139,6 +198,10 @@ router.get('/top-profiles', async (req, res) => {
             params.push(userId);
         }
 
+        /**
+         * Группировка по profile_id для подсчёта сообщений каждой анкеты.
+         * Сортировка по total_messages DESC - самые активные наверху.
+         */
         const query = `
             SELECT
                 p.profile_id,

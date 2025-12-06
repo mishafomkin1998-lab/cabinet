@@ -1,6 +1,10 @@
 /**
  * Dashboard Routes
  * Маршруты дашборда
+ *
+ * Эндпоинты:
+ * - GET / - Основная сводка статистики для главной страницы
+ * - GET /favorite-templates - Избранные шаблоны сообщений (заглушка)
  */
 
 const express = require('express');
@@ -9,11 +13,27 @@ const { logError } = require('../utils/helpers');
 
 const router = express.Router();
 
-// Сводка для дашборда
+/**
+ * GET /api/dashboard
+ * Возвращает полную сводку статистики для главной страницы дашборда
+ *
+ * @query {string} userId - ID текущего пользователя
+ * @query {string} role - Роль пользователя (translator/admin/director)
+ * @returns {Object} dashboard - Объект со статистикой:
+ *   - today: статистика за сегодня
+ *   - yesterday: статистика за вчера
+ *   - week: статистика за 7 дней
+ *   - month: статистика за 30 дней
+ *   - metrics: общие метрики (кол-во анкет, онлайн, время ответа)
+ *   - ai: статистика использования AI генерации
+ */
 router.get('/', async (req, res) => {
     const { userId, role } = req.query;
 
     try {
+        // Формируем фильтры для разных таблиц в зависимости от роли
+        // profileFilter - для таблицы allowed_profiles
+        // activityFilter - для таблицы activity_log
         let profileFilter = "";
         let activityFilter = "";
         let params = [];
@@ -30,8 +50,12 @@ router.get('/', async (req, res) => {
             params.push(userId);
             paramIndex++;
         }
+        // Для director фильтры остаются пустыми - видит всё
 
-        // Количество анкет (всего)
+        /**
+         * Запрос 1: Количество анкет
+         * Простой COUNT по таблице allowed_profiles с учётом фильтра по роли
+         */
         const profilesQuery = `
             SELECT COUNT(*) as total_profiles
             FROM allowed_profiles p
@@ -40,7 +64,11 @@ router.get('/', async (req, res) => {
         const profilesResult = await pool.query(profilesQuery, params);
         const totalProfiles = parseInt(profilesResult.rows[0]?.total_profiles) || 0;
 
-        // Онлайн анкеты (heartbeat за последние 2 минуты)
+        /**
+         * Запрос 2: Онлайн анкеты
+         * Считаем уникальные анкеты, у которых был heartbeat за последние 2 минуты.
+         * Это показывает, сколько анкет сейчас активно работают в боте.
+         */
         const onlineQuery = `
             SELECT COUNT(DISTINCT h.account_display_id) as online_count
             FROM heartbeats h
@@ -51,7 +79,12 @@ router.get('/', async (req, res) => {
         const onlineResult = await pool.query(onlineQuery, params);
         const profilesOnline = parseInt(onlineResult.rows[0]?.online_count) || 0;
 
-        // Генерации ИИ
+        /**
+         * Запрос 3: Статистика AI генераций
+         * - ai_today: сколько сообщений с AI сегодня
+         * - ai_week/ai_month: за неделю/месяц
+         * - total_today/total_week: всего сообщений (для расчёта процента)
+         */
         const aiQuery = `
             SELECT
                 COUNT(*) FILTER (WHERE used_ai = true AND DATE(created_at) = CURRENT_DATE) as ai_today,
@@ -65,7 +98,16 @@ router.get('/', async (req, res) => {
         const aiResult = await pool.query(aiQuery, params);
         const aiStats = aiResult.rows[0] || {};
 
-        // Статистика из activity_log
+        /**
+         * Запрос 4: Основная статистика сообщений
+         * Большой агрегированный запрос, который считает:
+         * - letters/chats за сегодня, вчера, неделю, месяц
+         * - уникальных мужчин за разные периоды
+         * - среднее и медианное время ответа
+         *
+         * FILTER (WHERE ...) - PostgreSQL синтаксис для условной агрегации
+         * PERCENTILE_CONT - вычисление медианы (50-й перцентиль)
+         */
         const statsQuery = `
             SELECT
                 COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter' AND DATE(a.created_at) = CURRENT_DATE), 0) as letters_today,
@@ -88,7 +130,10 @@ router.get('/', async (req, res) => {
         const statsResult = await pool.query(statsQuery, params);
         const stats = statsResult.rows[0] || {};
 
-        // Ошибки
+        /**
+         * Запрос 5: Количество ошибок
+         * Считаем ошибки за сегодня и неделю для отображения в дашборде
+         */
         const errorsQuery = `
             SELECT
                 COALESCE(COUNT(*) FILTER (WHERE DATE(timestamp) = CURRENT_DATE), 0) as errors_today,
@@ -98,7 +143,7 @@ router.get('/', async (req, res) => {
         const errorsResult = await pool.query(errorsQuery);
         const errors = errorsResult.rows[0] || {};
 
-        // Используем данные из activity_log
+        // Преобразуем строковые значения в числа
         const lettersToday = parseInt(stats.letters_today) || 0;
         const chatsToday = parseInt(stats.chats_today) || 0;
         const lettersYesterday = parseInt(stats.letters_yesterday) || 0;
@@ -111,6 +156,7 @@ router.get('/', async (req, res) => {
         const avgResponseSec = parseFloat(stats.avg_response_seconds) || 0;
         const medianResponseSec = parseFloat(stats.median_response_seconds) || 0;
 
+        // Формируем ответ с группировкой по периодам
         res.json({
             success: true,
             dashboard: {
@@ -138,13 +184,14 @@ router.get('/', async (req, res) => {
                 metrics: {
                     totalProfiles: totalProfiles,
                     profilesOnline: profilesOnline,
-                    avgResponseTime: Math.round(avgResponseSec / 60),
+                    avgResponseTime: Math.round(avgResponseSec / 60), // конвертируем секунды в минуты
                     medianResponseTime: Math.round(medianResponseSec / 60)
                 },
                 ai: {
                     today: parseInt(aiStats.ai_today) || 0,
                     week: parseInt(aiStats.ai_week) || 0,
                     month: parseInt(aiStats.ai_month) || 0,
+                    // Процент AI от всех сообщений
                     percentToday: aiStats.total_today > 0
                         ? Math.round((aiStats.ai_today / aiStats.total_today) * 100)
                         : 0,
@@ -162,9 +209,14 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Любимые шаблоны
+/**
+ * GET /api/favorite-templates
+ * Возвращает избранные шаблоны сообщений пользователя
+ * TODO: Реализовать хранение и получение шаблонов из БД
+ */
 router.get('/favorite-templates', async (req, res) => {
     try {
+        // Заглушка - пока возвращаем пустой массив
         res.json({ success: true, templates: [] });
     } catch (e) {
         console.error('Favorite templates error:', e.message);

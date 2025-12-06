@@ -1,6 +1,15 @@
 /**
  * Activity Routes
  * Маршруты активности и сообщений
+ *
+ * Эндпоинты:
+ * - POST /message_sent - Сохранение отправленного сообщения (основной)
+ * - POST /log - Альтернативное логирование активности
+ * - GET /recent - Последняя активность для ленты в дашборде
+ * - POST /profile/status - Обновление статуса профиля
+ * - POST /error - Логирование ошибок от бота
+ * - GET /error_logs - Получение логов ошибок
+ * - GET /history - История переписок с фильтрацией
  */
 
 const express = require('express');
@@ -9,7 +18,25 @@ const { logError } = require('../utils/helpers');
 
 const router = express.Router();
 
-// Отправка сообщения
+/**
+ * POST /api/message_sent
+ * Основной эндпоинт для сохранения отправленных сообщений.
+ * Вызывается ботом после каждой отправки письма или чата.
+ *
+ * Логика работы:
+ * 1. Проверяет/создаёт анкету в allowed_profiles (автодобавление)
+ * 2. Сохраняет контент сообщения в message_content
+ * 3. Если ошибка - записывает в error_logs
+ * 4. Сохраняет основную запись в messages
+ * 5. Дублирует в activity_log для быстрого отображения в дашборде
+ *
+ * @body {string} botId - ID бота
+ * @body {string} accountDisplayId - ID анкеты отправителя
+ * @body {string} recipientId - ID получателя (мужчины)
+ * @body {string} type - Тип сообщения (outgoing/chat_msg)
+ * @body {boolean} usedAi - Флаг использования AI генерации
+ * @returns {Object} {status: 'ok', contentId: number}
+ */
 router.post('/message_sent', async (req, res) => {
     const { botId, accountDisplayId, recipientId, type, responseTime, isFirst, isLast, convId, length,
             status, textContent, mediaUrl, fileName, translatorId, errorReason, usedAi } = req.body;
@@ -23,7 +50,8 @@ router.post('/message_sent', async (req, res) => {
     let errorLogId = null;
 
     try {
-        // Проверяем/создаём анкету в allowed_profiles
+        // Шаг 1: Проверяем существование анкеты, если нет - создаём автоматически
+        // Это позволяет боту работать даже если анкета не была добавлена вручную
         let profileData = await pool.query(
             'SELECT * FROM allowed_profiles WHERE profile_id = $1',
             [accountDisplayId]
@@ -38,11 +66,12 @@ router.post('/message_sent', async (req, res) => {
             profileData = await pool.query('SELECT * FROM allowed_profiles WHERE profile_id = $1', [accountDisplayId]);
         }
 
+        // Получаем привязки анкеты к админу и переводчику
         const profile = profileData.rows[0];
         const adminId = profile?.assigned_admin_id || null;
         const assignedTranslatorId = profile?.assigned_translator_id || translatorId || null;
 
-        // 1. Сохранение контента сообщения
+        // Шаг 2: Сохраняем контент сообщения отдельно (нормализация БД)
         const contentRes = await pool.query(
             `INSERT INTO message_content (text_content, media_url, file_name)
              VALUES ($1, $2, $3) RETURNING id`,
@@ -50,7 +79,7 @@ router.post('/message_sent', async (req, res) => {
         );
         contentId = contentRes.rows[0].id;
 
-        // 2. Если статус 'failed', записываем лог ошибки
+        // Шаг 3: Если отправка не удалась - записываем ошибку
         if (status === 'failed' && errorReason) {
              const logRes = await pool.query(
                 `INSERT INTO error_logs (endpoint, error_type, message, user_id, raw_data)
@@ -60,7 +89,7 @@ router.post('/message_sent', async (req, res) => {
             errorLogId = logRes.rows[0].id;
         }
 
-        // 3. Сохранение сообщения
+        // Шаг 4: Основная запись сообщения в таблицу messages
         const msgType = type || 'outgoing';
         await pool.query(
             `INSERT INTO messages (bot_id, account_id, type, sender_id, timestamp, response_time, is_first_message, is_last_message, conversation_id, message_length, status, message_content_id, error_log_id)
@@ -68,7 +97,8 @@ router.post('/message_sent', async (req, res) => {
             [botId, accountDisplayId, msgType, recipientId, responseTime || null, isFirst || false, isLast || false, convId || null, length || 0, status || 'success', contentId, errorLogId]
         );
 
-        // 4. ВАЖНО: Записываем в activity_log для отображения в dashboard
+        // Шаг 5: Дублируем в activity_log для быстрых запросов дашборда
+        // activity_log оптимизирован для агрегации (меньше JOIN'ов)
         const actionType = (msgType === 'chat_msg' || msgType === 'chat') ? 'chat' : 'letter';
 
         await pool.query(
