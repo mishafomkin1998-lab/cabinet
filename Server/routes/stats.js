@@ -17,7 +17,7 @@
 
 const express = require('express');
 const pool = require('../config/database');
-const { logError } = require('../utils/helpers');
+const { asyncHandler } = require('../utils/helpers');
 
 const router = express.Router();
 
@@ -34,11 +34,10 @@ const router = express.Router();
  *   - avgResponseTime: среднее время ответа в минутах
  *   - replyRate: процент ответов на первые сообщения
  */
-router.get('/detailed', async (req, res) => {
+router.get('/detailed', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
 
-    try {
-        // Формируем фильтр в зависимости от роли пользователя
+    // Формируем фильтр в зависимости от роли пользователя
         // translator видит только свои анкеты, admin - анкеты своей команды
         // director видит всё (фильтр пустой)
         let filter = "";
@@ -111,12 +110,7 @@ router.get('/detailed', async (req, res) => {
                 lastMessages: parseInt(stats.last_messages) || 0
             }
         });
-
-    } catch (e) {
-        await logError('/api/stats/detailed', 'QueryError', e.message, req.query, userId);
-        res.status(500).json({ error: e.message });
-    }
-});
+}));
 
 
 /**
@@ -126,12 +120,11 @@ router.get('/detailed', async (req, res) => {
  * @query {number} days - Количество дней (по умолчанию 30)
  * @returns {Array} data - Массив объектов {date, letters, chats, unique_men, avg_response}
  */
-router.get('/daily', async (req, res) => {
+router.get('/daily', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
     const days = parseInt(req.query.days) || 30;
 
-    try {
-        let profileFilter = "";
+    let profileFilter = "";
         let params = [days];
 
         if (role === 'translator') {
@@ -169,13 +162,9 @@ router.get('/daily', async (req, res) => {
             ORDER BY ds.date DESC
         `;
 
-        const result = await pool.query(query, params);
-        res.json({ success: true, data: result.rows || [] });
-    } catch (e) {
-        console.error('Daily stats error:', e.message);
-        res.status(500).json({ error: e.message });
-    }
-});
+    const result = await pool.query(query, params);
+    res.json({ success: true, data: result.rows || [] });
+}));
 
 /**
  * GET /api/stats/top-profiles
@@ -184,10 +173,10 @@ router.get('/daily', async (req, res) => {
  * @query {number} limit - Количество анкет (по умолчанию 10)
  * @returns {Array} profiles - Массив анкет с их статистикой
  */
-router.get('/top-profiles', async (req, res) => {
+router.get('/top-profiles', asyncHandler(async (req, res) => {
     const { userId, role, limit = 10 } = req.query;
-    try {
-        let filter = "";
+
+    let filter = "";
         let params = [limit];
 
         if (role === 'translator') {
@@ -220,16 +209,15 @@ router.get('/top-profiles', async (req, res) => {
             LIMIT $1
         `;
 
-        const result = await pool.query(query, params);
-        res.json({ success: true, profiles: result.rows });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
+    const result = await pool.query(query, params);
+    res.json({ success: true, profiles: result.rows });
+}));
 
 // Статистика по переводчикам
-router.get('/translators', async (req, res) => {
+router.get('/translators', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
-    try {
-        let filter = "";
+
+    let filter = "";
         let params = [];
 
         if (role === 'admin') {
@@ -277,20 +265,18 @@ router.get('/translators', async (req, res) => {
             efficiency: t.profiles_count > 0 ? ((parseInt(t.total_messages || 0) / t.profiles_count)).toFixed(1) : 0
         }));
 
-        res.json({ success: true, translators });
-    } catch (e) { await logError('/api/stats/translators', 'QueryError', e.message, req.query, userId); res.status(500).json({ error: e.message }); }
-});
+    res.json({ success: true, translators });
+}));
 
 // Статистика по админам
-router.get('/admins', async (req, res) => {
+router.get('/admins', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
 
     if (role !== 'director') {
         return res.json({ success: true, admins: [] });
     }
 
-    try {
-        const query = `
+    const query = `
             SELECT
                 u.id,
                 u.username,
@@ -334,17 +320,15 @@ router.get('/admins', async (req, res) => {
                 : 0
         }));
 
-        res.json({ success: true, admins });
-    } catch (e) { await logError('/api/stats/admins', 'QueryError', e.message, req.query, userId); res.status(500).json({ error: e.message }); }
-});
+    res.json({ success: true, admins });
+}));
 
 // Детали по анкете
-router.get('/profile/:profileId', async (req, res) => {
+router.get('/profile/:profileId', asyncHandler(async (req, res) => {
     const { profileId } = req.params;
     const { userId, role } = req.query;
 
-    try {
-        let accessQuery = `SELECT * FROM allowed_profiles WHERE profile_id = $1`;
+    let accessQuery = `SELECT * FROM allowed_profiles WHERE profile_id = $1`;
         const accessParams = [profileId];
 
         if (role === 'translator') {
@@ -416,15 +400,14 @@ router.get('/profile/:profileId', async (req, res) => {
                 : 0
         };
 
-        res.json({ success: true, profile: stats });
-    } catch (e) { await logError(`/api/stats/profile/${profileId}`, 'QueryError', e.message, req.query, userId); res.status(500).json({ error: e.message }); }
-});
+    res.json({ success: true, profile: stats });
+}));
 
 // Прогноз активности (без финансов)
-router.get('/forecast', async (req, res) => {
+router.get('/forecast', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
-    try {
-        let filter = "";
+
+    let filter = "";
         let params = [];
 
         if (role === 'translator') {
@@ -460,17 +443,15 @@ router.get('/forecast', async (req, res) => {
             weekForecast: Math.round(parseFloat(data.avg_daily_messages_7d || 0) * 7)
         };
 
-        res.json({ success: true, forecast });
-    } catch (e) { await logError('/api/stats/forecast', 'QueryError', e.message, req.query, userId); res.status(500).json({ error: e.message }); }
-});
+    res.json({ success: true, forecast });
+}));
 
 // Активность по часам
-router.get('/hourly-activity', async (req, res) => {
+router.get('/hourly-activity', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
     const days = parseInt(req.query.days) || 7;
 
-    try {
-        let activityFilter = "";
+    let activityFilter = "";
         let msgFilter = "";
         let params = [days];
 
@@ -520,20 +501,14 @@ router.get('/hourly-activity', async (req, res) => {
             return parseFloat((count / maxCount).toFixed(2));
         });
 
-        res.json({ success: true, hourlyData });
-    } catch (e) {
-        console.error('Hourly activity error:', e.message);
-        await logError('/api/stats/hourly-activity', 'QueryError', e.message, req.query, userId);
-        res.status(500).json({ error: e.message });
-    }
-});
+    res.json({ success: true, hourlyData });
+}));
 
 // Статистика по админам (GET /api/stats/by-admin)
-router.get('/by-admin', async (req, res) => {
+router.get('/by-admin', asyncHandler(async (req, res) => {
     const { dateFrom, dateTo } = req.query;
 
-    try {
-        let dateFilter = "";
+    let dateFilter = "";
         let params = [];
         let paramIndex = 1;
 
@@ -580,19 +555,14 @@ router.get('/by-admin', async (req, res) => {
             conversion: parseFloat(row.conversion) || 0
         }));
 
-        res.json({ success: true, admins });
-    } catch (e) {
-        console.error('Stats by admin error:', e.message);
-        res.status(500).json({ error: e.message });
-    }
-});
+    res.json({ success: true, admins });
+}));
 
 // Статистика по переводчикам (GET /api/stats/by-translator)
-router.get('/by-translator', async (req, res) => {
+router.get('/by-translator', asyncHandler(async (req, res) => {
     const { adminId, dateFrom, dateTo } = req.query;
 
-    try {
-        let filter = "";
+    let filter = "";
         let params = [];
         let paramIndex = 1;
 
@@ -652,11 +622,7 @@ router.get('/by-translator', async (req, res) => {
             ai_usage_percent: parseFloat(row.ai_usage_percent) || 0
         }));
 
-        res.json({ success: true, translators });
-    } catch (e) {
-        console.error('Stats by translator error:', e.message);
-        res.status(500).json({ error: e.message });
-    }
-});
+    res.json({ success: true, translators });
+}));
 
 module.exports = router;

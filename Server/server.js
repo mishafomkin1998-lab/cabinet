@@ -10,6 +10,7 @@ const path = require('path');
 // Модули
 const pool = require('./config/database');
 const { initDatabase } = require('./migrations');
+const { errorHandler } = require('./utils/helpers');
 const {
     authRoutes,
     teamRoutes,
@@ -126,6 +127,13 @@ app.get('/recalculate-stats', async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 });
+
+// ==========================================
+// ГЛОБАЛЬНЫЙ ОБРАБОТЧИК ОШИБОК
+// ==========================================
+
+// Должен быть ПОСЛЕ всех маршрутов
+app.use(errorHandler);
 
 // ==========================================
 // ИНИЦИАЛИЗАЦИЯ

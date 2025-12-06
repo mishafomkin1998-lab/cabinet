@@ -5,19 +5,18 @@
 
 const express = require('express');
 const pool = require('../config/database');
-const { logError } = require('../utils/helpers');
+const { asyncHandler } = require('../utils/helpers');
 
 const router = express.Router();
 
 // Heartbeat (legacy)
-router.post('/heartbeat', async (req, res) => {
+router.post('/heartbeat', asyncHandler(async (req, res) => {
     const { botId, accountDisplayId, status, timestamp, ip, systemInfo } = req.body;
     const profileStatus = status || 'online';
     const version = systemInfo?.version || null;
     const platform = systemInfo?.platform || null;
 
-    try {
-        // 1. Записываем heartbeat
+    // 1. Записываем heartbeat
         await pool.query(`
             INSERT INTO heartbeats (
                 bot_id, account_display_id, status,
@@ -76,20 +75,14 @@ router.post('/heartbeat', async (req, res) => {
 
         console.log(`❤️ Heartbeat от ${accountDisplayId} (бот ${botId}): ${profileStatus}`);
 
-        res.json({ status: 'ok' });
-
-    } catch (error) {
-        console.error('❌ Ошибка heartbeat:', error.message);
-        res.status(500).json({ error: error.message });
-    }
-});
+    res.json({ status: 'ok' });
+}));
 
 // Heartbeat по новой схеме (POST /api/bot/heartbeat)
-router.post('/bot/heartbeat', async (req, res) => {
+router.post('/bot/heartbeat', asyncHandler(async (req, res) => {
     const { botId, profileId, platform, ip, version, status } = req.body;
 
-    try {
-        // 1. Обновляем/создаем запись бота
+    // 1. Обновляем/создаем запись бота
         const existsBot = await pool.query(`SELECT 1 FROM bots WHERE bot_id = $1`, [botId]);
         if (existsBot.rows.length === 0) {
             await pool.query(
@@ -126,20 +119,14 @@ router.post('/bot/heartbeat', async (req, res) => {
 
         console.log(`❤️ Heartbeat от бота ${botId} (${profileId || 'no profile'}): ${status || 'online'}`);
 
-        res.json({ status: 'ok' });
-
-    } catch (error) {
-        console.error('❌ Ошибка heartbeat:', error.message);
-        res.status(500).json({ error: error.message });
-    }
-});
+    res.json({ status: 'ok' });
+}));
 
 // Статус анкет (онлайн/офлайн)
-router.get('/status', async (req, res) => {
+router.get('/status', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
 
-    try {
-        let profileFilter = "";
+    let profileFilter = "";
         let params = [];
 
         if (role === 'translator') {
@@ -211,21 +198,14 @@ router.get('/status', async (req, res) => {
             bots: profiles,
             profiles: profiles
         });
-
-    } catch (e) {
-        console.error('Bots status error:', e.message);
-        await logError('/api/bots/status', 'QueryError', e.message, req.query, userId);
-        res.status(500).json({ error: e.message });
-    }
-});
+}));
 
 // Статистика по конкретному боту
-router.get('/:botId/stats', async (req, res) => {
+router.get('/:botId/stats', asyncHandler(async (req, res) => {
     const { botId } = req.params;
     const { userId, role, days = 7 } = req.query;
 
-    try {
-        const accessQuery = `
+    const accessQuery = `
             SELECT h.account_display_id
             FROM heartbeats h
             JOIN allowed_profiles p ON h.account_display_id = p.profile_id
@@ -291,131 +271,100 @@ router.get('/:botId/stats', async (req, res) => {
                 }
             }
         });
-
-    } catch (e) {
-        await logError(`/api/bots/${botId}/stats`, 'QueryError', e.message, req.query, userId);
-        res.status(500).json({ error: e.message });
-    }
-});
+}));
 
 // Получение промта
-router.get('/prompt', async (req, res) => {
+router.get('/prompt', asyncHandler(async (req, res) => {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS settings (
+            id SERIAL PRIMARY KEY,
+            key VARCHAR(100) UNIQUE NOT NULL,
+            value TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
     try {
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS settings (
-                id SERIAL PRIMARY KEY,
-                key VARCHAR(100) UNIQUE NOT NULL,
-                value TEXT,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-        try {
-            await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS settings_key_unique ON settings(key)`);
-        } catch (e) { /* уже существует */ }
+        await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS settings_key_unique ON settings(key)`);
+    } catch (e) { /* уже существует */ }
 
-        const result = await pool.query(
-            `SELECT value FROM settings WHERE key = 'generation_prompt'`
-        );
+    const result = await pool.query(
+        `SELECT value FROM settings WHERE key = 'generation_prompt'`
+    );
 
-        const prompt = result.rows[0]?.value ||
-            'Write a creative and engaging message for a dating site. Keep it short, natural and intriguing.';
+    const prompt = result.rows[0]?.value ||
+        'Write a creative and engaging message for a dating site. Keep it short, natural and intriguing.';
 
-        res.json({ success: true, prompt });
-    } catch (e) {
-        console.error('Get prompt error:', e.message);
-        res.status(500).json({ error: e.message });
-    }
-});
+    res.json({ success: true, prompt });
+}));
 
 // Сохранение промта
-router.post('/prompt', async (req, res) => {
+router.post('/prompt', asyncHandler(async (req, res) => {
     const { prompt } = req.body;
-    try {
-        const exists = await pool.query(`SELECT 1 FROM settings WHERE key = 'generation_prompt'`);
-        if (exists.rows.length === 0) {
-            await pool.query(
-                `INSERT INTO settings (key, value, updated_at) VALUES ('generation_prompt', $1, NOW())`,
-                [prompt]
-            );
-        } else {
-            await pool.query(
-                `UPDATE settings SET value = $1, updated_at = NOW() WHERE key = 'generation_prompt'`,
-                [prompt]
-            );
-        }
 
-        res.json({ success: true });
-    } catch (e) {
-        console.error('Save prompt error:', e.message);
-        res.status(500).json({ error: e.message });
+    const exists = await pool.query(`SELECT 1 FROM settings WHERE key = 'generation_prompt'`);
+    if (exists.rows.length === 0) {
+        await pool.query(
+            `INSERT INTO settings (key, value, updated_at) VALUES ('generation_prompt', $1, NOW())`,
+            [prompt]
+        );
+    } else {
+        await pool.query(
+            `UPDATE settings SET value = $1, updated_at = NOW() WHERE key = 'generation_prompt'`,
+            [prompt]
+        );
     }
-});
+
+    res.json({ success: true });
+}));
 
 // Синхронизация промта
-router.post('/sync-prompt', async (req, res) => {
+router.post('/sync-prompt', asyncHandler(async (req, res) => {
     const { prompt } = req.body;
-    try {
-        const exists = await pool.query(`SELECT 1 FROM settings WHERE key = 'generation_prompt'`);
-        if (exists.rows.length === 0) {
-            await pool.query(
-                `INSERT INTO settings (key, value, updated_at) VALUES ('generation_prompt', $1, NOW())`,
-                [prompt]
-            );
-        } else {
-            await pool.query(
-                `UPDATE settings SET value = $1, updated_at = NOW() WHERE key = 'generation_prompt'`,
-                [prompt]
-            );
-        }
 
-        res.json({ success: true, message: 'Prompt synced' });
-    } catch (e) {
-        console.error('Sync prompt error:', e.message);
-        res.status(500).json({ error: e.message });
+    const exists = await pool.query(`SELECT 1 FROM settings WHERE key = 'generation_prompt'`);
+    if (exists.rows.length === 0) {
+        await pool.query(
+            `INSERT INTO settings (key, value, updated_at) VALUES ('generation_prompt', $1, NOW())`,
+            [prompt]
+        );
+    } else {
+        await pool.query(
+            `UPDATE settings SET value = $1, updated_at = NOW() WHERE key = 'generation_prompt'`,
+            [prompt]
+        );
     }
-});
+
+    res.json({ success: true, message: 'Prompt synced' });
+}));
 
 // Обновление всех ботов
-router.post('/refresh-all', async (req, res) => {
-    try {
-        res.json({ success: true, message: 'Refresh signal sent' });
-    } catch (e) {
-        console.error('Refresh bots error:', e.message);
-        res.status(500).json({ error: e.message });
-    }
-});
+router.post('/refresh-all', asyncHandler(async (req, res) => {
+    res.json({ success: true, message: 'Refresh signal sent' });
+}));
 
 // Включение/выключение бота
-router.post('/:botId/toggle', async (req, res) => {
+router.post('/:botId/toggle', asyncHandler(async (req, res) => {
     const { botId } = req.params;
     const { active } = req.body;
-    try {
-        const newStatus = active ? 'online' : 'offline';
-        await pool.query(
-            `UPDATE bots SET status = $1 WHERE bot_id = $2`,
-            [newStatus, botId]
-        );
-        res.json({ success: true, status: newStatus });
-    } catch (e) {
-        console.error('Toggle bot error:', e.message);
-        res.status(500).json({ error: e.message });
-    }
-});
+
+    const newStatus = active ? 'online' : 'offline';
+    await pool.query(
+        `UPDATE bots SET status = $1 WHERE bot_id = $2`,
+        [newStatus, botId]
+    );
+    res.json({ success: true, status: newStatus });
+}));
 
 // Изменение имени бота
-router.post('/:botId/name', async (req, res) => {
+router.post('/:botId/name', asyncHandler(async (req, res) => {
     const { botId } = req.params;
     const { name } = req.body;
-    try {
-        await pool.query(
-            `UPDATE bots SET name = $1 WHERE bot_id = $2`,
-            [name, botId]
-        );
-        res.json({ success: true });
-    } catch (e) {
-        console.error('Update bot name error:', e.message);
-        res.status(500).json({ error: e.message });
-    }
-});
+
+    await pool.query(
+        `UPDATE bots SET name = $1 WHERE bot_id = $2`,
+        [name, botId]
+    );
+    res.json({ success: true });
+}));
 
 module.exports = router;

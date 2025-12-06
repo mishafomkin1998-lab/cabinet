@@ -9,7 +9,7 @@
 
 const express = require('express');
 const pool = require('../config/database');
-const { logError } = require('../utils/helpers');
+const { asyncHandler } = require('../utils/helpers');
 
 const router = express.Router();
 
@@ -27,11 +27,10 @@ const router = express.Router();
  *   - metrics: общие метрики (кол-во анкет, онлайн, время ответа)
  *   - ai: статистика использования AI генерации
  */
-router.get('/', async (req, res) => {
+router.get('/', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
 
-    try {
-        // Формируем фильтры для разных таблиц в зависимости от роли
+    // Формируем фильтры для разных таблиц в зависимости от роли
         // profileFilter - для таблицы allowed_profiles
         // activityFilter - для таблицы activity_log
         let profileFilter = "";
@@ -201,27 +200,16 @@ router.get('/', async (req, res) => {
                 }
             }
         });
-
-    } catch (e) {
-        console.error('Dashboard error:', e.message);
-        await logError('/api/dashboard', 'QueryError', e.message, req.query, userId);
-        res.status(500).json({ error: e.message });
-    }
-});
+}));
 
 /**
  * GET /api/favorite-templates
  * Возвращает избранные шаблоны сообщений пользователя
  * TODO: Реализовать хранение и получение шаблонов из БД
  */
-router.get('/favorite-templates', async (req, res) => {
-    try {
-        // Заглушка - пока возвращаем пустой массив
-        res.json({ success: true, templates: [] });
-    } catch (e) {
-        console.error('Favorite templates error:', e.message);
-        res.status(500).json({ error: e.message });
-    }
-});
+router.get('/favorite-templates', asyncHandler(async (req, res) => {
+    // Заглушка - пока возвращаем пустой массив
+    res.json({ success: true, templates: [] });
+}));
 
 module.exports = router;

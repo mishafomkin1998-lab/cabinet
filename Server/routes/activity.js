@@ -14,7 +14,7 @@
 
 const express = require('express');
 const pool = require('../config/database');
-const { logError } = require('../utils/helpers');
+const { asyncHandler } = require('../utils/helpers');
 
 const router = express.Router();
 
@@ -37,7 +37,7 @@ const router = express.Router();
  * @body {boolean} usedAi - Флаг использования AI генерации
  * @returns {Object} {status: 'ok', contentId: number}
  */
-router.post('/message_sent', async (req, res) => {
+router.post('/message_sent', asyncHandler(async (req, res) => {
     const { botId, accountDisplayId, recipientId, type, responseTime, isFirst, isLast, convId, length,
             status, textContent, mediaUrl, fileName, translatorId, errorReason, usedAi } = req.body;
 
@@ -49,8 +49,7 @@ router.post('/message_sent', async (req, res) => {
     let contentId = null;
     let errorLogId = null;
 
-    try {
-        // Шаг 1: Проверяем существование анкеты, если нет - создаём автоматически
+    // Шаг 1: Проверяем существование анкеты, если нет - создаём автоматически
         // Это позволяет боту работать даже если анкета не была добавлена вручную
         let profileData = await pool.query(
             'SELECT * FROM allowed_profiles WHERE profile_id = $1',
@@ -109,21 +108,14 @@ router.post('/message_sent', async (req, res) => {
 
         console.log(`✅ Сообщение от бота ${botId} для анкеты ${accountDisplayId} сохранено + activity_log (contentId: ${contentId})`);
 
-        res.json({ status: 'ok', contentId: contentId });
-
-    } catch (e) {
-        console.error('❌ Ошибка сохранения сообщения:', e.message);
-        await logError('/api/message_sent', 'DatabaseError', e.message, req.body, translatorId);
-        res.status(500).json({ error: e.message });
-    }
-});
+    res.json({ status: 'ok', contentId: contentId });
+}));
 
 // Логирование активности
-router.post('/log', async (req, res) => {
+router.post('/log', asyncHandler(async (req, res) => {
     const { botId, profileId, actionType, manId, messageText, responseTimeSec, usedAi } = req.body;
 
-    try {
-        const profileResult = await pool.query(
+    const profileResult = await pool.query(
             `SELECT assigned_admin_id, assigned_translator_id FROM allowed_profiles WHERE profile_id = $1`,
             [profileId]
         );
@@ -159,22 +151,15 @@ router.post('/log', async (req, res) => {
 
         console.log(`📝 Активность: ${actionType} от ${profileId} (бот: ${botId || 'N/A'})`);
 
-        res.json({ status: 'ok' });
-
-    } catch (error) {
-        console.error('❌ Ошибка записи активности:', error.message);
-        await logError('/api/activity/log', 'DatabaseError', error.message, req.body, null);
-        res.status(500).json({ error: error.message });
-    }
-});
+    res.json({ status: 'ok' });
+}));
 
 // Последняя активность
-router.get('/recent', async (req, res) => {
+router.get('/recent', asyncHandler(async (req, res) => {
     const { userId, role, limit = 50 } = req.query;
     const limitInt = parseInt(limit) || 50;
 
-    try {
-        let activityFilter = "";
+    let activityFilter = "";
         let msgFilter = "";
         let params = [limitInt];
 
@@ -262,21 +247,14 @@ router.get('/recent', async (req, res) => {
             translator_name: row.translator_name
         }));
 
-        res.json({ success: true, activity });
-
-    } catch (e) {
-        console.error('Activity recent error:', e.message);
-        await logError('/api/activity/recent', 'QueryError', e.message, req.query, userId);
-        res.status(500).json({ error: e.message });
-    }
-});
+    res.json({ success: true, activity });
+}));
 
 // Статус профиля
-router.post('/profile/status', async (req, res) => {
+router.post('/profile/status', asyncHandler(async (req, res) => {
     const { botId, profileId, status, lastOnline } = req.body;
 
-    try {
-        await pool.query(`
+    await pool.query(`
             UPDATE allowed_profiles
             SET status = $1, last_online = $2
             WHERE profile_id = $3
@@ -291,20 +269,14 @@ router.post('/profile/status', async (req, res) => {
 
         console.log(`👤 Статус профиля ${profileId}: ${status || 'online'}`);
 
-        res.json({ status: 'ok' });
-
-    } catch (error) {
-        console.error('❌ Ошибка обновления статуса:', error.message);
-        res.status(500).json({ error: error.message });
-    }
-});
+    res.json({ status: 'ok' });
+}));
 
 // Логирование ошибок от бота
-router.post('/error', async (req, res) => {
+router.post('/error', asyncHandler(async (req, res) => {
     const { botId, accountDisplayId, endpoint, errorType, message, rawData, userId } = req.body;
 
-    try {
-        await pool.query(`
+    await pool.query(`
             INSERT INTO error_logs (
                 endpoint, error_type, message, raw_data, user_id
             ) VALUES ($1, $2, $3, $4, $5)
@@ -318,19 +290,14 @@ router.post('/error', async (req, res) => {
 
         console.log(`⚠️ Ошибка от бота ${botId} (${accountDisplayId}): ${errorType} - ${message}`);
 
-        res.json({ status: 'ok' });
-
-    } catch (error) {
-        console.error('❌ Ошибка логирования:', error.message);
-        res.status(500).json({ error: error.message });
-    }
-});
+    res.json({ status: 'ok' });
+}));
 
 // Логи ошибок
-router.get('/error_logs', async (req, res) => {
+router.get('/error_logs', asyncHandler(async (req, res) => {
     const { userId, role, limit = 50, offset = 0 } = req.query;
-    try {
-        let filter = "WHERE 1=1 ";
+
+    let filter = "WHERE 1=1 ";
         let params = [limit, offset];
 
         if (role === 'admin' || role === 'translator') {
@@ -347,19 +314,15 @@ router.get('/error_logs', async (req, res) => {
             LIMIT $1 OFFSET $2
         `;
 
-        const result = await pool.query(query, params);
-        res.json({ success: true, logs: result.rows });
-    } catch (e) {
-        await logError('/api/error_logs', 'QueryError', e.message, req.query, userId);
-        res.status(500).json({ error: e.message });
-    }
-});
+    const result = await pool.query(query, params);
+    res.json({ success: true, logs: result.rows });
+}));
 
 // История переписок
-router.get('/history', async (req, res) => {
+router.get('/history', asyncHandler(async (req, res) => {
     const { userId, role, search, profileId, senderId, startDate, endDate, type, status, limit = 50, offset = 0 } = req.query;
-    try {
-        let filter = "WHERE 1=1 ";
+
+    let filter = "WHERE 1=1 ";
         let params = [limit, offset];
         let paramIndex = 3;
 
@@ -428,13 +391,8 @@ router.get('/history', async (req, res) => {
         const countResult = await pool.query(countQuery, countParams);
         const totalCount = parseInt(countResult.rows[0].count);
 
-        const result = await pool.query(query, params);
-        res.json({ success: true, list: result.rows, total: totalCount });
-
-    } catch (e) {
-        await logError('/api/history', 'QueryError', e.message, req.query, userId);
-        res.status(500).json({ error: e.message });
-    }
-});
+    const result = await pool.query(query, params);
+    res.json({ success: true, list: result.rows, total: totalCount });
+}));
 
 module.exports = router;
