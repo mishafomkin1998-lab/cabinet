@@ -199,7 +199,7 @@
         }
     </style>
 </head>
-<body x-data="dashboard()" class="text-gray-800">
+<body x-data="dashboard()" x-init="init()" class="text-gray-800">
     <div class="flex h-screen">
         <!-- Сайдбар -->
         <aside class="glass-sidebar w-64 flex-shrink-0 flex flex-col p-5">
@@ -380,13 +380,13 @@
                                 <i class="fas fa-user text-blue-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold">120/150</div>
+                                <div class="text-3xl font-bold" x-text="botsStatus.online + '/' + dashboardStats.metrics.totalProfiles">0/0</div>
                                 <div class="text-gray-500">Анкеты онлайн</div>
                             </div>
                         </div>
-                        <div class="text-sm text-green-600">+5 за сегодня</div>
+                        <div class="text-sm text-green-600" x-text="'+' + dashboardStats.today.letters + ' писем сегодня'">+0 за сегодня</div>
                     </div>
-                    
+
                     <!-- Ответы -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
@@ -394,13 +394,13 @@
                                 <i class="fas fa-comment-alt text-purple-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold">1,450</div>
+                                <div class="text-3xl font-bold" x-text="(dashboardStats.today.letters + dashboardStats.today.chats).toLocaleString()">0</div>
                                 <div class="text-gray-500">Ответов сегодня</div>
                             </div>
                         </div>
-                        <div class="text-sm text-green-600">+12% к вчера</div>
+                        <div class="text-sm" :class="dashboardStats.metrics.growthPercent >= 0 ? 'text-green-600' : 'text-red-600'" x-text="(dashboardStats.metrics.growthPercent >= 0 ? '+' : '') + dashboardStats.metrics.growthPercent + '% к вчера'">0% к вчера</div>
                     </div>
-                    
+
                     <!-- Среднее время -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
@@ -408,40 +408,40 @@
                                 <i class="fas fa-clock text-green-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold">45с</div>
+                                <div class="text-3xl font-bold" x-text="dashboardStats.metrics.avgResponseTime + 'м'">0м</div>
                                 <div class="text-gray-500">Среднее время</div>
                             </div>
                         </div>
-                        <div class="text-sm text-green-600">-3с к вчера</div>
+                        <div class="text-sm text-gray-500">время ответа</div>
                     </div>
-                    
-                    <!-- Медианное время -->
+
+                    <!-- Доход -->
                     <div class="glass rounded-2xl p-6">
                         <div class="flex items-center mb-6">
                             <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 flex items-center justify-center mr-4">
-                                <i class="fas fa-chart-median text-orange-500"></i>
+                                <i class="fas fa-dollar-sign text-orange-500"></i>
                             </div>
                             <div>
-                                <div class="text-3xl font-bold">38с</div>
-                                <div class="text-gray-500">Медианное время</div>
+                                <div class="text-3xl font-bold" x-text="'$' + dashboardStats.today.income">$0</div>
+                                <div class="text-gray-500">Доход сегодня</div>
                             </div>
                         </div>
-                        <div class="text-sm text-green-600">-5с к вчера</div>
+                        <div class="text-sm text-gray-500" x-text="'За неделю: $' + dashboardStats.week.income">За неделю: $0</div>
                     </div>
                 </div>
-                
+
                 <!-- Активные чаты и переводчики -->
                 <div class="grid grid-cols-2 gap-6 mb-8">
                     <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6">Активные чаты</h3>
-                        <div class="text-3xl font-bold mb-2">87</div>
-                        <div class="text-sm text-gray-500">+8 за последний час</div>
+                        <h3 class="text-lg font-bold mb-6">Уникальных мужчин</h3>
+                        <div class="text-3xl font-bold mb-2" x-text="dashboardStats.today.uniqueMen">0</div>
+                        <div class="text-sm text-gray-500" x-text="'За неделю: ' + dashboardStats.week.uniqueMen">За неделю: 0</div>
                     </div>
-                    
+
                     <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6">Количество переводчиков</h3>
-                        <div class="text-3xl font-bold mb-2">15</div>
-                        <div class="text-sm text-gray-500">3 активных сейчас</div>
+                        <h3 class="text-lg font-bold mb-6">Команда</h3>
+                        <div class="text-3xl font-bold mb-2" x-text="admins.length + ' админов'">0 админов</div>
+                        <div class="text-sm text-gray-500" x-text="admins.reduce((sum, a) => sum + a.translators.length, 0) + ' переводчиков'">0 переводчиков</div>
                     </div>
                 </div>
                 
@@ -891,36 +891,55 @@
                         
                         <!-- Последние ответы -->
                         <div x-show="monitoringFunction === 'lastResponses'" class="space-y-4 max-h-96 overflow-y-auto scrollbar-thin">
-                            <div class="p-3 rounded-xl border border-gray-100">
-                                <div class="font-medium mb-2">История ответов #4521</div>
-                                <div class="space-y-2 text-sm">
-                                    <div class="bg-gray-100 p-2 rounded-lg">
-                                        <span class="font-medium">Мужчина:</span> Привет, как дела?
-                                    </div>
-                                    <div class="bg-blue-50 p-2 rounded-lg">
-                                        <span class="font-medium text-blue-600">Переводчик:</span> Привет) Хорошо, а у тебя?
-                                    </div>
-                                    <div class="bg-gray-100 p-2 rounded-lg">
-                                        <span class="font-medium">Мужчина:</span> Тоже хорошо, чем занимаешься?
-                                    </div>
-                                    <div class="bg-blue-50 p-2 rounded-lg">
-                                        <span class="font-medium text-blue-600">Переводчик:</span> Смотрю фильм, а ты?
-                                    </div>
+                            <template x-if="recentActivity.length === 0">
+                                <div class="p-8 text-center text-gray-500">
+                                    <i class="fas fa-comments text-4xl mb-2"></i>
+                                    <div>Нет активности</div>
                                 </div>
-                                <div class="text-xs text-gray-400 mt-2">2 минуты назад</div>
-                            </div>
+                            </template>
+                            <template x-for="activity in recentActivity.slice(0, 20)" :key="activity.id">
+                                <div class="p-3 rounded-xl border border-gray-100">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <div class="font-medium" x-text="'Анкета #' + activity.profile_id"></div>
+                                        <span class="px-2 py-1 rounded-full text-xs"
+                                              :class="activity.action_type === 'letter' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'"
+                                              x-text="activity.action_type === 'letter' ? 'Письмо' : 'Чат'">
+                                        </span>
+                                    </div>
+                                    <div class="space-y-2 text-sm">
+                                        <div class="bg-blue-50 p-2 rounded-lg" x-show="activity.message_text">
+                                            <span class="font-medium text-blue-600">Сообщение:</span>
+                                            <span x-text="activity.message_text?.substring(0, 100) + (activity.message_text?.length > 100 ? '...' : '')"></span>
+                                        </div>
+                                        <div class="flex justify-between text-xs text-gray-500">
+                                            <span x-text="'Мужчина: ' + (activity.man_id || '-')"></span>
+                                            <span x-text="'Доход: $' + (activity.income || 0)"></span>
+                                            <span x-show="activity.used_ai" class="text-orange-500">🤖 AI</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-xs text-gray-400 mt-2" x-text="formatDate(activity.created_at)"></div>
+                                </div>
+                            </template>
                         </div>
                         
                         <!-- Отправленные письма -->
                         <div x-show="monitoringFunction === 'sentLetters'" class="space-y-4 max-h-96 overflow-y-auto scrollbar-thin">
-                            <div class="flex items-start p-3 rounded-xl border border-gray-100">
-                                <i class="fas fa-envelope text-green-500 mt-1 mr-3"></i>
-                                <div class="flex-1">
-                                    <div class="font-medium">Отправлено письмо получателю #3812</div>
-                                    <div class="text-sm text-gray-600 mt-1">"Привет! Я увидела твой профиль и решила написать. Ты выглядишь интересным человеком..."</div>
-                                    <div class="text-xs text-gray-400 mt-1">5 минут назад</div>
+                            <template x-for="activity in recentActivity.filter(a => a.action_type === 'letter').slice(0, 20)" :key="activity.id">
+                                <div class="flex items-start p-3 rounded-xl border border-gray-100">
+                                    <i class="fas fa-envelope text-green-500 mt-1 mr-3"></i>
+                                    <div class="flex-1">
+                                        <div class="font-medium" x-text="'Письмо от ' + activity.profile_id + ' → ' + (activity.man_id || 'N/A')"></div>
+                                        <div class="text-sm text-gray-600 mt-1" x-text="activity.message_text?.substring(0, 150) + '...' || 'Без текста'"></div>
+                                        <div class="text-xs text-gray-400 mt-1" x-text="formatDate(activity.created_at)"></div>
+                                    </div>
                                 </div>
-                            </div>
+                            </template>
+                            <template x-if="recentActivity.filter(a => a.action_type === 'letter').length === 0">
+                                <div class="p-8 text-center text-gray-500">
+                                    <i class="fas fa-envelope text-4xl mb-2"></i>
+                                    <div>Нет писем</div>
+                                </div>
+                            </template>
                         </div>
                         
                         <!-- Любимая рассылка -->
@@ -940,20 +959,19 @@
                         <div x-show="monitoringFunction === 'workTime'" class="space-y-4">
                             <div class="grid grid-cols-3 gap-4">
                                 <div class="glass p-4 rounded-xl text-center">
-                                    <div class="text-2xl font-bold text-blue-600">4ч 25м</div>
-                                    <div class="text-sm text-gray-600">Сегодня</div>
+                                    <div class="text-2xl font-bold text-blue-600" x-text="(dashboardStats.today.letters + dashboardStats.today.chats)">0</div>
+                                    <div class="text-sm text-gray-600">Сообщений сегодня</div>
                                 </div>
                                 <div class="glass p-4 rounded-xl text-center">
-                                    <div class="text-2xl font-bold text-green-600">28ч 15м</div>
+                                    <div class="text-2xl font-bold text-green-600" x-text="(dashboardStats.week.letters + dashboardStats.week.chats)">0</div>
                                     <div class="text-sm text-gray-600">За неделю</div>
                                 </div>
                                 <div class="glass p-4 rounded-xl text-center">
-                                    <div class="text-2xl font-bold text-purple-600">112ч 40м</div>
+                                    <div class="text-2xl font-bold text-purple-600" x-text="(dashboardStats.month.letters + dashboardStats.month.chats)">0</div>
                                     <div class="text-sm text-gray-600">За месяц</div>
                                 </div>
                             </div>
-                            <div class="text-sm text-gray-600">
-                                Кликов в боте: 245 | Активных действий: 187
+                            <div class="text-sm text-gray-600" x-text="'Писем: ' + dashboardStats.today.letters + ' | Чатов: ' + dashboardStats.today.chats + ' | Ошибок: ' + dashboardStats.today.errors">
                             </div>
                         </div>
                         
@@ -1037,48 +1055,46 @@
             <!-- История -->
             <div x-show="activeMenu === 'history'" x-cloak class="fade-in">
                 <div class="glass rounded-2xl p-6">
-                    <h3 class="text-xl font-bold mb-6">История действий</h3>
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold">История сообщений</h3>
+                        <button @click="loadHistory()" class="px-4 py-2 rounded-lg bg-indigo-100 text-indigo-600 hover:bg-indigo-200">
+                            <i class="fas fa-sync mr-2"></i>Обновить
+                        </button>
+                    </div>
                     <div class="overflow-x-auto">
                         <table class="w-full">
                             <thead>
                                 <tr class="border-b border-gray-100">
                                     <th class="text-left py-4 px-6">Время</th>
-                                    <th class="text-left py-4 px-6">Пользователь</th>
-                                    <th class="text-left py-4 px-6">Действие</th>
-                                    <th class="text-left py-4 px-6">Детали</th>
+                                    <th class="text-left py-4 px-6">Анкета</th>
+                                    <th class="text-left py-4 px-6">Тип</th>
+                                    <th class="text-left py-4 px-6">Получатель</th>
+                                    <th class="text-left py-4 px-6">Сообщение</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                    <td class="py-4 px-6">05.12.2025 10:30</td>
-                                    <td class="py-4 px-6">Иван А. (админ)</td>
-                                    <td class="py-4 px-6">
-                                        <span class="px-2 py-1 rounded-full bg-green-100 text-green-800 text-xs">
-                                            Добавлено
-                                        </span>
-                                    </td>
-                                    <td class="py-4 px-6">Анкета #456123 назначена переводчику Мария</td>
-                                </tr>
-                                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                                    <td class="py-4 px-6">05.12.2025 09:15</td>
-                                    <td class="py-4 px-6">Петр С. (админ)</td>
-                                    <td class="py-4 px-6">
-                                        <span class="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs">
-                                            Изменено
-                                        </span>
-                                    </td>
-                                    <td class="py-4 px-6">Изменен статус анкеты #789456 на "В работе"</td>
-                                </tr>
-                                <tr class="hover:bg-gray-50">
-                                    <td class="py-4 px-6">04.12.2025 18:45</td>
-                                    <td class="py-4 px-6">Директор</td>
-                                    <td class="py-4 px-6">
-                                        <span class="px-2 py-1 rounded-full bg-purple-100 text-purple-800 text-xs">
-                                            Создано
-                                        </span>
-                                    </td>
-                                    <td class="py-4 px-6">Добавлен новый администратор "Алексей"</td>
-                                </tr>
+                                <template x-if="historyData.length === 0">
+                                    <tr>
+                                        <td colspan="5" class="py-8 text-center text-gray-500">
+                                            <i class="fas fa-inbox text-4xl mb-2"></i>
+                                            <div>Нет данных истории</div>
+                                        </td>
+                                    </tr>
+                                </template>
+                                <template x-for="item in historyData" :key="item.id">
+                                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                        <td class="py-4 px-6" x-text="formatDate(item.timestamp)"></td>
+                                        <td class="py-4 px-6 font-mono" x-text="item.account_id"></td>
+                                        <td class="py-4 px-6">
+                                            <span class="px-2 py-1 rounded-full text-xs"
+                                                  :class="item.type === 'outgoing' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'"
+                                                  x-text="item.type === 'outgoing' ? 'Письмо' : 'Чат'">
+                                            </span>
+                                        </td>
+                                        <td class="py-4 px-6" x-text="item.sender_id || '-'"></td>
+                                        <td class="py-4 px-6 max-w-xs truncate" :title="item.text_content" x-text="item.text_content?.substring(0, 50) + '...' || '-'"></td>
+                                    </tr>
+                                </template>
                             </tbody>
                         </table>
                     </div>
@@ -1299,6 +1315,37 @@
     </div>
     
     <script>
+        // ==========================================
+        // КОНФИГУРАЦИЯ API
+        // ==========================================
+        const SERVER_URL = 'http://188.137.253.169:3000';
+
+        // Временные данные пользователя (пока без авторизации)
+        const currentUser = {
+            id: 1,
+            role: 'director' // director видит всё
+        };
+
+        // ==========================================
+        // API ФУНКЦИИ
+        // ==========================================
+        async function apiRequest(endpoint, options = {}) {
+            try {
+                const url = `${SERVER_URL}${endpoint}`;
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    }
+                });
+                return await response.json();
+            } catch (error) {
+                console.error(`API Error [${endpoint}]:`, error);
+                return { success: false, error: error.message };
+            }
+        }
+
         function dashboard() {
             return {
                 language: 'ru',
@@ -1313,26 +1360,43 @@
                 sortBy: 'date',
                 sortDirection: 'desc',
                 searchQuery: '',
-                
+                loading: false,
+
+                // Данные статистики (загружаются с API)
+                dashboardStats: {
+                    today: { letters: 0, chats: 0, uniqueMen: 0, income: '0.00', errors: 0 },
+                    yesterday: { letters: 0, chats: 0, income: '0.00' },
+                    week: { letters: 0, chats: 0, uniqueMen: 0, income: '0.00', errors: 0 },
+                    month: { letters: 0, chats: 0, uniqueMen: 0, income: '0.00' },
+                    metrics: { totalProfiles: 0, avgResponseTime: 0, medianResponseTime: 0, growthPercent: 0, avgDailyIncome: '0.00' }
+                },
+
+                // Активность по часам (загружается с API)
+                hourlyActivity: Array(24).fill(0),
+
                 statsFilter: {
                     admin: '',
                     translator: '',
                     dateRange: 'Декабрь 2025'
                 },
-                
+
                 monitoringFilter: {
                     admin: '',
                     translator: '',
                     dateRange: 'Текущий месяц'
                 },
-                
+
                 monitoringFunction: 'lastResponses',
-                
+
+                // Данные мониторинга (загружаются с API)
+                recentActivity: [],
+                historyData: [],
+
                 newAccountIds: '',
                 newAccountComment: '',
                 newAccountLogin: '',
                 newAccountPassword: '',
-                
+
                 newAdmin: {
                     id: null,
                     name: '',
@@ -1342,127 +1406,181 @@
                     isMyAdmin: false,
                     salary: ''
                 },
-                
+
                 selectedAdmin: null,
                 accountsToAssign: '',
                 assignComment: '',
-                
+
                 generationPrompt: '',
-                
-                accounts: [
-                    {
-                        id: '456123',
-                        login: 'anna_25',
-                        password: 'pass123',
-                        status: 'online',
-                        lastOnline: '2 часа назад',
-                        letters: 5,
-                        admin: '',
-                        addedDate: '05.12.2025',
-                        comment: 'Активная анкета',
-                        paused: false
-                    },
-                    {
-                        id: '789456',
-                        login: 'maria_28',
-                        password: 'pass456',
-                        status: 'working',
-                        lastOnline: '30 минут назад',
-                        letters: 0,
-                        admin: 'admin1',
-                        addedDate: '04.12.2025',
-                        comment: 'Нет писем за неделю',
-                        paused: false
-                    },
-                    {
-                        id: '123789',
-                        login: 'kseniya_23',
-                        password: 'pass789',
-                        status: 'offline',
-                        lastOnline: '2 дня назад',
-                        letters: 12,
-                        admin: '',
-                        addedDate: '03.12.2025',
-                        comment: '',
-                        paused: true
+
+                // Данные анкет (загружаются с API)
+                accounts: [],
+
+                // Данные ботов (загружаются с API)
+                bots: [],
+                botsStatus: { online: 0, idle: 0, offline: 0, never_connected: 0 },
+
+                // Данные команды (загружаются с API)
+                admins: [],
+
+                // ==========================================
+                // ИНИЦИАЛИЗАЦИЯ - загрузка всех данных
+                // ==========================================
+                async init() {
+                    this.loading = true;
+                    console.log('🚀 Загрузка данных личного кабинета...');
+
+                    await Promise.all([
+                        this.loadDashboardStats(),
+                        this.loadProfiles(),
+                        this.loadBots(),
+                        this.loadTeam(),
+                        this.loadHourlyActivity(),
+                        this.loadRecentActivity(),
+                        this.loadHistory()
+                    ]);
+
+                    this.loading = false;
+                    console.log('✅ Данные загружены');
+                },
+
+                // Загрузка статистики дашборда
+                async loadDashboardStats() {
+                    const data = await apiRequest(`/api/dashboard?userId=${currentUser.id}&role=${currentUser.role}`);
+                    if (data.success && data.dashboard) {
+                        this.dashboardStats = data.dashboard;
                     }
-                ],
-                
-                bots: [
-                    {
-                        id: 1,
-                        name: 'Бот #1',
-                        icon: 'fas fa-desktop',
-                        status: 'active',
-                        os: 'Windows 11',
-                        ip: '192.168.1.100',
-                        proxies: 5,
-                        activeProxies: 3
-                    },
-                    {
-                        id: 2,
-                        name: 'Бот #2',
-                        icon: 'fas fa-laptop',
-                        status: 'inactive',
-                        os: 'macOS 14',
-                        ip: '192.168.1.101',
-                        proxies: 3,
-                        activeProxies: 0
+                },
+
+                // Загрузка анкет
+                async loadProfiles() {
+                    const data = await apiRequest(`/api/profiles?userId=${currentUser.id}&role=${currentUser.role}`);
+                    if (data.success && data.list) {
+                        this.accounts = data.list.map(p => ({
+                            id: p.profile_id,
+                            login: p.login || p.profile_id,
+                            password: p.password || '***',
+                            status: p.status || 'offline',
+                            lastOnline: p.last_online ? this.formatDate(p.last_online) : 'Никогда',
+                            letters: p.letters_today || 0,
+                            lettersTotal: p.letters_total || 0,
+                            admin: p.admin_name || '',
+                            adminId: p.admin_id,
+                            translatorId: p.translator_id,
+                            transName: p.trans_name,
+                            addedDate: p.added_at ? this.formatDate(p.added_at) : '',
+                            comment: p.note || '',
+                            paused: p.paused || false
+                        }));
                     }
-                ],
-                
-                admins: [
-                    {
-                        id: 1,
-                        name: 'Иван А.',
-                        login: 'admin1',
-                        password: 'pass123',
-                        initials: 'ИА',
-                        accounts: 5,
-                        conversion: 24.3,
-                        isMyAdmin: false,
-                        salary: 50000,
-                        translators: [
-                            { 
-                                id: 1, 
-                                name: 'Мария', 
-                                login: 'translator1',
-                                password: 'pass456',
-                                conversion: 24.3,
-                                accounts: ['456123', '789456']
-                            },
-                            { 
-                                id: 2, 
-                                name: 'Анна', 
-                                login: 'translator2',
-                                password: 'pass789',
-                                conversion: 21.5,
-                                accounts: ['123789']
+                },
+
+                // Загрузка ботов
+                async loadBots() {
+                    const data = await apiRequest(`/api/bots/status?userId=${currentUser.id}&role=${currentUser.role}`);
+                    if (data.success) {
+                        this.botsStatus = data.summary || { online: 0, idle: 0, offline: 0, never_connected: 0 };
+                        this.bots = (data.bots || []).map(b => ({
+                            id: b.botId,
+                            name: b.name || `Бот ${b.botId?.substring(0, 8) || 'N/A'}`,
+                            icon: b.platform?.includes('win') ? 'fas fa-desktop' : 'fas fa-laptop',
+                            status: b.status === 'online' ? 'active' : 'inactive',
+                            os: b.platform || 'Unknown',
+                            ip: b.ip || 'N/A',
+                            proxies: b.profilesCount || 0,
+                            activeProxies: b.status === 'online' ? b.profilesCount : 0,
+                            lastHeartbeat: b.lastHeartbeat,
+                            profiles: b.profiles || []
+                        }));
+                    }
+                },
+
+                // Загрузка команды
+                async loadTeam() {
+                    const data = await apiRequest(`/api/team?userId=${currentUser.id}&role=${currentUser.role}`);
+                    if (data.success && data.list) {
+                        // Группируем: админы с их переводчиками
+                        const adminsMap = {};
+                        const translators = [];
+
+                        data.list.forEach(user => {
+                            if (user.role === 'admin') {
+                                adminsMap[user.id] = {
+                                    id: user.id,
+                                    name: user.username,
+                                    login: user.login || user.username,
+                                    password: '***',
+                                    initials: user.username.substring(0, 2).toUpperCase(),
+                                    accounts: user.accounts_count || 0,
+                                    conversion: user.conversion || 0,
+                                    isMyAdmin: user.is_my_admin || false,
+                                    salary: user.salary,
+                                    translators: []
+                                };
+                            } else if (user.role === 'translator') {
+                                translators.push(user);
                             }
-                        ]
-                    },
-                    {
-                        id: 2,
-                        name: 'Петр С.',
-                        login: 'admin2',
-                        password: 'pass456',
-                        initials: 'ПС',
-                        accounts: 2,
-                        conversion: 18.7,
-                        isMyAdmin: true,
-                        salary: null,
-                        translators: [
-                            { 
-                                id: 3, 
-                                name: 'Дарья', 
-                                login: 'translator3',
-                                password: 'pass012',
-                                conversion: 18.7,
-                                accounts: []
+                        });
+
+                        // Привязываем переводчиков к админам
+                        translators.forEach(t => {
+                            if (t.owner_id && adminsMap[t.owner_id]) {
+                                adminsMap[t.owner_id].translators.push({
+                                    id: t.id,
+                                    name: t.username,
+                                    login: t.login || t.username,
+                                    password: '***',
+                                    conversion: t.conversion || 0,
+                                    accounts: t.accounts || []
+                                });
                             }
-                        ]
+                        });
+
+                        this.admins = Object.values(adminsMap);
                     }
-                ],
+                },
+
+                // Загрузка активности по часам
+                async loadHourlyActivity() {
+                    const data = await apiRequest(`/api/stats/hourly-activity?userId=${currentUser.id}&role=${currentUser.role}&days=7`);
+                    if (data.success && data.hourlyData) {
+                        this.hourlyActivity = data.hourlyData;
+                    }
+                },
+
+                // Загрузка последней активности
+                async loadRecentActivity() {
+                    const data = await apiRequest(`/api/activity/recent?userId=${currentUser.id}&role=${currentUser.role}&limit=50`);
+                    if (data.success && data.activity) {
+                        this.recentActivity = data.activity;
+                    }
+                },
+
+                // Загрузка истории
+                async loadHistory() {
+                    const data = await apiRequest(`/api/history?userId=${currentUser.id}&role=${currentUser.role}&limit=50`);
+                    if (data.success && data.list) {
+                        this.historyData = data.list;
+                    }
+                },
+
+                // Утилита форматирования даты
+                formatDate(dateStr) {
+                    if (!dateStr) return '';
+                    const date = new Date(dateStr);
+                    const now = new Date();
+                    const diffMs = now - date;
+                    const diffMins = Math.floor(diffMs / 60000);
+                    const diffHours = Math.floor(diffMs / 3600000);
+                    const diffDays = Math.floor(diffMs / 86400000);
+
+                    if (diffMins < 1) return 'только что';
+                    if (diffMins < 60) return `${diffMins} мин. назад`;
+                    if (diffHours < 24) return `${diffHours} ч. назад`;
+                    if (diffDays < 7) return `${diffDays} дн. назад`;
+
+                    return date.toLocaleDateString('ru-RU');
+                },
                 
                 setActiveMenu(menu) {
                     this.activeMenu = menu;
@@ -1500,12 +1618,11 @@
                 },
                 
                 getActivityLevel(hour) {
-                    if (hour >= 8 && hour <= 10) return 0.8 + Math.random() * 0.2;
-                    if (hour >= 14 && hour <= 16) return 0.9 + Math.random() * 0.1;
-                    if (hour >= 19 && hour <= 21) return 0.7 + Math.random() * 0.3;
-                    return 0.3 + Math.random() * 0.4;
+                    // Используем реальные данные из API (hourlyActivity - массив из 24 значений 0-1)
+                    const index = (hour - 1) >= 0 ? (hour - 1) : 0;
+                    return this.hourlyActivity[index] || 0;
                 },
-                
+
                 getActivityColor(hour) {
                     const level = this.getActivityLevel(hour);
                     if (level > 0.8) return 'from-red-400 to-orange-400';
@@ -1630,41 +1747,42 @@
                     console.log(`Анкета ${account.id} назначена админу: ${account.admin}`);
                 },
                 
-                saveAccounts() {
+                async saveAccounts() {
                     if (!this.newAccountIds.trim()) {
                         alert('Введите ID анкет');
                         return;
                     }
-                    
-                    const ids = this.newAccountIds.split(/[\s,]+/).filter(id => id.length === 6);
-                    
+
+                    const ids = this.newAccountIds.split(/[\s,]+/).filter(id => id.trim().length >= 3);
+
                     if (ids.length === 0) {
-                        alert('Введите корректные ID (6 цифр)');
+                        alert('Введите корректные ID');
                         return;
                     }
-                    
-                    ids.forEach(id => {
-                        this.accounts.unshift({
-                            id: id,
-                            login: this.newAccountLogin || `user_${id.substring(0, 3)}`,
-                            password: this.newAccountPassword || `pass${id.substring(0, 3)}`,
-                            status: 'online',
-                            lastOnline: 'только что',
-                            letters: 0,
-                            admin: '',
-                            addedDate: new Date().toLocaleDateString('ru-RU'),
-                            comment: this.newAccountComment,
-                            paused: false
-                        });
+
+                    // Отправляем на сервер
+                    const data = await apiRequest('/api/profiles/bulk', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            profiles: ids,
+                            note: this.newAccountComment,
+                            adminId: currentUser.role === 'admin' ? currentUser.id : null
+                        })
                     });
-                    
-                    this.newAccountIds = '';
-                    this.newAccountComment = '';
-                    this.newAccountLogin = '';
-                    this.newAccountPassword = '';
-                    this.showAddAccountModal = false;
-                    
-                    alert(`Добавлено ${ids.length} анкет`);
+
+                    if (data.success) {
+                        this.newAccountIds = '';
+                        this.newAccountComment = '';
+                        this.newAccountLogin = '';
+                        this.newAccountPassword = '';
+                        this.showAddAccountModal = false;
+
+                        // Перезагружаем анкеты
+                        await this.loadProfiles();
+                        alert(`Добавлено ${ids.length} анкет`);
+                    } else {
+                        alert('Ошибка: ' + (data.error || 'Не удалось добавить анкеты'));
+                    }
                 },
                 
                 editAdmin(admin) {
@@ -1720,57 +1838,48 @@
                     this.showViewAdminModal = true;
                 },
                 
-                saveAdmin() {
+                async saveAdmin() {
                     if (!this.newAdmin.name || !this.newAdmin.login || !this.newAdmin.password) {
                         alert('Заполните все обязательные поля');
                         return;
                     }
-                    
+
                     if (!this.newAdmin.isMyAdmin && !this.newAdmin.salary) {
                         alert('Для не "моего админа" укажите сумму');
                         return;
                     }
-                    
-                    if (this.newAdmin.id) {
-                        const index = this.admins.findIndex(a => a.id === this.newAdmin.id);
-                        if (index > -1) {
-                            this.admins[index] = { 
-                                ...this.admins[index],
-                                name: this.newAdmin.name,
-                                login: this.newAdmin.login,
+
+                    // Создание нового админа через API
+                    if (!this.newAdmin.id) {
+                        const data = await apiRequest('/api/users', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                username: this.newAdmin.name,
                                 password: this.newAdmin.password,
-                                initials: this.newAdmin.initials || this.admins[index].initials,
-                                isMyAdmin: this.newAdmin.isMyAdmin,
-                                salary: this.newAdmin.salary
-                            };
-                        }
-                    } else {
-                        const newId = Math.max(...this.admins.map(a => a.id)) + 1;
-                        this.admins.push({
-                            id: newId,
-                            name: this.newAdmin.name,
-                            login: this.newAdmin.login,
-                            password: this.newAdmin.password,
-                            initials: this.newAdmin.initials || this.newAdmin.name.substring(0, 2).toUpperCase(),
-                            accounts: 0,
-                            conversion: 0,
-                            isMyAdmin: this.newAdmin.isMyAdmin,
-                            salary: this.newAdmin.isMyAdmin ? null : this.newAdmin.salary,
-                            translators: []
+                                role: 'admin',
+                                ownerId: currentUser.id
+                            })
                         });
+
+                        if (!data.success) {
+                            alert('Ошибка: ' + (data.error || 'Не удалось создать админа'));
+                            return;
+                        }
                     }
-                    
-                    this.newAdmin = { 
+
+                    this.newAdmin = {
                         id: null,
-                        name: '', 
-                        login: '', 
-                        password: '', 
+                        name: '',
+                        login: '',
+                        password: '',
                         initials: '',
-                        isMyAdmin: false, 
-                        salary: '' 
+                        isMyAdmin: false,
+                        salary: ''
                     };
                     this.showAddAdminModal = false;
-                    
+
+                    // Перезагружаем команду
+                    await this.loadTeam();
                     alert('Администратор сохранен');
                 },
                 
