@@ -1294,11 +1294,45 @@
             if(!wasShown) opts.classList.add('show');
         }
 
+        // Проверка AI статуса для анкеты (по флагу ai_enabled у переводчика)
+        async function checkProfileAIEnabled(profileId) {
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/profiles/${encodeURIComponent(profileId)}/ai-status`);
+                const data = await response.json();
+                return {
+                    enabled: data.aiEnabled === true,
+                    reason: data.reason,
+                    translatorName: data.translatorName
+                };
+            } catch (error) {
+                console.error(`❌ Ошибка проверки AI статуса:`, error);
+                // При ошибке разрешаем использование AI (чтобы не блокировать работу)
+                return { enabled: true, reason: 'error' };
+            }
+        }
+
         async function handleAIAction(botId, action) {
             document.getElementById(`ai-options-${botId}`).classList.remove('show');
             const btn = document.querySelector(`#ai-options-${botId}`).parentElement.querySelector('.btn-ai-main');
             const originalHtml = btn.innerHTML;
-            
+
+            // Проверяем, включен ли AI для этой анкеты
+            const bot = bots[botId];
+            if (bot && bot.displayId) {
+                btn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Проверка...`;
+                const aiStatus = await checkProfileAIEnabled(bot.displayId);
+                if (!aiStatus.enabled) {
+                    btn.innerHTML = originalHtml;
+                    const reason = aiStatus.reason === 'disabled_by_admin'
+                        ? 'AI отключен администратором для этой анкеты'
+                        : aiStatus.reason === 'no_translator'
+                        ? 'Анкете не назначен переводчик'
+                        : 'AI недоступен для этой анкеты';
+                    alert(`⚠️ ${reason}`);
+                    return;
+                }
+            }
+
             if(!globalSettings.apiKey) return alert("Пожалуйста, введите OpenAI API Key в настройках!");
 
             const txtArea = document.getElementById(`msg-${botId}`);

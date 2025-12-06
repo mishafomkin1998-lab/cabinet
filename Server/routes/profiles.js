@@ -251,6 +251,50 @@ router.delete('/:profileId', async (req, res) => {
 });
 
 /**
+ * GET /api/profiles/:profileId/ai-status
+ * Проверяет, включен ли AI для анкеты (по флагу ai_enabled у переводчика)
+ */
+router.get('/:profileId/ai-status', async (req, res) => {
+    const { profileId } = req.params;
+    try {
+        // Получаем анкету и её переводчика
+        const result = await pool.query(`
+            SELECT
+                ap.profile_id,
+                ap.assigned_translator_id,
+                u.ai_enabled,
+                u.username as translator_name
+            FROM allowed_profiles ap
+            LEFT JOIN users u ON ap.assigned_translator_id = u.id
+            WHERE ap.profile_id = $1
+        `, [profileId]);
+
+        if (result.rows.length === 0) {
+            return res.json({ success: true, aiEnabled: false, reason: 'profile_not_found' });
+        }
+
+        const row = result.rows[0];
+
+        // Если нет переводчика - AI недоступен
+        if (!row.assigned_translator_id) {
+            return res.json({ success: true, aiEnabled: false, reason: 'no_translator' });
+        }
+
+        // Возвращаем статус AI переводчика
+        res.json({
+            success: true,
+            aiEnabled: row.ai_enabled === true,
+            translatorId: row.assigned_translator_id,
+            translatorName: row.translator_name,
+            reason: row.ai_enabled ? 'enabled' : 'disabled_by_admin'
+        });
+    } catch (e) {
+        console.error('AI status check error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
  * GET /api/profile-history
  * История действий с анкетами
  */
