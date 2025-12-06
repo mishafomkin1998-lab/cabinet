@@ -1902,6 +1902,10 @@
                         users = usersRes.data.Users || [];
                         if (target === 'online') {
                             this.log(`📊 Online users: ${users.length}`);
+                            console.log(`🔍 DEBUG Online API response:`, JSON.stringify(usersRes.data, null, 2));
+                            if (users.length > 0) {
+                                console.log(`🔍 DEBUG First online user:`, JSON.stringify(users[0], null, 2));
+                            }
                         }
                     }
 
@@ -1934,6 +1938,11 @@
 
                     let msgBody = this.replaceMacros(msgTemplate, user);
                     const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
+
+                    // DEBUG: Log check-send response for online users
+                    if (target === 'online') {
+                        console.log(`🔍 DEBUG check-send for ${user.AccountId}:`, JSON.stringify(checkRes.data, null, 2));
+                    }
 
                     if (checkRes.data.CheckId) {
                         const payload = { 
