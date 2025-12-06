@@ -5,7 +5,7 @@
 
 const express = require('express');
 const pool = require('../config/database');
-const { asyncHandler } = require('../utils/helpers');
+const { asyncHandler, buildRoleFilter } = require('../utils/helpers');
 
 const router = express.Router();
 
@@ -126,16 +126,7 @@ router.post('/bot/heartbeat', asyncHandler(async (req, res) => {
 router.get('/status', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
 
-    let profileFilter = "";
-        let params = [];
-
-        if (role === 'translator') {
-            profileFilter = `WHERE p.assigned_translator_id = $1`;
-            params.push(userId);
-        } else if (role === 'admin') {
-            profileFilter = `WHERE p.assigned_admin_id = $1`;
-            params.push(userId);
-        }
+    const { filter: profileFilter, params } = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'WHERE' });
 
         const profilesQuery = `
             SELECT DISTINCT ON (p.profile_id)

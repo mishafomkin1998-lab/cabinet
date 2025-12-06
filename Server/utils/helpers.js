@@ -78,6 +78,67 @@ async function errorHandler(err, req, res, next) {
     });
 }
 
+/**
+ * Строит SQL-фильтр на основе роли пользователя
+ * Централизует логику фильтрации данных по ролям (translator/admin/director)
+ *
+ * @param {string} role - Роль пользователя (translator/admin/director)
+ * @param {string} userId - ID пользователя для фильтрации
+ * @param {Object} options - Опции фильтрации:
+ *   @param {string} options.table - Тип таблицы: 'profiles' или 'activity' (по умолчанию 'profiles')
+ *   @param {string} options.alias - Алиас таблицы (по умолчанию 'p' для profiles, 'a' для activity)
+ *   @param {string} options.prefix - Префикс: 'WHERE', 'AND' или '' (по умолчанию 'WHERE')
+ *   @param {number} options.paramIndex - Номер параметра $N (по умолчанию 1)
+ * @returns {Object} { filter: string, params: array, nextParamIndex: number }
+ *
+ * @example
+ * // Для таблицы allowed_profiles
+ * const { filter, params } = buildRoleFilter(role, userId);
+ * // translator → { filter: 'WHERE p.assigned_translator_id = $1', params: [userId] }
+ * // admin → { filter: 'WHERE p.assigned_admin_id = $1', params: [userId] }
+ * // director → { filter: '', params: [] }
+ *
+ * @example
+ * // Для таблицы activity_log с другим параметром
+ * const { filter, params } = buildRoleFilter(role, userId, {
+ *     table: 'activity',
+ *     alias: 'a',
+ *     prefix: 'AND',
+ *     paramIndex: 2
+ * });
+ * // translator → { filter: 'AND a.translator_id = $2', params: [userId] }
+ */
+function buildRoleFilter(role, userId, options = {}) {
+    const {
+        table = 'profiles',
+        alias = table === 'activity' ? 'a' : 'p',
+        prefix = 'WHERE',
+        paramIndex = 1
+    } = options;
+
+    // Director видит всё — фильтр пустой
+    if (role === 'director' || !role) {
+        return { filter: '', params: [], nextParamIndex: paramIndex };
+    }
+
+    // Определяем поле для фильтрации в зависимости от таблицы и роли
+    let field;
+    if (table === 'activity') {
+        field = role === 'translator' ? 'translator_id' : 'admin_id';
+    } else {
+        field = role === 'translator' ? 'assigned_translator_id' : 'assigned_admin_id';
+    }
+
+    const condition = `${alias}.${field} = $${paramIndex}`;
+    const filter = prefix ? `${prefix} ${condition}` : condition;
+
+    return {
+        filter,
+        params: [userId],
+        nextParamIndex: paramIndex + 1
+    };
+}
+
 // Форматирование даты
 function formatDate(date) {
     return date.toISOString().split('T')[0];
@@ -96,5 +157,6 @@ module.exports = {
     formatDate,
     getMonthStart,
     asyncHandler,
-    errorHandler
+    errorHandler,
+    buildRoleFilter
 };

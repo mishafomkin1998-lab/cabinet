@@ -14,7 +14,7 @@
 
 const express = require('express');
 const pool = require('../config/database');
-const { asyncHandler } = require('../utils/helpers');
+const { asyncHandler, buildRoleFilter } = require('../utils/helpers');
 
 const router = express.Router();
 
@@ -159,19 +159,11 @@ router.get('/recent', asyncHandler(async (req, res) => {
     const { userId, role, limit = 50 } = req.query;
     const limitInt = parseInt(limit) || 50;
 
-    let activityFilter = "";
-        let msgFilter = "";
-        let params = [limitInt];
-
-        if (role === 'translator') {
-            activityFilter = `AND a.translator_id = $2`;
-            msgFilter = `AND p.assigned_translator_id = $2`;
-            params.push(userId);
-        } else if (role === 'admin') {
-            activityFilter = `AND a.admin_id = $2`;
-            msgFilter = `AND p.assigned_admin_id = $2`;
-            params.push(userId);
-        }
+    const activityRoleFilter = buildRoleFilter(role, userId, { table: 'activity', prefix: 'AND', paramIndex: 2 });
+        const profileRoleFilter = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'AND', paramIndex: 2 });
+        const activityFilter = activityRoleFilter.filter;
+        const msgFilter = profileRoleFilter.filter;
+        const params = [limitInt, ...activityRoleFilter.params];
 
         // Сначала пробуем activity_log
         const activityQuery = `
@@ -322,17 +314,10 @@ router.get('/error_logs', asyncHandler(async (req, res) => {
 router.get('/history', asyncHandler(async (req, res) => {
     const { userId, role, search, profileId, senderId, startDate, endDate, type, status, limit = 50, offset = 0 } = req.query;
 
-    let filter = "WHERE 1=1 ";
-        let params = [limit, offset];
-        let paramIndex = 3;
-
-        if (role === 'translator') {
-            filter += `AND p.assigned_translator_id = $${paramIndex++} `;
-            params.push(userId);
-        } else if (role === 'admin') {
-            filter += `AND p.assigned_admin_id = $${paramIndex++} `;
-            params.push(userId);
-        }
+    const roleFilter = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'AND', paramIndex: 3 });
+        let filter = "WHERE 1=1 " + roleFilter.filter + " ";
+        let params = [limit, offset, ...roleFilter.params];
+        let paramIndex = roleFilter.nextParamIndex;
 
         if (profileId) {
             filter += `AND p.profile_id = $${paramIndex++} `;

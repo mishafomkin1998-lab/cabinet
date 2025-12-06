@@ -9,7 +9,7 @@
 
 const express = require('express');
 const pool = require('../config/database');
-const { asyncHandler } = require('../utils/helpers');
+const { asyncHandler, buildRoleFilter } = require('../utils/helpers');
 
 const router = express.Router();
 
@@ -31,25 +31,11 @@ router.get('/', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
 
     // Формируем фильтры для разных таблиц в зависимости от роли
-        // profileFilter - для таблицы allowed_profiles
-        // activityFilter - для таблицы activity_log
-        let profileFilter = "";
-        let activityFilter = "";
-        let params = [];
-        let paramIndex = 1;
-
-        if (role === 'translator') {
-            profileFilter = `WHERE p.assigned_translator_id = $${paramIndex}`;
-            activityFilter = `AND a.translator_id = $${paramIndex}`;
-            params.push(userId);
-            paramIndex++;
-        } else if (role === 'admin') {
-            profileFilter = `WHERE p.assigned_admin_id = $${paramIndex}`;
-            activityFilter = `AND a.admin_id = $${paramIndex}`;
-            params.push(userId);
-            paramIndex++;
-        }
-        // Для director фильтры остаются пустыми - видит всё
+    const profileRoleFilter = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'WHERE' });
+    const activityRoleFilter = buildRoleFilter(role, userId, { table: 'activity', prefix: 'AND' });
+    const profileFilter = profileRoleFilter.filter;
+    const activityFilter = activityRoleFilter.filter;
+    const params = profileRoleFilter.params; // Одинаковые params для обоих фильтров
 
         /**
          * Запрос 1: Количество анкет

@@ -17,7 +17,7 @@
 
 const express = require('express');
 const pool = require('../config/database');
-const { asyncHandler } = require('../utils/helpers');
+const { asyncHandler, buildRoleFilter } = require('../utils/helpers');
 
 const router = express.Router();
 
@@ -38,18 +38,7 @@ router.get('/detailed', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
 
     // Формируем фильтр в зависимости от роли пользователя
-        // translator видит только свои анкеты, admin - анкеты своей команды
-        // director видит всё (фильтр пустой)
-        let filter = "";
-        let params = [];
-
-        if (role === 'translator') {
-            filter = `WHERE p.assigned_translator_id = $1`;
-            params.push(userId);
-        } else if (role === 'admin') {
-            filter = `WHERE p.assigned_admin_id = $1`;
-            params.push(userId);
-        }
+        const { filter, params } = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'WHERE' });
 
         /**
          * Агрегированный запрос статистики сообщений:
@@ -124,16 +113,9 @@ router.get('/daily', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
     const days = parseInt(req.query.days) || 30;
 
-    let profileFilter = "";
-        let params = [days];
-
-        if (role === 'translator') {
-            profileFilter = `AND p.assigned_translator_id = $2`;
-            params.push(userId);
-        } else if (role === 'admin') {
-            profileFilter = `AND p.assigned_admin_id = $2`;
-            params.push(userId);
-        }
+    const roleFilter = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'AND', paramIndex: 2 });
+        const profileFilter = roleFilter.filter;
+        const params = [days, ...roleFilter.params];
 
         /**
          * Запрос использует CTE (WITH) для генерации последовательности дат,
@@ -176,16 +158,9 @@ router.get('/daily', asyncHandler(async (req, res) => {
 router.get('/top-profiles', asyncHandler(async (req, res) => {
     const { userId, role, limit = 10 } = req.query;
 
-    let filter = "";
-        let params = [limit];
-
-        if (role === 'translator') {
-            filter = `AND p.assigned_translator_id = $2`;
-            params.push(userId);
-        } else if (role === 'admin') {
-            filter = `AND p.assigned_admin_id = $2`;
-            params.push(userId);
-        }
+    const roleFilter = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'AND', paramIndex: 2 });
+        const filter = roleFilter.filter;
+        const params = [limit, ...roleFilter.params];
 
         /**
          * Группировка по profile_id для подсчёта сообщений каждой анкеты.
@@ -407,16 +382,7 @@ router.get('/profile/:profileId', asyncHandler(async (req, res) => {
 router.get('/forecast', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
 
-    let filter = "";
-        let params = [];
-
-        if (role === 'translator') {
-            filter = `WHERE p.assigned_translator_id = $1`;
-            params.push(userId);
-        } else if (role === 'admin') {
-            filter = `WHERE p.assigned_admin_id = $1`;
-            params.push(userId);
-        }
+    const { filter, params } = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'WHERE' });
 
         const query = `
             SELECT
@@ -451,19 +417,11 @@ router.get('/hourly-activity', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
     const days = parseInt(req.query.days) || 7;
 
-    let activityFilter = "";
-        let msgFilter = "";
-        let params = [days];
-
-        if (role === 'translator') {
-            activityFilter = `AND a.translator_id = $2`;
-            msgFilter = `AND p.assigned_translator_id = $2`;
-            params.push(userId);
-        } else if (role === 'admin') {
-            activityFilter = `AND a.admin_id = $2`;
-            msgFilter = `AND p.assigned_admin_id = $2`;
-            params.push(userId);
-        }
+    const activityRoleFilter = buildRoleFilter(role, userId, { table: 'activity', prefix: 'AND', paramIndex: 2 });
+        const profileRoleFilter = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'AND', paramIndex: 2 });
+        const activityFilter = activityRoleFilter.filter;
+        const msgFilter = profileRoleFilter.filter;
+        const params = [days, ...activityRoleFilter.params];
 
         const activityQuery = `
             SELECT
