@@ -583,4 +583,110 @@ router.get('/by-translator', asyncHandler(async (req, res) => {
     res.json({ success: true, translators });
 }));
 
+/**
+ * GET /api/stats/work-time
+ * Расчёт времени работы переводчиков
+ * Сессия = непрерывная работа с перерывами не более 5 минут
+ *
+ * @query {string} dateFrom - Начало периода
+ * @query {string} dateTo - Конец периода
+ * @query {string} translatorId - ID переводчика (опционально)
+ */
+router.get('/work-time', asyncHandler(async (req, res) => {
+    const { dateFrom, dateTo, translatorId } = req.query;
+
+    let filter = '';
+    let params = [];
+    let paramIndex = 1;
+
+    if (dateFrom) {
+        filter += ` AND a.created_at >= $${paramIndex}::date`;
+        params.push(dateFrom);
+        paramIndex++;
+    }
+    if (dateTo) {
+        filter += ` AND a.created_at <= $${paramIndex}::date + INTERVAL '1 day'`;
+        params.push(dateTo);
+        paramIndex++;
+    }
+    if (translatorId) {
+        filter += ` AND a.translator_id = $${paramIndex}`;
+        params.push(translatorId);
+        paramIndex++;
+    }
+
+    // Получаем все действия переводчиков с временными метками
+    const query = `
+        SELECT
+            a.translator_id,
+            u.username as translator_name,
+            a.created_at,
+            DATE(a.created_at) as work_date
+        FROM activity_log a
+        JOIN users u ON a.translator_id = u.id
+        WHERE a.translator_id IS NOT NULL ${filter}
+        ORDER BY a.translator_id, a.created_at
+    `;
+
+    const result = await pool.query(query, params);
+
+    // Группируем по переводчику и считаем сессии
+    const workTimeByTranslator = {};
+    const SESSION_TIMEOUT = 5 * 60 * 1000; // 5 минут в миллисекундах
+
+    for (const row of result.rows) {
+        const tId = row.translator_id;
+        const timestamp = new Date(row.created_at).getTime();
+
+        if (!workTimeByTranslator[tId]) {
+            workTimeByTranslator[tId] = {
+                translator_id: tId,
+                translator_name: row.translator_name,
+                sessions: [],
+                currentSession: { start: timestamp, end: timestamp }
+            };
+        }
+
+        const translator = workTimeByTranslator[tId];
+        const lastEnd = translator.currentSession.end;
+
+        if (timestamp - lastEnd <= SESSION_TIMEOUT) {
+            // Продолжаем текущую сессию
+            translator.currentSession.end = timestamp;
+        } else {
+            // Начинаем новую сессию
+            if (translator.currentSession.end > translator.currentSession.start) {
+                translator.sessions.push(translator.currentSession);
+            }
+            translator.currentSession = { start: timestamp, end: timestamp };
+        }
+    }
+
+    // Завершаем последние сессии
+    for (const tId in workTimeByTranslator) {
+        const translator = workTimeByTranslator[tId];
+        if (translator.currentSession.end > translator.currentSession.start) {
+            translator.sessions.push(translator.currentSession);
+        }
+    }
+
+    // Считаем общее время работы
+    const workTime = Object.values(workTimeByTranslator).map(t => {
+        const totalMs = t.sessions.reduce((sum, s) => sum + (s.end - s.start), 0);
+        const totalMinutes = Math.round(totalMs / 60000);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+
+        return {
+            translator_id: t.translator_id,
+            translator_name: t.translator_name,
+            total_minutes: totalMinutes,
+            total_formatted: `${hours}ч ${minutes}м`,
+            sessions_count: t.sessions.length
+        };
+    });
+
+    res.json({ success: true, workTime });
+}));
+
 module.exports = router;

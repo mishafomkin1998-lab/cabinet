@@ -380,4 +380,73 @@ router.get('/history', asyncHandler(async (req, res) => {
     res.json({ success: true, list: result.rows, total: totalCount });
 }));
 
+/**
+ * POST /api/incoming_message
+ * Логирование входящих сообщений от мужчин.
+ * Вызывается ботом при получении нового письма/чата от мужчины.
+ *
+ * @body {string} botId - ID бота
+ * @body {string} profileId - ID анкеты (получатель)
+ * @body {string} manId - ID мужчины (отправитель)
+ * @body {string} manName - Имя мужчины
+ * @body {string} messageId - ID сообщения на платформе
+ * @body {string} type - Тип (letter/chat)
+ * @body {string} timestamp - Время получения
+ */
+router.post('/incoming_message', asyncHandler(async (req, res) => {
+    const { botId, profileId, manId, manName, messageId, type, timestamp } = req.body;
+
+    if (!profileId || !manId) {
+        return res.status(400).json({ success: false, error: 'profileId и manId обязательны' });
+    }
+
+    // Проверяем, не записано ли уже это сообщение (по messageId)
+    if (messageId) {
+        const existing = await pool.query(
+            'SELECT id FROM incoming_messages WHERE platform_message_id = $1',
+            [messageId]
+        );
+        if (existing.rows.length > 0) {
+            return res.json({ success: true, status: 'duplicate' });
+        }
+    }
+
+    // Проверяем, первое ли это сообщение от этого мужчины к этой анкете
+    const firstCheck = await pool.query(
+        'SELECT id FROM incoming_messages WHERE profile_id = $1 AND man_id = $2 LIMIT 1',
+        [profileId, manId]
+    );
+    const isFirstFromMan = firstCheck.rows.length === 0;
+
+    // Получаем привязки анкеты
+    const profileData = await pool.query(
+        'SELECT assigned_admin_id, assigned_translator_id FROM allowed_profiles WHERE profile_id = $1',
+        [profileId]
+    );
+    const profile = profileData.rows[0] || {};
+
+    // Записываем входящее сообщение
+    await pool.query(
+        `INSERT INTO incoming_messages
+         (profile_id, bot_id, man_id, man_name, platform_message_id, type, is_first_from_man, admin_id, translator_id, created_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        [
+            profileId,
+            botId || null,
+            manId,
+            manName || null,
+            messageId || null,
+            type || 'letter',
+            isFirstFromMan,
+            profile.assigned_admin_id || null,
+            profile.assigned_translator_id || null,
+            timestamp ? new Date(timestamp) : new Date()
+        ]
+    );
+
+    console.log(`📨 Входящее сообщение: ${manName || manId} → ${profileId} (первое: ${isFirstFromMan})`);
+
+    res.json({ success: true, isFirstFromMan });
+}));
+
 module.exports = router;

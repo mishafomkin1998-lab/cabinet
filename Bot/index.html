@@ -752,7 +752,37 @@
             }
         }
 
-        // 2. Функция отправки heartbeat
+        // 2. Функция отправки входящего сообщения от мужчины
+        async function sendIncomingMessageToLababot(params) {
+            const { botId, profileId, manId, manName, messageId, type = 'letter' } = params;
+
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/incoming_message`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        botId: botId,
+                        profileId: profileId,
+                        manId: String(manId),
+                        manName: manName || null,
+                        messageId: String(messageId),
+                        type: type,
+                        timestamp: new Date().toISOString()
+                    })
+                });
+
+                const data = await response.json();
+                if (data.isFirstFromMan) {
+                    console.log(`📨 Новый уникальный мужчина: ${manName || manId} → ${profileId}`);
+                }
+                return { success: true, data: data };
+            } catch (error) {
+                console.error(`❌ Ошибка отправки входящего на Lababot:`, error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        // 3. Функция отправки heartbeat
         async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
             console.log(`❤️ Отправляю heartbeat для ${displayId}`);
             
@@ -1711,8 +1741,18 @@
                             
                             if (unreadCount > 0) {
                                 unreadSessionsNow.push(sessionId);
-                                
+
                                 if (!this.unreadChatSessions.includes(sessionId)) {
+                                    // Отправляем входящее сообщение чата на сервер статистики
+                                    sendIncomingMessageToLababot({
+                                        botId: this.id,
+                                        profileId: this.displayId,
+                                        manId: partnerId,
+                                        manName: partnerName,
+                                        messageId: `chat_${sessionId}`,
+                                        type: 'chat'
+                                    });
+
                                     Logger.add(`💬 Новое сообщение в чате с <b>${partnerName}</b>`, 'chat', this.id, { partnerId, partnerName });
                                 }
                             }
@@ -1738,6 +1778,16 @@
                         const newMessages = msgs.filter(m => m.MessageId > this.lastMailId);
                         
                         newMessages.reverse().forEach(msg => {
+                            // Отправляем входящее сообщение на сервер статистики
+                            sendIncomingMessageToLababot({
+                                botId: this.id,
+                                profileId: this.displayId,
+                                manId: msg.User.AccountId,
+                                manName: msg.User.Name,
+                                messageId: msg.MessageId,
+                                type: 'letter'
+                            });
+
                             if (!msg.IsReplied) {
                                 Logger.add(
                                     `💌 Входящее письмо от <b>${msg.User.Name || `ID ${msg.User.AccountId}`}</b> (Ждет ответа)`,

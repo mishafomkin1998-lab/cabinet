@@ -214,7 +214,31 @@ async function initDatabase() {
             console.log('Миграция daily_stats_user_date_unique уже выполнена');
         }
 
-        // 11. Таблица настроек
+        // 11. Таблица входящих сообщений от мужчин
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS incoming_messages (
+                id SERIAL PRIMARY KEY,
+                profile_id VARCHAR(100) NOT NULL,
+                bot_id VARCHAR(100),
+                man_id VARCHAR(100) NOT NULL,
+                man_name VARCHAR(255),
+                platform_message_id VARCHAR(100),
+                type VARCHAR(20) DEFAULT 'letter',
+                is_first_from_man BOOLEAN DEFAULT FALSE,
+                admin_id INTEGER,
+                translator_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_incoming_profile ON incoming_messages(profile_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_incoming_man ON incoming_messages(man_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_incoming_date ON incoming_messages(created_at)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_incoming_first ON incoming_messages(is_first_from_man)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_incoming_translator ON incoming_messages(translator_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_incoming_admin ON incoming_messages(admin_id)`);
+        await fixSerialSequence('incoming_messages');
+
+        // 12. Таблица настроек
         await pool.query(`
             CREATE TABLE IF NOT EXISTS settings (
                 id SERIAL PRIMARY KEY,

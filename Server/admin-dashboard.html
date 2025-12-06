@@ -630,10 +630,10 @@
                             </div>
                         </div>
 
-                        <button @click="loadDashboardStats()" class="px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600">
-                            <i class="fas fa-sync-alt mr-2"></i><span x-text="t('common.refresh')"></span>
+                        <button @click="refreshAllStats()" class="px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600" :class="{'opacity-50 cursor-wait': loading}">
+                            <i class="fas fa-sync-alt mr-2" :class="{'fa-spin': loading}"></i><span x-text="t('common.refresh')"></span>
                         </button>
-                        <button @click="exportStats()" class="ml-2 px-4 py-2.5 rounded-xl bg-green-500 text-white hover:bg-green-600">
+                        <button @click="exportStats()" class="ml-auto px-4 py-2.5 rounded-xl bg-green-500 text-white hover:bg-green-600">
                             <i class="fas fa-download mr-2"></i><span x-text="t('common.export')"></span>
                         </button>
                     </div>
@@ -715,20 +715,21 @@
                             Расширенная статистика →
                         </button>
                     </div>
-                    <div class="grid grid-cols-12 gap-1 mb-2">
-                        <template x-for="hour in 12" :key="hour">
+                    <div class="grid grid-cols-24 gap-0.5 mb-2">
+                        <template x-for="hour in 24" :key="hour">
                             <div class="text-center">
-                                <div class="text-xs text-gray-500 mb-1" x-text="hour-1"></div>
-                                <div class="h-6 rounded bg-gradient-to-b" 
-                                     :class="getActivityColor(hour)"
-                                     :style="'height:' + (getActivityLevel(hour) * 30) + 'px'">
+                                <div class="text-[10px] text-gray-500 mb-1" x-text="(hour-1) + 'ч'"></div>
+                                <div class="h-6 rounded bg-gradient-to-b"
+                                     :class="getActivityColor(hour-1)"
+                                     :style="'height:' + (getActivityLevel(hour-1) * 30) + 'px'">
                                 </div>
                             </div>
                         </template>
                     </div>
                     <div class="flex justify-between text-xs text-gray-500">
-                        <span>00:00</span>
-                        <span>12:00</span>
+                        <span>0ч</span>
+                        <span>12ч</span>
+                        <span>23ч</span>
                     </div>
                 </div>
                 
@@ -1737,6 +1738,25 @@
                             this.stats = data.dashboard;
                         }
                     } catch (e) { console.error('loadDashboardStats error:', e); }
+                },
+
+                // Полное обновление всей статистики
+                async refreshAllStats() {
+                    this.loading = true;
+                    try {
+                        await Promise.all([
+                            this.loadDashboardStats(),
+                            this.loadHourlyActivity(),
+                            this.loadTranslatorStats(),
+                            this.loadRecentActivity(),
+                            this.loadAccounts(),
+                            this.loadBotsStatus()
+                        ]);
+                        console.log('✅ Статистика обновлена');
+                    } catch (e) {
+                        console.error('refreshAllStats error:', e);
+                    }
+                    this.loading = false;
                 },
 
                 async loadAccounts() {

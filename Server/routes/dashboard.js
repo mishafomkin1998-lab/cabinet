@@ -128,6 +128,41 @@ router.get('/', asyncHandler(async (req, res) => {
         const errorsResult = await pool.query(errorsQuery);
         const errors = errorsResult.rows[0] || {};
 
+        /**
+         * Запрос 6: Входящие сообщения от мужчин
+         * - incoming_letters/chats: количество входящих писем и чатов
+         * - unique_men: уникальные мужчины (те, кто написал первое письмо в периоде)
+         */
+        const incomingRoleFilter = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'AND', paramIndex: 1 });
+        const incomingFilter = incomingRoleFilter.filter.replace('p.assigned', 'i.admin_id IS NOT NULL AND i.admin_id').replace('assigned_translator_id', 'translator_id').replace('assigned_admin_id', 'admin_id') || '';
+
+        // Более простой фильтр для incoming_messages
+        let incomingWhereClause = '';
+        if (role === 'translator') {
+            incomingWhereClause = `AND i.translator_id = $1`;
+        } else if (role === 'admin') {
+            incomingWhereClause = `AND i.admin_id = $1`;
+        }
+
+        const incomingQuery = `
+            SELECT
+                COALESCE(COUNT(*) FILTER (WHERE i.type = 'letter' AND DATE(i.created_at) = CURRENT_DATE), 0) as incoming_letters_today,
+                COALESCE(COUNT(*) FILTER (WHERE i.type = 'chat' AND DATE(i.created_at) = CURRENT_DATE), 0) as incoming_chats_today,
+                COALESCE(COUNT(*) FILTER (WHERE i.type = 'letter' AND DATE(i.created_at) = CURRENT_DATE - 1), 0) as incoming_letters_yesterday,
+                COALESCE(COUNT(*) FILTER (WHERE i.type = 'chat' AND DATE(i.created_at) = CURRENT_DATE - 1), 0) as incoming_chats_yesterday,
+                COALESCE(COUNT(*) FILTER (WHERE i.type = 'letter' AND i.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as incoming_letters_week,
+                COALESCE(COUNT(*) FILTER (WHERE i.type = 'chat' AND i.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as incoming_chats_week,
+                COALESCE(COUNT(*) FILTER (WHERE i.type = 'letter' AND i.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as incoming_letters_month,
+                COALESCE(COUNT(*) FILTER (WHERE i.type = 'chat' AND i.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as incoming_chats_month,
+                COALESCE(COUNT(*) FILTER (WHERE i.is_first_from_man = true AND DATE(i.created_at) = CURRENT_DATE), 0) as unique_men_today,
+                COALESCE(COUNT(*) FILTER (WHERE i.is_first_from_man = true AND i.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as unique_men_week,
+                COALESCE(COUNT(*) FILTER (WHERE i.is_first_from_man = true AND i.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as unique_men_month
+            FROM incoming_messages i
+            WHERE 1=1 ${incomingWhereClause}
+        `;
+        const incomingResult = await pool.query(incomingQuery, params);
+        const incoming = incomingResult.rows[0] || {};
+
         // Преобразуем строковые значения в числа
         const lettersToday = parseInt(stats.letters_today) || 0;
         const chatsToday = parseInt(stats.chats_today) || 0;
@@ -148,23 +183,31 @@ router.get('/', asyncHandler(async (req, res) => {
                 today: {
                     letters: lettersToday,
                     chats: chatsToday,
-                    uniqueMen: parseInt(stats.unique_men_today) || 0,
+                    incomingLetters: parseInt(incoming.incoming_letters_today) || 0,
+                    incomingChats: parseInt(incoming.incoming_chats_today) || 0,
+                    uniqueMen: parseInt(incoming.unique_men_today) || 0, // Уникальные = первые входящие
                     errors: parseInt(errors.errors_today) || 0
                 },
                 yesterday: {
                     letters: lettersYesterday,
-                    chats: chatsYesterday
+                    chats: chatsYesterday,
+                    incomingLetters: parseInt(incoming.incoming_letters_yesterday) || 0,
+                    incomingChats: parseInt(incoming.incoming_chats_yesterday) || 0
                 },
                 week: {
                     letters: lettersWeek,
                     chats: chatsWeek,
-                    uniqueMen: parseInt(stats.unique_men_week) || 0,
+                    incomingLetters: parseInt(incoming.incoming_letters_week) || 0,
+                    incomingChats: parseInt(incoming.incoming_chats_week) || 0,
+                    uniqueMen: parseInt(incoming.unique_men_week) || 0,
                     errors: parseInt(errors.errors_week) || 0
                 },
                 month: {
                     letters: lettersMonth,
                     chats: chatsMonth,
-                    uniqueMen: parseInt(stats.unique_men_month) || 0
+                    incomingLetters: parseInt(incoming.incoming_letters_month) || 0,
+                    incomingChats: parseInt(incoming.incoming_chats_month) || 0,
+                    uniqueMen: parseInt(incoming.unique_men_month) || 0
                 },
                 metrics: {
                     totalProfiles: totalProfiles,
