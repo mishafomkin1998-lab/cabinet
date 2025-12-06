@@ -139,6 +139,22 @@ async function initDatabase() {
         await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS last_heartbeat TIMESTAMP`);
         await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
 
+        // Миграция: Исправляем SERIAL последовательность для id в bots
+        try {
+            // Создаём последовательность если её нет
+            await pool.query(`CREATE SEQUENCE IF NOT EXISTS bots_id_seq`);
+            // Устанавливаем текущее значение последовательности на max(id) + 1
+            const maxIdResult = await pool.query(`SELECT COALESCE(MAX(id), 0) as max_id FROM bots`);
+            const maxId = maxIdResult.rows[0].max_id || 0;
+            await pool.query(`SELECT setval('bots_id_seq', $1, true)`, [Math.max(maxId, 1)]);
+            // Привязываем последовательность к столбцу id
+            await pool.query(`ALTER TABLE bots ALTER COLUMN id SET DEFAULT nextval('bots_id_seq')`);
+            // Делаем столбец NOT NULL если ещё не установлено
+            await pool.query(`ALTER TABLE bots ALTER COLUMN id SET NOT NULL`);
+        } catch (e) {
+            console.log('Миграция bots_id_seq уже выполнена или не нужна:', e.message);
+        }
+
         // Создаём уникальный индекс если его нет (игнорируем ошибку если существует)
         try {
             await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS bots_bot_id_unique ON bots(bot_id) WHERE bot_id IS NOT NULL`);
@@ -156,6 +172,22 @@ async function initDatabase() {
                 UNIQUE(bot_id, profile_id)
             )
         `);
+
+        // Миграция: Исправляем SERIAL для bot_profiles
+        try {
+            await pool.query(`CREATE SEQUENCE IF NOT EXISTS bot_profiles_id_seq`);
+            const maxBpId = await pool.query(`SELECT COALESCE(MAX(id), 0) as max_id FROM bot_profiles`);
+            await pool.query(`SELECT setval('bot_profiles_id_seq', $1, true)`, [Math.max(maxBpId.rows[0].max_id || 0, 1)]);
+            await pool.query(`ALTER TABLE bot_profiles ALTER COLUMN id SET DEFAULT nextval('bot_profiles_id_seq')`);
+        } catch (e) { /* уже выполнено */ }
+
+        // Миграция: Исправляем SERIAL для profiles
+        try {
+            await pool.query(`CREATE SEQUENCE IF NOT EXISTS profiles_id_seq`);
+            const maxPrId = await pool.query(`SELECT COALESCE(MAX(id), 0) as max_id FROM profiles`);
+            await pool.query(`SELECT setval('profiles_id_seq', $1, true)`, [Math.max(maxPrId.rows[0].max_id || 0, 1)]);
+            await pool.query(`ALTER TABLE profiles ALTER COLUMN id SET DEFAULT nextval('profiles_id_seq')`);
+        } catch (e) { /* уже выполнено */ }
 
         // 5. Таблица активности (ключевая таблица!)
         await pool.query(`
@@ -181,6 +213,14 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_activity_type ON activity_log(action_type)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_activity_admin ON activity_log(admin_id)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_activity_translator ON activity_log(translator_id)`);
+
+        // Миграция: Исправляем SERIAL для activity_log
+        try {
+            await pool.query(`CREATE SEQUENCE IF NOT EXISTS activity_log_id_seq`);
+            const maxAlId = await pool.query(`SELECT COALESCE(MAX(id), 0) as max_id FROM activity_log`);
+            await pool.query(`SELECT setval('activity_log_id_seq', $1, true)`, [Math.max(maxAlId.rows[0].max_id || 0, 1)]);
+            await pool.query(`ALTER TABLE activity_log ALTER COLUMN id SET DEFAULT nextval('activity_log_id_seq')`);
+        } catch (e) { /* уже выполнено */ }
 
         // 6. Таблица Сообщений (для совместимости)
         await pool.query(`
@@ -262,6 +302,17 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_heartbeats_timestamp ON heartbeats(timestamp)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_heartbeats_bot_id ON heartbeats(bot_id)`);
 
+        // Миграции: Исправляем SERIAL для всех таблиц
+        const tablesToFix = ['messages', 'message_content', 'error_logs', 'heartbeats'];
+        for (const tableName of tablesToFix) {
+            try {
+                await pool.query(`CREATE SEQUENCE IF NOT EXISTS ${tableName}_id_seq`);
+                const maxId = await pool.query(`SELECT COALESCE(MAX(id), 0) as max_id FROM ${tableName}`);
+                await pool.query(`SELECT setval('${tableName}_id_seq', $1, true)`, [Math.max(maxId.rows[0].max_id || 0, 1)]);
+                await pool.query(`ALTER TABLE ${tableName} ALTER COLUMN id SET DEFAULT nextval('${tableName}_id_seq')`);
+            } catch (e) { /* уже выполнено */ }
+        }
+
         // 10. Таблица для ежедневной статистики
         await pool.query(`
             CREATE TABLE IF NOT EXISTS daily_stats (
@@ -279,6 +330,13 @@ async function initDatabase() {
             )
         `);
 
+        // Миграция: добавляем уникальный индекс для daily_stats если его нет
+        try {
+            await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS daily_stats_user_date_unique ON daily_stats(user_id, date)`);
+        } catch (e) {
+            console.log('Миграция daily_stats_user_date_unique уже выполнена:', e.message);
+        }
+
         console.log('✅ База данных готова к работе (v6.0 - полная схема для личного кабинета)');
     } catch (e) {
         console.error('❌ Ошибка инициализации БД:', e.message);
@@ -295,10 +353,14 @@ app.get('/setup-director', async (req, res) => {
     
     try {
         const hash = await bcrypt.hash(pass, 10);
-        await pool.query(
-            `INSERT INTO users (username, password_hash, role) VALUES ($1, $2, 'director')
-             ON CONFLICT (username) DO UPDATE SET password_hash = $2`, [user, hash]
-        );
+        const exists = await pool.query(`SELECT 1 FROM users WHERE username = $1`, [user]);
+        if (exists.rows.length === 0) {
+            await pool.query(
+                `INSERT INTO users (username, password_hash, role) VALUES ($1, $2, 'director')`, [user, hash]
+            );
+        } else {
+            await pool.query(`UPDATE users SET password_hash = $1 WHERE username = $2`, [hash, user]);
+        }
         res.send(`<h1>Готово!</h1><p>Директор <b>${user}</b> создан/обновлен.</p>`);
     } catch (e) { res.send('Ошибка создания: ' + e.message); }
 });
@@ -612,12 +674,19 @@ app.post('/api/profiles/bulk', async (req, res) => {
     try {
         for (const id of profiles) {
             if (id.trim().length > 2) {
-                await pool.query(
-                    `INSERT INTO allowed_profiles (profile_id, note, assigned_admin_id)
-                     VALUES ($1, $2, $3)
-                     ON CONFLICT (profile_id) DO UPDATE SET assigned_admin_id = $3`,
-                    [id.trim(), note, adminId || null]
-                );
+                const profileId = id.trim();
+                const exists = await pool.query(`SELECT 1 FROM allowed_profiles WHERE profile_id = $1`, [profileId]);
+                if (exists.rows.length === 0) {
+                    await pool.query(
+                        `INSERT INTO allowed_profiles (profile_id, note, assigned_admin_id) VALUES ($1, $2, $3)`,
+                        [profileId, note, adminId || null]
+                    );
+                } else {
+                    await pool.query(
+                        `UPDATE allowed_profiles SET assigned_admin_id = $1 WHERE profile_id = $2`,
+                        [adminId || null, profileId]
+                    );
+                }
             }
         }
         res.json({ success: true });
@@ -831,25 +900,31 @@ app.post('/api/bot/heartbeat', async (req, res) => {
     const { botId, profileId, platform, ip, version, status } = req.body;
 
     try {
-        // 1. Обновляем/создаем запись бота
-        await pool.query(`
-            INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat)
-            VALUES ($1, $2, $3, $4, $5, NOW())
-            ON CONFLICT (bot_id) DO UPDATE SET
-                platform = EXCLUDED.platform,
-                ip = EXCLUDED.ip,
-                version = EXCLUDED.version,
-                status = EXCLUDED.status,
-                last_heartbeat = NOW()
-        `, [botId, platform || null, ip || null, version || null, status || 'online']);
+        // 1. Обновляем/создаем запись бота (без ON CONFLICT)
+        const existsBot = await pool.query(`SELECT 1 FROM bots WHERE bot_id = $1`, [botId]);
+        if (existsBot.rows.length === 0) {
+            await pool.query(
+                `INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat) VALUES ($1, $2, $3, $4, $5, NOW())`,
+                [botId, platform || null, ip || null, version || null, status || 'online']
+            );
+        } else {
+            await pool.query(
+                `UPDATE bots SET platform = COALESCE($1, platform), ip = COALESCE($2, ip), version = COALESCE($3, version), status = $4, last_heartbeat = NOW() WHERE bot_id = $5`,
+                [platform, ip, version, status || 'online', botId]
+            );
+        }
 
-        // 2. Связываем бота с профилем
+        // 2. Связываем бота с профилем (без ON CONFLICT)
         if (profileId) {
-            await pool.query(`
-                INSERT INTO bot_profiles (bot_id, profile_id)
-                VALUES ($1, $2)
-                ON CONFLICT (bot_id, profile_id) DO NOTHING
-            `, [botId, profileId]);
+            const existsBotProfile = await pool.query(
+                `SELECT 1 FROM bot_profiles WHERE bot_id = $1 AND profile_id = $2`, [botId, profileId]
+            );
+            if (existsBotProfile.rows.length === 0) {
+                await pool.query(
+                    `INSERT INTO bot_profiles (bot_id, profile_id) VALUES ($1, $2)`,
+                    [botId, profileId]
+                );
+            }
 
             // 3. Обновляем статус профиля
             await pool.query(`
@@ -955,13 +1030,17 @@ app.post('/api/profile/status', async (req, res) => {
             WHERE profile_id = $3
         `, [status || 'online', lastOnline || new Date(), profileId]);
 
-        // Связываем бота с профилем если указан
+        // Связываем бота с профилем если указан (без ON CONFLICT)
         if (botId) {
-            await pool.query(`
-                INSERT INTO bot_profiles (bot_id, profile_id)
-                VALUES ($1, $2)
-                ON CONFLICT (bot_id, profile_id) DO NOTHING
-            `, [botId, profileId]);
+            const existsBotProfile = await pool.query(
+                `SELECT 1 FROM bot_profiles WHERE bot_id = $1 AND profile_id = $2`, [botId, profileId]
+            );
+            if (existsBotProfile.rows.length === 0) {
+                await pool.query(
+                    `INSERT INTO bot_profiles (bot_id, profile_id) VALUES ($1, $2)`,
+                    [botId, profileId]
+                );
+            }
         }
 
         console.log(`👤 Статус профиля ${profileId}: ${status || 'online'}`);
@@ -1621,11 +1700,17 @@ app.get('/reset-database', async (req, res) => {
     }
 });
 
-// Утилита для пересчета статистики
+// Утилита для пересчета статистики (без ON CONFLICT - используем DELETE + INSERT)
 app.get('/recalculate-stats', async (req, res) => {
     try {
         console.log('🔄 Пересчет ежедневной статистики...');
-        
+
+        // Удаляем старые записи за последние 30 дней
+        await pool.query(`
+            DELETE FROM daily_stats
+            WHERE date >= CURRENT_DATE - INTERVAL '30 days'
+        `);
+
         // Пересчитываем статистику за последние 30 дней для всех пользователей
         await pool.query(`
             INSERT INTO daily_stats (user_id, date, letters_count, chats_count, unique_men, total_income, avg_response_time)
@@ -1635,7 +1720,7 @@ app.get('/recalculate-stats', async (req, res) => {
                 COUNT(*) FILTER (WHERE m.type = 'outgoing') as letters_count,
                 COUNT(*) FILTER (WHERE m.type = 'chat_msg') as chats_count,
                 COUNT(DISTINCT m.sender_id) as unique_men,
-                (COUNT(*) FILTER (WHERE m.type = 'outgoing') * ${PRICE_LETTER} + 
+                (COUNT(*) FILTER (WHERE m.type = 'outgoing') * ${PRICE_LETTER} +
                  COUNT(*) FILTER (WHERE m.type = 'chat_msg') * ${PRICE_CHAT}) as total_income,
                 AVG(m.response_time) as avg_response_time
             FROM messages m
@@ -1643,14 +1728,8 @@ app.get('/recalculate-stats', async (req, res) => {
             WHERE m.timestamp >= CURRENT_DATE - INTERVAL '30 days'
                 AND p.assigned_translator_id IS NOT NULL
             GROUP BY p.assigned_translator_id, DATE(m.timestamp)
-            ON CONFLICT (user_id, date) DO UPDATE SET
-                letters_count = EXCLUDED.letters_count,
-                chats_count = EXCLUDED.chats_count,
-                unique_men = EXCLUDED.unique_men,
-                total_income = EXCLUDED.total_income,
-                avg_response_time = EXCLUDED.avg_response_time
         `);
-        
+
         res.json({ success: true, message: 'Статистика пересчитана' });
     } catch(e) {
         res.status(500).json({ error: e.message });
@@ -2300,6 +2379,10 @@ app.get('/api/bots/prompt', async (req, res) => {
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        // Миграция: добавляем уникальный индекс если его нет
+        try {
+            await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS settings_key_unique ON settings(key)`);
+        } catch (e) { /* уже существует */ }
 
         const result = await pool.query(
             `SELECT value FROM settings WHERE key = 'generation_prompt'`
@@ -2318,11 +2401,19 @@ app.get('/api/bots/prompt', async (req, res) => {
 app.post('/api/bots/prompt', async (req, res) => {
     const { prompt } = req.body;
     try {
-        await pool.query(`
-            INSERT INTO settings (key, value, updated_at)
-            VALUES ('generation_prompt', $1, NOW())
-            ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
-        `, [prompt]);
+        // Без ON CONFLICT - проверяем существование
+        const exists = await pool.query(`SELECT 1 FROM settings WHERE key = 'generation_prompt'`);
+        if (exists.rows.length === 0) {
+            await pool.query(
+                `INSERT INTO settings (key, value, updated_at) VALUES ('generation_prompt', $1, NOW())`,
+                [prompt]
+            );
+        } else {
+            await pool.query(
+                `UPDATE settings SET value = $1, updated_at = NOW() WHERE key = 'generation_prompt'`,
+                [prompt]
+            );
+        }
 
         res.json({ success: true });
     } catch (e) {
@@ -2335,12 +2426,19 @@ app.post('/api/bots/prompt', async (req, res) => {
 app.post('/api/bots/sync-prompt', async (req, res) => {
     const { prompt } = req.body;
     try {
-        // Сохраняем промт
-        await pool.query(`
-            INSERT INTO settings (key, value, updated_at)
-            VALUES ('generation_prompt', $1, NOW())
-            ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()
-        `, [prompt]);
+        // Сохраняем промт (без ON CONFLICT)
+        const exists = await pool.query(`SELECT 1 FROM settings WHERE key = 'generation_prompt'`);
+        if (exists.rows.length === 0) {
+            await pool.query(
+                `INSERT INTO settings (key, value, updated_at) VALUES ('generation_prompt', $1, NOW())`,
+                [prompt]
+            );
+        } else {
+            await pool.query(
+                `UPDATE settings SET value = $1, updated_at = NOW() WHERE key = 'generation_prompt'`,
+                [prompt]
+            );
+        }
 
         res.json({ success: true, message: 'Prompt synced' });
     } catch (e) {
