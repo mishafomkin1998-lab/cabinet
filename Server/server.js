@@ -653,10 +653,9 @@ app.post('/api/message_sent', async (req, res) => {
         );
 
         if (profileData.rows.length === 0) {
-            // Автоматически создаём анкету
+            // Автоматически создаём анкету (без ON CONFLICT)
             await pool.query(
-                `INSERT INTO allowed_profiles (profile_id, note, added_at)
-                 VALUES ($1, $2, NOW()) ON CONFLICT (profile_id) DO NOTHING`,
+                `INSERT INTO allowed_profiles (profile_id, note, added_at) VALUES ($1, $2, NOW())`,
                 [accountDisplayId, 'Автодобавлено ботом']
             );
             console.log(`📝 Анкета ${accountDisplayId} автоматически добавлена в allowed_profiles`);
@@ -732,40 +731,59 @@ app.post('/api/heartbeat', async (req, res) => {
             ) VALUES ($1, $2, $3, $4, $5, $6, $7)
         `, [botId, accountDisplayId, profileStatus, ip || null, version, platform, timestamp || new Date()]);
 
-        // 2. Автосоздание анкеты в allowed_profiles если нет
-        await pool.query(`
-            INSERT INTO allowed_profiles (profile_id, note, added_at)
-            VALUES ($1, 'Автодобавлено ботом', NOW())
-            ON CONFLICT (profile_id) DO NOTHING
-        `, [accountDisplayId]);
+        // 2. Автосоздание анкеты в allowed_profiles если нет (без ON CONFLICT)
+        const existsAllowed = await pool.query(
+            `SELECT 1 FROM allowed_profiles WHERE profile_id = $1`, [accountDisplayId]
+        );
+        if (existsAllowed.rows.length === 0) {
+            await pool.query(
+                `INSERT INTO allowed_profiles (profile_id, note, added_at) VALUES ($1, 'Автодобавлено ботом', NOW())`,
+                [accountDisplayId]
+            );
+        }
 
-        // 3. Обновляем/создаём запись в profiles для dashboard
-        await pool.query(`
-            INSERT INTO profiles (profile_id, status, last_online, added_at)
-            VALUES ($1, $2, NOW(), NOW())
-            ON CONFLICT (profile_id) DO UPDATE SET
-                status = $2,
-                last_online = NOW()
-        `, [accountDisplayId, profileStatus]);
+        // 3. Обновляем/создаём запись в profiles для dashboard (без ON CONFLICT)
+        const existsProfile = await pool.query(
+            `SELECT 1 FROM profiles WHERE profile_id = $1`, [accountDisplayId]
+        );
+        if (existsProfile.rows.length === 0) {
+            await pool.query(
+                `INSERT INTO profiles (profile_id, status, last_online, added_at) VALUES ($1, $2, NOW(), NOW())`,
+                [accountDisplayId, profileStatus]
+            );
+        } else {
+            await pool.query(
+                `UPDATE profiles SET status = $1, last_online = NOW() WHERE profile_id = $2`,
+                [profileStatus, accountDisplayId]
+            );
+        }
 
-        // 4. Обновляем/создаём запись бота в bots для dashboard
-        await pool.query(`
-            INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat)
-            VALUES ($1, $2, $3, $4, $5, NOW())
-            ON CONFLICT (bot_id) DO UPDATE SET
-                platform = COALESCE($2, bots.platform),
-                ip = COALESCE($3, bots.ip),
-                version = COALESCE($4, bots.version),
-                status = $5,
-                last_heartbeat = NOW()
-        `, [botId, platform, ip || null, version, profileStatus]);
+        // 4. Обновляем/создаём запись бота в bots для dashboard (без ON CONFLICT)
+        const existsBot = await pool.query(
+            `SELECT 1 FROM bots WHERE bot_id = $1`, [botId]
+        );
+        if (existsBot.rows.length === 0) {
+            await pool.query(
+                `INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat) VALUES ($1, $2, $3, $4, $5, NOW())`,
+                [botId, platform, ip || null, version, profileStatus]
+            );
+        } else {
+            await pool.query(
+                `UPDATE bots SET platform = COALESCE($1, platform), ip = COALESCE($2, ip), version = COALESCE($3, version), status = $4, last_heartbeat = NOW() WHERE bot_id = $5`,
+                [platform, ip || null, version, profileStatus, botId]
+            );
+        }
 
-        // 5. Связываем бота с анкетой
-        await pool.query(`
-            INSERT INTO bot_profiles (bot_id, profile_id, created_at)
-            VALUES ($1, $2, NOW())
-            ON CONFLICT (bot_id, profile_id) DO NOTHING
-        `, [botId, accountDisplayId]);
+        // 5. Связываем бота с анкетой (без ON CONFLICT)
+        const existsBotProfile = await pool.query(
+            `SELECT 1 FROM bot_profiles WHERE bot_id = $1 AND profile_id = $2`, [botId, accountDisplayId]
+        );
+        if (existsBotProfile.rows.length === 0) {
+            await pool.query(
+                `INSERT INTO bot_profiles (bot_id, profile_id, created_at) VALUES ($1, $2, NOW())`,
+                [botId, accountDisplayId]
+            );
+        }
 
         console.log(`❤️ Heartbeat от ${accountDisplayId} (бот ${botId}): ${profileStatus}`);
 
