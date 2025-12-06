@@ -385,4 +385,134 @@ router.get('/pricing', (req, res) => {
     });
 });
 
+/**
+ * POST /api/billing/pay-profile
+ * Оплатить анкету напрямую (только директор)
+ */
+router.post('/pay-profile', asyncHandler(async (req, res) => {
+    const { profileId, days, byUserId, note } = req.body;
+
+    if (!profileId || !days || !PRICING[days]) {
+        return res.status(400).json({
+            success: false,
+            error: 'Неверные параметры. Доступные периоды: 15, 30, 45, 60 дней'
+        });
+    }
+
+    // Проверяем права (только директор)
+    const byUser = await pool.query(`SELECT role FROM users WHERE id = $1`, [byUserId]);
+    if (byUser.rows.length === 0 || byUser.rows[0].role !== 'director') {
+        return res.status(403).json({ success: false, error: 'Нет прав' });
+    }
+
+    // Проверяем существование анкеты
+    const profile = await pool.query(
+        `SELECT profile_id, paid_until FROM allowed_profiles WHERE profile_id = $1`,
+        [profileId]
+    );
+
+    if (profile.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Анкета не найдена' });
+    }
+
+    // Продлеваем анкету
+    await pool.query(`
+        UPDATE allowed_profiles
+        SET paid_until = COALESCE(
+            CASE WHEN paid_until > NOW() THEN paid_until ELSE NOW() END
+        , NOW()) + INTERVAL '${days} days',
+        is_trial = FALSE
+        WHERE profile_id = $1
+    `, [profileId]);
+
+    // Сохраняем в историю оплаты анкет
+    await pool.query(
+        `INSERT INTO profile_payment_history (profile_id, days, action_type, by_user_id, note) VALUES ($1, $2, 'payment', $3, $4)`,
+        [profileId, days, byUserId, note || null]
+    );
+
+    res.json({
+        success: true,
+        message: `Анкета #${profileId} оплачена на ${days} дней`
+    });
+}));
+
+/**
+ * POST /api/billing/remove-payment
+ * Убрать оплату с анкеты (только директор)
+ */
+router.post('/remove-payment', asyncHandler(async (req, res) => {
+    const { profileId, byUserId } = req.body;
+
+    if (!profileId) {
+        return res.status(400).json({ success: false, error: 'Укажите ID анкеты' });
+    }
+
+    // Проверяем права (только директор)
+    const byUser = await pool.query(`SELECT role FROM users WHERE id = $1`, [byUserId]);
+    if (byUser.rows.length === 0 || byUser.rows[0].role !== 'director') {
+        return res.status(403).json({ success: false, error: 'Нет прав' });
+    }
+
+    // Сбрасываем оплату
+    await pool.query(`
+        UPDATE allowed_profiles
+        SET paid_until = NULL, is_trial = FALSE
+        WHERE profile_id = $1
+    `, [profileId]);
+
+    // Сохраняем в историю
+    await pool.query(
+        `INSERT INTO profile_payment_history (profile_id, days, action_type, by_user_id, note) VALUES ($1, 0, 'removal', $2, 'Оплата снята')`,
+        [profileId, byUserId]
+    );
+
+    res.json({
+        success: true,
+        message: `Оплата с анкеты #${profileId} снята`
+    });
+}));
+
+/**
+ * GET /api/billing/profile-payment-history
+ * Получить историю оплаты анкет (только для директора)
+ */
+router.get('/profile-payment-history', asyncHandler(async (req, res) => {
+    const { userId, limit = 100 } = req.query;
+
+    // Проверяем права
+    const user = await pool.query(`SELECT role FROM users WHERE id = $1`, [userId]);
+    if (user.rows.length === 0 || user.rows[0].role !== 'director') {
+        return res.status(403).json({ success: false, error: 'Нет доступа' });
+    }
+
+    const result = await pool.query(`
+        SELECT
+            pph.id,
+            pph.profile_id,
+            pph.days,
+            pph.action_type,
+            pph.note,
+            pph.created_at,
+            u.username as by_user_name
+        FROM profile_payment_history pph
+        LEFT JOIN users u ON pph.by_user_id = u.id
+        ORDER BY pph.created_at DESC
+        LIMIT $1
+    `, [limit]);
+
+    res.json({
+        success: true,
+        history: result.rows.map(row => ({
+            id: row.id,
+            profileId: row.profile_id,
+            days: row.days,
+            actionType: row.action_type,
+            note: row.note,
+            byUserName: row.by_user_name || 'Система',
+            createdAt: row.created_at
+        }))
+    });
+}));
+
 module.exports = router;

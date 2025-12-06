@@ -923,7 +923,7 @@
                                         <span x-text="t('profiles.incoming')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'incoming' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('admin')">
+                                    <th x-show="currentUser.role === 'director'" class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50" @click="sortAccounts('admin')">
                                         <span x-text="t('profiles.admin')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'admin' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                     </th>
@@ -964,7 +964,7 @@
                                                   :class="account.incoming > 0 ? 'bg-white text-green-600 font-medium shadow-sm' : 'bg-gray-100 text-gray-400'"
                                                   x-text="account.incoming || 0"></span>
                                         </td>
-                                        <td class="py-2 px-3">
+                                        <td x-show="currentUser.role === 'director'" class="py-2 px-3">
                                             <select class="glass px-2 py-1 rounded-lg text-xs"
                                                     x-model="account.admin"
                                                     @change="assignAccount(account)">
@@ -1550,6 +1550,75 @@
                     </div>
                 </div>
 
+                <!-- Форма оплаты анкет -->
+                <div class="glass rounded-2xl p-6 mb-6">
+                    <h3 class="text-lg font-bold mb-6">
+                        <i class="fas fa-id-card text-blue-500 mr-2"></i>
+                        Оплата анкеты
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <!-- ID анкеты -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">ID анкеты</label>
+                            <input type="text"
+                                   class="glass w-full px-4 py-3 rounded-xl"
+                                   placeholder="Например: 123456"
+                                   x-model="profilePayment.profileId">
+                        </div>
+
+                        <!-- Количество дней -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Период оплаты</label>
+                            <div class="flex gap-2">
+                                <button @click="profilePayment.days = 15"
+                                        class="flex-1 px-3 py-3 rounded-xl text-sm font-medium transition-colors"
+                                        :class="profilePayment.days === 15 ? 'bg-indigo-500 text-white' : 'bg-gray-100 hover:bg-gray-200'">
+                                    15 дней
+                                </button>
+                                <button @click="profilePayment.days = 30"
+                                        class="flex-1 px-3 py-3 rounded-xl text-sm font-medium transition-colors"
+                                        :class="profilePayment.days === 30 ? 'bg-indigo-500 text-white' : 'bg-gray-100 hover:bg-gray-200'">
+                                    30 дней
+                                </button>
+                                <button @click="profilePayment.days = 45"
+                                        class="flex-1 px-3 py-3 rounded-xl text-sm font-medium transition-colors"
+                                        :class="profilePayment.days === 45 ? 'bg-indigo-500 text-white' : 'bg-gray-100 hover:bg-gray-200'">
+                                    45 дней
+                                </button>
+                                <button @click="profilePayment.days = 60"
+                                        class="flex-1 px-3 py-3 rounded-xl text-sm font-medium transition-colors"
+                                        :class="profilePayment.days === 60 ? 'bg-indigo-500 text-white' : 'bg-gray-100 hover:bg-gray-200'">
+                                    60 дней
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Примечание -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Примечание</label>
+                            <input type="text"
+                                   class="glass w-full px-4 py-3 rounded-xl"
+                                   placeholder="Комментарий"
+                                   x-model="profilePayment.note">
+                        </div>
+
+                        <!-- Кнопки -->
+                        <div class="flex items-end gap-2">
+                            <button @click="submitProfilePayment()"
+                                    :disabled="!profilePayment.profileId || !profilePayment.days"
+                                    class="flex-1 glow-button px-4 py-3 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-credit-card mr-2"></i>Оплатить
+                            </button>
+                            <button @click="removeProfilePayment()"
+                                    :disabled="!profilePayment.profileId"
+                                    class="px-4 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Убрать оплату с анкеты">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Статистика и история -->
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                     <div class="glass rounded-2xl p-6 text-center">
@@ -1611,6 +1680,51 @@
                                     <td colspan="5" class="py-8 px-4 text-center text-gray-500">
                                         <i class="fas fa-wallet text-3xl mb-2 opacity-30"></i>
                                         <p>История пополнений пуста</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Таблица истории оплаты анкет -->
+                <div class="glass rounded-2xl p-6 mt-6">
+                    <h3 class="text-lg font-bold mb-6">
+                        <i class="fas fa-id-card text-blue-500 mr-2"></i>
+                        История оплаты анкет
+                    </h3>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-100">
+                                    <th class="text-left py-3 px-4">Дата</th>
+                                    <th class="text-left py-3 px-4">Анкета</th>
+                                    <th class="text-left py-3 px-4">Действие</th>
+                                    <th class="text-left py-3 px-4">Период</th>
+                                    <th class="text-left py-3 px-4">Примечание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="item in profilePaymentHistory" :key="item.id">
+                                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                        <td class="py-3 px-4 text-sm" x-text="formatDateTime(item.createdAt)"></td>
+                                        <td class="py-3 px-4 font-mono font-medium">#<span x-text="item.profileId"></span></td>
+                                        <td class="py-3 px-4">
+                                            <span x-show="item.actionType === 'payment'" class="px-2 py-1 bg-green-100 text-green-600 rounded text-xs">Оплата</span>
+                                            <span x-show="item.actionType === 'removal'" class="px-2 py-1 bg-red-100 text-red-600 rounded text-xs">Снятие</span>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <span x-show="item.days > 0" class="text-blue-600 font-semibold" x-text="item.days + ' дней'"></span>
+                                            <span x-show="item.days === 0" class="text-gray-400">-</span>
+                                        </td>
+                                        <td class="py-3 px-4 text-sm text-gray-500" x-text="item.note || '-'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="profilePaymentHistory.length === 0">
+                                    <td colspan="5" class="py-8 px-4 text-center text-gray-500">
+                                        <i class="fas fa-id-card text-3xl mb-2 opacity-30"></i>
+                                        <p>История оплаты анкет пуста</p>
                                     </td>
                                 </tr>
                             </tbody>
@@ -2254,6 +2368,12 @@
                     amount: 10,
                     note: ''
                 },
+                profilePayment: {
+                    profileId: '',
+                    days: 30,
+                    note: ''
+                },
+                profilePaymentHistory: [],
 
                 // Инициализация - загрузка данных с сервера
                 async init() {
@@ -3721,12 +3841,19 @@
                             this.financeAdmins = adminsData.admins;
                         }
 
-                        // Загружаем историю пополнений
+                        // Загружаем историю пополнений админов
                         const historyRes = await fetch(`${API_BASE}/api/billing/history?userId=${this.currentUser.id}&limit=100`);
                         const historyData = await historyRes.json();
                         if (historyData.success) {
                             this.financeHistory = historyData.history;
                             this.financeTotalSum = historyData.totalSum;
+                        }
+
+                        // Загружаем историю оплаты анкет
+                        const profileHistoryRes = await fetch(`${API_BASE}/api/billing/profile-payment-history?userId=${this.currentUser.id}&limit=100`);
+                        const profileHistoryData = await profileHistoryRes.json();
+                        if (profileHistoryData.success) {
+                            this.profilePaymentHistory = profileHistoryData.history;
                         }
                     } catch (e) {
                         console.error('loadFinanceData error:', e);
@@ -3773,6 +3900,72 @@
                         }
                     } catch (e) {
                         console.error('submitFinanceTopup error:', e);
+                        alert('Ошибка соединения');
+                    }
+                },
+
+                // Оплатить анкету (директор)
+                async submitProfilePayment() {
+                    if (!this.profilePayment.profileId || !this.profilePayment.days) {
+                        alert('Введите ID анкеты и выберите период');
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/billing/pay-profile`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileId: this.profilePayment.profileId,
+                                days: this.profilePayment.days,
+                                byUserId: this.currentUser.id,
+                                note: this.profilePayment.note || null
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert(`Анкета #${this.profilePayment.profileId} оплачена на ${this.profilePayment.days} дней`);
+                            this.profilePayment = { profileId: '', days: 30, note: '' };
+                            await this.loadFinanceData();
+                            await this.loadAccounts();
+                        } else {
+                            alert(data.error || 'Ошибка оплаты');
+                        }
+                    } catch (e) {
+                        console.error('submitProfilePayment error:', e);
+                        alert('Ошибка соединения');
+                    }
+                },
+
+                // Убрать оплату с анкеты (директор)
+                async removeProfilePayment() {
+                    if (!this.profilePayment.profileId) {
+                        alert('Введите ID анкеты');
+                        return;
+                    }
+
+                    if (!confirm(`Убрать оплату с анкеты #${this.profilePayment.profileId}?`)) return;
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/billing/remove-payment`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileId: this.profilePayment.profileId,
+                                byUserId: this.currentUser.id
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert(`Оплата с анкеты #${this.profilePayment.profileId} снята`);
+                            this.profilePayment = { profileId: '', days: 30, note: '' };
+                            await this.loadFinanceData();
+                            await this.loadAccounts();
+                        } else {
+                            alert(data.error || 'Ошибка');
+                        }
+                    } catch (e) {
+                        console.error('removeProfilePayment error:', e);
                         alert('Ошибка соединения');
                     }
                 },

@@ -318,10 +318,26 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_billing_history_date ON billing_history(created_at)`);
         await fixSerialSequence('billing_history');
 
+        // 18. История оплаты анкет
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS profile_payment_history (
+                id SERIAL PRIMARY KEY,
+                profile_id VARCHAR(50) NOT NULL,
+                days INTEGER NOT NULL DEFAULT 0,
+                action_type VARCHAR(20) NOT NULL DEFAULT 'payment',
+                by_user_id INTEGER REFERENCES users(id),
+                note TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_profile_payment_history_profile ON profile_payment_history(profile_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_profile_payment_history_date ON profile_payment_history(created_at)`);
+        await fixSerialSequence('profile_payment_history');
+
         // Очистка старых данных
         await cleanupOldData();
 
-        console.log('✅ База данных готова к работе (v8.0 - история пополнений)');
+        console.log('✅ База данных готова к работе (v9.0 - история оплаты анкет)');
     } catch (e) {
         console.error('❌ Ошибка инициализации БД:', e.message);
     }
