@@ -449,4 +449,103 @@ router.post('/incoming_message', asyncHandler(async (req, res) => {
     res.json({ success: true, isFirstFromMan });
 }));
 
+/**
+ * POST /api/favorite_template
+ * Сохранить избранный шаблон рассылки
+ */
+router.post('/favorite_template', asyncHandler(async (req, res) => {
+    const { profileId, botId, templateName, templateText, type = 'mail' } = req.body;
+
+    if (!profileId || !templateText) {
+        return res.status(400).json({ error: 'profileId и templateText обязательны' });
+    }
+
+    // Получаем admin_id и translator_id из профиля
+    const profileResult = await pool.query(
+        `SELECT assigned_admin_id, assigned_translator_id FROM allowed_profiles WHERE profile_id = $1`,
+        [profileId]
+    );
+
+    const adminId = profileResult.rows[0]?.assigned_admin_id || null;
+    const translatorId = profileResult.rows[0]?.assigned_translator_id || null;
+
+    // Проверяем, нет ли уже такого шаблона
+    const existCheck = await pool.query(
+        `SELECT id FROM favorite_templates WHERE profile_id = $1 AND template_text = $2`,
+        [profileId, templateText]
+    );
+
+    if (existCheck.rows.length > 0) {
+        return res.json({ success: true, message: 'Шаблон уже в избранном', id: existCheck.rows[0].id });
+    }
+
+    const result = await pool.query(
+        `INSERT INTO favorite_templates (profile_id, bot_id, template_name, template_text, type, admin_id, translator_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [profileId, botId || null, templateName || 'Без названия', templateText, type, adminId, translatorId]
+    );
+
+    console.log(`❤️ Избранный шаблон сохранён: ${profileId} - ${templateName}`);
+    res.json({ success: true, id: result.rows[0].id });
+}));
+
+/**
+ * DELETE /api/favorite_template
+ * Удалить шаблон из избранного
+ */
+router.delete('/favorite_template', asyncHandler(async (req, res) => {
+    const { profileId, templateText } = req.body;
+
+    if (!profileId || !templateText) {
+        return res.status(400).json({ error: 'profileId и templateText обязательны' });
+    }
+
+    await pool.query(
+        `DELETE FROM favorite_templates WHERE profile_id = $1 AND template_text = $2`,
+        [profileId, templateText]
+    );
+
+    res.json({ success: true });
+}));
+
+/**
+ * GET /api/favorite_templates
+ * Получить избранные шаблоны с фильтрацией по роли
+ */
+router.get('/favorite_templates', asyncHandler(async (req, res) => {
+    const { userId, role } = req.query;
+
+    let query = `
+        SELECT ft.*, ap.login as profile_login
+        FROM favorite_templates ft
+        LEFT JOIN allowed_profiles ap ON ft.profile_id = ap.profile_id
+    `;
+    let params = [];
+
+    if (role === 'admin' && userId) {
+        query += ` WHERE ft.admin_id = $1`;
+        params.push(userId);
+    } else if (role === 'translator' && userId) {
+        query += ` WHERE ft.translator_id = $1`;
+        params.push(userId);
+    }
+
+    query += ` ORDER BY ft.created_at DESC`;
+
+    const result = await pool.query(query, params);
+
+    res.json({
+        success: true,
+        templates: result.rows.map(t => ({
+            id: t.id,
+            profileId: t.profile_id,
+            profileLogin: t.profile_login,
+            templateName: t.template_name,
+            templateText: t.template_text,
+            type: t.type,
+            createdAt: t.created_at
+        }))
+    });
+}));
+
 module.exports = router;

@@ -251,6 +251,25 @@ async function initDatabase() {
             await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS settings_key_unique ON settings(key)`);
         } catch (e) { /* уже существует */ }
 
+        // 13. Таблица избранных шаблонов рассылки
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS favorite_templates (
+                id SERIAL PRIMARY KEY,
+                profile_id VARCHAR(100) NOT NULL,
+                bot_id VARCHAR(100),
+                template_name VARCHAR(255),
+                template_text TEXT NOT NULL,
+                type VARCHAR(20) DEFAULT 'mail',
+                admin_id INTEGER,
+                translator_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_fav_tpl_profile ON favorite_templates(profile_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_fav_tpl_admin ON favorite_templates(admin_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_fav_tpl_translator ON favorite_templates(translator_id)`);
+        await fixSerialSequence('favorite_templates');
+
         // Очистка старых данных
         await cleanupOldData();
 

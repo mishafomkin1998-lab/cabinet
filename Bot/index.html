@@ -844,6 +844,18 @@
             }
         }
 
+        // 5. Функция проверки статуса профиля (paused)
+        async function checkProfilePaused(profileId) {
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/profiles/${encodeURIComponent(profileId)}/status`);
+                const data = await response.json();
+                return data.paused === true;
+            } catch (error) {
+                console.error(`❌ Ошибка проверки статуса профиля:`, error);
+                return false; // В случае ошибки разрешаем рассылку
+            }
+        }
+
         // === КРИТИЧЕСКИ ВАЖНО: Скрипт "Анти-сон" ===
         const KEEP_ALIVE_SCRIPT = `
             console.log("%c[Lababot] Анти-сон активирован", "color: green; font-weight: bold");
@@ -1825,8 +1837,17 @@
                 } catch (e) {}
             }
 
-            startMail(text) {
+            async startMail(text) {
                 if(!this.token) return;
+
+                // Проверяем статус профиля на сервере
+                const isPaused = await checkProfilePaused(this.displayId);
+                if (isPaused) {
+                    this.log(`⛔ Рассылка заблокирована - анкета приостановлена в личном кабинете`);
+                    alert(`Анкета ${this.displayId} приостановлена в личном кабинете. Рассылка невозможна.`);
+                    return;
+                }
+
                 this.isMailRunning = true;
                 this.updateUI();
                 this.log(`🚀 MAIL Started`);
@@ -1998,8 +2019,17 @@
                 this.updateUI();
             }
 
-            startChat(fullText) {
+            async startChat(fullText) {
                 if(!this.token) return;
+
+                // Проверяем статус профиля на сервере
+                const isPaused = await checkProfilePaused(this.displayId);
+                if (isPaused) {
+                    this.log(`⛔ Чат заблокирован - анкета приостановлена в личном кабинете`);
+                    alert(`Анкета ${this.displayId} приостановлена в личном кабинете. Чат невозможен.`);
+                    return;
+                }
+
                 if (this.chatSettings.rotationStartTime === 0) this.chatSettings.rotationStartTime = Date.now();
                 this.isChatRunning = true;
                 this.updateUI();
@@ -2663,12 +2693,49 @@
             updateTemplateDropdown(botId, idx);
         }
 
-        function toggleTemplateFavorite(botId) {
+        async function toggleTemplateFavorite(botId) {
             const idx = document.getElementById(`tpl-select-${botId}`).value;
             if(idx === "") return;
             const bot = bots[botId];
             const tpls = getBotTemplates(bot.login)['mail'];
-            if(tpls[idx]) { tpls[idx].favorite = !tpls[idx].favorite; localStorage.setItem('botTemplates', JSON.stringify(botTemplates)); updateTemplateDropdown(botId, idx); }
+            if(tpls[idx]) {
+                const wasNotFavorite = !tpls[idx].favorite;
+                tpls[idx].favorite = wasNotFavorite;
+                localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+                updateTemplateDropdown(botId, idx);
+
+                // Синхронизируем с сервером
+                try {
+                    if (wasNotFavorite) {
+                        // Добавляем в избранное на сервере
+                        await fetch(`${LABABOT_SERVER}/api/favorite_template`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileId: bot.displayId,
+                                botId: bot.id,
+                                templateName: tpls[idx].name,
+                                templateText: tpls[idx].text,
+                                type: 'mail'
+                            })
+                        });
+                        console.log(`❤️ Шаблон "${tpls[idx].name}" добавлен в избранное на сервере`);
+                    } else {
+                        // Удаляем из избранного на сервере
+                        await fetch(`${LABABOT_SERVER}/api/favorite_template`, {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileId: bot.displayId,
+                                templateText: tpls[idx].text
+                            })
+                        });
+                        console.log(`💔 Шаблон "${tpls[idx].name}" удалён из избранного на сервере`);
+                    }
+                } catch(e) {
+                    console.error('Ошибка синхронизации избранного:', e);
+                }
+            }
         }
 
         function deleteTemplate(botId) {

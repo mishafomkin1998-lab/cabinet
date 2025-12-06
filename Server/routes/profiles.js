@@ -156,6 +156,27 @@ router.post('/assign', async (req, res) => {
 });
 
 /**
+ * GET /api/profiles/:profileId/status
+ * Проверяет статус анкеты (paused)
+ */
+router.get('/:profileId/status', async (req, res) => {
+    const { profileId } = req.params;
+    try {
+        const result = await pool.query(
+            `SELECT paused FROM allowed_profiles WHERE profile_id = $1`,
+            [profileId]
+        );
+        if (result.rows.length === 0) {
+            return res.json({ success: true, paused: false, exists: false });
+        }
+        res.json({ success: true, paused: result.rows[0].paused || false, exists: true });
+    } catch (e) {
+        console.error('Profile status error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
  * POST /api/profiles/toggle-access
  * Переключает статус paused для анкеты (остановить/запустить)
  */
