@@ -1865,6 +1865,9 @@
                         const convId = this.getConvId(user.AccountId);
 
                         // 3. Отправляем полную статистику на НАШ сервер Lababot
+                        // DEBUG: Проверка флага usedAi перед отправкой
+                        console.log(`🔍 DEBUG Mail: this.usedAi = ${this.usedAi}, this.id = ${this.id}`);
+
                         const lababotResult = await sendMessageToLababot({
                             botId: this.id,
                             accountDisplayId: this.displayId,
@@ -2030,6 +2033,9 @@
                         const isLast = this.isLastMessageInRotation();
 
                         // 3. Отправляем полную статистику на НАШ сервер Lababot
+                        // DEBUG: Проверка флага usedAi перед отправкой
+                        console.log(`🔍 DEBUG Chat: this.usedAi = ${this.usedAi}, this.id = ${this.id}`);
+
                         const lababotResult = await sendMessageToLababot({
                             botId: this.id,
                             accountDisplayId: this.displayId,
