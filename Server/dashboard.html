@@ -466,14 +466,14 @@
 <body x-data="dashboard()" x-init="init()" :class="{ 'dark': darkMode }" class="text-gray-800">
     <div class="flex h-screen">
         <!-- Сайдбар -->
-        <aside class="glass-sidebar w-64 flex-shrink-0 flex flex-col p-5">
+        <aside class="glass-sidebar w-64 flex-shrink-0 flex flex-col p-4">
             <!-- Логотип -->
-            <div class="mb-10">
+            <div class="mb-4">
                 <a href="index.html" class="flex items-center">
-                    <div class="w-11 h-11 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg">
-                        <i class="fas fa-robot text-white text-base"></i>
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg">
+                        <i class="fas fa-robot text-white text-sm"></i>
                     </div>
-                    <h1 class="text-xl font-bold ml-3 gradient-text">Nova</h1>
+                    <h1 class="text-lg font-bold ml-3 gradient-text">Nova</h1>
                 </a>
             </div>
             
@@ -520,7 +520,7 @@
             </nav>
 
             <!-- Status -->
-            <div class="pt-5 border-t border-gray-100">
+            <div class="pt-3 border-t border-gray-100">
                 <div class="flex items-center">
                     <div class="status-dot mr-2"></div>
                     <span class="text-sm text-gray-600" x-text="t('messages.allSystemsActive')"></span>
@@ -529,7 +529,7 @@
         </aside>
 
         <!-- Main content -->
-        <main class="flex-1 overflow-y-auto px-6 pt-4 pb-6">
+        <main class="flex-1 overflow-y-auto px-5 pt-2 pb-4">
             <!-- Loading indicator -->
             <div x-show="loading" class="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
                 <div class="text-center">
@@ -553,10 +553,10 @@
             </div>
 
             <!-- Header -->
-            <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center justify-between mb-3">
                 <div>
-                    <h2 class="text-2xl font-bold" x-text="getPageTitle()"></h2>
-                    <p class="text-gray-500" x-text="getPageSubtitle()"></p>
+                    <h2 class="text-xl font-bold" x-text="getPageTitle()"></h2>
+                    <p class="text-sm text-gray-500" x-text="getPageSubtitle()"></p>
                 </div>
 
                 <div class="flex items-center space-x-3">
@@ -949,6 +949,12 @@
                     <div class="glass rounded-2xl p-6">
                         <h3 class="text-lg font-bold mb-6" x-text="t('control.activeSessions')"></h3>
                         <div class="space-y-4">
+                            <!-- Сообщение если ботов нет -->
+                            <div x-show="bots.length === 0" class="text-center py-8 text-gray-500">
+                                <i class="fas fa-robot text-4xl mb-3 opacity-30"></i>
+                                <p>Нет активных ботов</p>
+                                <p class="text-sm">Боты появятся здесь после подключения</p>
+                            </div>
                             <template x-for="bot in bots" :key="bot.id">
                                 <div class="p-4 rounded-xl border border-gray-100">
                                     <div class="flex items-center justify-between mb-3">
@@ -1327,6 +1333,16 @@
                 <!-- Фильтры истории -->
                 <div class="glass rounded-2xl p-5 mb-6">
                     <div class="flex items-center gap-4 flex-wrap">
+                        <!-- Поиск по анкете -->
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="text"
+                                   class="glass pl-10 pr-4 py-2.5 rounded-xl w-48"
+                                   placeholder="Поиск по ID анкеты..."
+                                   x-model="historyFilter.profileId"
+                                   @keyup.enter="loadProfileHistory()">
+                        </div>
+
                         <!-- Выбор админа -->
                         <div>
                             <select class="glass px-4 py-2.5 rounded-xl" x-model="historyFilter.admin">
@@ -1870,6 +1886,7 @@
                 // Фильтры истории
                 historyFilter: {
                     admin: '',
+                    profileId: '',
                     dateFrom: '',
                     dateTo: ''
                 },
@@ -3023,6 +3040,9 @@
                         }
                         if (this.historyFilter.admin) {
                             url += `&adminId=${this.historyFilter.admin}`;
+                        }
+                        if (this.historyFilter.profileId) {
+                            url += `&profileId=${this.historyFilter.profileId}`;
                         }
                         const res = await fetch(url);
                         const data = await res.json();

@@ -299,7 +299,7 @@ router.get('/:profileId/ai-status', async (req, res) => {
  * История действий с анкетами
  */
 router.get('/history', async (req, res) => {
-    const { userId, role, adminId, dateFrom, dateTo, limit = 100 } = req.query;
+    const { userId, role, adminId, profileId, dateFrom, dateTo, limit = 100 } = req.query;
     try {
         let filter = 'WHERE 1=1';
         let params = [limit];
@@ -318,6 +318,12 @@ router.get('/history', async (req, res) => {
         if (adminId) {
             filter += ` AND pa.performed_by_id = $${paramIndex++}`;
             params.push(adminId);
+        }
+
+        // Фильтр по ID анкеты
+        if (profileId) {
+            filter += ` AND pa.profile_id ILIKE $${paramIndex++}`;
+            params.push(`%${profileId}%`);
         }
 
         // Фильтр по датам
