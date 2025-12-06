@@ -659,6 +659,7 @@
         let minichatBotId = null;
         let minichatPartnerId = null;
         let minichatLastMessageId = 0;
+        let minichatType = 'mail'; // 'mail' или 'chat'
 
         // ============= API ДЛЯ ОТПРАВКИ ДАННЫХ НА LABABOT SERVER =============
         const LABABOT_SERVER = 'http://188.137.253.169:3000';
@@ -977,7 +978,7 @@
                     let logClass = '';
                     
                     if (l.type === 'chat' || l.type === 'mail') {
-                         linkAction = `openMiniChat('${l.botId}', '${partnerId}', '${partnerName}')`; 
+                         linkAction = `openMiniChat('${l.botId}', '${partnerId}', '${partnerName}', '${l.type}')`;
                          content = `${l.type === 'chat' ? '💬' : '💌'} Новое ${l.type === 'chat' ? 'сообщение' : 'письмо'} от <b>${partnerName}</b> (ID ${partnerId})`;
                     } else if (l.type === 'vip-online') {
                          logClass = 'vip';
@@ -1005,21 +1006,35 @@
         };
         setInterval(() => Logger.cleanOld(), 5000);
         
-        async function openMiniChat(botId, partnerId, partnerName) {
+        async function openMiniChat(botId, partnerId, partnerName, type = 'mail') {
             minichatBotId = botId;
             minichatPartnerId = partnerId;
-            minichatLastMessageId = 0; 
-            
-            selectTab(botId); 
+            minichatLastMessageId = 0;
+            minichatType = type; // 'mail' или 'chat'
+
+            selectTab(botId);
 
             document.getElementById('minichat-partner-id').innerText = partnerId;
             document.getElementById('minichat-partner-name').innerText = partnerName;
             document.getElementById('minichat-bot-display-id').innerText = bots[botId].displayId;
             document.getElementById('minichat-history').innerHTML = '<div class="text-center text-muted small mt-5"><i class="fa fa-spinner fa-spin"></i> Загрузка истории...</div>';
             document.getElementById('minichat-input').value = '';
-            
+
+            // Обновляем заголовок модального окна в зависимости от типа
+            const modalTitle = document.querySelector('#minichat-modal .modal-header span');
+            if (modalTitle) {
+                modalTitle.innerHTML = type === 'chat'
+                    ? '💬 Чат с <span id="minichat-partner-name">' + partnerName + '</span>'
+                    : '💌 Переписка с <span id="minichat-partner-name">' + partnerName + '</span>';
+            }
+
             openModal('minichat-modal');
-            await loadMiniChatHistory();
+
+            if (type === 'chat') {
+                await loadMiniChatHistoryForChat();
+            } else {
+                await loadMiniChatHistory();
+            }
         }
 
         async function loadMiniChatHistory() {
@@ -1069,6 +1084,59 @@
             }
         }
 
+        // Загрузка истории ЧАТА (не писем)
+        async function loadMiniChatHistoryForChat() {
+            if (!minichatBotId || !minichatPartnerId) return;
+
+            const bot = bots[minichatBotId];
+            if (!bot) return;
+
+            const chatHistoryEl = document.getElementById('minichat-history');
+
+            try {
+                // Используем chat-messages API с id мужчины
+                const res = await makeApiRequest(bot, 'POST', '/chat-messages', { id: minichatPartnerId });
+                const data = res.data;
+
+                if (!data.IsSuccess) {
+                    chatHistoryEl.innerHTML = '<div class="text-center text-danger small mt-5">Ошибка загрузки чата.</div>';
+                    return;
+                }
+
+                const msgs = data.Messages || [];
+
+                chatHistoryEl.innerHTML = '';
+
+                // Сообщения приходят в обратном порядке (новые сверху), сортируем по дате
+                msgs.sort((a, b) => new Date(a.Date) - new Date(b.Date));
+
+                for (const msg of msgs) {
+                    if (!msg.Body) continue;
+
+                    // IsMyMessage: false = сообщение от мужчины, true = наше сообщение
+                    const isMyMessage = msg.IsMyMessage === true;
+                    const msgDiv = document.createElement('div');
+                    msgDiv.className = `chat-msg ${isMyMessage ? 'me' : 'partner'}`;
+
+                    const timeStr = new Date(msg.Date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                    msgDiv.innerHTML = `<div class="msg-bubble">${msg.Body}</div><div class="msg-time">${timeStr}</div>`;
+
+                    chatHistoryEl.appendChild(msgDiv);
+                }
+
+                if (msgs.length === 0) {
+                    chatHistoryEl.innerHTML = '<div class="text-center text-muted small mt-5">История чата пуста.</div>';
+                }
+
+                chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
+
+            } catch (e) {
+                chatHistoryEl.innerHTML = '<div class="text-center text-danger small mt-5">Ошибка загрузки истории чата.</div>';
+                console.error("MiniChat (chat) history error:", e);
+            }
+        }
+
         async function sendMiniChatMessage() {
             if (!minichatBotId || !minichatPartnerId) return;
 
@@ -1082,19 +1150,26 @@
             inputEl.disabled = true;
 
             try {
-                const checkRes = await makeApiRequest(bot, 'GET', `/api/messages/check-send/${minichatPartnerId}`);
-                if (!checkRes.data.CheckId) throw new Error("Check send failed");
+                if (minichatType === 'chat') {
+                    // Отправка через чат API
+                    const payload = { recipientId: minichatPartnerId, body: message };
+                    await makeApiRequest(bot, 'POST', '/chat-send', payload);
+                } else {
+                    // Отправка через почтовый API
+                    const checkRes = await makeApiRequest(bot, 'GET', `/api/messages/check-send/${minichatPartnerId}`);
+                    if (!checkRes.data.CheckId) throw new Error("Check send failed");
 
-                const payload = { 
-                    CheckId: checkRes.data.CheckId, 
-                    RecipientAccountId: minichatPartnerId, 
-                    Body: message, 
-                    ReplyForMessageId: minichatLastMessageId || null, 
-                    AttachmentName: null, AttachmentHash: null, AttachmentFile: null 
-                };
-                
-                await makeApiRequest(bot, 'POST', '/api/messages/send', payload);
-                
+                    const payload = {
+                        CheckId: checkRes.data.CheckId,
+                        RecipientAccountId: minichatPartnerId,
+                        Body: message,
+                        ReplyForMessageId: minichatLastMessageId || null,
+                        AttachmentName: null, AttachmentHash: null, AttachmentFile: null
+                    };
+
+                    await makeApiRequest(bot, 'POST', '/api/messages/send', payload);
+                }
+
                 const chatHistoryEl = document.getElementById('minichat-history');
                 const msgDiv = document.createElement('div');
                 msgDiv.className = `chat-msg me`;
@@ -1104,9 +1179,9 @@
                 chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
 
                 inputEl.value = '';
-                
+
             } catch (e) {
-                alert("Ошибка отправки сообщения. См. консоль.");
+                alert(`Ошибка отправки ${minichatType === 'chat' ? 'чата' : 'письма'}. См. консоль.`);
                 console.error("MiniChat send error:", e);
                 inputEl.value = message;
             } finally {
