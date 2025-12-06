@@ -114,7 +114,53 @@ async function initDatabase() {
         await pool.query(`ALTER TABLE allowed_profiles ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'offline'`);
         await pool.query(`ALTER TABLE allowed_profiles ADD COLUMN IF NOT EXISTS last_online TIMESTAMP`);
 
-        // 3. Таблица ботов
+        // 3. Таблица ботов - МИГРАЦИЯ: пересоздаём если id имеет неправильный тип
+        try {
+            // Проверяем тип столбца id
+            const idTypeCheck = await pool.query(`
+                SELECT data_type FROM information_schema.columns
+                WHERE table_name = 'bots' AND column_name = 'id'
+            `);
+
+            if (idTypeCheck.rows.length > 0 && idTypeCheck.rows[0].data_type !== 'integer') {
+                console.log('⚠️ Таблица bots имеет неправильный тип id, пересоздаём...');
+
+                // Сохраняем данные
+                const oldData = await pool.query(`SELECT bot_id, name, platform, ip, version, status, last_heartbeat, created_at FROM bots`);
+
+                // Удаляем старую таблицу
+                await pool.query(`DROP TABLE IF EXISTS bots CASCADE`);
+
+                // Создаём новую с правильной структурой
+                await pool.query(`
+                    CREATE TABLE bots (
+                        id SERIAL PRIMARY KEY,
+                        bot_id VARCHAR(100) UNIQUE,
+                        name VARCHAR(100),
+                        platform VARCHAR(100),
+                        ip VARCHAR(50),
+                        version VARCHAR(20),
+                        status VARCHAR(20) DEFAULT 'offline',
+                        last_heartbeat TIMESTAMP,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                `);
+
+                // Восстанавливаем данные
+                for (const row of oldData.rows) {
+                    await pool.query(`
+                        INSERT INTO bots (bot_id, name, platform, ip, version, status, last_heartbeat, created_at)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    `, [row.bot_id, row.name, row.platform, row.ip, row.version, row.status, row.last_heartbeat, row.created_at]);
+                }
+
+                console.log('✅ Таблица bots пересоздана с правильной структурой');
+            }
+        } catch (e) {
+            console.log('Проверка типа bots.id:', e.message);
+        }
+
+        // Создаём таблицу если не существует
         await pool.query(`
             CREATE TABLE IF NOT EXISTS bots (
                 id SERIAL PRIMARY KEY,
@@ -138,22 +184,6 @@ async function initDatabase() {
         await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'offline'`);
         await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS last_heartbeat TIMESTAMP`);
         await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
-
-        // Миграция: Исправляем SERIAL последовательность для id в bots
-        try {
-            // Создаём последовательность если её нет
-            await pool.query(`CREATE SEQUENCE IF NOT EXISTS bots_id_seq`);
-            // Устанавливаем текущее значение последовательности на max(id) + 1
-            const maxIdResult = await pool.query(`SELECT COALESCE(MAX(id), 0) as max_id FROM bots`);
-            const maxId = maxIdResult.rows[0].max_id || 0;
-            await pool.query(`SELECT setval('bots_id_seq', $1, true)`, [Math.max(maxId, 1)]);
-            // Привязываем последовательность к столбцу id
-            await pool.query(`ALTER TABLE bots ALTER COLUMN id SET DEFAULT nextval('bots_id_seq')`);
-            // Делаем столбец NOT NULL если ещё не установлено
-            await pool.query(`ALTER TABLE bots ALTER COLUMN id SET NOT NULL`);
-        } catch (e) {
-            console.log('Миграция bots_id_seq уже выполнена или не нужна:', e.message);
-        }
 
         // Создаём уникальный индекс если его нет (игнорируем ошибку если существует)
         try {
