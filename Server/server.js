@@ -129,8 +129,15 @@ async function initDatabase() {
             )
         `);
 
-        // Миграция: добавляем bot_id если его нет
+        // Миграция: добавляем ВСЕ недостающие столбцы в bots
         await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS bot_id VARCHAR(100)`);
+        await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS name VARCHAR(100)`);
+        await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS platform VARCHAR(100)`);
+        await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS ip VARCHAR(50)`);
+        await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS version VARCHAR(20)`);
+        await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'offline'`);
+        await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS last_heartbeat TIMESTAMP`);
+        await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
 
         // Создаём уникальный индекс если его нет (игнорируем ошибку если существует)
         try {
