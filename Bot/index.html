@@ -226,6 +226,14 @@
             box-shadow: 0 -2px 15px rgba(0, 255, 136, 0.2);
         }
 
+        body.theme-dark .tab-item.tab-loading {
+            border-color: #00d4ff;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
+        }
+        body.theme-dark .tab-item.tab-loading .tab-spinner {
+            color: #00d4ff;
+        }
+
         body.theme-dark .alert-light {
             background: #1a1a1a;
             border: 1px solid #252525;
@@ -941,6 +949,25 @@
         .tab-item.tab-green { background: #d1e7dd !important; border-color: #badbcc !important; color: #0f5132 !important; }
         .tab-item.tab-yellow { background: #fff3cd !important; border-color: #ffecb5 !important; color: #664d03 !important; }
         .tab-item.tab-red { background: #f8d7da !important; border-color: #f5c2c7 !important; color: #842029 !important; }
+
+        /* Анимация загрузки вкладки */
+        .tab-item.tab-loading {
+            animation: tabPulse 1s ease-in-out infinite;
+        }
+        .tab-item.tab-loading .tab-id {
+            display: none;
+        }
+        .tab-item .tab-spinner {
+            display: none;
+        }
+        .tab-item.tab-loading .tab-spinner {
+            display: inline-block;
+        }
+        @keyframes tabPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
         .tab-item.active { 
             background: var(--tab-bg-active); color: var(--tab-text-active); border-color: var(--mode-color); 
             box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 2;
@@ -4170,7 +4197,7 @@
             // ОБНОВЛЕНИЕ 2: Привязка нового события DragNDrop
             tab.onmousedown = (e) => startTabDrag(e, tab);
 
-            tab.innerHTML = `<div class="status-dot online"></div> ${bot.displayId} <span class="tab-close" onclick="closeTab(event, '${bot.id}')"><i class="fa fa-times"></i></span>`;
+            tab.innerHTML = `<div class="status-dot online"></div><span class="tab-id">${bot.displayId}</span><span class="tab-spinner"><i class="fa fa-sync fa-spin"></i></span><span class="tab-close" onclick="closeTab(event, '${bot.id}')"><i class="fa fa-times"></i></span>`;
             document.getElementById('tabs-bar').appendChild(tab);
 
             const ws = document.createElement('div');
@@ -5013,23 +5040,59 @@
                 b.updateUI();
             });
         }
+        // Показать загрузку на вкладке
+        function showTabLoading(botId) {
+            const tab = document.getElementById(`tab-${botId}`);
+            if (tab) tab.classList.add('tab-loading');
+        }
+
+        // Скрыть загрузку на вкладке
+        function hideTabLoading(botId) {
+            const tab = document.getElementById(`tab-${botId}`);
+            if (tab) tab.classList.remove('tab-loading');
+        }
+
+        // Перелогинить одну анкету
+        async function reloginBot(botId) {
+            const bot = bots[botId];
+            if (!bot) return false;
+
+            showTabLoading(botId);
+            try {
+                const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: bot.login, Password: bot.pass });
+                if (res.data.Token) {
+                    bot.token = res.data.Token;
+                    bot.getProfileData();
+                    hideTabLoading(botId);
+                    return true;
+                }
+            } catch (e) {
+                console.error(`Relogin error for ${bot.displayId}:`, e);
+            }
+            hideTabLoading(botId);
+            return false;
+        }
+
         async function reloginAllBots() {
             if(!confirm("Перезайти во все анкеты?")) return;
             const botIds = Object.keys(bots);
             if(botIds.length === 0) return;
-            const btn = document.querySelector('.btn-refresh'); const orig = btn.innerHTML; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>'; btn.disabled = true;
+
+            const btn = document.querySelector('.btn-refresh');
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+
+            // Показываем загрузку на всех вкладках
+            botIds.forEach(id => showTabLoading(id));
+
             for(const id of botIds) {
-                const bot = bots[id];
-                try {
-                    const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: bot.login, Password: bot.pass });
-                    if(res.data.Token) { 
-                        bot.token = res.data.Token; 
-                        bot.getProfileData(); 
-                    }
-                } catch(e) {}
-                await new Promise(r => setTimeout(r, 500));
+                await reloginBot(id);
+                await new Promise(r => setTimeout(r, 300));
             }
-            btn.innerHTML = orig; btn.disabled = false;
+
+            btn.innerHTML = orig;
+            btn.disabled = false;
         }
         
         // ОБНОВЛЕННАЯ ФУНКЦИЯ exportAllData
