@@ -9,6 +9,23 @@ async function initDatabase() {
     try {
         console.log('⚙️ Проверка таблиц базы данных v6.0 (полная схема для личного кабинета)...');
 
+        // === КРИТИЧЕСКИЕ МИГРАЦИИ (выполняются первыми) ===
+        // Добавляем колонки которые могут использоваться сразу при запуске
+
+        // Миграция bots.verified_profile_id (для проверки подмены ID)
+        try {
+            await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS verified_profile_id VARCHAR(50)`);
+            await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS profile_verified_at TIMESTAMP`);
+        } catch (e) { /* таблица bots может не существовать */ }
+
+        // Миграция error_logs колонок (для логирования ошибок)
+        try {
+            await pool.query(`ALTER TABLE error_logs ADD COLUMN IF NOT EXISTS error_message TEXT`);
+            await pool.query(`ALTER TABLE error_logs ADD COLUMN IF NOT EXISTS details JSONB`);
+        } catch (e) { /* таблица error_logs может не существовать */ }
+
+        // === ОСНОВНЫЕ ТАБЛИЦЫ ===
+
         // 1. Таблица пользователей
         await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
@@ -162,7 +179,9 @@ async function initDatabase() {
                 endpoint VARCHAR(100),
                 error_type VARCHAR(100),
                 message TEXT,
+                error_message TEXT,
                 raw_data JSONB,
+                details JSONB,
                 user_id INTEGER
             )
         `);
