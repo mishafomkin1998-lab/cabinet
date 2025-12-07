@@ -1986,6 +1986,17 @@
             </div>
 
             <div class="space-y-4">
+                <!-- Выбор админа (только для директора) -->
+                <div x-show="currentUser.role === 'director'">
+                    <label class="block text-sm font-medium mb-2">Админ</label>
+                    <select class="glass w-full px-4 py-3 rounded-xl" x-model="newTranslator.adminId">
+                        <option value="">-- Выберите админа --</option>
+                        <template x-for="admin in admins" :key="admin.id">
+                            <option :value="admin.id" x-text="admin.name"></option>
+                        </template>
+                    </select>
+                </div>
+
                 <div>
                     <label class="block text-sm font-medium mb-2">Имя</label>
                     <input type="text"
@@ -2552,7 +2563,8 @@
                     login: '',
                     password: '',
                     salary: '',
-                    aiEnabled: false
+                    aiEnabled: false,
+                    adminId: ''
                 },
 
                 showAddTranslatorModal: false,
@@ -3530,12 +3542,12 @@
                     this.showAssignAccountsModal = true;
                 },
 
-                assignAccountsToAdminConfirm() {
+                async assignAccountsToAdminConfirm() {
                     // Собираем ID из чекбоксов и текстового поля
                     let ids = [...this.selectedAccountIds];
 
                     if (this.accountsToAssign.trim()) {
-                        const manualIds = this.accountsToAssign.split(/[\s,]+/).filter(id => id.length >= 5);
+                        const manualIds = this.accountsToAssign.split(/[\s,]+/).filter(id => id.length >= 3);
                         ids = [...ids, ...manualIds];
                     }
 
@@ -3547,20 +3559,36 @@
                         return;
                     }
 
-                    // Обновляем анкеты в базе данных
-                    ids.forEach(id => {
-                        const accountIndex = this.accounts.findIndex(a => String(a.id) === String(id));
-                        if (accountIndex > -1) {
-                            this.accounts[accountIndex].admin = this.selectedAdmin.login;
-                            if (this.assignComment) {
-                                this.accounts[accountIndex].comment = this.assignComment;
-                            }
-                        }
-                    });
+                    try {
+                        // Сначала получаем текущие анкеты админа
+                        const currentRes = await fetch(`${API_BASE}/api/team/${this.selectedAdmin.id}/profiles`);
+                        const currentData = await currentRes.json();
+                        const currentIds = currentData.success ? currentData.profileIds : [];
 
-                    this.showAssignAccountsModal = false;
-                    this.selectedAccountIds = [];
-                    alert(`Назначено ${ids.length} анкет администратору ${this.selectedAdmin.name}`);
+                        // Объединяем с новыми (без дубликатов)
+                        const allIds = [...new Set([...currentIds, ...ids])];
+
+                        // Отправляем на сервер
+                        const res = await fetch(`${API_BASE}/api/team/${this.selectedAdmin.id}/profiles`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ profileIds: allIds })
+                        });
+                        const data = await res.json();
+
+                        if (data.success) {
+                            this.showAssignAccountsModal = false;
+                            this.selectedAccountIds = [];
+                            alert(`Назначено ${ids.length} анкет администратору ${this.selectedAdmin.name}`);
+                            await this.loadAccounts();
+                            await this.loadTeam();
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось назначить анкеты'));
+                        }
+                    } catch (e) {
+                        console.error('assignAccountsToAdminConfirm error:', e);
+                        alert('Ошибка сети при назначении анкет');
+                    }
                 },
                 
                 viewAdminDetails(admin) {
@@ -3675,7 +3703,8 @@
                         login: '',
                         password: '',
                         salary: '',
-                        aiEnabled: false
+                        aiEnabled: false,
+                        adminId: ''
                     };
                     this.showAddTranslatorModal = true;
                 },
@@ -3686,6 +3715,17 @@
                         return;
                     }
 
+                    // Для директора требуем выбор админа
+                    if (this.currentUser.role === 'director' && !this.newTranslator.adminId) {
+                        alert('Выберите админа для переводчика');
+                        return;
+                    }
+
+                    // ownerId = выбранный админ (для директора) или текущий пользователь (для админа)
+                    const ownerId = this.currentUser.role === 'director'
+                        ? this.newTranslator.adminId
+                        : this.currentUser.id;
+
                     try {
                         // Создание нового переводчика
                         const res = await fetch(`${API_BASE}/api/users`, {
@@ -3695,7 +3735,7 @@
                                 username: this.newTranslator.login,
                                 password: this.newTranslator.password,
                                 role: 'translator',
-                                ownerId: this.currentUser.id,
+                                ownerId: ownerId,
                                 salary: this.newTranslator.salary ? parseFloat(this.newTranslator.salary) : null,
                                 aiEnabled: this.newTranslator.aiEnabled
                             })
@@ -3715,7 +3755,8 @@
                             login: '',
                             password: '',
                             salary: '',
-                            aiEnabled: false
+                            aiEnabled: false,
+                            adminId: ''
                         };
                         this.showAddTranslatorModal = false;
 
