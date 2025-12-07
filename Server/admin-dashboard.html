@@ -808,10 +808,19 @@
                             <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
                         </div>
                     </div>
-                    <!-- Кнопка добавления анкеты - скрыта для ограниченных админов -->
-                    <button x-show="!currentUser.isRestricted" @click="showAddAccountModal = true" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
-                        + Добавить
-                    </button>
+                    <!-- Кнопки действий -->
+                    <div class="flex items-center space-x-3">
+                        <!-- Кнопка оплаты - показывается когда есть выбранные анкеты -->
+                        <template x-if="!currentUser.isRestricted && selectedProfileIds.length > 0">
+                            <button @click="paySelectedProfiles" class="bg-green-500 hover:bg-green-600 px-5 py-2.5 rounded-xl text-white font-medium transition-all">
+                                <i class="fas fa-credit-card mr-2"></i>Оплатить (<span x-text="selectedProfileIds.length"></span>)
+                            </button>
+                        </template>
+                        <!-- Кнопка добавления анкеты - скрыта для ограниченных админов -->
+                        <button x-show="!currentUser.isRestricted" @click="showAddAccountModal = true" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                            + Добавить
+                        </button>
+                    </div>
                 </div>
                 
                 <!-- Сортировка -->
@@ -820,6 +829,21 @@
                         <table class="w-full">
                             <thead>
                                 <tr class="border-b border-gray-100">
+                                    <!-- Чекбокс для выбора (если не ограниченный админ) -->
+                                    <th x-show="!currentUser.isRestricted" class="text-left py-4 px-3 w-10">
+                                        <input type="checkbox"
+                                               class="w-4 h-4 rounded cursor-pointer"
+                                               x-ref="selectAllCheckbox"
+                                               @click="toggleSelectAllProfiles($event.target.checked)"
+                                               x-effect="
+                                                   const unpaidCount = filteredAccounts.filter(a => !a.isPaid && !a.isFree).length;
+                                                   const selectedCount = selectedProfileIds.length;
+                                                   if ($refs.selectAllCheckbox) {
+                                                       $refs.selectAllCheckbox.checked = selectedCount > 0 && selectedCount === unpaidCount;
+                                                       $refs.selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < unpaidCount;
+                                                   }
+                                               ">
+                                    </th>
                                     <th class="text-left py-4 px-6 cursor-pointer hover:bg-gray-50" @click="sortAccounts('id')">
                                         <span x-text="t('profiles.id')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'id' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
@@ -856,9 +880,18 @@
                             <tbody>
                                 <template x-for="account in filteredAccounts" :key="account.id">
                                     <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                                        :class="{'account-no-letters': account.letters === 0, 
+                                        :class="{'account-no-letters': account.letters === 0,
                                                 'account-online': account.status === 'online',
                                                 'account-offline': account.status === 'offline'}">
+                                        <!-- Чекбокс для выбора (если не ограниченный админ) -->
+                                        <td x-show="!currentUser.isRestricted" class="py-4 px-3">
+                                            <input type="checkbox"
+                                                   class="w-4 h-4 rounded cursor-pointer"
+                                                   :value="account.id"
+                                                   :checked="selectedProfileIds.includes(account.id)"
+                                                   :disabled="account.isPaid || account.isFree"
+                                                   @click.stop="toggleProfileSelection(account.id, !selectedProfileIds.includes(account.id))">
+                                        </td>
                                         <td class="py-4 px-6 font-mono" x-text="'#' + account.id"></td>
                                         <td class="py-4 px-6" x-text="account.login"></td>
                                         <td class="py-4 px-6 font-mono text-gray-500" x-text="account.password"></td>
@@ -1248,17 +1281,18 @@
                            x-model="newAccountComment">
                 </div>
                 
-                <div class="grid grid-cols-2 gap-4">
+                <!-- Логин/пароль - только для админов с галочкой "Мой админ" -->
+                <div x-show="currentUser.isRestricted" class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium mb-2">Логин</label>
-                        <input type="text" 
+                        <input type="text"
                                class="glass w-full px-4 py-3 rounded-xl"
                                placeholder="Общий логин"
                                x-model="newAccountLogin">
                     </div>
                     <div>
                         <label class="block text-sm font-medium mb-2">Пароль</label>
-                        <input type="text" 
+                        <input type="text"
                                class="glass w-full px-4 py-3 rounded-xl"
                                placeholder="Общий пароль"
                                x-model="newAccountPassword">
@@ -1641,6 +1675,7 @@
                 sortBy: 'date',
                 sortDirection: 'desc',
                 searchQuery: '',
+                selectedProfileIds: [], // Выбранные анкеты для оплаты
                 loading: true,
                 error: null,
 
@@ -1921,19 +1956,43 @@
                         const res = await fetch(`${API_BASE}/api/profiles?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
                         const data = await res.json();
                         if (data.success) {
-                            this.accounts = data.list.map(p => ({
-                                id: p.profile_id,
-                                login: p.login || p.profile_id,
-                                password: p.password || '',
-                                status: p.status || 'offline',
-                                lastOnline: p.last_online ? new Date(p.last_online).toLocaleString('ru-RU') : '-',
-                                letters: p.letters_today || 0,
-                                admin: p.admin_name || '',
-                                translator: p.trans_name || '',
-                                addedDate: new Date(p.added_at).toLocaleDateString('ru-RU'),
-                                comment: p.note ? p.note.replace(/\s*\[Last seen:.*?\]/g, '').trim() : '',
-                                paused: p.paused || false
+                            // Получаем статус оплаты для каждого профиля
+                            const accountsWithPayment = await Promise.all(data.list.map(async (p) => {
+                                let paymentStatus = { isPaid: true, isFree: false, daysLeft: 999, isTrial: false, trialUsed: false };
+                                try {
+                                    const payRes = await fetch(`${API_BASE}/api/billing/profile-status/${p.profile_id}`);
+                                    const payData = await payRes.json();
+                                    if (payData.success) {
+                                        paymentStatus = {
+                                            isPaid: payData.isPaid,
+                                            isFree: payData.isFree,
+                                            daysLeft: payData.daysLeft,
+                                            isTrial: payData.isTrial || false,
+                                            trialUsed: payData.trialUsed || false
+                                        };
+                                    }
+                                } catch (e) {}
+
+                                return {
+                                    id: p.profile_id,
+                                    login: p.login || p.profile_id,
+                                    password: p.password || '',
+                                    status: p.status || 'offline',
+                                    lastOnline: p.last_online ? new Date(p.last_online).toLocaleString('ru-RU') : '-',
+                                    letters: p.letters_today || 0,
+                                    admin: p.admin_name || '',
+                                    translator: p.trans_name || '',
+                                    addedDate: new Date(p.added_at).toLocaleDateString('ru-RU'),
+                                    comment: p.note ? p.note.replace(/\s*\[Last seen:.*?\]/g, '').trim() : '',
+                                    paused: p.paused || false,
+                                    isPaid: paymentStatus.isPaid,
+                                    isFree: paymentStatus.isFree,
+                                    daysLeft: paymentStatus.daysLeft,
+                                    isTrial: paymentStatus.isTrial,
+                                    trialUsed: paymentStatus.trialUsed
+                                };
                             }));
+                            this.accounts = accountsWithPayment;
                         }
                     } catch (e) { console.error('loadAccounts error:', e); }
                 },
@@ -2428,7 +2487,69 @@
                         }
                     }
                 },
-                
+
+                // Функции для выделения анкет
+                toggleProfileSelection(profileId, checked) {
+                    if (checked) {
+                        if (!this.selectedProfileIds.includes(profileId)) {
+                            this.selectedProfileIds.push(profileId);
+                        }
+                    } else {
+                        this.selectedProfileIds = this.selectedProfileIds.filter(id => id !== profileId);
+                    }
+                },
+
+                toggleSelectAllProfiles(checked) {
+                    if (checked) {
+                        this.selectedProfileIds = this.filteredAccounts
+                            .filter(a => !a.isPaid && !a.isFree)
+                            .map(a => a.id);
+                    } else {
+                        this.selectedProfileIds = [];
+                    }
+                },
+
+                async paySelectedProfiles() {
+                    if (this.selectedProfileIds.length === 0) return;
+
+                    const selectedAccounts = this.accounts.filter(a => this.selectedProfileIds.includes(a.id));
+                    const PRICE_PER_PROFILE = 0.05; // $0.05 за анкету в день
+                    const DAYS = 30;
+                    const totalCost = selectedAccounts.length * PRICE_PER_PROFILE * DAYS;
+
+                    if (this.userBalance < totalCost) {
+                        alert(`Недостаточно средств. Нужно: $${totalCost.toFixed(2)}, На балансе: $${this.userBalance.toFixed(2)}`);
+                        return;
+                    }
+
+                    if (!confirm(`Оплатить ${this.selectedProfileIds.length} анкет на 30 дней за $${totalCost.toFixed(2)}?`)) return;
+
+                    let successCount = 0;
+                    try {
+                        for (const profileId of this.selectedProfileIds) {
+                            const res = await fetch(`${API_BASE}/api/billing/pay-profile`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    userId: this.currentUser.id,
+                                    profileId: profileId,
+                                    days: DAYS
+                                })
+                            });
+                            const data = await res.json();
+                            if (data.success) successCount++;
+                        }
+
+                        alert(`Оплачено ${successCount} из ${this.selectedProfileIds.length} анкет`);
+                        this.selectedProfileIds = [];
+                        await this.loadAccounts();
+                        await this.loadUserBalance();
+                    } catch (e) {
+                        console.error('paySelectedProfiles error:', e);
+                        alert('Ошибка при оплате');
+                    }
+                },
+
                 assignAccount(account) {
                     console.log(`Анкета ${account.id} назначена админу: ${account.admin}`);
                 },

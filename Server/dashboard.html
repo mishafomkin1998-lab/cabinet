@@ -528,8 +528,8 @@
                             <span class="ml-3 font-medium" x-text="t('menu.profiles')"></span>
                         </div>
                     </div>
-                    <!-- Управление - скрыто для переводчиков -->
-                    <div x-show="currentUser.role !== 'translator'">
+                    <!-- Управление - только для директора -->
+                    <div x-show="currentUser.role === 'director'">
                         <div @click="setActiveMenu('control')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'control' ? 'active' : ''">
                             <i class="fas fa-sliders-h w-5 text-gray-600"></i>
                             <span class="ml-3 font-medium" x-text="t('menu.control')"></span>
@@ -782,8 +782,8 @@
 
                 <!-- Bots and work time -->
                 <div class="grid gap-6 mb-8" :class="currentUser.role === 'translator' ? 'grid-cols-1' : 'grid-cols-2'">
-                    <!-- Статус ботов - скрыт для переводчиков -->
-                    <div x-show="currentUser.role !== 'translator'" class="glass rounded-2xl p-6">
+                    <!-- Статус ботов - только для директора -->
+                    <div x-show="currentUser.role === 'director'" class="glass rounded-2xl p-6">
                         <h3 class="text-lg font-bold mb-4" x-text="t('stats.botsStatus')"></h3>
                         <div class="text-3xl font-bold leading-tight mb-3" x-text="bots.length">0</div>
                         <div class="text-sm text-gray-500 flex gap-3 flex-wrap">
@@ -799,7 +799,61 @@
                         <div class="text-sm text-gray-500"><span x-text="t('stats.forMonth')"></span>: <span x-text="stats.metrics.workTimeMonth || '0ч 0м'"></span></div>
                     </div>
                 </div>
-                
+
+                <!-- Детальная информация о ботах - только для директора -->
+                <div x-show="currentUser.role === 'director' && bots.length > 0" class="glass rounded-2xl p-6 mb-8">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold">Мониторинг ботов</h3>
+                        <button @click="loadBotsStatus()" class="text-sm text-indigo-600 hover:text-indigo-800">
+                            <i class="fas fa-sync-alt mr-1"></i>Обновить
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-100 text-xs text-gray-500 uppercase">
+                                    <th class="text-left py-3 px-4">Бот</th>
+                                    <th class="text-left py-3 px-4">Статус</th>
+                                    <th class="text-left py-3 px-4">IP</th>
+                                    <th class="text-left py-3 px-4">Анкет</th>
+                                    <th class="text-left py-3 px-4">Версия</th>
+                                    <th class="text-left py-3 px-4">Последняя активность</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="bot in bots" :key="bot.id">
+                                    <tr class="border-b border-gray-50 hover:bg-gray-50">
+                                        <td class="py-3 px-4">
+                                            <div class="flex items-center">
+                                                <i :class="bot.icon || 'fas fa-robot'" class="mr-2 text-gray-400"></i>
+                                                <span class="font-medium" x-text="bot.name || bot.id"></span>
+                                            </div>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <span class="px-2 py-1 rounded-full text-xs font-medium"
+                                                  :class="{
+                                                      'bg-green-100 text-green-700': bot.status === 'online' || bot.status === 'active',
+                                                      'bg-yellow-100 text-yellow-700': bot.status === 'idle',
+                                                      'bg-red-100 text-red-700': bot.status === 'offline' || bot.status === 'error',
+                                                      'bg-gray-100 text-gray-700': bot.status === 'never_connected'
+                                                  }"
+                                                  x-text="bot.status === 'online' || bot.status === 'active' ? 'Online' :
+                                                          bot.status === 'idle' ? 'Idle' :
+                                                          bot.status === 'error' ? 'Error' :
+                                                          bot.status === 'never_connected' ? 'Не подключался' : 'Offline'">
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4 font-mono text-sm text-gray-500" x-text="bot.ip || '-'"></td>
+                                        <td class="py-3 px-4" x-text="bot.profilesCount || 0"></td>
+                                        <td class="py-3 px-4 text-sm text-gray-500" x-text="bot.version || '-'"></td>
+                                        <td class="py-3 px-4 text-sm text-gray-500" x-text="bot.lastHeartbeat ? new Date(bot.lastHeartbeat).toLocaleString('ru-RU') : '-'"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
                 <!-- Активность -->
                 <div class="glass rounded-2xl p-6">
                     <div class="flex justify-between items-center mb-4">
@@ -951,7 +1005,8 @@
                             </button>
                         </template>
                     </div>
-                    <button @click="showAddAccountModal = true" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                    <!-- Кнопка добавления - скрыта для переводчиков -->
+                    <button x-show="currentUser.role !== 'translator'" @click="showAddAccountModal = true" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
                         <i class="fas fa-plus mr-2"></i><span x-text="t('common.add')"></span>
                     </button>
                 </div>
@@ -1104,7 +1159,7 @@
             </div>
             
             <!-- Управление -->
-            <div x-show="activeMenu === 'control'" x-cloak class="fade-in">
+            <div x-show="activeMenu === 'control' && currentUser.role === 'director'" x-cloak class="fade-in">
                 <div class="grid grid-cols-2 gap-6">
                     <!-- Сессии -->
                     <div class="glass rounded-2xl p-6">
