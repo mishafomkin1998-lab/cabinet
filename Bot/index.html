@@ -503,6 +503,39 @@
             border-color: #333;
         }
 
+        /* Вкладки настроек */
+        body.theme-dark .settings-tabs {
+            border-bottom-color: #333;
+        }
+        body.theme-dark .settings-tab {
+            background: #252525;
+            color: #aaa;
+        }
+        body.theme-dark .settings-tab:hover {
+            background: #333;
+            color: #f0f0f0;
+        }
+        body.theme-dark .settings-tab.active {
+            background: #00ff88;
+            color: #000;
+        }
+        body.theme-dark .settings-section {
+            background: #1a1a1a;
+            border: 1px solid #333;
+        }
+        body.theme-dark .settings-section-title {
+            color: #00ff88;
+        }
+        body.theme-dark .proxy-row label {
+            color: #aaa;
+        }
+        body.theme-dark code {
+            background: #252525;
+            color: #00ff88;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
         /* Статистика */
         body.theme-dark .stat-line {
             color: #aaa;
@@ -1098,6 +1131,86 @@
         .log-link:hover { color: var(--mode-color); }
 
         #minichat-modal .modal-card { width: 450px; height: 500px; }
+
+        /* Широкое модальное окно настроек */
+        #settings-modal .modal-card {
+            width: 750px;
+            max-width: 95vw;
+            max-height: 85vh;
+        }
+        .settings-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+        .settings-tab {
+            padding: 8px 16px;
+            border: none;
+            background: #f8f9fa;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.2s;
+        }
+        .settings-tab:hover { background: #e9ecef; color: #333; }
+        .settings-tab.active { background: var(--mode-color, #0d6efd); color: white; }
+        .settings-panel { display: none; }
+        .settings-panel.active { display: block; }
+        .settings-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .settings-section-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 12px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .proxy-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .proxy-row label {
+            min-width: 110px;
+            font-size: 13px;
+            color: #555;
+        }
+        .proxy-row input { flex: 1; }
+        .proxy-row .btn-test-proxy {
+            padding: 5px 10px;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+        .proxy-status {
+            font-size: 11px;
+            min-width: 20px;
+        }
+        .proxy-status.success { color: #198754; }
+        .proxy-status.error { color: #dc3545; }
+        .proxy-status.testing { color: #0d6efd; }
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        @media (max-width: 700px) {
+            .settings-grid { grid-template-columns: 1fr; }
+            #settings-modal .modal-card { width: 95vw; }
+            .proxy-row { flex-wrap: wrap; }
+            .proxy-row label { min-width: 100%; }
+        }
+
         .chat-history { flex: 1; overflow-y: auto; background: #fafafa; border: 1px solid #eee; padding: 10px; margin-bottom: 10px; border-radius: 4px; font-size: 13px; }
         .chat-msg { margin-bottom: 8px; display: flex; flex-direction: column; }
         .chat-msg.me { align-items: flex-end; }
@@ -1275,92 +1388,165 @@
     <div id="settings-modal" class="modal-overlay">
         <div class="modal-card">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="m-0" id="settings-header-title">Глобальные настройки</h5>
-                <button class="btn btn-sm btn-outline-info" onclick="toggleInstructionView()">
-                    <i class="fa fa-info-circle"></i> <span id="btn-instr-text">Инструкция</span>
-                </button>
+                <h5 class="m-0"><i class="fa fa-cog"></i> Глобальные настройки</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeModal('settings-modal')"><i class="fa fa-times"></i></button>
             </div>
 
-            <div id="settings-main-view">
-                <div class="mb-2">
-                    <label class="form-label small">Язык</label>
-                    <select id="set-lang" class="form-select" onchange="saveGlobalSettings()">
-                        <option value="ru">Русский</option>
-                        <option value="en">English</option>
-                    </select>
+            <!-- Вкладки -->
+            <div class="settings-tabs">
+                <button class="settings-tab active" onclick="switchSettingsTab('interface')"><i class="fa fa-palette"></i> Интерфейс</button>
+                <button class="settings-tab" onclick="switchSettingsTab('proxy')"><i class="fa fa-globe"></i> Прокси</button>
+                <button class="settings-tab" onclick="switchSettingsTab('ai')"><i class="fa fa-robot"></i> AI функции</button>
+                <button class="settings-tab" onclick="switchSettingsTab('other')"><i class="fa fa-ellipsis-h"></i> Другое</button>
+            </div>
+
+            <!-- Панель: Интерфейс -->
+            <div id="settings-panel-interface" class="settings-panel active">
+                <div class="settings-grid">
+                    <div class="settings-section">
+                        <div class="settings-section-title"><i class="fa fa-language"></i> Язык и тема</div>
+                        <div class="mb-2">
+                            <label class="form-label small">Язык интерфейса</label>
+                            <select id="set-lang" class="form-select" onchange="saveGlobalSettings()">
+                                <option value="ru">Русский</option>
+                                <option value="en">English</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Тема оформления</label>
+                            <select id="set-theme" class="form-select" onchange="saveGlobalSettings()">
+                                <option value="light">Светлая</option>
+                                <option value="dark">Тёмная</option>
+                                <option value="ladadate">LadaDate</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title"><i class="fa fa-sliders-h"></i> Поведение</div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="set-sounds" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-sounds">Звуковые уведомления</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="set-confirm-close" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-confirm-close">Подтверждать закрытие вкладки</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="set-hotkeys" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-hotkeys">Горячие клавиши (Ctrl+Tab)</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="set-extended" onchange="saveGlobalSettings(); toggleExtendedFeatures()">
+                            <label class="form-check-label small" for="set-extended">Расширить возможности (AI)</label>
+                        </div>
+                    </div>
                 </div>
-                <div class="mb-2">
-                    <label class="form-label small">Тема</label>
-                    <select id="set-theme" class="form-select" onchange="saveGlobalSettings()">
-                        <option value="light">Светлая</option>
-                        <option value="dark">Тёмная</option>
-                        <option value="ladadate">LadaDate</option>
-                    </select>
+            </div>
+
+            <!-- Панель: Прокси -->
+            <div id="settings-panel-proxy" class="settings-panel">
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-network-wired"></i> Прокси для анкет (по позиции вкладки)</div>
+                    <small class="text-muted d-block mb-3">Формат: <code>ip:port</code> — Прокси применяется к анкетам по их позиции в списке вкладок</small>
+
+                    <div class="proxy-row">
+                        <label>Анкеты 1-10:</label>
+                        <input id="set-proxy-1" class="form-control form-control-sm" placeholder="ip:port" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(1)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-1" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 11-20:</label>
+                        <input id="set-proxy-2" class="form-control form-control-sm" placeholder="ip:port" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(2)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-2" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 21-30:</label>
+                        <input id="set-proxy-3" class="form-control form-control-sm" placeholder="ip:port" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(3)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-3" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 31-40:</label>
+                        <input id="set-proxy-4" class="form-control form-control-sm" placeholder="ip:port" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(4)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-4" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 41-50:</label>
+                        <input id="set-proxy-5" class="form-control form-control-sm" placeholder="ip:port" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(5)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-5" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 51-60:</label>
+                        <input id="set-proxy-6" class="form-control form-control-sm" placeholder="ip:port" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(6)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-6" class="proxy-status"></span>
+                    </div>
                 </div>
 
-                <div class="mb-3 border p-2 rounded bg-light">
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-sounds" onchange="saveGlobalSettings()">
-                        <label class="form-check-label small" for="set-sounds">Звуковые уведомления</label>
-                    </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-confirm-close" onchange="saveGlobalSettings()">
-                        <label class="form-check-label small" for="set-confirm-close">Подтверждать закрытие вкладки</label>
-                    </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-hotkeys" onchange="saveGlobalSettings()">
-                        <label class="form-check-label small" for="set-hotkeys">Горячие клавиши (Ctrl+Tab)</label>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="set-extended" onchange="saveGlobalSettings(); toggleExtendedFeatures()">
-                        <label class="form-check-label small" for="set-extended">Расширить возможности (AI, Prompts)</label>
-                    </div>
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-server"></i> Прокси для .exe (общий)</div>
+                    <small class="text-muted d-block mb-2">Формат: <code>http://user:pass@ip:port</code></small>
+                    <input id="set-proxy-url" class="form-control" placeholder="URL вашего прокси-сервера для .exe" onchange="saveGlobalSettings()">
                 </div>
-                
-                <div class="mb-2">
-                    <label class="form-label small">Proxy для Ladadate (http://user:pass@ip:port)</label>
-                    <input id="set-proxy-url" class="form-control" placeholder="URL вашего прокси-сервера" onchange="saveGlobalSettings()">
-                    <small class="text-muted" style="font-size:10px">Для работы в .exe: этот URL будет точкой входа в ваш прокси-сервер</small>
-                </div>
+            </div>
 
-                <div class="mb-2 ai-hidden" id="set-prompt-container">
-                    <label class="form-label small">OpenAI API Key (sk-...)</label>
-                    <input id="set-apikey" class="form-control mb-2" type="password" placeholder="Вставьте ключ здесь" onchange="saveGlobalSettings()">
-                    
-                    <label class="form-label small">Proxy для AI (http://user:pass@ip:port)</label>
-                    <input id="set-proxy-ai" class="form-control mb-2" placeholder="URL вашего прокси-сервера для AI" onchange="saveGlobalSettings()">
-                    <small class="text-muted" style="font-size:10px">Этот URL должен быть вашим промежуточным прокси для OpenAI</small>
-                    
-                    <label class="form-label small">Введите свой промт для "My prompt"</label>
-                    <textarea id="set-prompt" class="form-control" rows="2" placeholder="Напиши здесь промт..." onchange="saveGlobalSettings()"></textarea>
+            <!-- Панель: AI функции -->
+            <div id="settings-panel-ai" class="settings-panel">
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-key"></i> OpenAI API</div>
+                    <div class="mb-2">
+                        <label class="form-label small">API Key (sk-...)</label>
+                        <input id="set-apikey" class="form-control" type="password" placeholder="Вставьте ключ здесь" onchange="saveGlobalSettings()">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Прокси для AI (http://user:pass@ip:port)</label>
+                        <input id="set-proxy-ai" class="form-control" placeholder="URL промежуточного прокси для OpenAI" onchange="saveGlobalSettings()">
+                        <small class="text-muted" style="font-size:10px">Опционально: для обхода блокировок OpenAI</small>
+                    </div>
                 </div>
-
-                <div class="mb-3">
-                    <label class="form-label small">Proxy (http://user:pass@ip:port)</label>
-                    <input id="set-proxy" class="form-control" placeholder="Используйте расширение браузера!" disabled>
-                    <small class="text-muted" style="font-size:10px">Для тестов установите Proxy SwitchyOmega</small>
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-comment-dots"></i> My Prompt</div>
+                    <label class="form-label small">Введите свой промт для кнопки "My Prompt"</label>
+                    <textarea id="set-prompt" class="form-control" rows="4" placeholder="Напиши здесь промт для AI..." onchange="saveGlobalSettings()"></textarea>
                 </div>
+            </div>
 
-                <div class="mb-3 border p-2 rounded bg-light">
-                    <label class="form-label small"><i class="fa fa-server"></i> Translator ID (для статистики Lababot)</label>
+            <!-- Панель: Другое -->
+            <div id="settings-panel-other" class="settings-panel">
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-chart-bar"></i> Статистика Lababot</div>
+                    <label class="form-label small">Translator ID</label>
                     <input id="set-translator-id" class="form-control" type="number" placeholder="Введите ID переводчика (опционально)" onchange="saveGlobalSettings()">
                     <small class="text-muted" style="font-size:10px">Этот ID будет отправляться в статистике на сервер Lababot</small>
                 </div>
-
-                <button class="btn btn-success w-100 mb-2" onclick="saveGlobalSettings(); closeModal('settings-modal')">Сохранить</button>
-            </div>
-
-            <div id="settings-instruction-view" style="display: none;">
-                <div class="alert alert-secondary text-center">
-                    <i class="fa fa-book-open fa-2x mb-2"></i><br>
-                    1. Установите расширение <b>Proxy SwitchyOmega</b> для прокси (для браузера).<br>
-                    2. Для .exe: Убедитесь, что ваш прокси-сервер принимает запросы с <b>set-proxy-url</b> и <b>set-proxy-ai</b>.<br>
-                    3. Получите ключ на <b>platform.openai.com</b>.
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-info-circle"></i> Инструкция</div>
+                    <div class="text-muted small">
+                        <p><b>1.</b> Для браузера: установите расширение <b>Proxy SwitchyOmega</b></p>
+                        <p><b>2.</b> Для .exe: заполните "Прокси для .exe" на вкладке Прокси</p>
+                        <p><b>3.</b> Для AI: получите ключ на <b>platform.openai.com</b></p>
+                    </div>
                 </div>
-                <button class="btn btn-outline-secondary w-100 mt-auto" onclick="toggleInstructionView()">Назад к настройкам</button>
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-database"></i> Данные</div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="exportSettings()"><i class="fa fa-download"></i> Экспорт настроек</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="importSettings()"><i class="fa fa-upload"></i> Импорт настроек</button>
+                    </div>
+                </div>
             </div>
 
-            <button class="btn btn-cancel-modal w-100" onclick="closeModal('settings-modal')">Закрыть</button>
+            <!-- Скрытое поле для совместимости -->
+            <input type="hidden" id="set-proxy" value="">
+
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-success flex-fill" onclick="saveGlobalSettings(); closeModal('settings-modal')"><i class="fa fa-save"></i> Сохранить</button>
+                <button class="btn btn-outline-secondary flex-fill" onclick="closeModal('settings-modal')">Закрыть</button>
+            </div>
         </div>
     </div>
     
@@ -1392,7 +1578,9 @@
             lang: 'ru', theme: 'light', proxy: '', proxyURL: '', proxyAI: '',
             hotkeys: true, myPrompt: '', apiKey: '',
             soundsEnabled: true, confirmTabClose: true, extendedFeatures: true,
-            translatorId: null // ID переводчика для статистики
+            translatorId: null, // ID переводчика для статистики
+            // Прокси для анкет по позициям (1-10, 11-20, 21-30, 31-40, 41-50, 51-60)
+            proxy1: '', proxy2: '', proxy3: '', proxy4: '', proxy5: '', proxy6: ''
         };
         
         let globalSettings = JSON.parse(localStorage.getItem('globalSettings')) || defaultSettings;
@@ -2397,9 +2585,17 @@
             globalSettings.confirmTabClose = document.getElementById('set-confirm-close').checked;
             globalSettings.extendedFeatures = document.getElementById('set-extended').checked;
 
-            // НОВОЕ: Сохраняем Translator ID
+            // Сохраняем Translator ID
             const translatorIdValue = document.getElementById('set-translator-id').value.trim();
             globalSettings.translatorId = translatorIdValue ? parseInt(translatorIdValue) : null;
+
+            // Сохраняем прокси для анкет (1-6)
+            for (let i = 1; i <= 6; i++) {
+                const proxyInput = document.getElementById(`set-proxy-${i}`);
+                if (proxyInput) {
+                    globalSettings[`proxy${i}`] = proxyInput.value.trim();
+                }
+            }
 
             localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
 
@@ -2411,25 +2607,169 @@
                 bot.translatorId = globalSettings.translatorId;
             });
         }
-        
-        function openGlobalSettings() { 
-            document.getElementById('settings-main-view').style.display = 'block';
-            document.getElementById('settings-instruction-view').style.display = 'none';
-            document.getElementById('settings-header-title').innerText = "Глобальные настройки";
-            document.getElementById('btn-instr-text').innerText = "Инструкция";
-            openModal('settings-modal'); 
+
+        function openGlobalSettings() {
+            // Загружаем значения в форму
+            document.getElementById('set-lang').value = globalSettings.lang;
+            document.getElementById('set-theme').value = globalSettings.theme;
+            document.getElementById('set-proxy').value = globalSettings.proxy;
+            document.getElementById('set-proxy-url').value = globalSettings.proxyURL || '';
+            document.getElementById('set-proxy-ai').value = globalSettings.proxyAI || '';
+            document.getElementById('set-hotkeys').checked = globalSettings.hotkeys;
+            document.getElementById('set-apikey').value = globalSettings.apiKey || '';
+            document.getElementById('set-prompt').value = globalSettings.myPrompt || '';
+            document.getElementById('set-sounds').checked = globalSettings.soundsEnabled;
+            document.getElementById('set-confirm-close').checked = globalSettings.confirmTabClose;
+            document.getElementById('set-extended').checked = globalSettings.extendedFeatures;
+            document.getElementById('set-translator-id').value = globalSettings.translatorId || '';
+
+            // Загружаем прокси для анкет (1-6)
+            for (let i = 1; i <= 6; i++) {
+                const proxyInput = document.getElementById(`set-proxy-${i}`);
+                if (proxyInput) {
+                    proxyInput.value = globalSettings[`proxy${i}`] || '';
+                }
+            }
+
+            // Показываем первую вкладку
+            switchSettingsTab('interface');
+            openModal('settings-modal');
         }
 
-        function toggleInstructionView() {
-            const main = document.getElementById('settings-main-view');
-            const instr = document.getElementById('settings-instruction-view');
-            const title = document.getElementById('settings-header-title');
-            
-            if (main.style.display === 'none') {
-                main.style.display = 'block'; instr.style.display = 'none'; title.innerText = "Глобальные настройки";
-            } else {
-                main.style.display = 'none'; instr.style.display = 'block'; title.innerText = "Инструкция";
+        // Переключение вкладок в настройках
+        function switchSettingsTab(tabName) {
+            // Скрываем все панели
+            document.querySelectorAll('.settings-panel').forEach(panel => panel.classList.remove('active'));
+            // Убираем активный класс со всех вкладок
+            document.querySelectorAll('.settings-tab').forEach(tab => tab.classList.remove('active'));
+
+            // Показываем нужную панель
+            const panel = document.getElementById(`settings-panel-${tabName}`);
+            if (panel) panel.classList.add('active');
+
+            // Активируем нужную вкладку
+            const tabs = document.querySelectorAll('.settings-tab');
+            tabs.forEach(tab => {
+                if (tab.textContent.toLowerCase().includes(tabName.substring(0, 3)) ||
+                    tab.onclick.toString().includes(tabName)) {
+                    tab.classList.add('active');
+                }
+            });
+            // Более надежный способ - по onclick
+            document.querySelectorAll('.settings-tab').forEach(tab => {
+                if (tab.getAttribute('onclick') && tab.getAttribute('onclick').includes(`'${tabName}'`)) {
+                    tab.classList.add('active');
+                }
+            });
+        }
+
+        // Тест прокси
+        async function testProxy(num) {
+            const proxyInput = document.getElementById(`set-proxy-${num}`);
+            const statusSpan = document.getElementById(`proxy-status-${num}`);
+            const proxy = proxyInput.value.trim();
+
+            if (!proxy) {
+                statusSpan.innerHTML = '<i class="fa fa-exclamation-circle"></i>';
+                statusSpan.className = 'proxy-status error';
+                statusSpan.title = 'Введите прокси';
+                return;
             }
+
+            statusSpan.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+            statusSpan.className = 'proxy-status testing';
+            statusSpan.title = 'Проверка...';
+
+            try {
+                // Проверяем прокси через простой запрос
+                const [host, port] = proxy.split(':');
+                if (!host || !port) {
+                    throw new Error('Неверный формат. Используйте ip:port');
+                }
+
+                // Простая проверка формата
+                const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+                const portNum = parseInt(port);
+
+                if (!ipRegex.test(host) || isNaN(portNum) || portNum < 1 || portNum > 65535) {
+                    throw new Error('Неверный IP или порт');
+                }
+
+                // Если формат правильный - показываем успех (реальная проверка требует backend)
+                statusSpan.innerHTML = '<i class="fa fa-check-circle"></i>';
+                statusSpan.className = 'proxy-status success';
+                statusSpan.title = `Формат верный: ${host}:${port}`;
+
+            } catch (e) {
+                statusSpan.innerHTML = '<i class="fa fa-times-circle"></i>';
+                statusSpan.className = 'proxy-status error';
+                statusSpan.title = e.message || 'Ошибка';
+            }
+        }
+
+        // Получить прокси для бота по его позиции
+        function getProxyForBot(botId) {
+            const botIds = Object.keys(bots);
+            const position = botIds.indexOf(botId) + 1; // позиция с 1
+
+            if (position <= 0) return null;
+
+            // Определяем какой прокси использовать
+            const proxyIndex = Math.ceil(position / 10); // 1-10 -> 1, 11-20 -> 2, и т.д.
+
+            if (proxyIndex > 6) return null; // У нас только 6 прокси
+
+            const proxy = globalSettings[`proxy${proxyIndex}`];
+            return proxy || null;
+        }
+
+        // Экспорт/Импорт настроек
+        function exportSettings() {
+            const data = {
+                globalSettings,
+                botTemplates,
+                accountPreferences
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `lababot-settings-${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importSettings() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        if (data.globalSettings) {
+                            globalSettings = { ...defaultSettings, ...data.globalSettings };
+                            localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+                        }
+                        if (data.botTemplates) {
+                            botTemplates = data.botTemplates;
+                            localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+                        }
+                        if (data.accountPreferences) {
+                            accountPreferences = data.accountPreferences;
+                            localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
+                        }
+                        alert('Настройки импортированы! Перезагрузите страницу.');
+                    } catch (err) {
+                        alert('Ошибка импорта: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
         }
 
         function toggleExtendedFeatures() {
