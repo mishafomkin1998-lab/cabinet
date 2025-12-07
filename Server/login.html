@@ -136,10 +136,99 @@
                 opacity: 0;
             }
         }
+
+        /* ❄️ Новогодняя анимация снега ❄️ */
+        .snowflake {
+            position: fixed;
+            top: -10px;
+            color: #fff;
+            font-size: 1rem;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+            user-select: none;
+            pointer-events: none;
+            z-index: 1000;
+            animation: snowfall linear infinite;
+        }
+
+        @keyframes snowfall {
+            0% {
+                transform: translateY(0) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0.3;
+            }
+        }
+
+        /* Праздничная картинка */
+        .new-year-decoration {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .new-year-decoration img {
+            max-width: 120px;
+            height: auto;
+            filter: drop-shadow(0 5px 15px rgba(0,0,0,0.2));
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Праздничная гирлянда сверху */
+        .garland {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 30px;
+            background: linear-gradient(90deg,
+                #ff6b6b 0%, #feca57 15%, #48dbfb 30%,
+                #ff9ff3 45%, #1dd1a1 60%, #ff6b6b 75%,
+                #feca57 90%, #48dbfb 100%);
+            background-size: 200% 100%;
+            animation: garlandMove 3s linear infinite;
+            z-index: 999;
+            opacity: 0.8;
+        }
+
+        .garland::after {
+            content: '🎄 С Новым Годом! 🎄';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            font-size: 14px;
+        }
+
+        @keyframes garlandMove {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 200% 0%; }
+        }
     </style>
 </head>
 <body>
-    <div class="glass rounded-3xl w-full max-w-md overflow-hidden fade-in">
+    <!-- 🎄 Новогодние украшения 🎄 -->
+    <div class="garland"></div>
+
+    <!-- Праздничная картинка (замени new-year.png на свою) -->
+    <div class="new-year-decoration">
+        <img src="new-year.png" alt="С Новым Годом!" onerror="this.parentElement.style.display='none'">
+    </div>
+
+    <!-- Контейнер для снежинок -->
+    <div id="snowContainer"></div>
+
+    <div class="glass rounded-3xl w-full max-w-md overflow-hidden fade-in" style="margin-top: 40px;">
         <!-- Заголовок -->
         <div class="p-8 pb-6">
             <div class="flex items-center justify-between mb-2">
@@ -366,7 +455,52 @@
             elements.forEach((el, index) => {
                 el.style.animationDelay = `${index * 0.1}s`;
             });
+
+            // ❄️ Генерация снежинок ❄️
+            createSnowflakes();
         });
+
+        // Функция создания снежинок
+        function createSnowflakes() {
+            const snowContainer = document.getElementById('snowContainer');
+            const snowflakes = ['❄', '❅', '❆', '✻', '✼', '❉', '✽'];
+            const numberOfSnowflakes = 50;
+
+            for (let i = 0; i < numberOfSnowflakes; i++) {
+                setTimeout(() => {
+                    createSnowflake(snowContainer, snowflakes);
+                }, i * 200); // Постепенное появление
+            }
+
+            // Продолжаем создавать снежинки
+            setInterval(() => {
+                createSnowflake(snowContainer, snowflakes);
+            }, 500);
+        }
+
+        function createSnowflake(container, snowflakes) {
+            const snowflake = document.createElement('div');
+            snowflake.className = 'snowflake';
+            snowflake.innerHTML = snowflakes[Math.floor(Math.random() * snowflakes.length)];
+
+            // Случайные параметры
+            const startPositionX = Math.random() * 100;
+            const size = Math.random() * 1.5 + 0.5;
+            const duration = Math.random() * 5 + 5;
+            const opacity = Math.random() * 0.7 + 0.3;
+
+            snowflake.style.left = startPositionX + 'vw';
+            snowflake.style.fontSize = size + 'rem';
+            snowflake.style.animationDuration = duration + 's';
+            snowflake.style.opacity = opacity;
+
+            container.appendChild(snowflake);
+
+            // Удаляем снежинку после анимации
+            setTimeout(() => {
+                snowflake.remove();
+            }, duration * 1000);
+        }
     </script>
 </body>
 </html>
