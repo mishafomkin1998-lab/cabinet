@@ -944,8 +944,14 @@
                                     <th x-show="!isRestricted" class="text-left py-2 px-3 w-10">
                                         <input type="checkbox"
                                                class="w-4 h-4 rounded"
-                                               @change="toggleSelectAllProfiles($event.target.checked)"
-                                               :checked="selectedProfileIds.length > 0 && selectedProfileIds.length === filteredAccounts.filter(a => !a.isPaid && !a.isFree).length">
+                                               x-ref="selectAllCheckbox"
+                                               @click="toggleSelectAllProfiles($event.target.checked)"
+                                               x-effect="
+                                                   const unpaidCount = filteredAccounts.filter(a => !a.isPaid && !a.isFree).length;
+                                                   const selectedCount = selectedProfileIds.length;
+                                                   $refs.selectAllCheckbox.checked = selectedCount > 0 && selectedCount === unpaidCount;
+                                                   $refs.selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < unpaidCount;
+                                               ">
                                     </th>
                                     <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 100px;" @click="sortAccounts('id')">
                                         <span x-text="t('profiles.id')"></span>
@@ -995,11 +1001,11 @@
                                         <!-- Чекбокс для выбора (если не "мой админ") -->
                                         <td x-show="!isRestricted" class="py-2 px-3">
                                             <input type="checkbox"
-                                                   class="w-4 h-4 rounded"
+                                                   class="w-4 h-4 rounded cursor-pointer"
                                                    :value="account.id"
                                                    :checked="selectedProfileIds.includes(account.id)"
                                                    :disabled="account.isPaid || account.isFree"
-                                                   @change="toggleProfileSelection(account.id, $event.target.checked)">
+                                                   @click.stop="toggleProfileSelection(account.id, !selectedProfileIds.includes(account.id))">
                                         </td>
                                         <td class="py-2 px-3 font-mono" x-text="account.id"></td>
                                         <td class="py-2 px-3">
