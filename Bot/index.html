@@ -36,8 +36,202 @@
             --tab-bg-active: #e3f2fd;
             --tab-text-active: #0d6efd;
             --mode-color: #0d6efd;
+            --border-color: #dee2e6;
+            --hover-bg: #f0f0f0;
+            --input-bg: #fff;
+            --input-border: #ced4da;
+            --secondary-text: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
         }
-        
+
+        /* === ТЁМНАЯ ТЕМА === */
+        body.theme-dark {
+            --bg-color: #1a1a2e;
+            --text-color: #e4e4e4;
+            --panel-bg: #16213e;
+            --tab-bg-active: #0f3460;
+            --tab-text-active: #4fc3f7;
+            --mode-color: #4fc3f7;
+            --border-color: #2a2a4a;
+            --hover-bg: #252545;
+            --input-bg: #1a1a2e;
+            --input-border: #3a3a5a;
+            --secondary-text: #9e9e9e;
+        }
+
+        body.theme-dark .global-toolbar {
+            background: var(--panel-bg);
+            border-bottom-color: var(--border-color);
+        }
+
+        body.theme-dark .btn-circle {
+            background: var(--panel-bg);
+            border-color: var(--border-color);
+            color: var(--text-color);
+        }
+
+        body.theme-dark .btn-play { background: #1b4332; color: #40c057; border-color: #2d6a4f; }
+        body.theme-dark .btn-stop { background: #4a1515; color: #ff6b6b; border-color: #6b2020; }
+        body.theme-dark .btn-clear { background: #2a2a4a; color: #adb5bd; border-color: #3a3a5a; }
+        body.theme-dark .btn-refresh { background: #1a3a5c; color: #4fc3f7; border-color: #2a4a6c; }
+        body.theme-dark .btn-logger { background: #4a4000; color: #ffd43b; border-color: #5a5010; }
+        body.theme-dark .btn-settings { background: #2a2a4a; color: #adb5bd; border-color: #3a3a5a; }
+
+        body.theme-dark .form-control,
+        body.theme-dark .form-select {
+            background-color: var(--input-bg);
+            border-color: var(--input-border);
+            color: var(--text-color);
+        }
+
+        body.theme-dark .modal-content {
+            background: var(--panel-bg);
+            color: var(--text-color);
+            border-color: var(--border-color);
+        }
+
+        body.theme-dark .bg-light {
+            background-color: var(--bg-color) !important;
+        }
+
+        body.theme-dark .text-muted {
+            color: var(--secondary-text) !important;
+        }
+
+        body.theme-dark .bot-counter {
+            background: var(--bg-color);
+            color: var(--text-color);
+        }
+
+        body.theme-dark .tabs-container {
+            background: var(--panel-bg);
+            border-bottom-color: var(--border-color);
+        }
+
+        body.theme-dark .tab-item {
+            background: var(--bg-color);
+            border-color: var(--border-color);
+            color: var(--text-color);
+        }
+
+        body.theme-dark .tab-item.active {
+            background: var(--tab-bg-active);
+            color: var(--tab-text-active);
+        }
+
+        body.theme-dark .alert-light {
+            background: var(--bg-color);
+            border-color: var(--border-color);
+            color: var(--text-color);
+        }
+
+        body.theme-dark #welcome-screen {
+            color: var(--text-color);
+        }
+
+        body.theme-dark .status-group-wrapper {
+            border-left-color: var(--border-color);
+        }
+
+        body.theme-dark .btn-group-toggle {
+            color: var(--secondary-text);
+        }
+
+        body.theme-dark .btn-group-toggle:hover {
+            color: var(--text-color);
+        }
+
+        /* === ТЕМА LADADATE === */
+        body.theme-ladadate {
+            --bg-color: #f0f4f8;
+            --text-color: #1e3a5f;
+            --panel-bg: #ffffff;
+            --tab-bg-active: #e8f4fd;
+            --tab-text-active: #2196f3;
+            --mode-color: #2196f3;
+            --border-color: #d0dce8;
+            --hover-bg: #e8f4fd;
+            --input-bg: #fff;
+            --input-border: #b8c9d9;
+            --secondary-text: #5a7a9a;
+            --sidebar-bg: #1e3a5f;
+            --accent-orange: #f5a623;
+            --accent-green: #4caf50;
+        }
+
+        body.theme-ladadate .global-toolbar {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+            border-bottom: none;
+            box-shadow: 0 2px 10px rgba(30, 58, 95, 0.3);
+        }
+
+        body.theme-ladadate .global-toolbar .bot-counter {
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+        }
+
+        body.theme-ladadate .btn-circle {
+            background: rgba(255,255,255,0.9);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: #1e3a5f;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        body.theme-ladadate .btn-circle:hover {
+            background: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        body.theme-ladadate .btn-play { background: #e8f5e9; color: #2e7d32; border-color: #a5d6a7; }
+        body.theme-ladadate .btn-stop { background: #ffebee; color: #c62828; border-color: #ef9a9a; }
+        body.theme-ladadate .btn-refresh { background: #e3f2fd; color: #1565c0; border-color: #90caf9; }
+        body.theme-ladadate .btn-logger { background: #fff8e1; color: #f57c00; border-color: #ffcc80; }
+
+        body.theme-ladadate .tabs-container {
+            background: var(--panel-bg);
+            border-bottom: 2px solid #2196f3;
+        }
+
+        body.theme-ladadate .tab-item {
+            background: var(--bg-color);
+            border-color: var(--border-color);
+            color: var(--text-color);
+        }
+
+        body.theme-ladadate .tab-item.active {
+            background: #2196f3;
+            color: #fff;
+            border-color: #2196f3;
+        }
+
+        body.theme-ladadate .modal-content {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 10px 40px rgba(30, 58, 95, 0.2);
+        }
+
+        body.theme-ladadate .modal-header {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+            color: #fff;
+            border-radius: 12px 12px 0 0;
+        }
+
+        body.theme-ladadate .modal-header .btn-close {
+            filter: brightness(0) invert(1);
+        }
+
+        body.theme-ladadate .btn-primary {
+            background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%);
+            border: none;
+        }
+
+        body.theme-ladadate .btn-success {
+            background: linear-gradient(135deg, #4caf50 0%, #388e3c 100%);
+            border: none;
+        }
+
         body.mode-chat {
             --mode-color: #6610f2;
             --tab-bg-active: #f3e5f5;
@@ -545,7 +739,8 @@
                     <label class="form-label small">Тема</label>
                     <select id="set-theme" class="form-select" onchange="saveGlobalSettings()">
                         <option value="light">Светлая</option>
-                        <option value="dark">Темная</option>
+                        <option value="dark">Тёмная</option>
+                        <option value="ladadate">LadaDate</option>
                     </select>
                 </div>
 
@@ -1619,6 +1814,20 @@
             document.getElementById('set-confirm-close').checked = globalSettings.confirmTabClose;
             document.getElementById('set-extended').checked = globalSettings.extendedFeatures;
             document.getElementById('set-translator-id').value = globalSettings.translatorId || '';
+            applyTheme(globalSettings.theme);
+        }
+
+        function applyTheme(theme) {
+            // Убираем все классы тем
+            document.body.classList.remove('theme-dark', 'theme-ladadate');
+
+            // Применяем выбранную тему
+            if (theme === 'dark') {
+                document.body.classList.add('theme-dark');
+            } else if (theme === 'ladadate') {
+                document.body.classList.add('theme-ladadate');
+            }
+            // light - без класса, используются стандартные стили
         }
 
         function saveGlobalSettings() {
@@ -1639,6 +1848,9 @@
             globalSettings.translatorId = translatorIdValue ? parseInt(translatorIdValue) : null;
 
             localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+
+            // Применяем тему
+            applyTheme(globalSettings.theme);
 
             // Обновляем translatorId для всех существующих ботов
             Object.values(bots).forEach(bot => {
