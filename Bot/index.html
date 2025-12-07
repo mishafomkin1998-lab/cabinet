@@ -3475,12 +3475,11 @@
             async processMailUser(msgTemplate) {
                 let user = null;
                 let msgBody = '';
+                let isRetryAttempt = false;
+                let currentRetryItem = null;
                 try {
                     const target = this.mailSettings.target;
                     let users = [];
-
-                    let isRetryAttempt = false;
-                    let currentRetryItem = null;
 
                     if (target === 'inbox') {
                         const messagesRes = await makeApiRequest(this, 'GET', '/api/messages');
