@@ -9,6 +9,52 @@ const { asyncHandler, buildRoleFilter } = require('../utils/helpers');
 
 const router = express.Router();
 
+// Функция проверки статуса оплаты анкеты
+async function checkProfilePaymentStatus(profileId) {
+    const result = await pool.query(`
+        SELECT
+            ap.profile_id,
+            ap.paid_until,
+            ap.is_trial,
+            ap.trial_started_at,
+            ap.assigned_admin_id,
+            u.is_restricted as admin_is_restricted
+        FROM allowed_profiles ap
+        LEFT JOIN users u ON ap.assigned_admin_id = u.id
+        WHERE ap.profile_id = $1
+    `, [profileId]);
+
+    if (result.rows.length === 0) {
+        // Анкета не найдена - будет создана автоматически, trial доступен
+        return { isPaid: false, canTrial: true, reason: 'not_found' };
+    }
+
+    const row = result.rows[0];
+
+    // Если админ - "мой админ", оплата не требуется
+    if (row.admin_is_restricted) {
+        return { isPaid: true, isFree: true, reason: 'my_admin' };
+    }
+
+    const paidUntil = row.paid_until ? new Date(row.paid_until) : null;
+    const now = new Date();
+    const isPaid = paidUntil && paidUntil > now;
+
+    if (isPaid) {
+        const daysLeft = Math.ceil((paidUntil - now) / (1000 * 60 * 60 * 24));
+        return { isPaid: true, daysLeft, reason: 'paid' };
+    }
+
+    // Не оплачена - проверяем trial
+    const trialUsed = !!row.trial_started_at;
+    if (!trialUsed) {
+        return { isPaid: false, canTrial: true, reason: 'trial_available' };
+    }
+
+    // Trial использован и истёк
+    return { isPaid: false, canTrial: false, reason: 'payment_required' };
+}
+
 // Heartbeat (legacy)
 router.post('/heartbeat', asyncHandler(async (req, res) => {
     const { botId, accountDisplayId, status, timestamp, ip, systemInfo } = req.body;
@@ -30,6 +76,31 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
                 status: 'error',
                 error: 'profile_id_mismatch',
                 message: `ID анкеты не совпадает. Ожидается: ${verifiedId}, получен: ${accountDisplayId}`
+            });
+        }
+    }
+
+    // 0.5. Проверка оплаты анкеты
+    const paymentStatus = await checkProfilePaymentStatus(accountDisplayId);
+    if (!paymentStatus.isPaid) {
+        if (paymentStatus.canTrial) {
+            // Trial доступен - возвращаем специальный статус
+            console.log(`💳 Анкета ${accountDisplayId} не оплачена, trial доступен`);
+            return res.json({
+                status: 'trial_available',
+                message: 'Анкета не оплачена. Доступен тестовый период 2 дня.',
+                profileId: accountDisplayId,
+                canTrial: true
+            });
+        } else {
+            // Trial использован, оплата требуется
+            console.log(`🚫 Анкета ${accountDisplayId} не оплачена, trial истёк`);
+            return res.status(402).json({
+                status: 'payment_required',
+                error: 'payment_required',
+                message: 'Тестовый период истёк. Для продолжения работы требуется оплата.',
+                profileId: accountDisplayId,
+                canTrial: false
             });
         }
     }
@@ -130,6 +201,29 @@ router.post('/bot/heartbeat', asyncHandler(async (req, res) => {
                     status: 'error',
                     error: 'profile_id_mismatch',
                     message: `ID анкеты не совпадает. Ожидается: ${verifiedId}, получен: ${profileId}`
+                });
+            }
+        }
+
+        // Проверка оплаты анкеты
+        const paymentStatus = await checkProfilePaymentStatus(profileId);
+        if (!paymentStatus.isPaid) {
+            if (paymentStatus.canTrial) {
+                console.log(`💳 Анкета ${profileId} не оплачена, trial доступен`);
+                return res.json({
+                    status: 'trial_available',
+                    message: 'Анкета не оплачена. Доступен тестовый период 2 дня.',
+                    profileId: profileId,
+                    canTrial: true
+                });
+            } else {
+                console.log(`🚫 Анкета ${profileId} не оплачена, trial истёк`);
+                return res.status(402).json({
+                    status: 'payment_required',
+                    error: 'payment_required',
+                    message: 'Тестовый период истёк. Для продолжения работы требуется оплата.',
+                    profileId: profileId,
+                    canTrial: false
                 });
             }
         }
@@ -394,6 +488,85 @@ router.post('/sync-prompt', asyncHandler(async (req, res) => {
     }
 
     res.json({ success: true, message: 'Prompt synced' });
+}));
+
+// Активация тестового периода из бота
+router.post('/activate-trial', asyncHandler(async (req, res) => {
+    const { profileId, botId } = req.body;
+
+    if (!profileId) {
+        return res.status(400).json({
+            success: false,
+            error: 'profile_id_required',
+            message: 'Укажите ID анкеты'
+        });
+    }
+
+    // Проверяем существование анкеты
+    const profile = await pool.query(
+        `SELECT profile_id, trial_started_at, paid_until, assigned_admin_id FROM allowed_profiles WHERE profile_id = $1`,
+        [profileId]
+    );
+
+    if (profile.rows.length === 0) {
+        // Создаём анкету и сразу активируем trial
+        await pool.query(`
+            INSERT INTO allowed_profiles (profile_id, note, added_at, is_trial, trial_started_at, paid_until)
+            VALUES ($1, 'Автодобавлено ботом', NOW(), TRUE, NOW(), NOW() + INTERVAL '2 days')
+        `, [profileId]);
+
+        console.log(`🎁 Trial активирован для новой анкеты ${profileId}`);
+
+        return res.json({
+            success: true,
+            status: 'trial_activated',
+            message: 'Тестовый период активирован на 2 дня',
+            profileId: profileId,
+            trialDays: 2,
+            expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
+        });
+    }
+
+    const row = profile.rows[0];
+
+    // Проверяем, не был ли уже trial
+    if (row.trial_started_at) {
+        return res.status(400).json({
+            success: false,
+            error: 'trial_already_used',
+            message: 'Тестовый период уже был использован для этой анкеты'
+        });
+    }
+
+    // Проверяем, может уже оплачена
+    if (row.paid_until && new Date(row.paid_until) > new Date()) {
+        return res.json({
+            success: true,
+            status: 'already_paid',
+            message: 'Анкета уже оплачена',
+            profileId: profileId
+        });
+    }
+
+    // Активируем trial
+    await pool.query(`
+        UPDATE allowed_profiles
+        SET is_trial = TRUE,
+            trial_started_at = NOW(),
+            paid_until = NOW() + INTERVAL '2 days'
+        WHERE profile_id = $1
+    `, [profileId]);
+
+    console.log(`🎁 Trial активирован для анкеты ${profileId} (бот: ${botId || 'unknown'})`);
+
+    res.json({
+        success: true,
+        status: 'trial_activated',
+        message: 'Тестовый период активирован на 2 дня',
+        profileId: profileId,
+        trialDays: 2,
+        expiresAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)
+    });
 }));
 
 // Обновление всех ботов
