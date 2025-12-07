@@ -2259,13 +2259,38 @@
                 const proxyConfig = {
                     host: url.hostname,
                     port: url.port,
-                    protocol: url.protocol.replace(':', '') 
+                    protocol: url.protocol.replace(':', '')
                 };
                 if (url.username && url.password) {
                     proxyConfig.auth = { username: url.username, password: url.password };
                 }
                 return proxyConfig;
             } catch (e) { return null; }
+        }
+
+        // Парсинг простого формата ip:port
+        function parseSimpleProxy(proxyString) {
+            if (!proxyString) return null;
+            const trimmed = proxyString.trim();
+            if (!trimmed) return null;
+
+            const parts = trimmed.split(':');
+            if (parts.length !== 2) return null;
+
+            const [host, portStr] = parts;
+            const port = parseInt(portStr);
+
+            // Проверка валидности
+            const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+            if (!ipRegex.test(host) || isNaN(port) || port < 1 || port > 65535) {
+                return null;
+            }
+
+            return {
+                host: host,
+                port: port,
+                protocol: 'http'
+            };
         }
         
         const LADADATE_BASE_URL = 'https://ladadate.com';
@@ -2367,16 +2392,36 @@
 
         async function makeApiRequest(bot, method, path, data = null, isRetry = false) {
             let endpoint = `${LADADATE_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
-            let config = { 
-                method: method, 
+            let config = {
+                method: method,
                 url: endpoint,
                 headers: { 'Content-Type': 'application/json' },
-                data: data 
+                data: data
             };
             if (bot && bot.token) config.headers.Authorization = `Bearer ${bot.token}`;
-            if (globalSettings.proxyURL) {
-                const proxyConfig = parseProxyUrl(globalSettings.proxyURL);
-                if (proxyConfig) config.proxy = proxyConfig;
+
+            // Определяем прокси для запроса
+            let proxyConfig = null;
+
+            // 1. Сначала пробуем прокси по позиции бота (ip:port)
+            if (bot && bot.id) {
+                const positionProxy = getProxyForBot(bot.id);
+                if (positionProxy) {
+                    proxyConfig = parseSimpleProxy(positionProxy);
+                    if (proxyConfig) {
+                        console.log(`🌐 Прокси для ${bot.displayId || bot.id}: ${positionProxy}`);
+                    }
+                }
+            }
+
+            // 2. Если нет прокси по позиции, используем общий proxyURL (http://user:pass@ip:port)
+            if (!proxyConfig && globalSettings.proxyURL) {
+                proxyConfig = parseProxyUrl(globalSettings.proxyURL);
+            }
+
+            // 3. Применяем прокси если он есть (без прокси тоже работает)
+            if (proxyConfig) {
+                config.proxy = proxyConfig;
             }
 
             try {
@@ -2386,7 +2431,7 @@
                     console.log(`[Auto-Relogin] Token expired for ${bot.displayId}. Attempting silent relogin...`);
                     try {
                         const loginRes = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: bot.login, Password: bot.pass });
-                        
+
                         if (loginRes.data.Token) {
                             console.log(`[Auto-Relogin] Success for ${bot.displayId}! Retrying original request...`);
                             bot.token = loginRes.data.Token;
