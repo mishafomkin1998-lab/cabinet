@@ -1282,8 +1282,7 @@
 
     <div class="global-toolbar">
         <div class="toolbar-left">
-            <button class="btn btn-success btn-circle" onclick="openAddModal()" data-tip="Добавить новую анкету"><i class="fa fa-plus"></i></button>
-            <button class="btn btn-primary btn-circle" onclick="openManager()" data-tip="Управление учетными записями"><i class="fa fa-list"></i></button>
+            <button class="btn btn-success btn-circle" onclick="openAddModal()" data-tip="Анкеты"><i class="fa fa-plus"></i></button>
         </div>
         <div class="toolbar-center">
             <button class="btn btn-circle btn-logger" id="btn-logger-main" onclick="toggleLogger()" data-tip="Открыть Логгер"><i class="fa fa-list-alt"></i></button>
@@ -1326,53 +1325,46 @@
     <div id="browsers-container"></div>
 
     <div id="add-modal" class="modal-overlay">
-        <div class="modal-card">
-            <h5 id="add-modal-title">Новая анкета</h5>
-            <input id="newLogin" class="form-control mb-2" placeholder="Email">
-            <input id="newPass" class="form-control mb-2" placeholder="Пароль">
-            <input id="newId" class="form-control mb-3" placeholder="ID (вид)">
-            <button id="btnLogin" class="btn btn-success w-100 mb-2" onclick="handleLoginOrUpdate()">
-                <div class="spinner" id="loginSpinner"></div> 
-                <span id="btnLoginText">Войти</span>
-            </button>
-            <div id="loginError" class="text-danger small mt-2 text-center"></div>
-            <button class="btn btn-cancel-modal w-100" onclick="closeModal('add-modal')">Отмена</button>
-        </div>
-    </div>
+        <div class="modal-card" style="width: 450px;">
+            <h5>Анкеты</h5>
 
-    <div id="manager-modal" class="modal-overlay">
-        <div class="modal-card">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h5 class="m-0">Учетные записи</h5>
-                <button class="btn btn-sm btn-outline-primary" onclick="exportAccounts()" data-tip="Скачать список"><i class="fa fa-download"></i></button>
-            </div>
-            <div id="manager-list" class="mb-3" style="max-height: 200px; overflow-y: auto;"></div>
+            <!-- Список анкет -->
+            <div id="manager-list" class="mb-3" style="max-height: 150px; overflow-y: auto;"></div>
+
             <hr>
-            <h6>Импорт TXT</h6>
-            <div class="alert alert-light p-1 small text-muted border">
-                Формат: <b>ID Логин Пароль</b> (через пробел)
-            </div>
-            <div class="input-group mb-2">
-                <input type="file" id="importFile" class="form-control" accept=".txt">
-                <button class="btn btn-primary" onclick="runFileImport()">Загрузить</button>
-            </div>
-            <div class="d-flex gap-2 mt-3">
-                <button class="btn btn-outline-success flex-fill" onclick="exportAllData()">
-                    <i class="fa fa-download"></i> Экспорт всех данных
-                </button>
-                <button class="btn btn-outline-info flex-fill" onclick="document.getElementById('importAllFile').click()">
-                    <i class="fa fa-upload"></i> Импорт данных
-                </button>
-                <input type="file" id="importAllFile" hidden accept=".json" onchange="handleFullImport(this)">
-            </div>
+
+            <!-- Добавление новой анкеты -->
+            <h6 id="add-modal-title"><i class="fa fa-plus text-success"></i> Добавить анкету</h6>
+            <input id="newLogin" class="form-control form-control-sm mb-2" placeholder="Email">
+            <input id="newPass" class="form-control form-control-sm mb-2" placeholder="Пароль">
+            <input id="newId" class="form-control form-control-sm mb-2" placeholder="ID (вид)">
+            <button id="btnLogin" class="btn btn-success btn-sm w-100 mb-2" onclick="handleLoginOrUpdate()">
+                <div class="spinner" id="loginSpinner"></div>
+                <span id="btnLoginText">Добавить</span>
+            </button>
+            <div id="loginError" class="text-danger small text-center"></div>
+
             <hr>
-            <h6><i class="fa fa-robot text-primary"></i> AI Ответы на письма</h6>
-            <div class="mb-2">
-                <label class="form-label small text-muted mb-1">Инструкция для AI (как отвечать на письма)</label>
-                <textarea id="manager-ai-reply-prompt" class="form-control" rows="2" placeholder="Напр: отвечай романтично, используй комплименты, задавай вопросы о жизни" oninput="saveAIReplyPrompt()"></textarea>
-                <small class="text-muted">Эта инструкция будет использоваться при генерации ответов в MiniChat</small>
+
+            <!-- Импорт / Экспорт -->
+            <div class="d-flex gap-2 mb-3">
+                <button class="btn btn-outline-success btn-sm flex-fill" onclick="exportAllData()">
+                    <i class="fa fa-download"></i> Экспорт
+                </button>
+                <button class="btn btn-outline-primary btn-sm flex-fill" onclick="document.getElementById('importFile').click()">
+                    <i class="fa fa-upload"></i> Импорт
+                </button>
+                <input type="file" id="importFile" hidden accept=".txt,.json" onchange="handleUniversalImport(this)">
             </div>
-            <button class="btn btn-cancel-modal w-100 mt-3" onclick="closeModal('manager-modal')">Закрыть</button>
+            <div class="alert alert-light p-2 small text-muted border mb-3">
+                <b>Импорт:</b> TXT (ID Логин Пароль) или JSON (полный бекап)
+            </div>
+
+            <!-- AI промпт -->
+            <h6><i class="fa fa-robot text-primary"></i> AI Ответы</h6>
+            <textarea id="manager-ai-reply-prompt" class="form-control form-control-sm" rows="2" placeholder="Инструкция для AI (напр: романтично, с комплиментами)" oninput="saveAIReplyPrompt()"></textarea>
+
+            <button class="btn btn-cancel-modal w-100 mt-3" onclick="closeModal('add-modal')">Закрыть</button>
         </div>
     </div>
 
@@ -4392,14 +4384,6 @@
         function checkDuplicate(login, displayId) {
             return !!Object.values(bots).find(b => b.login.toLowerCase() === login.toLowerCase() || b.displayId.toLowerCase() === displayId.toLowerCase());
         }
-        function openManager() {
-            renderManagerList();
-            // Загружаем сохранённый промпт для AI ответов
-            const promptInput = document.getElementById('manager-ai-reply-prompt');
-            if (promptInput) promptInput.value = globalSettings.aiReplyPrompt || '';
-            openModal('manager-modal');
-        }
-
         function saveAIReplyPrompt() {
             const promptInput = document.getElementById('manager-ai-reply-prompt');
             globalSettings.aiReplyPrompt = promptInput.value;
@@ -4421,44 +4405,98 @@
             const blob = new Blob([localStorage.getItem('savedBots') || '[]'], {type: 'application/json'});
             const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'lababot_accounts.json'; a.click(); URL.revokeObjectURL(url);
         }
-        function runFileImport() {
-            const input = document.getElementById('importFile');
-            if (!input.files.length) return alert("Выберите файл!");
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                const lines = e.target.result.split('\n');
-                let count = 0, skipped = 0, errors = 0;
-                const btn = document.querySelector('button[onclick="runFileImport()"]');
-                const orig = btn.innerText; btn.innerText = "Загрузка..."; btn.disabled = true;
-                for (let line of lines) {
-                    const parts = line.trim().split(/\s+/);
-                    if (parts.length >= 3) {
-                        if (checkDuplicate(parts[1], parts[0])) { skipped++; continue; }
-                        if (await performLogin(parts[1], parts[2], parts[0])) count++; else errors++;
-                        await new Promise(r => setTimeout(r, 100));
-                    }
+        async function handleUniversalImport(input) {
+            if (!input.files.length) return;
+            const file = input.files[0];
+            const fileName = file.name.toLowerCase();
+
+            if (fileName.endsWith('.json')) {
+                // JSON - полный импорт
+                if (!confirm('Внимание! Импорт JSON перезапишет существующие данные. Продолжить?')) {
+                    input.value = '';
+                    return;
                 }
-                alert(`Импорт: Успешно ${count}, Дубли ${skipped}, Ошибки ${errors}`);
-                btn.innerText = orig; btn.disabled = false; closeModal('manager-modal'); input.value = ''; renderManagerList();
-            };
-            reader.readAsText(input.files[0]);
+
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    try {
+                        const data = JSON.parse(e.target.result);
+
+                        if (data.bots && Array.isArray(data.bots)) {
+                            for (const botData of data.bots) {
+                                if (botData.login && botData.displayId) {
+                                    await performLogin(botData.login, botData.pass || 'password', botData.displayId);
+                                }
+                            }
+                        }
+                        if (data.templates) {
+                            botTemplates = data.templates;
+                            localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+                        }
+                        if (data.accountPreferences) {
+                            accountPreferences = data.accountPreferences;
+                            localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
+                        }
+                        if (data.globalSettings) {
+                            globalSettings = { ...globalSettings, ...data.globalSettings };
+                            localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+                        }
+
+                        alert('Данные успешно импортированы!');
+                        renderManagerList();
+                    } catch (error) {
+                        alert('Ошибка импорта JSON: ' + error.message);
+                    }
+                    input.value = '';
+                };
+                reader.readAsText(file);
+
+            } else if (fileName.endsWith('.txt')) {
+                // TXT - только анкеты (ID Логин Пароль)
+                const reader = new FileReader();
+                reader.onload = async function(e) {
+                    const lines = e.target.result.split('\n');
+                    let count = 0, skipped = 0, errors = 0;
+
+                    for (let line of lines) {
+                        const parts = line.trim().split(/\s+/);
+                        if (parts.length >= 3) {
+                            if (checkDuplicate(parts[1], parts[0])) { skipped++; continue; }
+                            if (await performLogin(parts[1], parts[2], parts[0])) count++; else errors++;
+                            await new Promise(r => setTimeout(r, 100));
+                        }
+                    }
+
+                    alert(`Импорт TXT: Успешно ${count}, Дубли ${skipped}, Ошибки ${errors}`);
+                    input.value = '';
+                    renderManagerList();
+                };
+                reader.readAsText(file);
+
+            } else {
+                alert('Неподдерживаемый формат. Используйте .txt или .json');
+                input.value = '';
+            }
         }
         function editAccount(id) {
-            closeModal('manager-modal');
             const bot = bots[id];
             if(!bot) return;
             editingBotId = id;
-            document.getElementById('add-modal-title').innerText = "Изменить анкету";
+            document.getElementById('add-modal-title').innerHTML = '<i class="fa fa-pencil text-warning"></i> Изменить анкету';
             document.getElementById('newLogin').value = bot.login; document.getElementById('newPass').value = bot.pass; document.getElementById('newId').value = bot.displayId;
             document.getElementById('btnLoginText').innerText = "Сохранить"; document.getElementById('loginError').innerText = "";
-            openModal('add-modal');
         }
-        function openAddModal() { 
+        function openAddModal() {
             editingBotId = null;
-            document.getElementById('add-modal-title').innerText = "Новая анкета";
+            document.getElementById('add-modal-title').innerHTML = '<i class="fa fa-plus text-success"></i> Добавить анкету';
             document.getElementById('newLogin').value = ""; document.getElementById('newPass').value = ""; document.getElementById('newId').value = "";
-            document.getElementById('btnLoginText').innerText = "Войти"; document.getElementById('loginError').innerText = "";
-            openModal('add-modal'); 
+            document.getElementById('btnLoginText').innerText = "Добавить"; document.getElementById('loginError').innerText = "";
+            // Рендерим список анкет
+            renderManagerList();
+            // Загружаем AI промпт
+            const promptInput = document.getElementById('manager-ai-reply-prompt');
+            if (promptInput) promptInput.value = globalSettings.aiReplyPrompt || '';
+            openModal('add-modal');
         }
         function openStatsModal(botId, type) {
             currentModalBotId = botId; currentStatsType = type;
