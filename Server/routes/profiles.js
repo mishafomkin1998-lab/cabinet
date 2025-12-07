@@ -144,12 +144,28 @@ router.post('/bulk', async (req, res) => {
                 const profileId = id.trim();
                 const exists = await pool.query(`SELECT 1 FROM allowed_profiles WHERE profile_id = $1`, [profileId]);
                 if (exists.rows.length === 0) {
+                    // Проверяем есть ли сохранённая оплата для этой анкеты
+                    const backupResult = await pool.query(
+                        `SELECT paid_until_backup FROM profile_payment_history
+                         WHERE profile_id = $1 AND action_type = 'deletion_backup' AND paid_until_backup > NOW()
+                         ORDER BY created_at DESC LIMIT 1`,
+                        [profileId]
+                    );
+
+                    let paidUntil = null;
+                    if (backupResult.rows.length > 0) {
+                        paidUntil = backupResult.rows[0].paid_until_backup;
+                    }
+
                     await pool.query(
-                        `INSERT INTO allowed_profiles (profile_id, note, assigned_admin_id) VALUES ($1, $2, $3)`,
-                        [profileId, note, adminId || null]
+                        `INSERT INTO allowed_profiles (profile_id, note, assigned_admin_id, paid_until) VALUES ($1, $2, $3, $4)`,
+                        [profileId, note, adminId || null, paidUntil]
                     );
                     // Логируем добавление
-                    await logProfileAction(profileId, 'add', userId, userName, note || 'Добавлена новая анкета');
+                    const logNote = paidUntil
+                        ? `Добавлена анкета (оплата восстановлена до ${new Date(paidUntil).toLocaleDateString('ru-RU')})`
+                        : (note || 'Добавлена новая анкета');
+                    await logProfileAction(profileId, 'add', userId, userName, logNote);
                 } else {
                     await pool.query(
                         `UPDATE allowed_profiles SET assigned_admin_id = $1 WHERE profile_id = $2`,
@@ -241,12 +257,28 @@ router.post('/toggle-access', async (req, res) => {
 
 /**
  * DELETE /api/profiles/:profileId
- * Удаляет анкету из базы данных
+ * Удаляет анкету из базы данных (сохраняя paid_until в истории для восстановления)
  */
 router.delete('/:profileId', async (req, res) => {
     const { profileId } = req.params;
     const { userId, userName } = req.query;
     try {
+        // Сохраняем paid_until перед удалением для возможности восстановления
+        const profile = await pool.query(
+            `SELECT paid_until, is_trial, trial_started_at FROM allowed_profiles WHERE profile_id = $1`,
+            [profileId]
+        );
+
+        if (profile.rows.length > 0 && profile.rows[0].paid_until) {
+            // Сохраняем в историю оплаты для восстановления при повторном добавлении
+            await pool.query(
+                `INSERT INTO profile_payment_history (profile_id, days, action_type, by_user_id, note, paid_until_backup)
+                 VALUES ($1, 0, 'deletion_backup', $2, 'Бэкап при удалении', $3)
+                 ON CONFLICT DO NOTHING`,
+                [profileId, userId, profile.rows[0].paid_until]
+            );
+        }
+
         // Логируем удаление перед удалением
         await logProfileAction(profileId, 'delete', userId, userName, 'Анкета удалена');
 

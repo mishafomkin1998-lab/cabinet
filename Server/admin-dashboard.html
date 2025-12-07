@@ -2560,36 +2560,45 @@
                         alert('Введите ID анкет');
                         return;
                     }
-                    
-                    const ids = this.newAccountIds.split(/[\s,]+/).filter(id => id.length === 6);
-                    
+
+                    const ids = this.newAccountIds.split(/[\s,]+/).filter(id => id.trim().length >= 3);
+
                     if (ids.length === 0) {
-                        alert('Введите корректные ID (6 цифр)');
+                        alert('Введите корректные ID анкет');
                         return;
                     }
-                    
-                    ids.forEach(id => {
-                        this.accounts.unshift({
-                            id: id,
-                            login: this.newAccountLogin || `user_${id.substring(0, 3)}`,
-                            password: this.newAccountPassword || `pass${id.substring(0, 3)}`,
-                            status: 'online',
-                            lastOnline: 'только что',
-                            letters: 0,
-                            admin: '',
-                            addedDate: new Date().toLocaleDateString('ru-RU'),
-                            comment: this.newAccountComment,
-                            paused: false
-                        });
+
+                    // Отправляем на сервер
+                    fetch(`${API_BASE}/api/profiles/bulk`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            profiles: ids,
+                            note: this.newAccountComment || '',
+                            adminId: this.currentUser.role === 'director' ? null : this.currentUser.id,
+                            userId: this.currentUser.id,
+                            userName: this.currentUser.username
+                        })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            this.newAccountIds = '';
+                            this.newAccountComment = '';
+                            this.newAccountLogin = '';
+                            this.newAccountPassword = '';
+                            this.showAddAccountModal = false;
+
+                            alert(`Добавлено ${ids.length} анкет`);
+                            this.loadProfiles(); // Перезагружаем список
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось добавить анкеты'));
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Save accounts error:', err);
+                        alert('Ошибка сети при добавлении анкет');
                     });
-                    
-                    this.newAccountIds = '';
-                    this.newAccountComment = '';
-                    this.newAccountLogin = '';
-                    this.newAccountPassword = '';
-                    this.showAddAccountModal = false;
-                    
-                    alert(`Добавлено ${ids.length} анкет`);
                 },
                 
                 editAdmin(admin) {
