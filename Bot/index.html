@@ -348,6 +348,202 @@
             border-color: #00ff88 !important;
         }
 
+        /* Панели колонок */
+        body.theme-dark .panel-col {
+            background: linear-gradient(180deg, #161616 0%, #1a1a1a 100%);
+            border: 1px solid #252525;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Селекты/Выпадающие списки */
+        body.theme-dark .form-select,
+        body.theme-dark select {
+            background-color: #1a1a1a;
+            color: #f0f0f0;
+            border: 1px solid #333;
+        }
+
+        body.theme-dark .form-select:focus,
+        body.theme-dark select:focus {
+            background-color: #1a1a1a;
+            color: #f0f0f0;
+            border-color: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+        }
+
+        body.theme-dark .form-select option,
+        body.theme-dark select option {
+            background-color: #1a1a1a;
+            color: #f0f0f0;
+        }
+
+        /* Поле прикрепления фото */
+        body.theme-dark .photo-select-area {
+            background: #1a1a1a;
+            border: 2px dashed #333;
+            color: #888;
+        }
+
+        body.theme-dark .photo-select-area:hover {
+            border-color: #00ff88;
+            background: #1f1f1f;
+            color: #00ff88;
+        }
+
+        body.theme-dark .photo-block {
+            background: #161616;
+            border: 1px solid #252525;
+        }
+
+        body.theme-dark .btn-remove-photo {
+            background: #252525;
+            border-left: 1px solid #333;
+            color: #ff5555;
+        }
+
+        body.theme-dark .btn-remove-photo:hover {
+            background: #3a1515;
+        }
+
+        body.theme-dark .photo-preview-float {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Список ЧС (Blacklist) */
+        body.theme-dark .scroll-list {
+            background: #1a1a1a;
+            border: 1px solid #333;
+        }
+
+        body.theme-dark .scroll-list div {
+            color: #f0f0f0;
+            border-bottom: 1px solid #252525;
+        }
+
+        body.theme-dark .scroll-list div:hover {
+            background: #252525;
+        }
+
+        body.theme-dark .scroll-list div.selected {
+            background: linear-gradient(90deg, rgba(0, 255, 136, 0.2) 0%, rgba(0, 255, 136, 0.1) 100%);
+            border-left: 3px solid #00ff88;
+        }
+
+        /* Светлые секции -> темные */
+        body.theme-dark .bg-light {
+            background: #1a1a1a !important;
+            border-color: #333 !important;
+        }
+
+        /* Заголовки колонок */
+        body.theme-dark .col-title {
+            color: #00ff88;
+            border-bottom-color: #333;
+        }
+
+        /* Инпуты */
+        body.theme-dark input[type="text"],
+        body.theme-dark input[type="password"],
+        body.theme-dark input[type="number"],
+        body.theme-dark .form-control {
+            background: #1a1a1a;
+            color: #f0f0f0;
+            border: 1px solid #333;
+        }
+
+        body.theme-dark input[type="text"]:focus,
+        body.theme-dark input[type="password"]:focus,
+        body.theme-dark input[type="number"]:focus,
+        body.theme-dark .form-control:focus {
+            background: #1a1a1a;
+            color: #f0f0f0;
+            border-color: #00ff88;
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+        }
+
+        /* Выпадающий список переменных */
+        body.theme-dark .vars-dropdown {
+            background: #1a1a1a;
+            border: 1px solid #333;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        body.theme-dark .vars-dropdown .vars-item {
+            color: #f0f0f0;
+        }
+
+        body.theme-dark .vars-dropdown .vars-item:hover {
+            background: #252525;
+            color: #00ff88;
+        }
+
+        /* Модальные окна */
+        body.theme-dark .modal-content,
+        body.theme-dark .modal-card,
+        body.theme-dark .panel-card {
+            background: #161616;
+            border: 1px solid #333;
+            color: #f0f0f0;
+        }
+
+        body.theme-dark .modal-card h5,
+        body.theme-dark .modal-card h4,
+        body.theme-dark .modal-card label {
+            color: #f0f0f0;
+        }
+
+        body.theme-dark .modal-overlay {
+            background: rgba(0, 0, 0, 0.7);
+        }
+
+        body.theme-dark .modal-header,
+        body.theme-dark .modal-footer {
+            border-color: #333;
+        }
+
+        /* Статистика */
+        body.theme-dark .stat-line {
+            color: #aaa;
+        }
+
+        body.theme-dark .action-log {
+            background: #0d0d0d;
+            border: 1px solid #252525;
+            color: #888;
+        }
+
+        body.theme-dark .log-entry {
+            border-top-color: #252525;
+        }
+
+        body.theme-dark .log-entry.vip {
+            background: #2a2515;
+            border-color: #4a4025;
+        }
+
+        body.theme-dark .active-invite-box {
+            background: #152515;
+            border-color: #254525;
+            color: #6fdc6f;
+        }
+
+        /* Лейблы */
+        body.theme-dark label,
+        body.theme-dark .form-label {
+            color: #aaa;
+        }
+
+        /* Текст статусов */
+        body.theme-dark .text-muted {
+            color: #666 !important;
+        }
+
+        body.theme-dark .text-primary {
+            color: #00ff88 !important;
+        }
+
         /* === ТЕМА LADADATE (красивая и разнообразная) === */
         body.theme-ladadate {
             --bg-color: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
