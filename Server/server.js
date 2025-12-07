@@ -37,6 +37,11 @@ app.use(express.static(__dirname));
 // МАРШРУТЫ
 // ==========================================
 
+// Главная страница - редирект на login
+app.get('/', (req, res) => {
+    res.redirect('/login.html');
+});
+
 // Аутентификация
 app.use('/', authRoutes);
 
