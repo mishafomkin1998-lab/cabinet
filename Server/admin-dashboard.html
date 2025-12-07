@@ -1,5 +1,3 @@
-[file name]: dashboard.html
-[file content begin]
 <!DOCTYPE html>
 <html lang="ru" x-data="{ htmlLang: 'ru' }" :lang="htmlLang">
 <head>
@@ -2590,7 +2588,7 @@
                             this.showAddAccountModal = false;
 
                             alert(`Добавлено ${ids.length} анкет`);
-                            this.loadProfiles(); // Перезагружаем список
+                            this.loadAccounts(); // Перезагружаем список
                         } else {
                             alert('Ошибка: ' + (data.error || 'Не удалось добавить анкеты'));
                         }

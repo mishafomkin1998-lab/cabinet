@@ -37,6 +37,7 @@ router.get('/', async (req, res) => {
             filter = `WHERE p.assigned_translator_id = $1`;
             params.push(userId);
         }
+        // role === 'director' - без фильтра, показываем все анкеты
 
         const query = `
             SELECT
