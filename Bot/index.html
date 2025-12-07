@@ -1365,6 +1365,13 @@
                 </button>
                 <input type="file" id="importAllFile" hidden accept=".json" onchange="handleFullImport(this)">
             </div>
+            <hr>
+            <h6><i class="fa fa-robot text-primary"></i> AI Ответы на письма</h6>
+            <div class="mb-2">
+                <label class="form-label small text-muted mb-1">Инструкция для AI (как отвечать на письма)</label>
+                <textarea id="manager-ai-reply-prompt" class="form-control" rows="2" placeholder="Напр: отвечай романтично, используй комплименты, задавай вопросы о жизни" oninput="saveAIReplyPrompt()"></textarea>
+                <small class="text-muted">Эта инструкция будет использоваться при генерации ответов в MiniChat</small>
+            </div>
             <button class="btn btn-cancel-modal w-100 mt-3" onclick="closeModal('manager-modal')">Закрыть</button>
         </div>
     </div>
@@ -1619,6 +1626,7 @@
             hotkeys: true, myPrompt: '', apiKey: '',
             soundsEnabled: true, confirmTabClose: true, extendedFeatures: true,
             translatorId: null, // ID переводчика для статистики
+            aiReplyPrompt: '', // Промпт для AI ответов на письма
             // Прокси для анкет по позициям (1-10, 11-20, 21-30, 31-40, 41-50, 51-60)
             proxy1: '', proxy2: '', proxy3: '', proxy4: '', proxy5: '', proxy6: ''
         };
@@ -2191,9 +2199,32 @@
             const chatHistoryEl = document.getElementById('minichat-history');
             const userPrompt = promptInput.value.trim();
 
+            // Проверяем наличие API ключа
             if (!globalSettings.apiKey) {
                 alert('Добавьте OpenAI API Key в настройках (вкладка AI функции)');
                 return;
+            }
+
+            const originalBtnHtml = btn.innerHTML;
+
+            // Проверяем разрешение AI для этой анкеты
+            const bot = bots[minichatBotId];
+            if (bot && bot.displayId) {
+                btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+                btn.disabled = true;
+
+                const aiStatus = await checkProfileAIEnabled(bot.displayId);
+                if (!aiStatus.enabled) {
+                    btn.innerHTML = originalBtnHtml;
+                    btn.disabled = false;
+                    const reason = aiStatus.reason === 'disabled_by_admin'
+                        ? 'AI отключен администратором для этой анкеты'
+                        : aiStatus.reason === 'no_translator'
+                        ? 'Анкете не назначен переводчик'
+                        : 'AI недоступен для этой анкеты';
+                    alert(`⚠️ ${reason}`);
+                    return;
+                }
             }
 
             // Получаем последние сообщения из истории чата
@@ -2202,6 +2233,8 @@
 
             if (partnerMessages.length === 0) {
                 alert('Нет входящих сообщений для ответа');
+                btn.innerHTML = originalBtnHtml;
+                btn.disabled = false;
                 return;
             }
 
@@ -2224,7 +2257,6 @@
             // Последнее сообщение партнёра
             const lastPartnerMsg = partnerMessages[partnerMessages.length - 1].textContent;
 
-            const originalBtnHtml = btn.innerHTML;
             btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
             btn.disabled = true;
 
@@ -2232,8 +2264,12 @@
                 const isChat = minichatType === 'chat';
                 const partnerName = document.getElementById('minichat-partner-name').textContent;
 
+                // Используем кастомный промпт из настроек если есть, иначе дефолтный
+                const basePrompt = globalSettings.aiReplyPrompt || '';
                 let styleInstruction = userPrompt
                     ? `Reply style: ${userPrompt}.`
+                    : basePrompt
+                    ? `Additional instructions: ${basePrompt}`
                     : 'Reply in a warm, friendly and engaging manner.';
 
                 const systemPrompt = isChat
@@ -4356,7 +4392,19 @@
         function checkDuplicate(login, displayId) {
             return !!Object.values(bots).find(b => b.login.toLowerCase() === login.toLowerCase() || b.displayId.toLowerCase() === displayId.toLowerCase());
         }
-        function openManager() { renderManagerList(); openModal('manager-modal'); }
+        function openManager() {
+            renderManagerList();
+            // Загружаем сохранённый промпт для AI ответов
+            const promptInput = document.getElementById('manager-ai-reply-prompt');
+            if (promptInput) promptInput.value = globalSettings.aiReplyPrompt || '';
+            openModal('manager-modal');
+        }
+
+        function saveAIReplyPrompt() {
+            const promptInput = document.getElementById('manager-ai-reply-prompt');
+            globalSettings.aiReplyPrompt = promptInput.value;
+            localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+        }
         function renderManagerList() {
             const list = document.getElementById('manager-list'); list.innerHTML = '';
             Object.values(bots).forEach(b => {
@@ -4462,8 +4510,27 @@
             }
 
             const originalBtnHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Генерация...';
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Проверка...';
             btn.disabled = true;
+
+            // Проверяем разрешение AI для активной анкеты
+            const bot = activeTabId ? bots[activeTabId] : null;
+            if (bot && bot.displayId) {
+                const aiStatus = await checkProfileAIEnabled(bot.displayId);
+                if (!aiStatus.enabled) {
+                    btn.innerHTML = originalBtnHtml;
+                    btn.disabled = false;
+                    const reason = aiStatus.reason === 'disabled_by_admin'
+                        ? 'AI отключен администратором для этой анкеты'
+                        : aiStatus.reason === 'no_translator'
+                        ? 'Анкете не назначен переводчик'
+                        : 'AI недоступен для этой анкеты';
+                    alert(`⚠️ ${reason}`);
+                    return;
+                }
+            }
+
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Генерация...';
 
             try {
                 const isChat = globalMode === 'chat';
