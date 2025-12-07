@@ -540,7 +540,7 @@
         </aside>
 
         <!-- Main content -->
-        <main class="flex-1 overflow-y-auto px-6 pt-4 pb-6">
+        <main class="flex-1 overflow-y-auto px-5 pt-2 pb-4">
             <!-- Loading indicator -->
             <div x-show="loading" class="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
                 <div class="text-center">
@@ -557,7 +557,7 @@
                         <div class="font-bold text-red-700" x-text="t('messages.connectionError')"></div>
                         <div class="text-sm text-gray-600" x-text="error"></div>
                     </div>
-                    <button @click="loadAllData()" class="ml-auto px-4 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200">
+                    <button @click="loadAllData()" class="ml-auto px-5 py-2.5 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 font-medium transition-all">
                         <i class="fas fa-redo mr-1"></i> <span x-text="t('messages.retry')"></span>
                     </button>
                 </div>
@@ -645,12 +645,14 @@
                             </div>
                         </div>
 
-                        <button @click="refreshAllStats()" class="px-4 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600" :class="{'opacity-50 cursor-wait': loading}">
-                            <i class="fas fa-sync-alt mr-2" :class="{'fa-spin': loading}"></i><span x-text="t('common.refresh')"></span>
-                        </button>
-                        <button @click="exportStats()" class="ml-auto px-4 py-2.5 rounded-xl bg-green-500 text-white hover:bg-green-600">
-                            <i class="fas fa-download mr-2"></i><span x-text="t('common.export')"></span>
-                        </button>
+                        <div class="ml-auto flex gap-2">
+                            <button @click="refreshAllStats()" class="w-9 h-9 rounded-lg bg-indigo-500 text-white hover:bg-indigo-600 flex items-center justify-center" :class="{'opacity-50 cursor-wait': loading}" :title="t('common.refresh')">
+                                <i class="fas fa-sync-alt text-sm" :class="{'fa-spin': loading}"></i>
+                            </button>
+                            <button @click="exportStats()" class="w-9 h-9 rounded-lg bg-green-500 text-white hover:bg-green-600 flex items-center justify-center" :title="t('common.export')">
+                                <i class="fas fa-download text-sm"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
