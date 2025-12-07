@@ -46,158 +46,306 @@
             --warning-color: #ffc107;
         }
 
-        /* === ТЁМНАЯ ТЕМА (тёмно-серая) === */
+        /* === ТЁМНАЯ ТЕМА (Cyberpunk/Neon style) === */
         body.theme-dark {
-            --bg-color: #1a1a1a;
-            --text-color: #e8e8e8;
-            --panel-bg: #242424;
-            --tab-bg-active: #3a3a3a;
-            --tab-text-active: #50fa7b;
-            --mode-color: #50fa7b;
-            --border-color: #000000;
-            --hover-bg: #333333;
-            --input-bg: #2d2d2d;
-            --input-border: #404040;
-            --secondary-text: #888888;
+            --bg-color: #0d0d0d;
+            --text-color: #f0f0f0;
+            --panel-bg: #161616;
+            --tab-bg-active: #1f1f1f;
+            --tab-text-active: #00ff88;
+            --mode-color: #00ff88;
+            --border-color: #252525;
+            --hover-bg: #1f1f1f;
+            --input-bg: #1a1a1a;
+            --input-border: #333;
+            --secondary-text: #777;
+            --accent-green: #00ff88;
+            --accent-cyan: #00d4ff;
+            --accent-purple: #bd93f9;
+            --accent-pink: #ff79c6;
+            --accent-red: #ff5555;
+            --accent-yellow: #f1fa8c;
+        }
+
+        body.theme-dark {
+            background: linear-gradient(180deg, #0d0d0d 0%, #1a1a1a 100%);
         }
 
         body.theme-dark .global-toolbar {
-            background: var(--panel-bg);
-            border-bottom: 1px solid #000;
+            background: linear-gradient(90deg, #0d0d0d 0%, #161616 50%, #0d0d0d 100%);
+            border-bottom: 2px solid #00ff88;
+            box-shadow: 0 2px 20px rgba(0, 255, 136, 0.15);
         }
 
         body.theme-dark .btn-circle {
-            background: #2d2d2d;
-            border: 1px solid #404040;
-            color: var(--text-color);
+            background: linear-gradient(145deg, #1f1f1f 0%, #161616 100%);
+            border: none;
+            color: #ccc;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            transition: all 0.3s ease;
         }
 
         body.theme-dark .btn-circle:hover {
-            background: #3a3a3a;
-            border-color: #505050;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
         }
 
-        body.theme-dark .btn-play { background: #1e3a1e; color: #50fa7b; border-color: #2d5a2d; }
-        body.theme-dark .btn-stop { background: #3a1e1e; color: #ff5555; border-color: #5a2d2d; }
-        body.theme-dark .btn-clear { background: #2d2d2d; color: #aaa; border-color: #404040; }
-        body.theme-dark .btn-refresh { background: #1e2a3a; color: #8be9fd; border-color: #2d3a5a; }
-        body.theme-dark .btn-logger { background: #3a3a1e; color: #f1fa8c; border-color: #5a5a2d; }
-        body.theme-dark .btn-settings { background: #2d2d2d; color: #aaa; border-color: #404040; }
-        body.theme-dark .btn-mode-switch { background: #2d2d2d; color: #aaa; border-color: #404040; }
+        body.theme-dark .btn-play {
+            background: linear-gradient(145deg, #1a3a1a 0%, #0d2a0d 100%);
+            color: #00ff88;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
+        }
+        body.theme-dark .btn-play:hover {
+            box-shadow: 0 0 25px rgba(0, 255, 136, 0.4);
+        }
+
+        body.theme-dark .btn-stop {
+            background: linear-gradient(145deg, #3a1a1a 0%, #2a0d0d 100%);
+            color: #ff5555;
+            box-shadow: 0 0 15px rgba(255, 85, 85, 0.2);
+        }
+        body.theme-dark .btn-stop:hover {
+            box-shadow: 0 0 25px rgba(255, 85, 85, 0.4);
+        }
+
+        body.theme-dark .btn-clear {
+            background: linear-gradient(145deg, #252525 0%, #1a1a1a 100%);
+            color: #888;
+        }
+
+        body.theme-dark .btn-refresh {
+            background: linear-gradient(145deg, #1a2a3a 0%, #0d1a2a 100%);
+            color: #00d4ff;
+            box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+        }
+        body.theme-dark .btn-refresh:hover {
+            box-shadow: 0 0 25px rgba(0, 212, 255, 0.4);
+        }
+
+        body.theme-dark .btn-logger {
+            background: linear-gradient(145deg, #3a3a1a 0%, #2a2a0d 100%);
+            color: #f1fa8c;
+            box-shadow: 0 0 15px rgba(241, 250, 140, 0.2);
+        }
+        body.theme-dark .btn-logger:hover {
+            box-shadow: 0 0 25px rgba(241, 250, 140, 0.4);
+        }
+
+        body.theme-dark .btn-settings {
+            background: linear-gradient(145deg, #2a2a2a 0%, #1a1a1a 100%);
+            color: #bd93f9;
+        }
+        body.theme-dark .btn-settings:hover {
+            box-shadow: 0 0 20px rgba(189, 147, 249, 0.3);
+        }
+
+        body.theme-dark .btn-mode-switch {
+            background: linear-gradient(145deg, #2a1a3a 0%, #1a0d2a 100%);
+            color: #bd93f9;
+        }
 
         body.theme-dark .form-control,
         body.theme-dark .form-select {
-            background-color: #2d2d2d;
-            border-color: #404040;
-            color: var(--text-color);
+            background-color: #1a1a1a;
+            border: 1px solid #333;
+            color: #f0f0f0;
+            transition: all 0.3s ease;
         }
 
         body.theme-dark .form-control:focus,
         body.theme-dark .form-select:focus {
-            background-color: #333333;
-            border-color: #50fa7b;
-            box-shadow: 0 0 0 2px rgba(80, 250, 123, 0.2);
+            background-color: #1f1f1f;
+            border-color: #00ff88;
+            box-shadow: 0 0 0 3px rgba(0, 255, 136, 0.15), 0 0 20px rgba(0, 255, 136, 0.1);
         }
 
         body.theme-dark .modal-content {
-            background: #242424;
-            color: var(--text-color);
-            border: 1px solid #000;
+            background: #161616;
+            color: #f0f0f0;
+            border: 1px solid #252525;
+            box-shadow: 0 25px 80px rgba(0,0,0,0.8), 0 0 40px rgba(0, 255, 136, 0.1);
+            border-radius: 12px;
         }
 
         body.theme-dark .modal-header {
-            background: #1a1a1a;
-            border-bottom: 1px solid #000;
+            background: linear-gradient(90deg, #0d0d0d 0%, #161616 100%);
+            border-bottom: 1px solid #00ff88;
+            border-radius: 12px 12px 0 0;
         }
 
         body.theme-dark .modal-footer {
-            background: #1a1a1a;
-            border-top: 1px solid #000;
+            background: #0d0d0d;
+            border-top: 1px solid #252525;
+            border-radius: 0 0 12px 12px;
         }
 
         body.theme-dark .bg-light {
-            background-color: #2d2d2d !important;
-            border-color: #404040 !important;
+            background-color: #1a1a1a !important;
+            border: 1px solid #252525 !important;
+            border-radius: 8px;
         }
 
         body.theme-dark .text-muted {
-            color: #888 !important;
+            color: #666 !important;
         }
 
         body.theme-dark .bot-counter {
-            background: #2d2d2d;
-            color: var(--text-color);
-            border: 1px solid #404040;
+            background: linear-gradient(145deg, #1f1f1f 0%, #161616 100%);
+            color: #00ff88;
+            border: none;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.2);
+            font-weight: bold;
         }
 
         body.theme-dark .tabs-container {
-            background: #1a1a1a;
-            border-bottom: 1px solid #000;
+            background: #0d0d0d;
+            border-bottom: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
         }
 
         body.theme-dark .tab-item {
-            background: #242424;
-            border: 1px solid #000;
-            color: #aaa;
+            background: #161616;
+            border: 1px solid #252525;
+            color: #888;
+            border-radius: 8px 8px 0 0;
+            margin: 0 2px;
+            transition: all 0.3s ease;
         }
 
         body.theme-dark .tab-item:hover {
-            background: #2d2d2d;
+            background: #1f1f1f;
+            color: #ccc;
+            border-color: #333;
         }
 
         body.theme-dark .tab-item.active {
-            background: #3a3a3a;
-            color: #50fa7b;
-            border-color: #50fa7b;
+            background: linear-gradient(180deg, #1f1f1f 0%, #161616 100%);
+            color: #00ff88;
+            border-color: #00ff88;
+            border-bottom-color: transparent;
+            box-shadow: 0 -2px 15px rgba(0, 255, 136, 0.2);
         }
 
         body.theme-dark .alert-light {
-            background: #2d2d2d;
-            border-color: #404040;
-            color: var(--text-color);
+            background: #1a1a1a;
+            border: 1px solid #252525;
+            color: #ccc;
+            border-radius: 8px;
         }
 
         body.theme-dark #welcome-screen {
-            color: var(--text-color);
-        }
-
-        body.theme-dark .status-group-wrapper {
-            border-left-color: #404040;
-        }
-
-        body.theme-dark .btn-group-toggle {
             color: #888;
         }
 
+        body.theme-dark #welcome-screen strong {
+            color: #00ff88;
+            text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+        }
+
+        body.theme-dark .status-group-wrapper {
+            border-left: 1px solid #333;
+        }
+
+        body.theme-dark .btn-group-toggle {
+            color: #666;
+        }
+
         body.theme-dark .btn-group-toggle:hover {
-            color: var(--text-color);
+            color: #00ff88;
         }
 
         body.theme-dark .border {
-            border-color: #404040 !important;
+            border-color: #252525 !important;
         }
 
         body.theme-dark .card,
         body.theme-dark .panel {
-            background: #242424;
-            border-color: #000;
+            background: #161616;
+            border: 1px solid #252525;
+            border-radius: 8px;
         }
 
         body.theme-dark textarea {
-            background: #2d2d2d;
-            border-color: #404040;
-            color: var(--text-color);
+            background: #1a1a1a;
+            border: 1px solid #333;
+            color: #f0f0f0;
+            border-radius: 8px;
+        }
+
+        body.theme-dark textarea:focus {
+            border-color: #00ff88;
+            box-shadow: 0 0 15px rgba(0, 255, 136, 0.15);
         }
 
         body.theme-dark .btn-primary {
-            background: #3a3a3a;
-            border-color: #50fa7b;
-            color: #50fa7b;
+            background: linear-gradient(145deg, #00ff88 0%, #00cc6a 100%);
+            border: none;
+            color: #0d0d0d;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
         }
 
         body.theme-dark .btn-primary:hover {
-            background: #50fa7b;
-            color: #1a1a1a;
+            background: linear-gradient(145deg, #00ff99 0%, #00dd77 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 255, 136, 0.4);
+        }
+
+        body.theme-dark .btn-success {
+            background: linear-gradient(145deg, #00ff88 0%, #00cc6a 100%);
+            border: none;
+            color: #0d0d0d;
+        }
+
+        body.theme-dark .btn-danger {
+            background: linear-gradient(145deg, #ff5555 0%, #cc4444 100%);
+            border: none;
+            color: #fff;
+        }
+
+        body.theme-dark ::selection {
+            background: #00ff88;
+            color: #0d0d0d;
+        }
+
+        body.theme-dark ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        body.theme-dark ::-webkit-scrollbar-track {
+            background: #0d0d0d;
+        }
+
+        body.theme-dark ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+
+        body.theme-dark ::-webkit-scrollbar-thumb:hover {
+            background: #00ff88;
+        }
+
+        /* Убираем ВСЕ белые границы */
+        body.theme-dark *,
+        body.theme-dark *::before,
+        body.theme-dark *::after {
+            border-color: #252525 !important;
+        }
+
+        body.theme-dark hr {
+            border-color: #333 !important;
+            opacity: 0.5;
+        }
+
+        body.theme-dark .form-check-input {
+            background-color: #1a1a1a;
+            border-color: #333 !important;
+        }
+
+        body.theme-dark .form-check-input:checked {
+            background-color: #00ff88;
+            border-color: #00ff88 !important;
         }
 
         /* === ТЕМА LADADATE (красивая и разнообразная) === */
