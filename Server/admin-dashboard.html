@@ -564,25 +564,13 @@
             </div>
 
             <!-- Header -->
-            <div class="flex items-center justify-between mb-5">
+            <div class="flex items-center justify-between mb-3">
                 <div>
-                    <h2 class="text-2xl font-bold" x-text="getPageTitle()"></h2>
-                    <p class="text-gray-500" x-text="getPageSubtitle()"></p>
+                    <h2 class="text-xl font-bold" x-text="getPageTitle()"></h2>
+                    <p class="text-sm text-gray-500" x-text="getPageSubtitle()"></p>
                 </div>
 
                 <div class="flex items-center space-x-3">
-                    <!-- Theme toggle -->
-                    <button @click="toggleDarkMode()" class="theme-toggle glass w-10 h-10 rounded-xl flex items-center justify-center hover:bg-gray-50 transition-all">
-                        <i class="fas" :class="darkMode ? 'fa-sun text-yellow-500' : 'fa-moon text-indigo-500'"></i>
-                    </button>
-
-                    <!-- Language selector -->
-                    <select class="glass px-3 py-2 rounded-xl text-sm font-bold focus:outline-none cursor-pointer hover:bg-gray-50 transition-colors" x-model="language" @change="changeLanguage">
-                        <option value="ru">RU</option>
-                        <option value="en">EN</option>
-                        <option value="uk">UK</option>
-                    </select>
-
                     <!-- Profile -->
                     <div class="relative" x-data="{open: false}">
                         <button @click="open = !open" class="flex items-center glass px-4 py-2 rounded-xl hover:bg-gray-50">
@@ -728,26 +716,25 @@
                 
                 <!-- Активность -->
                 <div class="glass rounded-2xl p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-bold">Пиковые часы активности</h3>
-                        <button class="text-sm text-indigo-600 hover:text-indigo-800">
-                            Расширенная статистика →
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-bold" x-text="t('stats.peakHours')"></h3>
+                        <button @click="alert('Эта функция пока в разработке')" class="text-sm text-indigo-600 hover:text-indigo-800" x-text="t('stats.advancedStats') + ' →'">
                         </button>
                     </div>
-                    <div class="grid grid-cols-24 gap-0.5 mb-2">
+                    <div class="flex items-end h-20 gap-1">
                         <template x-for="hour in 24" :key="hour">
-                            <div class="text-center">
-                                <div class="text-[10px] text-gray-500 mb-1" x-text="(hour-1) + 'ч'"></div>
-                                <div class="h-6 rounded bg-gradient-to-b"
-                                     :class="getActivityColor(hour-1)"
-                                     :style="'height:' + (getActivityLevel(hour-1) * 30) + 'px'">
-                                </div>
+                            <div class="flex-1 rounded-t transition-all bg-gradient-to-t"
+                                 :class="getActivityColor(hour-1)"
+                                 :style="'height:' + Math.max(getActivityLevel(hour-1) * 100, 8) + '%'"
+                                 :title="(hour-1) + ':00 - активность ' + Math.round(getActivityLevel(hour-1) * 100) + '%'">
                             </div>
                         </template>
                     </div>
-                    <div class="flex justify-between text-xs text-gray-500">
+                    <div class="flex justify-between text-[10px] text-gray-400 mt-1">
                         <span>0ч</span>
+                        <span>6ч</span>
                         <span>12ч</span>
+                        <span>18ч</span>
                         <span>23ч</span>
                     </div>
                 </div>
