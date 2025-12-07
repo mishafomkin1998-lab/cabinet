@@ -890,7 +890,7 @@
                                                    :value="account.id"
                                                    :checked="selectedProfileIds.includes(account.id)"
                                                    :disabled="account.isPaid || account.isFree"
-                                                   @click.stop="toggleProfileSelection(account.id, !selectedProfileIds.includes(account.id))">
+                                                   @change="toggleProfileSelection(account.id, $event.target.checked)">
                                         </td>
                                         <td class="py-4 px-6 font-mono" x-text="'#' + account.id"></td>
                                         <td class="py-4 px-6" x-text="account.login"></td>
