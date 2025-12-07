@@ -879,14 +879,83 @@
                     isFree: data.isFree === true, // "мой админ" - бесплатно
                     isTrial: data.isTrial === true,
                     trialUsed: data.trialUsed === true,
+                    canTrial: !data.trialUsed && !data.isPaid, // Можно активировать trial
                     daysLeft: data.daysLeft || 0,
                     reason: data.reason || 'unknown'
                 };
             } catch (error) {
                 console.error(`❌ Ошибка проверки оплаты профиля:`, error);
                 // При ошибке разрешаем работу
-                return { isPaid: true, isFree: false, isTrial: false, trialUsed: false, daysLeft: 999 };
+                return { isPaid: true, isFree: false, isTrial: false, trialUsed: false, canTrial: false, daysLeft: 999 };
             }
+        }
+
+        // 7. Функция активации тестового периода
+        async function activateTrialPeriod(profileId) {
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/bots/activate-trial`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ profileId: profileId })
+                });
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error(`❌ Ошибка активации trial:`, error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        // 8. Функция показа диалога оплаты/trial
+        function showPaymentDialog(profileId, canTrial) {
+            return new Promise((resolve) => {
+                const overlay = document.createElement('div');
+                overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+                const dialog = document.createElement('div');
+                dialog.style.cssText = 'background:white;border-radius:8px;padding:20px;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+
+                let html = `
+                    <h3 style="margin:0 0 15px 0;font-size:16px;">ladabot</h3>
+                    <p style="margin:0 0 10px 0;">Анкета ${profileId} не оплачена.${canTrial ? '' : ' Тестовый период истёк.'}</p>
+                    <p style="margin:0 0 20px 0;color:#666;font-size:14px;">Обратитесь за пополнением в телеграм к пользователю @S_Shevil</p>
+                    <div style="display:flex;gap:10px;justify-content:flex-end;">
+                `;
+
+                if (canTrial) {
+                    html += `<button id="trialBtn" style="padding:8px 16px;background:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">Получить 2 тестовых дня</button>`;
+                }
+                html += `<button id="cancelBtn" style="padding:8px 16px;background:#f0f0f0;border:1px solid #ccc;border-radius:4px;cursor:pointer;">OK</button>`;
+                html += '</div>';
+
+                dialog.innerHTML = html;
+                overlay.appendChild(dialog);
+                document.body.appendChild(overlay);
+
+                dialog.querySelector('#cancelBtn').onclick = () => {
+                    document.body.removeChild(overlay);
+                    resolve({ action: 'cancel' });
+                };
+
+                if (canTrial) {
+                    dialog.querySelector('#trialBtn').onclick = async () => {
+                        const btn = dialog.querySelector('#trialBtn');
+                        btn.disabled = true;
+                        btn.textContent = 'Активация...';
+
+                        const result = await activateTrialPeriod(profileId);
+                        document.body.removeChild(overlay);
+
+                        if (result.success) {
+                            alert('✅ Тестовый период активирован на 2 дня!');
+                            resolve({ action: 'trial_activated' });
+                        } else {
+                            alert('❌ Ошибка: ' + (result.message || result.error || 'Не удалось активировать'));
+                            resolve({ action: 'error', error: result.error });
+                        }
+                    };
+                }
+            });
         }
 
         // === КРИТИЧЕСКИ ВАЖНО: Скрипт "Анти-сон" ===
@@ -2002,15 +2071,17 @@
                 const paymentStatus = await checkProfilePaymentStatus(this.displayId);
                 if (!paymentStatus.isPaid && !paymentStatus.isFree) {
                     this.log(`⛔ Рассылка заблокирована - анкета не оплачена`);
-                    let msg = `Анкета ${this.displayId} не оплачена.`;
-                    if (paymentStatus.reason === 'trial_expired') {
-                        msg += ' Тестовый период истёк.';
-                    } else if (paymentStatus.reason === 'not_paid') {
-                        msg += ' Требуется оплата.';
+
+                    // Показываем диалог с возможностью активации trial
+                    const dialogResult = await showPaymentDialog(this.displayId, paymentStatus.canTrial);
+
+                    if (dialogResult.action === 'trial_activated') {
+                        // Trial активирован - запускаем рассылку
+                        this.log(`✅ Trial активирован, запускаем рассылку`);
+                    } else {
+                        // Отмена или ошибка
+                        return;
                     }
-                    msg += '\n\nОбратитесь за пополнением в телеграмм к пользователю @S_Shevil';
-                    alert(msg);
-                    return;
                 }
 
                 this.isMailRunning = true;
@@ -2237,15 +2308,17 @@
                 const paymentStatus = await checkProfilePaymentStatus(this.displayId);
                 if (!paymentStatus.isPaid && !paymentStatus.isFree) {
                     this.log(`⛔ Чат заблокирован - анкета не оплачена`);
-                    let msg = `Анкета ${this.displayId} не оплачена.`;
-                    if (paymentStatus.reason === 'trial_expired') {
-                        msg += ' Тестовый период истёк.';
-                    } else if (paymentStatus.reason === 'not_paid') {
-                        msg += ' Требуется оплата.';
+
+                    // Показываем диалог с возможностью активации trial
+                    const dialogResult = await showPaymentDialog(this.displayId, paymentStatus.canTrial);
+
+                    if (dialogResult.action === 'trial_activated') {
+                        // Trial активирован - запускаем чат
+                        this.log(`✅ Trial активирован, запускаем чат`);
+                    } else {
+                        // Отмена или ошибка
+                        return;
                     }
-                    msg += '\n\nОбратитесь за пополнением в телеграмм к пользователю @S_Shevil';
-                    alert(msg);
-                    return;
                 }
 
                 if (this.chatSettings.rotationStartTime === 0) this.chatSettings.rotationStartTime = Date.now();
