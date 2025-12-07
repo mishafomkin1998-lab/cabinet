@@ -503,6 +503,19 @@
             border-color: #333;
         }
 
+        /* AI блок в MiniChat и шаблонах */
+        body.theme-dark #minichat-modal .mb-2.p-2.rounded,
+        body.theme-dark #tpl-modal .mb-2.p-2.rounded {
+            background: #1a2a3a !important;
+            border-color: #00d4ff !important;
+        }
+        body.theme-dark #minichat-ai-prompt,
+        body.theme-dark #tpl-ai-prompt {
+            background: #161616;
+            border-color: #333;
+            color: #f0f0f0;
+        }
+
         /* Вкладки настроек */
         body.theme-dark .settings-tabs {
             border-bottom-color: #333;
@@ -1247,6 +1260,18 @@
             <div class="chat-history" id="minichat-history">
                 <div class="text-center text-muted small mt-5">Загрузка истории...</div>
             </div>
+
+            <!-- AI генерация ответа -->
+            <div class="mb-2 p-2 rounded" style="background: #f0f7ff; border: 1px solid #cce5ff;">
+                <div class="d-flex gap-2 align-items-center">
+                    <i class="fa fa-robot text-primary"></i>
+                    <input id="minichat-ai-prompt" class="form-control form-control-sm" placeholder="Как ответить? (напр: игриво, романтично)">
+                    <button class="btn btn-primary btn-sm" onclick="generateMiniChatAIReply()" id="minichat-ai-btn" style="white-space: nowrap;">
+                        <i class="fa fa-magic"></i> AI
+                    </button>
+                </div>
+            </div>
+
             <div class="d-flex gap-2">
                 <textarea id="minichat-input" class="form-control" rows="2" placeholder="Сообщение..."></textarea>
                 <button class="btn btn-primary" onclick="sendMiniChatMessage()"><i class="fa fa-paper-plane"></i></button>
@@ -2155,6 +2180,108 @@
             } catch (e) {
                 chatHistoryEl.innerHTML = '<div class="text-center text-danger small mt-5">Ошибка загрузки истории чата.</div>';
                 console.error("MiniChat (chat) history error:", e);
+            }
+        }
+
+        // AI генерация ответа на входящее сообщение
+        async function generateMiniChatAIReply() {
+            const promptInput = document.getElementById('minichat-ai-prompt');
+            const messageInput = document.getElementById('minichat-input');
+            const btn = document.getElementById('minichat-ai-btn');
+            const chatHistoryEl = document.getElementById('minichat-history');
+            const userPrompt = promptInput.value.trim();
+
+            if (!globalSettings.apiKey) {
+                alert('Добавьте OpenAI API Key в настройках (вкладка AI функции)');
+                return;
+            }
+
+            // Получаем последние сообщения из истории чата
+            const partnerMessages = chatHistoryEl.querySelectorAll('.chat-msg.partner .msg-bubble');
+            const myMessages = chatHistoryEl.querySelectorAll('.chat-msg.me .msg-bubble');
+
+            if (partnerMessages.length === 0) {
+                alert('Нет входящих сообщений для ответа');
+                return;
+            }
+
+            // Собираем последние 5 сообщений для контекста
+            const allMsgs = chatHistoryEl.querySelectorAll('.chat-msg');
+            const contextMessages = [];
+            const lastMessages = Array.from(allMsgs).slice(-5);
+
+            for (const msg of lastMessages) {
+                const isMe = msg.classList.contains('me');
+                const bubble = msg.querySelector('.msg-bubble');
+                if (bubble) {
+                    contextMessages.push({
+                        role: isMe ? 'assistant' : 'user',
+                        content: bubble.textContent
+                    });
+                }
+            }
+
+            // Последнее сообщение партнёра
+            const lastPartnerMsg = partnerMessages[partnerMessages.length - 1].textContent;
+
+            const originalBtnHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+
+            try {
+                const isChat = minichatType === 'chat';
+                const partnerName = document.getElementById('minichat-partner-name').textContent;
+
+                let styleInstruction = userPrompt
+                    ? `Reply style: ${userPrompt}.`
+                    : 'Reply in a warm, friendly and engaging manner.';
+
+                const systemPrompt = isChat
+                    ? `You are helping write a chat reply on a dating site. Write in English. Keep it short (1-2 sentences). Be conversational and engaging. ${styleInstruction} Do not use emojis. Reply directly without any introduction like "Here's a reply".`
+                    : `You are helping write a letter reply on a dating site. Write in English. Keep it medium length (2-4 sentences). Be warm and personal. ${styleInstruction} Do not use emojis. Reply directly without any introduction like "Here's a reply".`;
+
+                const config = {
+                    headers: {
+                        'Authorization': `Bearer ${globalSettings.apiKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                };
+
+                if (globalSettings.proxyAI) {
+                    const proxyConfig = parseProxyUrl(globalSettings.proxyAI);
+                    if (proxyConfig) config.proxy = proxyConfig;
+                }
+
+                // Формируем сообщения для API
+                const apiMessages = [
+                    { role: 'system', content: systemPrompt },
+                    ...contextMessages,
+                    { role: 'user', content: `[Last message from ${partnerName}]: "${lastPartnerMsg}"\n\nWrite a reply to this message.` }
+                ];
+
+                const response = await axios.post(OPENAI_API_ENDPOINT, {
+                    model: 'gpt-3.5-turbo',
+                    messages: apiMessages,
+                    temperature: 0.8,
+                    max_tokens: 200
+                }, config);
+
+                const generatedReply = response.data.choices[0].message.content.trim();
+
+                // Вставляем ответ в поле ввода (НЕ отправляем!)
+                messageInput.value = generatedReply;
+                messageInput.focus();
+
+                // Очищаем промпт после успешной генерации
+                promptInput.value = '';
+
+            } catch (error) {
+                console.error('AI Reply generation error:', error);
+                const errorMsg = error.response?.data?.error?.message || error.message || 'Неизвестная ошибка';
+                alert(`Ошибка генерации: ${errorMsg}`);
+            } finally {
+                btn.innerHTML = originalBtnHtml;
+                btn.disabled = false;
             }
         }
 
