@@ -1345,9 +1345,24 @@
     </div>
 
     <div id="tpl-modal" class="modal-overlay">
-        <div class="modal-card" style="width: 500px;">
+        <div class="modal-card" style="width: 550px;">
             <h5 id="tpl-modal-title">Новый шаблон</h5>
             <div class="mb-2"><input id="tpl-modal-name" class="form-control" placeholder="Название"></div>
+
+            <!-- AI генерация -->
+            <div class="mb-2 p-2 rounded" style="background: #f0f7ff; border: 1px solid #cce5ff;">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="fa fa-robot text-primary"></i>
+                    <small class="text-primary fw-bold">Генерация с помощью AI</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <input id="tpl-ai-prompt" class="form-control form-control-sm" placeholder="Опишите какой текст нужен (например: приглашение на свидание, романтичное)">
+                    <button class="btn btn-primary btn-sm" onclick="generateTemplateWithAI()" id="tpl-ai-btn" style="white-space: nowrap;">
+                        <i class="fa fa-magic"></i> Сгенерировать
+                    </button>
+                </div>
+            </div>
+
             <div class="mb-3 relative-box">
                 <textarea id="tpl-modal-text" class="form-control" rows="5" placeholder="Текст..." oninput="checkVarTrigger(this, 'tpl-vars-dropdown'); validateInput(this)"></textarea>
                 <div id="tpl-vars-dropdown" class="vars-dropdown">
@@ -4300,7 +4315,73 @@
             } else { editingTemplateIndex = null; document.getElementById('tpl-modal-name').value=""; document.getElementById('tpl-modal-text').value=""; }
             openModal('tpl-modal');
         }
-        
+
+        // Генерация текста шаблона с помощью AI
+        async function generateTemplateWithAI() {
+            const promptInput = document.getElementById('tpl-ai-prompt');
+            const textArea = document.getElementById('tpl-modal-text');
+            const btn = document.getElementById('tpl-ai-btn');
+            const userPrompt = promptInput.value.trim();
+
+            if (!userPrompt) {
+                alert('Опишите какой текст нужно сгенерировать');
+                promptInput.focus();
+                return;
+            }
+
+            if (!globalSettings.apiKey) {
+                alert('Добавьте OpenAI API Key в настройках (вкладка AI функции)');
+                return;
+            }
+
+            const originalBtnHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Генерация...';
+            btn.disabled = true;
+
+            try {
+                const isChat = globalMode === 'chat';
+                const systemPrompt = isChat
+                    ? `You are an expert at writing romantic chat invitations for a dating site. Write in English. The message should be friendly, intriguing and make the person want to respond. Use {Name} placeholder for recipient's name if appropriate. Keep it short (2-3 sentences). Do not use emojis.`
+                    : `You are an expert at writing romantic letters for a dating site. Write in English. The letter should be warm, personal and engaging. Use {Name} placeholder for recipient's name, {City} for their city, {Age} for their age if appropriate. Keep it medium length (3-5 sentences). Do not use emojis.`;
+
+                const config = {
+                    headers: {
+                        'Authorization': `Bearer ${globalSettings.apiKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                };
+
+                if (globalSettings.proxyAI) {
+                    const proxyConfig = parseProxyUrl(globalSettings.proxyAI);
+                    if (proxyConfig) config.proxy = proxyConfig;
+                }
+
+                const response = await axios.post(OPENAI_API_ENDPOINT, {
+                    model: 'gpt-3.5-turbo',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: `Write a ${isChat ? 'chat invitation' : 'letter'} with this style/theme: ${userPrompt}` }
+                    ],
+                    temperature: 0.8,
+                    max_tokens: 300
+                }, config);
+
+                const generatedText = response.data.choices[0].message.content.trim();
+                textArea.value = generatedText;
+
+                // Очищаем поле промпта после успешной генерации
+                promptInput.value = '';
+
+            } catch (error) {
+                console.error('AI Generation error:', error);
+                const errorMsg = error.response?.data?.error?.message || error.message || 'Неизвестная ошибка';
+                alert(`Ошибка генерации: ${errorMsg}`);
+            } finally {
+                btn.innerHTML = originalBtnHtml;
+                btn.disabled = false;
+            }
+        }
+
         async function saveTemplateFromModal() {
             const name = document.getElementById('tpl-modal-name').value;
             const text = document.getElementById('tpl-modal-text').value;
