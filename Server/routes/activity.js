@@ -41,6 +41,25 @@ router.post('/message_sent', asyncHandler(async (req, res) => {
     const { botId, accountDisplayId, recipientId, type, responseTime, isFirst, isLast, convId, length,
             status, textContent, mediaUrl, fileName, translatorId, errorReason, usedAi } = req.body;
 
+    // Проверка верификации ID анкеты (защита от подмены)
+    if (botId && accountDisplayId) {
+        const botCheck = await pool.query(
+            `SELECT verified_profile_id FROM bots WHERE bot_id = $1`, [botId]
+        );
+
+        if (botCheck.rows.length > 0 && botCheck.rows[0].verified_profile_id) {
+            const verifiedId = botCheck.rows[0].verified_profile_id;
+            if (verifiedId !== accountDisplayId) {
+                console.log(`🚫 ПОДМЕНА ID при отправке! Бот ${botId}: ожидается ${verifiedId}, получен ${accountDisplayId}`);
+                return res.status(403).json({
+                    status: 'error',
+                    error: 'profile_id_mismatch',
+                    message: `ID анкеты не совпадает с верифицированным`
+                });
+            }
+        }
+    }
+
     // Логируем usedAi для отладки
     if (usedAi) {
         console.log(`🤖 Получено сообщение с AI от ${accountDisplayId}, usedAi=${usedAi}`);

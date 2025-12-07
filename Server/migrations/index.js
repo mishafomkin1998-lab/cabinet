@@ -337,10 +337,15 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_profile_payment_history_date ON profile_payment_history(created_at)`);
         await fixSerialSequence('profile_payment_history');
 
+        // 19. Верификация ID анкеты для бота (защита от подмены)
+        await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS verified_profile_id VARCHAR(50)`);
+        await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS profile_verified_at TIMESTAMP`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_bots_verified_profile ON bots(verified_profile_id)`);
+
         // Очистка старых данных
         await cleanupOldData();
 
-        console.log('✅ База данных готова к работе (v9.0 - история оплаты анкет)');
+        console.log('✅ База данных готова к работе (v10.0 - верификация ID анкет)');
     } catch (e) {
         console.error('❌ Ошибка инициализации БД:', e.message);
     }

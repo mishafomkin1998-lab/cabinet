@@ -16,64 +16,98 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
     const version = systemInfo?.version || null;
     const platform = systemInfo?.platform || null;
 
+    // 0. Проверка верификации ID анкеты (защита от подмены)
+    const botCheck = await pool.query(
+        `SELECT verified_profile_id FROM bots WHERE bot_id = $1`, [botId]
+    );
+
+    if (botCheck.rows.length > 0 && botCheck.rows[0].verified_profile_id) {
+        // Бот уже зарегистрирован - проверяем соответствие ID
+        const verifiedId = botCheck.rows[0].verified_profile_id;
+        if (verifiedId !== accountDisplayId) {
+            console.log(`🚫 ПОДМЕНА ID! Бот ${botId}: ожидается ${verifiedId}, получен ${accountDisplayId}`);
+            return res.status(403).json({
+                status: 'error',
+                error: 'profile_id_mismatch',
+                message: `ID анкеты не совпадает. Ожидается: ${verifiedId}, получен: ${accountDisplayId}`
+            });
+        }
+    }
+
     // 1. Записываем heartbeat
-        await pool.query(`
-            INSERT INTO heartbeats (
-                bot_id, account_display_id, status,
-                ip, version, platform, timestamp
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `, [botId, accountDisplayId, profileStatus, ip || null, version, platform, timestamp || new Date()]);
+    await pool.query(`
+        INSERT INTO heartbeats (
+            bot_id, account_display_id, status,
+            ip, version, platform, timestamp
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `, [botId, accountDisplayId, profileStatus, ip || null, version, platform, timestamp || new Date()]);
 
-        // 2. Автосоздание анкеты в allowed_profiles если нет
-        const existsAllowed = await pool.query(
-            `SELECT 1 FROM allowed_profiles WHERE profile_id = $1`, [accountDisplayId]
+    // 2. Автосоздание анкеты в allowed_profiles если нет
+    const existsAllowed = await pool.query(
+        `SELECT 1 FROM allowed_profiles WHERE profile_id = $1`, [accountDisplayId]
+    );
+    if (existsAllowed.rows.length === 0) {
+        await pool.query(
+            `INSERT INTO allowed_profiles (profile_id, note, added_at) VALUES ($1, 'Автодобавлено ботом', NOW())`,
+            [accountDisplayId]
         );
-        if (existsAllowed.rows.length === 0) {
-            await pool.query(
-                `INSERT INTO allowed_profiles (profile_id, note, added_at) VALUES ($1, 'Автодобавлено ботом', NOW())`,
-                [accountDisplayId]
-            );
-        }
+    }
 
-        // 3. Обновляем/создаём запись в profiles для dashboard
-        const existsProfile = await pool.query(
-            `SELECT 1 FROM profiles WHERE profile_id = $1`, [accountDisplayId]
+    // 3. Обновляем/создаём запись в profiles для dashboard
+    const existsProfile = await pool.query(
+        `SELECT 1 FROM profiles WHERE profile_id = $1`, [accountDisplayId]
+    );
+    if (existsProfile.rows.length === 0) {
+        await pool.query(
+            `INSERT INTO profiles (profile_id, status, last_online, added_at) VALUES ($1, $2, NOW(), NOW())`,
+            [accountDisplayId, profileStatus]
         );
-        if (existsProfile.rows.length === 0) {
+    } else {
+        await pool.query(
+            `UPDATE profiles SET status = $1, last_online = NOW() WHERE profile_id = $2`,
+            [profileStatus, accountDisplayId]
+        );
+    }
+
+    // 4. Обновляем/создаём запись бота в bots для dashboard + верификация ID
+    const existsBot = await pool.query(
+        `SELECT verified_profile_id FROM bots WHERE bot_id = $1`, [botId]
+    );
+    if (existsBot.rows.length === 0) {
+        // Новый бот - сохраняем verified_profile_id
+        await pool.query(
+            `INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat, verified_profile_id, profile_verified_at)
+             VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW())`,
+            [botId, platform, ip || null, version, profileStatus, accountDisplayId]
+        );
+        console.log(`🔐 Бот ${botId} верифицирован с анкетой ${accountDisplayId}`);
+    } else {
+        // Существующий бот - обновляем данные
+        if (!existsBot.rows[0].verified_profile_id) {
+            // Если verified_profile_id ещё не установлен - устанавливаем
             await pool.query(
-                `INSERT INTO profiles (profile_id, status, last_online, added_at) VALUES ($1, $2, NOW(), NOW())`,
-                [accountDisplayId, profileStatus]
+                `UPDATE bots SET platform = COALESCE($1, platform), ip = COALESCE($2, ip), version = COALESCE($3, version),
+                 status = $4, last_heartbeat = NOW(), verified_profile_id = $5, profile_verified_at = NOW()
+                 WHERE bot_id = $6`,
+                [platform, ip || null, version, profileStatus, accountDisplayId, botId]
             );
+            console.log(`🔐 Бот ${botId} верифицирован с анкетой ${accountDisplayId}`);
         } else {
             await pool.query(
-                `UPDATE profiles SET status = $1, last_online = NOW() WHERE profile_id = $2`,
-                [profileStatus, accountDisplayId]
-            );
-        }
-
-        // 4. Обновляем/создаём запись бота в bots для dashboard
-        const existsBot = await pool.query(
-            `SELECT 1 FROM bots WHERE bot_id = $1`, [botId]
-        );
-        if (existsBot.rows.length === 0) {
-            await pool.query(
-                `INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat) VALUES ($1, $2, $3, $4, $5, NOW())`,
-                [botId, platform, ip || null, version, profileStatus]
-            );
-        } else {
-            await pool.query(
-                `UPDATE bots SET platform = COALESCE($1, platform), ip = COALESCE($2, ip), version = COALESCE($3, version), status = $4, last_heartbeat = NOW() WHERE bot_id = $5`,
+                `UPDATE bots SET platform = COALESCE($1, platform), ip = COALESCE($2, ip), version = COALESCE($3, version),
+                 status = $4, last_heartbeat = NOW() WHERE bot_id = $5`,
                 [platform, ip || null, version, profileStatus, botId]
             );
         }
+    }
 
-        // 5. Связываем бота с анкетой
-        await pool.query(
-            `INSERT INTO bot_profiles (bot_id, profile_id, created_at) VALUES ($1, $2, NOW()) ON CONFLICT DO NOTHING`,
-            [botId, accountDisplayId]
-        );
+    // 5. Связываем бота с анкетой
+    await pool.query(
+        `INSERT INTO bot_profiles (bot_id, profile_id, created_at) VALUES ($1, $2, NOW()) ON CONFLICT DO NOTHING`,
+        [botId, accountDisplayId]
+    );
 
-        console.log(`❤️ Heartbeat от ${accountDisplayId} (бот ${botId}): ${profileStatus}`);
+    console.log(`❤️ Heartbeat от ${accountDisplayId} (бот ${botId}): ${profileStatus}`);
 
     res.json({ status: 'ok' });
 }));
@@ -82,42 +116,76 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
 router.post('/bot/heartbeat', asyncHandler(async (req, res) => {
     const { botId, profileId, platform, ip, version, status } = req.body;
 
-    // 1. Обновляем/создаем запись бота
-        const existsBot = await pool.query(`SELECT 1 FROM bots WHERE bot_id = $1`, [botId]);
-        if (existsBot.rows.length === 0) {
+    // 0. Проверка верификации ID анкеты (защита от подмены)
+    if (profileId) {
+        const botCheck = await pool.query(
+            `SELECT verified_profile_id FROM bots WHERE bot_id = $1`, [botId]
+        );
+
+        if (botCheck.rows.length > 0 && botCheck.rows[0].verified_profile_id) {
+            const verifiedId = botCheck.rows[0].verified_profile_id;
+            if (verifiedId !== profileId) {
+                console.log(`🚫 ПОДМЕНА ID! Бот ${botId}: ожидается ${verifiedId}, получен ${profileId}`);
+                return res.status(403).json({
+                    status: 'error',
+                    error: 'profile_id_mismatch',
+                    message: `ID анкеты не совпадает. Ожидается: ${verifiedId}, получен: ${profileId}`
+                });
+            }
+        }
+    }
+
+    // 1. Обновляем/создаем запись бота + верификация ID
+    const existsBot = await pool.query(`SELECT verified_profile_id FROM bots WHERE bot_id = $1`, [botId]);
+    if (existsBot.rows.length === 0) {
+        await pool.query(
+            `INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat, verified_profile_id, profile_verified_at)
+             VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW())`,
+            [botId, platform || null, ip || null, version || null, status || 'online', profileId || null]
+        );
+        if (profileId) {
+            console.log(`🔐 Бот ${botId} верифицирован с анкетой ${profileId}`);
+        }
+    } else {
+        if (!existsBot.rows[0].verified_profile_id && profileId) {
             await pool.query(
-                `INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat) VALUES ($1, $2, $3, $4, $5, NOW())`,
-                [botId, platform || null, ip || null, version || null, status || 'online']
+                `UPDATE bots SET platform = COALESCE($1, platform), ip = COALESCE($2, ip), version = COALESCE($3, version),
+                 status = $4, last_heartbeat = NOW(), verified_profile_id = $5, profile_verified_at = NOW()
+                 WHERE bot_id = $6`,
+                [platform, ip, version, status || 'online', profileId, botId]
             );
+            console.log(`🔐 Бот ${botId} верифицирован с анкетой ${profileId}`);
         } else {
             await pool.query(
-                `UPDATE bots SET platform = COALESCE($1, platform), ip = COALESCE($2, ip), version = COALESCE($3, version), status = $4, last_heartbeat = NOW() WHERE bot_id = $5`,
+                `UPDATE bots SET platform = COALESCE($1, platform), ip = COALESCE($2, ip), version = COALESCE($3, version),
+                 status = $4, last_heartbeat = NOW() WHERE bot_id = $5`,
                 [platform, ip, version, status || 'online', botId]
             );
         }
+    }
 
-        // 2. Связываем бота с профилем
-        if (profileId) {
-            await pool.query(
-                `INSERT INTO bot_profiles (bot_id, profile_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-                [botId, profileId]
-            );
+    // 2. Связываем бота с профилем
+    if (profileId) {
+        await pool.query(
+            `INSERT INTO bot_profiles (bot_id, profile_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+            [botId, profileId]
+        );
 
-            // 3. Обновляем статус профиля
-            await pool.query(`
-                UPDATE allowed_profiles
-                SET status = $1, last_online = NOW()
-                WHERE profile_id = $2
-            `, [status || 'online', profileId]);
-        }
-
-        // 4. Записываем в heartbeats для истории
+        // 3. Обновляем статус профиля
         await pool.query(`
-            INSERT INTO heartbeats (bot_id, account_display_id, status, ip, version, platform, timestamp)
-            VALUES ($1, $2, $3, $4, $5, $6, NOW())
-        `, [botId, profileId || '', status || 'online', ip || null, version || null, platform || null]);
+            UPDATE allowed_profiles
+            SET status = $1, last_online = NOW()
+            WHERE profile_id = $2
+        `, [status || 'online', profileId]);
+    }
 
-        console.log(`❤️ Heartbeat от бота ${botId} (${profileId || 'no profile'}): ${status || 'online'}`);
+    // 4. Записываем в heartbeats для истории
+    await pool.query(`
+        INSERT INTO heartbeats (bot_id, account_display_id, status, ip, version, platform, timestamp)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW())
+    `, [botId, profileId || '', status || 'online', ip || null, version || null, platform || null]);
+
+    console.log(`❤️ Heartbeat от бота ${botId} (${profileId || 'no profile'}): ${status || 'online'}`);
 
     res.json({ status: 'ok' });
 }));
@@ -356,6 +424,65 @@ router.post('/:botId/name', asyncHandler(async (req, res) => {
         [name, botId]
     );
     res.json({ success: true });
+}));
+
+// Сброс верификации бота (только директор)
+// Позволяет переподключить бота к другой анкете
+router.post('/:botId/reset-verification', asyncHandler(async (req, res) => {
+    const { botId } = req.params;
+    const { userId } = req.body;
+
+    // Проверяем права (только директор)
+    const user = await pool.query(`SELECT role FROM users WHERE id = $1`, [userId]);
+    if (user.rows.length === 0 || user.rows[0].role !== 'director') {
+        return res.status(403).json({ success: false, error: 'Только директор может сбросить верификацию' });
+    }
+
+    // Получаем текущий verified_profile_id для логирования
+    const bot = await pool.query(
+        `SELECT verified_profile_id FROM bots WHERE bot_id = $1`, [botId]
+    );
+
+    if (bot.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Бот не найден' });
+    }
+
+    const oldProfileId = bot.rows[0].verified_profile_id;
+
+    // Сбрасываем верификацию
+    await pool.query(
+        `UPDATE bots SET verified_profile_id = NULL, profile_verified_at = NULL WHERE bot_id = $1`,
+        [botId]
+    );
+
+    console.log(`🔓 Верификация бота ${botId} сброшена (был привязан к ${oldProfileId || 'ничему'})`);
+
+    res.json({
+        success: true,
+        message: `Верификация бота сброшена. При следующем подключении бот будет привязан к новой анкете.`,
+        previousProfileId: oldProfileId
+    });
+}));
+
+// Получить информацию о верификации бота
+router.get('/:botId/verification', asyncHandler(async (req, res) => {
+    const { botId } = req.params;
+
+    const bot = await pool.query(
+        `SELECT verified_profile_id, profile_verified_at FROM bots WHERE bot_id = $1`,
+        [botId]
+    );
+
+    if (bot.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Бот не найден' });
+    }
+
+    res.json({
+        success: true,
+        verified: !!bot.rows[0].verified_profile_id,
+        profileId: bot.rows[0].verified_profile_id,
+        verifiedAt: bot.rows[0].profile_verified_at
+    });
 }));
 
 module.exports = router;
