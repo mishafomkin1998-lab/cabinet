@@ -337,7 +337,7 @@
             const existingUser = localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser');
             if (existingUser) {
                 const user = JSON.parse(existingUser);
-                if (user.role === 'admin') {
+                if (user.role === 'admin' || user.role === 'director') {
                     window.location.href = 'admin-dashboard.html';
                 } else {
                     window.location.href = 'dashboard.html';
@@ -410,7 +410,7 @@
                         }
 
                         // Перенаправляем в зависимости от роли
-                        if (data.user.role === 'admin') {
+                        if (data.user.role === 'admin' || data.user.role === 'director') {
                             window.location.href = 'admin-dashboard.html';
                         } else {
                             window.location.href = 'dashboard.html';

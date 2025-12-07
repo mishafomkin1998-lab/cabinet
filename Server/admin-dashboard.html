@@ -34,8 +34,8 @@
         if (!novaUserData || !novaUserData.loggedIn) {
             window.location.href = 'login.html';
         }
-        // Redirect non-admins to regular dashboard
-        if (novaUserData && novaUserData.role !== 'admin') {
+        // Redirect non-admins to regular dashboard (directors can access admin panel)
+        if (novaUserData && novaUserData.role !== 'admin' && novaUserData.role !== 'director') {
             window.location.href = 'dashboard.html';
         }
 
