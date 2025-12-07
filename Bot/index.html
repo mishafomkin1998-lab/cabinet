@@ -1356,13 +1356,9 @@
                 </button>
                 <input type="file" id="importFile" hidden accept=".txt,.json" onchange="handleUniversalImport(this)">
             </div>
-            <div class="alert alert-light p-2 small text-muted border mb-3">
+            <div class="alert alert-light p-2 small text-muted border">
                 <b>Импорт:</b> TXT (ID Логин Пароль) или JSON (полный бекап)
             </div>
-
-            <!-- AI промпт -->
-            <h6><i class="fa fa-robot text-primary"></i> AI Ответы</h6>
-            <textarea id="manager-ai-reply-prompt" class="form-control form-control-sm" rows="2" placeholder="Инструкция для AI (напр: романтично, с комплиментами)" oninput="saveAIReplyPrompt()"></textarea>
 
             <button class="btn btn-cancel-modal w-100 mt-3" onclick="closeModal('add-modal')">Закрыть</button>
         </div>
@@ -1550,7 +1546,13 @@
                 <div class="settings-section">
                     <div class="settings-section-title"><i class="fa fa-comment-dots"></i> My Prompt</div>
                     <label class="form-label small">Введите свой промт для кнопки "My Prompt"</label>
-                    <textarea id="set-prompt" class="form-control" rows="4" placeholder="Напиши здесь промт для AI..." onchange="saveGlobalSettings()"></textarea>
+                    <textarea id="set-prompt" class="form-control" rows="3" placeholder="Напиши здесь промт для AI..." onchange="saveGlobalSettings()"></textarea>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-reply"></i> Промпт для ответов</div>
+                    <label class="form-label small">Инструкция для AI при генерации ответов на письма</label>
+                    <textarea id="set-ai-reply-prompt" class="form-control" rows="2" placeholder="Напр: отвечай романтично, с комплиментами, задавай вопросы" onchange="saveGlobalSettings()"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется в MiniChat при нажатии кнопки AI</small>
                 </div>
             </div>
 
@@ -2767,6 +2769,7 @@
             document.getElementById('set-hotkeys').checked = globalSettings.hotkeys;
             document.getElementById('set-apikey').value = globalSettings.apiKey || '';
             document.getElementById('set-prompt').value = globalSettings.myPrompt || '';
+            document.getElementById('set-ai-reply-prompt').value = globalSettings.aiReplyPrompt || '';
             document.getElementById('set-sounds').checked = globalSettings.soundsEnabled;
             document.getElementById('set-confirm-close').checked = globalSettings.confirmTabClose;
             document.getElementById('set-extended').checked = globalSettings.extendedFeatures;
@@ -2796,6 +2799,7 @@
             globalSettings.hotkeys = document.getElementById('set-hotkeys').checked;
             globalSettings.apiKey = document.getElementById('set-apikey').value;
             globalSettings.myPrompt = document.getElementById('set-prompt').value;
+            globalSettings.aiReplyPrompt = document.getElementById('set-ai-reply-prompt').value;
             globalSettings.soundsEnabled = document.getElementById('set-sounds').checked;
             globalSettings.confirmTabClose = document.getElementById('set-confirm-close').checked;
             globalSettings.extendedFeatures = document.getElementById('set-extended').checked;
@@ -2833,6 +2837,7 @@
             document.getElementById('set-hotkeys').checked = globalSettings.hotkeys;
             document.getElementById('set-apikey').value = globalSettings.apiKey || '';
             document.getElementById('set-prompt').value = globalSettings.myPrompt || '';
+            document.getElementById('set-ai-reply-prompt').value = globalSettings.aiReplyPrompt || '';
             document.getElementById('set-sounds').checked = globalSettings.soundsEnabled;
             document.getElementById('set-confirm-close').checked = globalSettings.confirmTabClose;
             document.getElementById('set-extended').checked = globalSettings.extendedFeatures;
@@ -4384,11 +4389,6 @@
         function checkDuplicate(login, displayId) {
             return !!Object.values(bots).find(b => b.login.toLowerCase() === login.toLowerCase() || b.displayId.toLowerCase() === displayId.toLowerCase());
         }
-        function saveAIReplyPrompt() {
-            const promptInput = document.getElementById('manager-ai-reply-prompt');
-            globalSettings.aiReplyPrompt = promptInput.value;
-            localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
-        }
         function renderManagerList() {
             const list = document.getElementById('manager-list'); list.innerHTML = '';
             Object.values(bots).forEach(b => {
@@ -4491,11 +4491,7 @@
             document.getElementById('add-modal-title').innerHTML = '<i class="fa fa-plus text-success"></i> Добавить анкету';
             document.getElementById('newLogin').value = ""; document.getElementById('newPass').value = ""; document.getElementById('newId').value = "";
             document.getElementById('btnLoginText').innerText = "Добавить"; document.getElementById('loginError').innerText = "";
-            // Рендерим список анкет
             renderManagerList();
-            // Загружаем AI промпт
-            const promptInput = document.getElementById('manager-ai-reply-prompt');
-            if (promptInput) promptInput.value = globalSettings.aiReplyPrompt || '';
             openModal('add-modal');
         }
         function openStatsModal(botId, type) {
