@@ -183,8 +183,8 @@ router.put('/:id/profiles', async (req, res) => {
                 } else {
                     // Создаем новую запись
                     await pool.query(
-                        `INSERT INTO allowed_profiles (profile_id, assigned_admin_id, comment)
-                         VALUES ($1, $2, 'Добавлено при создании/редактировании админа')`,
+                        `INSERT INTO allowed_profiles (profile_id, assigned_admin_id, note)
+                         VALUES ($1, $2, 'Добавлено при назначении админу')`,
                         [profileId, adminId]
                     );
                 }
