@@ -614,8 +614,8 @@
                 </div>
 
                 <div class="flex items-center space-x-3">
-                    <!-- Balance (for users without "мой админ") -->
-                    <template x-if="!isRestricted">
+                    <!-- Balance (only for admins without "мой админ") -->
+                    <template x-if="currentUser.role === 'admin' && !isRestricted">
                         <div class="glass px-4 py-2 rounded-xl flex items-center">
                             <i class="fas fa-wallet mr-2 text-gray-400"></i>
                             <span class="font-semibold" :class="userBalance > 0 ? 'text-green-600' : 'text-red-500'">
