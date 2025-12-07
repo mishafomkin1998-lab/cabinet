@@ -2523,6 +2523,14 @@
                 this.lastMailId = 0;
                 this.myBirthday = null;
 
+                // === Очередь повторов для неотправленных сообщений ===
+                this.mailRetryQueue = []; // { user, retryCount, failedAt }
+                this.chatRetryQueue = [];
+                this.mailContactedUsers = new Set(); // ID пользователей которым уже отправили в этой сессии
+                this.chatContactedUsers = new Set();
+                this.maxRetries = 3; // Максимум попыток
+                this.retryCooldownMs = 60000; // 1 минута между попытками
+
                 // === ДОБАВЛЕНО: Отслеживание диалогов для полной спецификации ===
                 this.conversations = {}; // Структура: { recipientId: { firstMessageTime, lastMessageTime, messageCount } }
                 this.translatorId = globalSettings.translatorId || null; // ID переводчика из глобальных настроек
@@ -2884,10 +2892,13 @@
                     const target = this.mailSettings.target;
                     let users = [];
 
+                    let isRetryAttempt = false;
+                    let currentRetryItem = null;
+
                     if (target === 'inbox') {
                         const messagesRes = await makeApiRequest(this, 'GET', '/api/messages');
                         const unrepliedMsgs = (messagesRes.data.Messages || []).filter(m => !m.IsReplied);
-                        
+
                         if (unrepliedMsgs.length > 0) {
                             const msg = unrepliedMsgs[Math.floor(Math.random() * unrepliedMsgs.length)];
                             users.push({
@@ -2897,7 +2908,7 @@
                                 Age: msg.User.Age,
                                 Country: msg.User.Country,
                                 ProfilePhoto: msg.User.ProfilePhoto,
-                                messageToReply: msg.MessageId 
+                                messageToReply: msg.MessageId
                             });
                         }
                     } else {
@@ -2913,31 +2924,54 @@
                         }
                     }
 
-                    if(users.length === 0) {
-                        if(this.mailSettings.auto && target !== 'online') {
-                            let newTarget = 'online';
-                            if(target === 'payers') newTarget = 'my-favorites';
-                            else if(target === 'my-favorites') newTarget = 'favorites';
-                            else if(target === 'favorites') newTarget = 'inbox';
-                            else if(target === 'inbox') newTarget = 'online';
-                            this.log(`⚠️ Нет пользователей (${target}). Переход на ${newTarget}`);
-                            this.mailSettings.target = newTarget;
-                            if(activeTabId === this.id) document.getElementById(`target-select-${this.id}`).value = newTarget;
-                            return this.processMailUser(msgTemplate);
-                        } else {
-                            this.log(`⏳ Нет онлайн пользователей. Ожидание...`);
-                            return;
-                        }
-                    }
+                    // Фильтруем: убираем тех кому уже отправили и кто в ЧС
+                    users = users.filter(u =>
+                        !this.mailContactedUsers.has(u.AccountId.toString()) &&
+                        !this.mailSettings.blacklist.includes(u.AccountId.toString()) &&
+                        (!this.mailSettings.photoOnly || u.ProfilePhoto)
+                    );
 
-                    user = users[Math.floor(Math.random() * users.length)];
-                    if (this.mailSettings.blacklist.includes(user.AccountId.toString())) {
-                        this.log(`⛔ Пользователь ${user.AccountId} в черном списке`);
-                        return;
-                    }
-                    if (this.mailSettings.photoOnly && !user.ProfilePhoto) {
-                        this.log(`⛔ У пользователя ${user.AccountId} нет фото (режим photoOnly)`);
-                        return;
+                    // Если новых пользователей нет - пробуем очередь повторов
+                    if (users.length === 0) {
+                        const now = Date.now();
+                        const readyForRetry = this.mailRetryQueue.filter(item =>
+                            now - item.failedAt >= this.retryCooldownMs &&
+                            item.retryCount < this.maxRetries
+                        );
+
+                        if (readyForRetry.length > 0) {
+                            currentRetryItem = readyForRetry[Math.floor(Math.random() * readyForRetry.length)];
+                            user = currentRetryItem.user;
+                            currentRetryItem.retryCount++;
+                            currentRetryItem.failedAt = now;
+                            isRetryAttempt = true;
+                            this.log(`🔄 Повтор для ${user.Name} (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
+                        } else if (this.mailRetryQueue.some(item => item.retryCount < this.maxRetries)) {
+                            // Есть пользователи в очереди, но cooldown ещё не прошёл
+                            this.log(`⏳ Ожидание cooldown для повторов...`);
+                            return;
+                        } else {
+                            // Проверяем auto режим
+                            if(this.mailSettings.auto && target !== 'online') {
+                                let newTarget = 'online';
+                                if(target === 'payers') newTarget = 'my-favorites';
+                                else if(target === 'my-favorites') newTarget = 'favorites';
+                                else if(target === 'favorites') newTarget = 'inbox';
+                                else if(target === 'inbox') newTarget = 'online';
+                                this.log(`⚠️ Нет пользователей (${target}). Переход на ${newTarget}`);
+                                this.mailSettings.target = newTarget;
+                                // Очищаем contacted при смене категории
+                                this.mailContactedUsers.clear();
+                                this.mailRetryQueue = [];
+                                if(activeTabId === this.id) document.getElementById(`target-select-${this.id}`).value = newTarget;
+                                return this.processMailUser(msgTemplate);
+                            } else {
+                                this.log(`⏳ Нет пользователей для отправки. Ожидание...`);
+                                return;
+                            }
+                        }
+                    } else {
+                        user = users[Math.floor(Math.random() * users.length)];
                     }
 
                     msgBody = this.replaceMacros(msgTemplate, user);
@@ -2999,12 +3033,26 @@
                         this.mailStats.sent++;
                         this.mailHistory.sent.push(`${user.AccountId} (${user.Name})`);
                         this.log(`✅ Письмо отправлено: ${user.Name}`);
+
+                        // Добавляем в "отправленные" и убираем из очереди повторов
+                        this.mailContactedUsers.add(user.AccountId.toString());
+                        if (isRetryAttempt) {
+                            this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
+                        }
                     } else {
                         // Нет CheckId - считаем как ошибку
                         const errorReason = checkRes.data?.Message || checkRes.data?.Error || 'нет CheckId';
                         this.mailStats.errors++;
                         this.mailHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                         this.log(`❌ Ошибка: не могу отправить письмо ${user.Name} (${user.AccountId}): ${errorReason}`);
+
+                        // Добавляем в очередь повторов (если не retry или retry ещё не исчерпан)
+                        if (!isRetryAttempt) {
+                            this.mailRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
+                        } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
+                            this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
+                            this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                        }
 
                         // Отправляем ошибку на сервер
                         await sendErrorToLababot(
@@ -3045,6 +3093,16 @@
                         this.mailHistory.errors.push(`${user?.AccountId || 'unknown'}: ${errorReason}`);
                         this.log(`❌ Ошибка: ${user?.Name || user?.AccountId || 'unknown'} - ${errorReason}`);
 
+                        // Добавляем в очередь повторов
+                        if (user && user.AccountId) {
+                            if (!isRetryAttempt) {
+                                this.mailRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
+                            } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
+                                this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
+                                this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                            }
+                        }
+
                         // Отправляем ошибку на сервер
                         await sendErrorToLababot(
                             this.id,
@@ -3078,6 +3136,16 @@
                     } else {
                         this.mailStats.errors++;
                         this.mailHistory.errors.push(e.message);
+
+                        // Добавляем в очередь повторов
+                        if (user && user.AccountId) {
+                            if (!isRetryAttempt) {
+                                this.mailRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
+                            } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
+                                this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
+                                this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                            }
+                        }
 
                         // Отправляем ошибку на наш сервер через старый API
                         await sendErrorToLababot(
@@ -3211,22 +3279,50 @@
                 
                 const currentMsgTemplate = invites[this.chatSettings.currentInviteIndex];
                 
+                let user = null;
+                let isRetryAttempt = false;
+                let currentRetryItem = null;
+
                 try {
                     const target = this.chatSettings.target;
                     let apiPath = '/api/users/online';
                     if (target === 'payers') apiPath = '/api/users/payers';
-                    
+
                     const usersRes = await makeApiRequest(this, 'GET', apiPath);
-                    const users = usersRes.data.Users || [];
-                    
-                    if(users.length === 0) { 
-                        this.log(`💬 Нет пользователей в категории ${target}.`); 
-                        return; 
+                    let users = usersRes.data.Users || [];
+
+                    // Фильтруем: убираем тех кому уже отправили и кто в ЧС
+                    users = users.filter(u =>
+                        !this.chatContactedUsers.has(u.AccountId.toString()) &&
+                        !this.chatSettings.blacklist.includes(u.AccountId.toString())
+                    );
+
+                    // Если новых пользователей нет - пробуем очередь повторов
+                    if (users.length === 0) {
+                        const now = Date.now();
+                        const readyForRetry = this.chatRetryQueue.filter(item =>
+                            now - item.failedAt >= this.retryCooldownMs &&
+                            item.retryCount < this.maxRetries
+                        );
+
+                        if (readyForRetry.length > 0) {
+                            currentRetryItem = readyForRetry[Math.floor(Math.random() * readyForRetry.length)];
+                            user = currentRetryItem.user;
+                            currentRetryItem.retryCount++;
+                            currentRetryItem.failedAt = now;
+                            isRetryAttempt = true;
+                            this.log(`🔄 Повтор чата для ${user.Name} (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
+                        } else if (this.chatRetryQueue.some(item => item.retryCount < this.maxRetries)) {
+                            this.log(`⏳ Ожидание cooldown для повторов...`);
+                            return;
+                        } else {
+                            this.log(`💬 Нет пользователей в категории ${target}.`);
+                            return;
+                        }
+                    } else {
+                        user = users[Math.floor(Math.random() * users.length)];
                     }
-                    
-                    const user = users[Math.floor(Math.random() * users.length)];
-                    if (this.chatSettings.blacklist.includes(user.AccountId.toString())) return;
-                    
+
                     let msgBody = this.replaceMacros(currentMsgTemplate, user);
                     
                     try {
@@ -3274,7 +3370,13 @@
                         this.chatStats.sent++;
                         this.chatHistory.sent.push(`${user.AccountId} (${user.Name})`);
                         this.log(`💬 Сообщение чата отправлено: ${user.Name}`);
-                        
+
+                        // Добавляем в "отправленные" и убираем из очереди повторов
+                        this.chatContactedUsers.add(user.AccountId.toString());
+                        if (isRetryAttempt) {
+                            this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
+                        }
+
                     } catch (chatErr) {
                         // Fallback: пытаемся отправить как письмо
                         try {
@@ -3321,12 +3423,26 @@
                                 this.chatStats.sent++;
                                 this.chatHistory.sent.push(`${user.AccountId} (${user.Name})`);
                                 this.log(`💬 Сообщение отправлено через письмо (fallback): ${user.Name}`);
+
+                                // Добавляем в "отправленные" и убираем из очереди повторов
+                                this.chatContactedUsers.add(user.AccountId.toString());
+                                if (isRetryAttempt) {
+                                    this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
+                                }
                             } else {
                                 // Нет CheckId в fallback - СЧИТАЕМ КАК ОШИБКУ
                                 const errorReason = checkRes.data?.Message || checkRes.data?.Error || 'нет CheckId (fallback)';
                                 this.chatStats.errors++;
                                 this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                                 this.log(`❌ Ошибка: не могу отправить чат ${user.Name} (${user.AccountId}): ${errorReason}`);
+
+                                // Добавляем в очередь повторов
+                                if (!isRetryAttempt) {
+                                    this.chatRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
+                                } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
+                                    this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
+                                    this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                                }
 
                                 // Отправляем ошибку на сервер
                                 await sendErrorToLababot(
@@ -3367,6 +3483,16 @@
                                 this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                                 this.log(`❌ Ошибка API чата: ${errorReason}`);
 
+                                // Добавляем в очередь повторов
+                                if (user && user.AccountId) {
+                                    if (!isRetryAttempt) {
+                                        this.chatRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
+                                    } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
+                                        this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
+                                        this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                                    }
+                                }
+
                                 // Отправляем ошибку на наш сервер через старый API
                                 await sendErrorToLababot(
                                     this.id,
@@ -3400,12 +3526,22 @@
                             }
                         }
                     }
-                } catch (e) { 
+                } catch (e) {
                     if(e.message === "Network Error" || !e.response) {
                         this.log(`📡 Ошибка сети. Повтор...`);
-                    } else { 
-                        this.chatStats.errors++; 
+                    } else {
+                        this.chatStats.errors++;
                         this.chatHistory.errors.push(e.message);
+
+                        // Добавляем в очередь повторов
+                        if (user && user.AccountId) {
+                            if (!isRetryAttempt) {
+                                this.chatRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
+                            } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
+                                this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
+                                this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                            }
+                        }
                         
                         // Отправляем ошибку на наш сервер
                         await sendErrorToLababot(
