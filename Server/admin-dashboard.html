@@ -510,7 +510,20 @@
                             <span class="ml-3 font-medium" x-text="t('menu.profiles')"></span>
                         </div>
                     </div>
-                    <!-- Управление и Команда убраны для админов -->
+                    <!-- Управление - только для директора -->
+                    <div x-show="currentUser.role === 'director'">
+                        <div @click="setActiveMenu('team')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'team' ? 'active' : ''">
+                            <i class="fas fa-users w-5 text-gray-600"></i>
+                            <span class="ml-3 font-medium">Команда</span>
+                        </div>
+                    </div>
+                    <!-- Финансы - только для директора -->
+                    <div x-show="currentUser.role === 'director'">
+                        <div @click="setActiveMenu('finances')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'finances' ? 'active' : ''">
+                            <i class="fas fa-wallet w-5 text-gray-600"></i>
+                            <span class="ml-3 font-medium">Финансы</span>
+                        </div>
+                    </div>
                     <div>
                         <div @click="setActiveMenu('monitoring')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'monitoring' ? 'active' : ''">
                             <i class="fas fa-eye w-5 text-gray-600"></i>
@@ -937,8 +950,194 @@
                 </div>
             </div>
 
-            <!-- Управление и Команда убраны для админов -->
-            
+            <!-- Команда (только для директора) -->
+            <div x-show="activeMenu === 'team' && currentUser.role === 'director'" x-cloak class="fade-in">
+                <div class="glass rounded-2xl p-6 mb-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-bold">Управление командой</h3>
+                        <div class="flex gap-3">
+                            <button @click="showAddAdminModal = true" class="px-5 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white transition-all">
+                                <i class="fas fa-user-plus mr-2"></i>Добавить админа
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Список админов -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <template x-for="admin in admins" :key="admin.id">
+                            <div class="glass rounded-xl p-4 hover:shadow-md transition-shadow">
+                                <div class="flex items-center space-x-3 mb-3">
+                                    <div class="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
+                                        <span class="text-white font-medium" x-text="admin.initials"></span>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-medium truncate" x-text="admin.name"></div>
+                                        <div class="text-sm text-gray-500"><span x-text="admin.accounts"></span> анкет</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm" :class="admin.isMyAdmin ? 'text-green-600' : 'text-gray-500'" x-text="admin.isMyAdmin ? 'Мой админ' : 'Админ'"></span>
+                                    <div class="flex items-center space-x-1">
+                                        <button @click="editAdmin(admin)" class="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center" title="Редактировать">
+                                            <i class="fas fa-edit text-gray-600 text-xs"></i>
+                                        </button>
+                                        <button @click="deleteAdmin(admin)" class="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center" title="Удалить">
+                                            <i class="fas fa-trash text-red-600 text-xs"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Финансы (только для директора) -->
+            <div x-show="activeMenu === 'finances' && currentUser.role === 'director'" x-cloak class="fade-in">
+                <!-- Форма пополнения -->
+                <div class="glass rounded-2xl p-6 mb-6">
+                    <h3 class="text-lg font-bold mb-6">
+                        <i class="fas fa-plus-circle text-green-500 mr-2"></i>
+                        Пополнить баланс админа
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Выберите админа</label>
+                            <select class="glass w-full px-4 py-3 rounded-xl" x-model="financeTopup.adminId">
+                                <option value="">-- Выберите админа --</option>
+                                <template x-for="admin in financeAdmins" :key="admin.id">
+                                    <option :value="admin.id" x-text="admin.name + ' (баланс: $' + admin.balance.toFixed(2) + ')'"></option>
+                                </template>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Сумма ($)</label>
+                            <input type="number" class="glass w-full px-4 py-3 rounded-xl" min="1" step="1" placeholder="Введите сумму" x-model.number="financeTopup.amount">
+                            <div class="flex gap-2 mt-2">
+                                <button @click="financeTopup.amount = 5" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$5</button>
+                                <button @click="financeTopup.amount = 10" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$10</button>
+                                <button @click="financeTopup.amount = 20" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$20</button>
+                                <button @click="financeTopup.amount = 50" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$50</button>
+                                <button @click="financeTopup.amount = 100" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$100</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Примечание</label>
+                            <input type="text" class="glass w-full px-4 py-3 rounded-xl" placeholder="Комментарий" x-model="financeTopup.note">
+                        </div>
+                    </div>
+                    <div class="flex justify-end mt-6">
+                        <button @click="submitFinanceTopup()" :disabled="!financeTopup.adminId || !financeTopup.amount || financeTopup.amount <= 0" class="glow-button px-6 py-3 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-wallet mr-2"></i>Пополнить баланс
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Форма оплаты анкет -->
+                <div class="glass rounded-2xl p-6 mb-6">
+                    <h3 class="text-lg font-bold mb-6">
+                        <i class="fas fa-id-card text-blue-500 mr-2"></i>
+                        Оплата анкеты
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">ID анкеты</label>
+                            <input type="text" class="glass w-full px-4 py-3 rounded-xl" placeholder="Например: 123456" x-model="profilePayment.profileId">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Период оплаты</label>
+                            <div class="flex gap-2">
+                                <button @click="profilePayment.days = 15" class="flex-1 px-3 py-3 rounded-xl text-sm font-medium transition-colors" :class="profilePayment.days === 15 ? 'bg-indigo-500 text-white' : 'bg-gray-100 hover:bg-gray-200'">15 дней</button>
+                                <button @click="profilePayment.days = 30" class="flex-1 px-3 py-3 rounded-xl text-sm font-medium transition-colors" :class="profilePayment.days === 30 ? 'bg-indigo-500 text-white' : 'bg-gray-100 hover:bg-gray-200'">30 дней</button>
+                                <button @click="profilePayment.days = 45" class="flex-1 px-3 py-3 rounded-xl text-sm font-medium transition-colors" :class="profilePayment.days === 45 ? 'bg-indigo-500 text-white' : 'bg-gray-100 hover:bg-gray-200'">45 дней</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Примечание</label>
+                            <input type="text" class="glass w-full px-4 py-3 rounded-xl" placeholder="Комментарий" x-model="profilePayment.note">
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <button @click="submitProfilePayment()" :disabled="!profilePayment.profileId || !profilePayment.days" class="flex-1 glow-button px-4 py-3 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-credit-card mr-2"></i>Оплатить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Статистика -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-green-600">$<span x-text="financeTotalSum.toFixed(2)"></span></div>
+                        <div class="text-sm text-gray-500 mt-1">Всего пополнено</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-blue-600" x-text="financeHistory.length"></div>
+                        <div class="text-sm text-gray-500 mt-1">Транзакций</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-purple-600" x-text="financeAdmins.length"></div>
+                        <div class="text-sm text-gray-500 mt-1">Админов с балансом</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-orange-600">$<span x-text="financeAdminsTotalBalance.toFixed(2)"></span></div>
+                        <div class="text-sm text-gray-500 mt-1">Общий баланс админов</div>
+                    </div>
+                </div>
+
+                <!-- История операций -->
+                <div class="glass rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-bold"><i class="fas fa-history text-gray-500 mr-2"></i>История операций</h3>
+                        <button @click="loadFinanceData()" class="px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm font-medium transition-all">
+                            <i class="fas fa-sync-alt mr-1"></i> Обновить
+                        </button>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-100">
+                                    <th class="text-left py-3 px-4">Дата</th>
+                                    <th class="text-left py-3 px-4">Тип</th>
+                                    <th class="text-left py-3 px-4">Объект</th>
+                                    <th class="text-left py-3 px-4">Детали</th>
+                                    <th class="text-left py-3 px-4">Примечание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="item in combinedFinanceHistory" :key="item.uniqueId">
+                                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                        <td class="py-3 px-4 text-sm" x-text="formatDateTime(item.createdAt)"></td>
+                                        <td class="py-3 px-4">
+                                            <span x-show="item.type === 'topup'" class="px-2 py-1 bg-green-100 text-green-600 rounded text-xs font-medium"><i class="fas fa-wallet mr-1"></i>Пополнение</span>
+                                            <span x-show="item.type === 'profile_payment'" class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs font-medium"><i class="fas fa-id-card mr-1"></i>Оплата анкеты</span>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <span x-show="item.type === 'topup'" class="font-medium" x-text="item.adminName"></span>
+                                            <span x-show="item.type !== 'topup'" class="font-mono font-medium" x-text="item.profileId"></span>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <template x-if="item.type === 'topup'">
+                                                <span class="text-green-600 font-semibold">+$<span x-text="item.amount?.toFixed(2)"></span></span>
+                                            </template>
+                                            <template x-if="item.type === 'profile_payment'">
+                                                <span class="text-blue-600 font-semibold" x-text="item.days + ' дней'"></span>
+                                            </template>
+                                        </td>
+                                        <td class="py-3 px-4 text-sm text-gray-500" x-text="item.note || '-'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="combinedFinanceHistory.length === 0">
+                                    <td colspan="5" class="py-8 px-4 text-center text-gray-500">
+                                        <i class="fas fa-history text-3xl mb-2 opacity-30"></i>
+                                        <p>История операций пуста</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
             <!-- Мониторинг -->
             <div x-show="activeMenu === 'monitoring'" x-cloak class="fade-in">
                 <!-- Фильтры для мониторинга (для админа - только переводчики) -->
@@ -1792,6 +1991,13 @@
                 translatorStats: [],
                 historyActions: [],
 
+                // Финансы (только для директора)
+                financeAdmins: [],
+                financeHistory: [],
+                financeTotalSum: 0,
+                financeTopup: { adminId: '', amount: 10, note: '' },
+                profilePayment: { profileId: '', days: 30, note: '' },
+
                 // Инициализация - загрузка данных с сервера
                 async init() {
                     console.log('Dashboard init, user:', this.currentUser);
@@ -1803,6 +2009,10 @@
                     // Загружаем баланс для админов без "мой админ"
                     if (!this.currentUser.isRestricted) {
                         await this.loadUserBalance();
+                    }
+                    // Загружаем финансовые данные для директора
+                    if (this.currentUser.role === 'director') {
+                        await this.loadFinanceData();
                     }
                     // Автообновление каждые 30 секунд
                     setInterval(() => this.loadDashboardStats(), 30000);
@@ -2941,6 +3151,119 @@
                         alert('Ошибка соединения');
                     } finally {
                         this.settingsSaving = false;
+                    }
+                },
+
+                // ========== ФИНАНСЫ (только для директора) ==========
+                get financeAdminsTotalBalance() {
+                    return this.financeAdmins.reduce((sum, admin) => sum + (admin.balance || 0), 0);
+                },
+
+                get combinedFinanceHistory() {
+                    const topups = this.financeHistory.map((h, i) => ({
+                        ...h,
+                        type: 'topup',
+                        uniqueId: 'topup_' + i,
+                        createdAt: h.created_at
+                    }));
+                    return topups.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                },
+
+                async loadFinanceData() {
+                    if (this.currentUser.role !== 'director') return;
+                    try {
+                        const adminsRes = await fetch(`${API_BASE}/api/billing/admins`);
+                        const adminsData = await adminsRes.json();
+                        if (adminsData.success) {
+                            this.financeAdmins = adminsData.admins || [];
+                        }
+                        const historyRes = await fetch(`${API_BASE}/api/billing/history`);
+                        const historyData = await historyRes.json();
+                        if (historyData.success) {
+                            this.financeHistory = historyData.history || [];
+                            this.financeTotalSum = historyData.totalSum || 0;
+                        }
+                    } catch (e) {
+                        console.error('loadFinanceData error:', e);
+                    }
+                },
+
+                async submitFinanceTopup() {
+                    if (!this.financeTopup.adminId || !this.financeTopup.amount || this.financeTopup.amount <= 0) {
+                        alert('Выберите админа и введите сумму');
+                        return;
+                    }
+                    try {
+                        const res = await fetch(`${API_BASE}/api/billing/topup`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                userId: this.financeTopup.adminId,
+                                amount: this.financeTopup.amount,
+                                byUserId: this.currentUser.id,
+                                note: this.financeTopup.note || null
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            const admin = this.financeAdmins.find(a => a.id == this.financeTopup.adminId);
+                            alert(`Баланс ${admin?.name || 'Админ'} пополнен на $${this.financeTopup.amount}`);
+                            this.financeTopup = { adminId: '', amount: 10, note: '' };
+                            await this.loadFinanceData();
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                        }
+                    } catch (e) {
+                        console.error('submitFinanceTopup error:', e);
+                        alert('Ошибка соединения');
+                    }
+                },
+
+                async submitProfilePayment() {
+                    if (!this.profilePayment.profileId || !this.profilePayment.days) {
+                        alert('Введите ID анкеты и выберите период');
+                        return;
+                    }
+                    try {
+                        const res = await fetch(`${API_BASE}/api/billing/pay-profile`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileId: this.profilePayment.profileId,
+                                days: this.profilePayment.days,
+                                byUserId: this.currentUser.id,
+                                note: this.profilePayment.note || null
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert(`Анкета ${this.profilePayment.profileId} оплачена на ${this.profilePayment.days} дней`);
+                            this.profilePayment = { profileId: '', days: 30, note: '' };
+                            await this.loadFinanceData();
+                            await this.loadAccounts();
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                        }
+                    } catch (e) {
+                        console.error('submitProfilePayment error:', e);
+                        alert('Ошибка соединения');
+                    }
+                },
+
+                async deleteAdmin(admin) {
+                    if (!confirm(`Удалить админа "${admin.name}"?`)) return;
+                    try {
+                        const res = await fetch(`${API_BASE}/api/users/${admin.id}`, { method: 'DELETE' });
+                        const data = await res.json();
+                        if (data.success) {
+                            await this.loadTeam();
+                            alert('Админ удален');
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
+                        }
+                    } catch (e) {
+                        console.error('deleteAdmin error:', e);
+                        alert('Ошибка соединения');
                     }
                 },
 
