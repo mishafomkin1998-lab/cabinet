@@ -474,10 +474,7 @@
             <!-- Логотип -->
             <div class="mb-6">
                 <a href="index.html" class="flex items-center">
-                    <div class="w-11 h-11 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg">
-                        <i class="fas fa-robot text-white text-base"></i>
-                    </div>
-                    <h1 class="text-xl font-bold ml-3 gradient-text">Nova</h1>
+                    <img src="logo.png" alt="Nova" class="h-12 w-auto">
                 </a>
             </div>
 
@@ -524,8 +521,17 @@
                 </div>
             </nav>
 
+            <!-- Кнопка поддержки -->
+            <div class="pt-3 border-t border-gray-100 mb-3">
+                <a href="https://t.me/S_Shevil" target="_blank"
+                   class="flex items-center p-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600 transition-all">
+                    <i class="fab fa-telegram w-5"></i>
+                    <span class="ml-3 font-medium">Поддержка</span>
+                </a>
+            </div>
+
             <!-- Status -->
-            <div class="pt-5 border-t border-gray-100">
+            <div class="pt-3 border-t border-gray-100">
                 <div class="flex items-center">
                     <div class="status-dot mr-2"></div>
                     <span class="text-sm text-gray-600" x-text="t('messages.allSystemsActive')"></span>
@@ -580,8 +586,13 @@
                     <!-- Profile -->
                     <div class="relative" x-data="{open: false}">
                         <button @click="open = !open" class="flex items-center glass px-4 py-2 rounded-xl hover:bg-gray-50">
-                            <div class="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center">
-                                <span class="text-white text-sm font-medium" x-text="currentUser.username ? currentUser.username.substring(0,1).toUpperCase() : 'U'">U</span>
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center overflow-hidden">
+                                <template x-if="currentUser.avatar_url">
+                                    <img :src="currentUser.avatar_url" class="w-full h-full object-cover">
+                                </template>
+                                <template x-if="!currentUser.avatar_url">
+                                    <span class="text-white text-sm font-medium" x-text="currentUser.username ? currentUser.username.substring(0,1).toUpperCase() : 'U'">U</span>
+                                </template>
                             </div>
                             <span class="ml-2 text-sm font-medium hidden md:block" x-text="currentUser.username"></span>
                             <i class="fas fa-chevron-down ml-2 text-gray-400 text-xs"></i>
@@ -592,6 +603,10 @@
                                 <div class="font-medium" x-text="currentUser.username"></div>
                                 <div class="text-xs text-gray-500" x-text="t('roles.' + currentUser.role)"></div>
                             </div>
+                            <a href="#" @click.prevent="showSettingsModal = true; open = false" class="flex items-center p-3 rounded-lg hover:bg-gray-100 text-gray-700 mb-1">
+                                <i class="fas fa-cog mr-3"></i>
+                                <span>Настройки</span>
+                            </a>
                             <a href="#" @click="logout()" class="flex items-center p-3 rounded-lg hover:bg-red-50 text-red-500">
                                 <i class="fas fa-sign-out-alt mr-3"></i>
                                 <span x-text="t('userMenu.logout')"></span>
@@ -642,59 +657,61 @@
                 <!-- Stats cards -->
                 <div class="grid grid-cols-4 gap-6 mb-8">
                     <!-- Total profiles -->
-                    <div class="glass rounded-2xl p-6 cursor-pointer" @click="setActiveMenu('accounts')">
-                        <div class="flex items-center mb-6">
-                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-50 to-blue-100 flex items-center justify-center mr-4">
-                                <i class="fas fa-user text-blue-500"></i>
+                    <div class="glass rounded-2xl p-6 cursor-pointer flex flex-col h-40" @click="setActiveMenu('accounts')">
+                        <div class="flex items-start flex-1">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-50 to-blue-100 flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fas fa-user text-blue-500 text-lg"></i>
                             </div>
-                            <div>
+                            <div class="min-w-0">
                                 <div class="text-3xl font-bold" x-text="stats.metrics.totalProfiles">0</div>
-                                <div class="text-gray-500" x-text="t('stats.totalProfiles')"></div>
+                                <div class="text-sm text-gray-500 truncate" x-text="t('stats.totalProfiles')"></div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500"><span x-text="t('stats.loaded')"></span>: <span x-text="accounts.length"></span></div>
+                        <div class="text-sm pt-3 border-t border-gray-100 truncate">
+                            <span class="text-green-600 font-medium"><span x-text="t('stats.online')"></span>: <span x-text="accounts.filter(a => a.status === 'online').length"></span>/<span x-text="accounts.length"></span></span>
+                        </div>
                     </div>
 
                     <!-- Incoming letters -->
-                    <div class="glass rounded-2xl p-6">
-                        <div class="flex items-center mb-6">
-                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 flex items-center justify-center mr-4">
-                                <i class="fas fa-envelope-open text-purple-500"></i>
+                    <div class="glass rounded-2xl p-6 flex flex-col h-40">
+                        <div class="flex items-start flex-1">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fas fa-envelope-open text-purple-500 text-lg"></i>
                             </div>
-                            <div>
+                            <div class="min-w-0">
                                 <div class="text-3xl font-bold" x-text="stats.today.incomingLetters || 0">0</div>
-                                <div class="text-gray-500" x-text="t('stats.incomingLetters')"></div>
+                                <div class="text-sm text-gray-500 truncate" x-text="t('stats.incomingLetters')"></div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500"><span x-text="t('stats.chats')"></span>: <span x-text="stats.today.chats"></span> | <span x-text="t('stats.forMonth')"></span>: <span x-text="stats.month.incomingLetters || 0"></span></div>
+                        <div class="text-sm text-gray-500 pt-3 border-t border-gray-100 truncate"><span x-text="t('stats.chats')"></span>: <span x-text="stats.today.chats"></span> | <span x-text="t('stats.forMonth')"></span>: <span x-text="stats.month.incomingLetters || 0"></span></div>
                     </div>
 
                     <!-- Median response time -->
-                    <div class="glass rounded-2xl p-6">
-                        <div class="flex items-center mb-6">
-                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-green-50 to-green-100 flex items-center justify-center mr-4">
-                                <i class="fas fa-stopwatch text-green-500"></i>
+                    <div class="glass rounded-2xl p-6 flex flex-col h-40">
+                        <div class="flex items-start flex-1">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-green-50 to-green-100 flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fas fa-stopwatch text-green-500 text-lg"></i>
                             </div>
-                            <div>
-                                <div class="text-3xl font-bold"><span x-text="stats.metrics.medianResponseTime || 0"></span> <span x-text="t('time.min')"></span></div>
-                                <div class="text-gray-500" x-text="t('stats.medianTime')"></div>
+                            <div class="min-w-0">
+                                <div class="text-3xl font-bold"><span x-text="stats.metrics.medianResponseTime || 0"></span> <span class="text-base" x-text="t('time.min')"></span></div>
+                                <div class="text-sm text-gray-500 truncate" x-text="t('stats.medianTime')"></div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500" x-text="t('stats.medianResponseTime')"></div>
+                        <div class="text-sm text-gray-500 pt-3 border-t border-gray-100 truncate" x-text="t('stats.medianResponseTime')"></div>
                     </div>
 
                     <!-- Average response time -->
-                    <div class="glass rounded-2xl p-6">
-                        <div class="flex items-center mb-6">
-                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 flex items-center justify-center mr-4">
-                                <i class="fas fa-clock text-orange-500"></i>
+                    <div class="glass rounded-2xl p-6 flex flex-col h-40">
+                        <div class="flex items-start flex-1">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 flex items-center justify-center mr-4 flex-shrink-0">
+                                <i class="fas fa-clock text-orange-500 text-lg"></i>
                             </div>
-                            <div>
-                                <div class="text-3xl font-bold"><span x-text="stats.metrics.avgResponseTime"></span> <span x-text="t('time.min')"></span></div>
-                                <div class="text-gray-500" x-text="t('stats.avgTime')"></div>
+                            <div class="min-w-0">
+                                <div class="text-3xl font-bold"><span x-text="stats.metrics.avgResponseTime"></span> <span class="text-base" x-text="t('time.min')"></span></div>
+                                <div class="text-sm text-gray-500 truncate" x-text="t('stats.avgTime')"></div>
                             </div>
                         </div>
-                        <div class="text-sm text-gray-500"><span x-text="t('stats.uniqueMen')"></span>: <span x-text="stats.today.uniqueMen"></span></div>
+                        <div class="text-sm text-gray-500 pt-3 border-t border-gray-100 truncate"><span x-text="t('stats.uniqueMen')"></span>: <span x-text="stats.today.uniqueMen"></span></div>
                     </div>
                 </div>
 
@@ -1238,7 +1255,7 @@
                 </div>
                 
                 <div class="flex justify-end space-x-3 pt-4">
-                    <button @click="showAddAccountModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
+                    <button @click="showAddAccountModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
                         Отмена
                     </button>
                     <button @click="saveAccounts" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
@@ -1304,7 +1321,7 @@
                 </div>
                 
                 <div class="flex justify-end space-x-3 pt-4">
-                    <button @click="showAddAdminModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
+                    <button @click="showAddAdminModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
                         Отмена
                     </button>
                     <button @click="saveAdmin" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
@@ -1366,7 +1383,7 @@
                 </div>
 
                 <div class="flex justify-end space-x-3 pt-4">
-                    <button @click="showAssignAccountsModal = false" class="px-4 py-2 rounded-xl hover:bg-gray-100">
+                    <button @click="showAssignAccountsModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
                         Отмена
                     </button>
                     <button @click="assignAccountsToAdminConfirm" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
@@ -1422,12 +1439,121 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- Модальное окно настроек -->
+    <div x-show="showSettingsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-lg" @click.outside="showSettingsModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">Настройки профиля</h3>
+                <button @click="showSettingsModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-5">
+                <!-- Аватар -->
+                <div class="flex items-center space-x-4">
+                    <div class="w-16 h-16 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center overflow-hidden">
+                        <template x-if="userSettings.avatarUrl || currentUser.avatar_url">
+                            <img :src="userSettings.avatarUrl || currentUser.avatar_url" class="w-full h-full object-cover">
+                        </template>
+                        <template x-if="!userSettings.avatarUrl && !currentUser.avatar_url">
+                            <span class="text-white text-2xl font-medium" x-text="currentUser.username ? currentUser.username.substring(0,1).toUpperCase() : 'U'"></span>
+                        </template>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium mb-1">URL фото профиля</label>
+                        <input type="url"
+                               class="glass w-full px-4 py-2 rounded-xl text-sm"
+                               placeholder="https://example.com/photo.jpg"
+                               x-model="userSettings.avatarUrl">
+                    </div>
+                </div>
+
+                <!-- Никнейм -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Никнейм</label>
+                    <input type="text"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           :placeholder="currentUser.username"
+                           x-model="userSettings.newUsername">
+                </div>
+
+                <!-- Новый пароль -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Новый пароль</label>
+                    <input type="password"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Оставьте пустым, если не хотите менять"
+                           x-model="userSettings.newPassword">
+                </div>
+
+                <!-- Подтверждение пароля -->
+                <div x-show="userSettings.newPassword">
+                    <label class="block text-sm font-medium mb-2">Подтвердите пароль</label>
+                    <input type="password"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Повторите новый пароль"
+                           x-model="userSettings.newPasswordConfirm">
+                </div>
+
+                <!-- Разделитель -->
+                <div class="border-t border-gray-200 pt-4">
+                    <h4 class="text-sm font-semibold text-gray-600 mb-3">Настройки интерфейса</h4>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Язык -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Язык</label>
+                            <select class="glass w-full px-4 py-3 rounded-xl" x-model="language" @change="changeLanguage">
+                                <option value="ru">Русский</option>
+                                <option value="en">English</option>
+                                <option value="uk">Українська</option>
+                            </select>
+                        </div>
+
+                        <!-- Тема -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Тема</label>
+                            <button @click="toggleDarkMode()"
+                                    class="glass w-full px-4 py-3 rounded-xl flex items-center justify-between hover:bg-gray-50 transition-all">
+                                <span x-text="darkMode ? 'Тёмная' : 'Светлая'"></span>
+                                <i class="fas" :class="darkMode ? 'fa-moon text-indigo-500' : 'fa-sun text-yellow-500'"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showSettingsModal = false; resetUserSettings()" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
+                        Отмена
+                    </button>
+                    <button @click="saveUserSettings()"
+                            :disabled="settingsSaving || (userSettings.newPassword && userSettings.newPassword !== userSettings.newPasswordConfirm)"
+                            class="glow-button px-5 py-2.5 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span x-show="!settingsSaving">Сохранить</span>
+                        <span x-show="settingsSaving"><i class="fas fa-spinner fa-spin mr-2"></i>Сохранение...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         function dashboard() {
             return {
                 // User data from auth
                 currentUser: novaUserData,
+
+                // Settings modal
+                showSettingsModal: false,
+                userSettings: {
+                    newUsername: '',
+                    newPassword: '',
+                    newPasswordConfirm: '',
+                    avatarUrl: ''
+                },
+                settingsSaving: false,
 
                 // Localization
                 language: savedLanguage,
@@ -2589,6 +2715,73 @@
                 getProfileActionLabel(actionType) {
                     const actions = this.t('history.actions');
                     return actions[actionType] || actionType;
+                },
+
+                // Сбросить настройки пользователя
+                resetUserSettings() {
+                    this.userSettings = {
+                        newUsername: '',
+                        newPassword: '',
+                        newPasswordConfirm: '',
+                        avatarUrl: ''
+                    };
+                },
+
+                // Сохранить настройки пользователя
+                async saveUserSettings() {
+                    if (this.userSettings.newPassword && this.userSettings.newPassword !== this.userSettings.newPasswordConfirm) {
+                        alert('Пароли не совпадают');
+                        return;
+                    }
+
+                    this.settingsSaving = true;
+                    try {
+                        const updateData = {
+                            userId: this.currentUser.id
+                        };
+
+                        if (this.userSettings.newUsername) {
+                            updateData.username = this.userSettings.newUsername;
+                        }
+                        if (this.userSettings.newPassword) {
+                            updateData.password = this.userSettings.newPassword;
+                        }
+                        if (this.userSettings.avatarUrl) {
+                            updateData.avatarUrl = this.userSettings.avatarUrl;
+                        }
+
+                        const res = await fetch(`${API_BASE}/api/user/profile`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(updateData)
+                        });
+
+                        const data = await res.json();
+                        if (data.success) {
+                            // Обновляем локальные данные пользователя
+                            if (updateData.username) {
+                                this.currentUser.username = updateData.username;
+                            }
+                            if (updateData.avatarUrl) {
+                                this.currentUser.avatar_url = updateData.avatarUrl;
+                            }
+
+                            // Сохраняем в localStorage/sessionStorage
+                            const storage = localStorage.getItem('novaUser') ? localStorage : sessionStorage;
+                            storage.setItem('novaUser', JSON.stringify(this.currentUser));
+
+                            alert('Настройки сохранены');
+                            this.showSettingsModal = false;
+                            this.resetUserSettings();
+                        } else {
+                            alert(data.error || 'Ошибка сохранения');
+                        }
+                    } catch (e) {
+                        console.error('saveUserSettings error:', e);
+                        alert('Ошибка соединения');
+                    } finally {
+                        this.settingsSaving = false;
+                    }
                 },
 
                 logout() {
