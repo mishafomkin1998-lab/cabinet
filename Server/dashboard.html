@@ -614,6 +614,16 @@
                 </div>
 
                 <div class="flex items-center space-x-3">
+                    <!-- Balance (for users without "мой админ") -->
+                    <template x-if="!isRestricted">
+                        <div class="glass px-4 py-2 rounded-xl flex items-center">
+                            <i class="fas fa-wallet mr-2 text-gray-400"></i>
+                            <span class="font-semibold" :class="userBalance > 0 ? 'text-green-600' : 'text-red-500'">
+                                $<span x-text="userBalance.toFixed(2)"></span>
+                            </span>
+                        </div>
+                    </template>
+
                     <!-- Profile -->
                     <div class="relative" x-data="{open: false}">
                         <button @click="open = !open" class="flex items-center glass px-4 py-2 rounded-xl hover:bg-gray-50">
