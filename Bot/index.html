@@ -1800,7 +1800,7 @@
                          content = `${l.type === 'chat' ? '💬' : '💌'} Новое ${l.type === 'chat' ? 'сообщение' : 'письмо'} от <b>${partnerName}</b> (ID ${partnerId})`;
                     } else if (l.type === 'vip-online') {
                          logClass = 'vip';
-                         linkAction = `selectTab('${l.botId}')`; 
+                         linkAction = `openMiniChat('${l.botId}', '${partnerId}', '${partnerName}', 'mail')`;
                          content = `👑 VIP <b>${partnerName}</b> (ID ${partnerId}) теперь ONLINE!`;
                     } else if (l.type === 'bday') {
                          linkAction = `selectTab('${l.botId}')`; 
