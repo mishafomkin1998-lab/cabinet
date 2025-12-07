@@ -3641,34 +3641,38 @@
                             this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
                         }
 
-                        // Отправляем ошибку на сервер
-                        await sendErrorToLababot(
-                            this.id,
-                            this.displayId,
-                            'mail_no_checkid',
-                            errorReason
-                        );
+                        // Отправляем ошибку на сервер (с защитой от падения)
+                        try {
+                            await sendErrorToLababot(
+                                this.id,
+                                this.displayId,
+                                'mail_no_checkid',
+                                errorReason
+                            );
+                        } catch (err) { console.error('sendErrorToLababot failed:', err); }
 
                         // Также через message_sent API с status='failed'
-                        const convData = this.trackConversation(user.AccountId);
-                        const convId = this.getConvId(user.AccountId);
-                        await sendMessageToLababot({
-                            botId: this.id,
-                            accountDisplayId: this.displayId,
-                            recipientId: user.AccountId,
-                            type: 'outgoing',
-                            textContent: msgBody || '',
-                            status: 'failed',
-                            responseTime: convData.responseTime,
-                            isFirst: convData.isFirst,
-                            isLast: false,
-                            convId: convId,
-                            mediaUrl: null,
-                            fileName: null,
-                            translatorId: this.translatorId,
-                            errorReason: errorReason,
-                            usedAi: false
-                        });
+                        try {
+                            const convData = this.trackConversation(user.AccountId);
+                            const convId = this.getConvId(user.AccountId);
+                            await sendMessageToLababot({
+                                botId: this.id,
+                                accountDisplayId: this.displayId,
+                                recipientId: user.AccountId,
+                                type: 'outgoing',
+                                textContent: msgBody || '',
+                                status: 'failed',
+                                responseTime: convData.responseTime,
+                                isFirst: convData.isFirst,
+                                isLast: false,
+                                convId: convId,
+                                mediaUrl: null,
+                                fileName: null,
+                                translatorId: this.translatorId,
+                                errorReason: errorReason,
+                                usedAi: false
+                            });
+                        } catch (err) { console.error('sendMessageToLababot failed:', err); }
                     }
                 } catch (e) {
                     if(e.message === "Network Error" || !e.response) {
@@ -3690,35 +3694,39 @@
                             }
                         }
 
-                        // Отправляем ошибку на сервер
-                        await sendErrorToLababot(
-                            this.id,
-                            this.displayId,
-                            'mail_403_error',
-                            errorReason
-                        );
+                        // Отправляем ошибку на сервер (с защитой от падения)
+                        try {
+                            await sendErrorToLababot(
+                                this.id,
+                                this.displayId,
+                                'mail_403_error',
+                                errorReason
+                            );
+                        } catch (err) { console.error('sendErrorToLababot failed:', err); }
 
                         // Также через message_sent API с status='failed'
                         if (user && user.AccountId) {
-                            const convData = this.trackConversation(user.AccountId);
-                            const convId = this.getConvId(user.AccountId);
-                            await sendMessageToLababot({
-                                botId: this.id,
-                                accountDisplayId: this.displayId,
-                                recipientId: user.AccountId,
-                                type: 'outgoing',
-                                textContent: msgBody || '',
-                                status: 'failed',
-                                responseTime: convData.responseTime,
-                                isFirst: convData.isFirst,
-                                isLast: false,
-                                convId: convId,
-                                mediaUrl: null,
-                                fileName: null,
-                                translatorId: this.translatorId,
-                                errorReason: errorReason,
-                                usedAi: false
-                            });
+                            try {
+                                const convData = this.trackConversation(user.AccountId);
+                                const convId = this.getConvId(user.AccountId);
+                                await sendMessageToLababot({
+                                    botId: this.id,
+                                    accountDisplayId: this.displayId,
+                                    recipientId: user.AccountId,
+                                    type: 'outgoing',
+                                    textContent: msgBody || '',
+                                    status: 'failed',
+                                    responseTime: convData.responseTime,
+                                    isFirst: convData.isFirst,
+                                    isLast: false,
+                                    convId: convId,
+                                    mediaUrl: null,
+                                    fileName: null,
+                                    translatorId: this.translatorId,
+                                    errorReason: errorReason,
+                                    usedAi: false
+                                });
+                            } catch (err) { console.error('sendMessageToLababot failed:', err); }
                         }
                     } else {
                         this.mailStats.errors++;
@@ -3734,37 +3742,41 @@
                             }
                         }
 
-                        // Отправляем ошибку на наш сервер через старый API
-                        await sendErrorToLababot(
-                            this.id,
-                            this.displayId,
-                            'mail_send_error',
-                            e.response?.data?.Error || e.message
-                        );
+                        // Отправляем ошибку на наш сервер через старый API (с защитой от падения)
+                        try {
+                            await sendErrorToLababot(
+                                this.id,
+                                this.displayId,
+                                'mail_send_error',
+                                e.response?.data?.Error || e.message
+                            );
+                        } catch (err) { console.error('sendErrorToLababot failed:', err); }
 
                         // НОВОЕ: Отправляем также через message_sent API с status='failed'
                         // (если есть информация о получателе)
                         if (user && user.AccountId) {
-                            const convData = this.trackConversation(user.AccountId);
-                            const convId = this.getConvId(user.AccountId);
+                            try {
+                                const convData = this.trackConversation(user.AccountId);
+                                const convId = this.getConvId(user.AccountId);
 
-                            await sendMessageToLababot({
-                                botId: this.id,
-                                accountDisplayId: this.displayId,
-                                recipientId: user.AccountId,
-                                type: 'outgoing',
-                                textContent: msgBody || '',
-                                status: 'failed',
-                                responseTime: convData.responseTime,
-                                isFirst: convData.isFirst,
-                                isLast: false,
-                                convId: convId,
-                                mediaUrl: this.photoName ? `attached_photo_${this.photoName}` : null,
-                                fileName: this.photoName || null,
-                                translatorId: this.translatorId,
-                                errorReason: e.response?.data?.Error || e.message,
-                                usedAi: false
-                            });
+                                await sendMessageToLababot({
+                                    botId: this.id,
+                                    accountDisplayId: this.displayId,
+                                    recipientId: user.AccountId,
+                                    type: 'outgoing',
+                                    textContent: msgBody || '',
+                                    status: 'failed',
+                                    responseTime: convData.responseTime,
+                                    isFirst: convData.isFirst,
+                                    isLast: false,
+                                    convId: convId,
+                                    mediaUrl: this.photoName ? `attached_photo_${this.photoName}` : null,
+                                    fileName: this.photoName || null,
+                                    translatorId: this.translatorId,
+                                    errorReason: e.response?.data?.Error || e.message,
+                                    usedAi: false
+                                });
+                            } catch (err) { console.error('sendMessageToLababot failed:', err); }
                         }
                     }
                 }
