@@ -337,9 +337,10 @@
             const existingUser = localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser');
             if (existingUser) {
                 const user = JSON.parse(existingUser);
-                if (user.role === 'admin' || user.role === 'director') {
+                if (user.role === 'admin') {
                     window.location.href = 'admin-dashboard.html';
                 } else {
+                    // director и translator идут на dashboard.html
                     window.location.href = 'dashboard.html';
                 }
                 return;
@@ -410,9 +411,10 @@
                         }
 
                         // Перенаправляем в зависимости от роли
-                        if (data.user.role === 'admin' || data.user.role === 'director') {
+                        if (data.user.role === 'admin') {
                             window.location.href = 'admin-dashboard.html';
                         } else {
+                            // director и translator идут на dashboard.html
                             window.location.href = 'dashboard.html';
                         }
                     } else {
