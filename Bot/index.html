@@ -4656,10 +4656,18 @@
             const btnFav = document.getElementById(`btn-fav-${botId}`);
             if(val !== null && val !== "" && val !== undefined && tpls[val]) {
                  sel.value = val;
-                 const area=document.getElementById(`msg-${botId}`); 
-                 area.disabled=false; 
-                 area.value=tpls[val].text; 
+                 const area=document.getElementById(`msg-${botId}`);
+                 area.disabled=false;
+                 area.value=tpls[val].text;
                  if(isChat) bots[botId].lastTplChat = val; else bots[botId].lastTplMail = val;
+
+                 // Сохраняем выбор шаблона
+                 if(!accountPreferences[bot.login]) accountPreferences[bot.login] = {};
+                 if(isChat) accountPreferences[bot.login].chatTpl = val;
+                 else accountPreferences[bot.login].mailTpl = val;
+                 localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
+                 saveSession();
+
                  if(btnFav) { if(tpls[val].favorite) { btnFav.classList.add('btn-heart-active','btn-danger'); btnFav.classList.remove('btn-outline-danger'); } else { btnFav.classList.remove('btn-heart-active','btn-danger'); btnFav.classList.add('btn-outline-danger'); } }
                  validateInput(area);
             } else { 
