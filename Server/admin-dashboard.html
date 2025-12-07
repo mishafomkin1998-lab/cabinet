@@ -1958,7 +1958,7 @@
                         if (data.success) {
                             // Получаем статус оплаты для каждого профиля
                             const accountsWithPayment = await Promise.all(data.list.map(async (p) => {
-                                let paymentStatus = { isPaid: true, isFree: false, daysLeft: 999, isTrial: false, trialUsed: false };
+                                let paymentStatus = { isPaid: false, isFree: false, daysLeft: 0, isTrial: false, trialUsed: false };
                                 try {
                                     const payRes = await fetch(`${API_BASE}/api/billing/profile-status/${p.profile_id}`);
                                     const payData = await payRes.json();
