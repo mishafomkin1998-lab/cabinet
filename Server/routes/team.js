@@ -116,7 +116,7 @@ router.post('/', async (req, res) => {
              VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
             [username, hash, role, ownerId, isRestricted ? null : salary, aiEnabled || false]
         );
-        res.json({ success: true, id: result.rows[0].id });
+        res.json({ success: true, userId: result.rows[0].id });
     } catch (e) {
         console.error('Create user error:', e.message);
         res.json({ success: false, error: 'Логин занят' });
