@@ -25,8 +25,8 @@
 
     <!-- Configuration -->
     <script>
-        // API Server URL (change for remote access, e.g.: 'http://192.168.1.100:3000')
-        const API_BASE = 'http://188.137.253.169:3000';
+        // API Server URL - автоматически определяет адрес сервера
+        const API_BASE = window.location.origin;
 
         // Auth check - only admins allowed
         const novaUserData = JSON.parse(localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser') || 'null');

@@ -328,8 +328,8 @@
     <div class="absolute bottom-10 right-10 w-80 h-80 rounded-full bg-gradient-to-r from-pink-100 to-blue-100 opacity-30 blur-3xl"></div>
     
     <script>
-        // Конфигурация API - измени на IP сервера если нужен доступ с других устройств
-        const API_BASE = 'http://188.137.253.169:3000';
+        // Конфигурация API - автоматически определяет адрес сервера
+        const API_BASE = window.location.origin;
 
         document.addEventListener('DOMContentLoaded', function() {
             // Если уже авторизован - перенаправляем на соответствующий dashboard
