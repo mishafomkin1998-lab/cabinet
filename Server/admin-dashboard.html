@@ -86,6 +86,18 @@
             box-shadow: 4px 0 24px rgba(0, 0, 0, 0.02);
         }
 
+        /* Исправленные select */
+        select.glass {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 36px !important;
+            cursor: pointer;
+        }
+
         /* Улучшенные таблицы */
         table {
             border-collapse: separate;
@@ -571,6 +583,16 @@
                 </div>
 
                 <div class="flex items-center space-x-3">
+                    <!-- Balance (for admins without "мой админ") -->
+                    <template x-if="!currentUser.isRestricted">
+                        <div class="glass px-4 py-2 rounded-xl flex items-center">
+                            <i class="fas fa-wallet mr-2 text-gray-400"></i>
+                            <span class="font-semibold" :class="userBalance > 0 ? 'text-green-600' : 'text-red-500'">
+                                $<span x-text="userBalance.toFixed(2)"></span>
+                            </span>
+                        </div>
+                    </template>
+
                     <!-- Profile -->
                     <div class="relative" x-data="{open: false}">
                         <button @click="open = !open" class="flex items-center glass px-4 py-2 rounded-xl hover:bg-gray-50">
@@ -1550,6 +1572,9 @@
                 // Dark mode
                 darkMode: localStorage.getItem('novaDarkMode') === 'true',
 
+                // Balance (for admins without "мой админ")
+                userBalance: 0,
+
                 // Toggle dark mode
                 toggleDarkMode() {
                     this.darkMode = !this.darkMode;
@@ -1741,6 +1766,10 @@
                     // Инициализация Flatpickr
                     this.$nextTick(() => this.initFlatpickr());
                     await this.loadAllData();
+                    // Загружаем баланс для админов без "мой админ"
+                    if (!this.currentUser.isRestricted) {
+                        await this.loadUserBalance();
+                    }
                     // Автообновление каждые 30 секунд
                     setInterval(() => this.loadDashboardStats(), 30000);
                 },
@@ -1836,6 +1865,19 @@
                         this.error = 'Ошибка загрузки данных';
                     }
                     this.loading = false;
+                },
+
+                // Загрузка баланса пользователя
+                async loadUserBalance() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/billing/balance/${this.currentUser.id}`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.userBalance = data.balance || 0;
+                        }
+                    } catch (e) {
+                        console.error('loadUserBalance error:', e);
+                    }
                 },
 
                 async loadDashboardStats() {
