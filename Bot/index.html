@@ -44,116 +44,6 @@
             --tab-text-active: #6610f2;
         }
 
-        /* === GLASSMORPHISM EFFECT === */
-        .glass-btn {
-            position: relative;
-            background: linear-gradient(135deg,
-                rgba(255,255,255,0.9) 0%,
-                rgba(255,255,255,0.6) 50%,
-                rgba(255,255,255,0.4) 100%);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.5);
-            box-shadow:
-                0 8px 32px rgba(0,0,0,0.1),
-                inset 0 1px 0 rgba(255,255,255,0.8),
-                inset 0 -1px 0 rgba(0,0,0,0.05);
-            overflow: hidden;
-        }
-
-        /* Блик сверху */
-        .glass-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -50%;
-            width: 200%;
-            height: 50%;
-            background: linear-gradient(
-                to bottom,
-                rgba(255,255,255,0.8) 0%,
-                rgba(255,255,255,0.3) 50%,
-                transparent 100%
-            );
-            border-radius: inherit;
-            pointer-events: none;
-        }
-
-        /* Анимированный блик при hover */
-        .glass-btn::after {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 50%;
-            height: 200%;
-            background: linear-gradient(
-                90deg,
-                transparent,
-                rgba(255,255,255,0.4),
-                transparent
-            );
-            transform: rotate(25deg);
-            transition: left 0.5s ease;
-            pointer-events: none;
-        }
-
-        .glass-btn:hover::after {
-            left: 150%;
-        }
-
-        .glass-btn:hover {
-            box-shadow:
-                0 12px 40px rgba(0,0,0,0.15),
-                inset 0 1px 0 rgba(255,255,255,0.9),
-                inset 0 -1px 0 rgba(0,0,0,0.05);
-            transform: translateY(-2px) scale(1.05);
-        }
-
-        .glass-btn:active {
-            transform: translateY(0) scale(0.98);
-            box-shadow:
-                0 4px 16px rgba(0,0,0,0.1),
-                inset 0 1px 0 rgba(255,255,255,0.6);
-        }
-
-        /* Цветные варианты стекла */
-        .glass-btn-green {
-            background: linear-gradient(135deg,
-                rgba(232,245,233,0.95) 0%,
-                rgba(200,230,201,0.7) 100%);
-            border-color: rgba(165,214,167,0.6);
-        }
-
-        .glass-btn-red {
-            background: linear-gradient(135deg,
-                rgba(255,235,238,0.95) 0%,
-                rgba(255,205,210,0.7) 100%);
-            border-color: rgba(239,154,154,0.6);
-        }
-
-        .glass-btn-blue {
-            background: linear-gradient(135deg,
-                rgba(227,242,253,0.95) 0%,
-                rgba(187,222,251,0.7) 100%);
-            border-color: rgba(144,202,249,0.6);
-        }
-
-        .glass-btn-yellow {
-            background: linear-gradient(135deg,
-                rgba(255,249,196,0.95) 0%,
-                rgba(255,245,157,0.7) 100%);
-            border-color: rgba(255,238,88,0.6);
-        }
-
-        .glass-btn-purple {
-            background: linear-gradient(135deg,
-                rgba(243,229,245,0.95) 0%,
-                rgba(225,190,231,0.7) 100%);
-            border-color: rgba(206,147,216,0.6);
-        }
-        /* === END GLASSMORPHISM === */
-
         body { background-color: var(--bg-color); color: var(--text-color); height: 100vh; display: flex; flex-direction: column; overflow: hidden; user-select: none; font-family: 'Segoe UI', sans-serif; }
         
         /* HEADER */
@@ -506,34 +396,34 @@
 
     <div class="global-toolbar">
         <div class="toolbar-left">
-            <button class="btn btn-success btn-circle glass-btn glass-btn-green" onclick="openAddModal()" data-tip="Добавить новую анкету"><i class="fa fa-plus"></i></button>
-            <button class="btn btn-primary btn-circle glass-btn glass-btn-blue" onclick="openManager()" data-tip="Управление учетными записями"><i class="fa fa-list"></i></button>
+            <button class="btn btn-success btn-circle" onclick="openAddModal()" data-tip="Добавить новую анкету"><i class="fa fa-plus"></i></button>
+            <button class="btn btn-primary btn-circle" onclick="openManager()" data-tip="Управление учетными записями"><i class="fa fa-list"></i></button>
         </div>
         <div class="toolbar-center">
-            <button class="btn btn-circle btn-logger glass-btn glass-btn-yellow" id="btn-logger-main" onclick="toggleLogger()" data-tip="Открыть Логгер"><i class="fa fa-list-alt"></i></button>
-            <button class="btn btn-circle btn-play glass-btn glass-btn-green" onclick="startAll()" data-tip="Старт (Текущий режим)"><i class="fa fa-play"></i></button>
-
-            <button class="btn btn-circle btn-stop glass-btn glass-btn-red" onclick="stopAll()" data-tip="Стоп (Текущий режим)"><i class="fa fa-stop"></i></button>
-            <button class="btn btn-circle btn-clear glass-btn" onclick="clearAllStats()" data-tip="Сбросить статистику всех"><i class="fa fa-eraser"></i></button>
-            <button class="btn btn-circle btn-mode-switch glass-btn glass-btn-blue active-mail" id="btn-mode-toggle" onclick="toggleGlobalMode()" data-tip="Переключить режим (Mail/Chat)"><i class="fa fa-envelope"></i></button>
-            <button class="btn btn-circle btn-refresh glass-btn glass-btn-blue" onclick="reloginAllBots()" data-tip="Перелогинить все анкеты"><i class="fa fa-sync"></i></button>
+            <button class="btn btn-circle btn-logger" id="btn-logger-main" onclick="toggleLogger()" data-tip="Открыть Логгер"><i class="fa fa-list-alt"></i></button>
+            <button class="btn btn-circle btn-play" onclick="startAll()" data-tip="Старт (Текущий режим)"><i class="fa fa-play"></i></button>
+            
+            <button class="btn btn-circle btn-stop" onclick="stopAll()" data-tip="Стоп (Текущий режим)"><i class="fa fa-stop"></i></button>
+            <button class="btn btn-circle btn-clear" onclick="clearAllStats()" data-tip="Сбросить статистику всех"><i class="fa fa-eraser"></i></button>
+            <button class="btn btn-circle btn-mode-switch active-mail" id="btn-mode-toggle" onclick="toggleGlobalMode()" data-tip="Переключить режим (Mail/Chat)"><i class="fa fa-envelope"></i></button>
+            <button class="btn btn-circle btn-refresh" onclick="reloginAllBots()" data-tip="Перелогинить все анкеты"><i class="fa fa-sync"></i></button>
             
             <div class="status-group-wrapper">
                 <button class="btn-group-toggle" id="btn-group-toggle" onclick="toggleStatusGroup()" data-tip="Показать/Скрыть статусы">
                     <i class="fa fa-caret-right"></i>
                 </button>
                 <div class="status-buttons-container" id="status-buttons-container">
-                    <button class="btn btn-circle btn-status-circle btn-online-color glass-btn glass-btn-green" onclick="setGlobalTarget('online')" data-tip="Установить всем: Online (Online)"><i class="fa fa-globe"></i></button>
-                    <button class="btn btn-circle btn-status-circle btn-fav-of-color glass-btn" onclick="setGlobalTarget('favorites')" data-tip="Установить всем: I am favorite of (favorites)"><i class="fa fa-star"></i></button>
-                    <button class="btn btn-circle btn-status-circle btn-my-fav-color glass-btn glass-btn-yellow" onclick="setGlobalTarget('my-favorites')" data-tip="Установить всем: My favorite (my-favorites)"><i class="fa fa-heart"></i></button>
-                    <button class="btn btn-circle btn-status-circle btn-inbox-color glass-btn glass-btn-blue" onclick="setGlobalTarget('inbox')" data-tip="Установить всем: Inbox (inbox)"><i class="fa fa-inbox"></i></button>
-                    <button class="btn btn-circle btn-status-circle btn-payers-color glass-btn glass-btn-purple" onclick="setGlobalTarget('payers')" data-tip="Установить всем: Payers (payers)"><i class="fa fa-credit-card"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-online-color" onclick="setGlobalTarget('online')" data-tip="Установить всем: Online (Online)"><i class="fa fa-globe"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-fav-of-color" onclick="setGlobalTarget('favorites')" data-tip="Установить всем: I am favorite of (favorites)"><i class="fa fa-star"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-my-fav-color" onclick="setGlobalTarget('my-favorites')" data-tip="Установить всем: My favorite (my-favorites)"><i class="fa fa-heart"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-inbox-color" onclick="setGlobalTarget('inbox')" data-tip="Установить всем: Inbox (inbox)"><i class="fa fa-inbox"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-payers-color" onclick="setGlobalTarget('payers')" data-tip="Установить всем: Payers (payers)"><i class="fa fa-credit-card"></i></button>
                 </div>
             </div>
         </div>
         <div class="toolbar-right">
             <span id="global-bot-count" class="bot-counter">Анкет: 0</span>
-            <button class="btn btn-circle btn-settings glass-btn" onclick="openGlobalSettings()" data-tip="Глобальные настройки"><i class="fa fa-cog"></i></button>
+            <button class="btn btn-circle btn-settings" onclick="openGlobalSettings()" data-tip="Глобальные настройки"><i class="fa fa-cog"></i></button>
         </div>
     </div>
 
