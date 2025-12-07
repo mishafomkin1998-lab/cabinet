@@ -2796,15 +2796,14 @@
                             this.newAccountLogin = '';
                             this.newAccountPassword = '';
                             this.showAddAccountModal = false;
-
                             alert(`Добавлено ${ids.length} анкет`);
-                            this.loadAccounts(); // Перезагружаем список
+                            this.loadAccounts(); // Перезагружаем список с сервера
                         } else {
                             alert('Ошибка: ' + (data.error || 'Не удалось добавить анкеты'));
                         }
                     })
                     .catch(err => {
-                        console.error('Save accounts error:', err);
+                        console.error('saveAccounts error:', err);
                         alert('Ошибка сети при добавлении анкет');
                     });
                 },

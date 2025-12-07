@@ -1,5 +1,3 @@
-[file name]: dashboard.html
-[file content begin]
 <!DOCTYPE html>
 <html lang="ru" x-data="{ htmlLang: 'ru' }" :lang="htmlLang">
 <head>
@@ -3442,34 +3440,42 @@
                         alert('Введите ID анкет');
                         return;
                     }
-                    
-                    const ids = this.newAccountIds.split(/[\s,]+/).filter(id => id.length === 6);
-                    
+
+                    const ids = this.newAccountIds.split(/[\s,]+/).filter(id => id.trim().length >= 3);
+
                     if (ids.length === 0) {
-                        alert('Введите корректные ID (6 цифр)');
+                        alert('Введите корректные ID анкет');
                         return;
                     }
-                    
-                    ids.forEach(id => {
-                        this.accounts.unshift({
-                            id: id,
-                            profile_id: id,
-                            login: id,
-                            status: 'offline',
-                            lastOnline: '-',
-                            incoming: 0,
-                            admin: '',
-                            addedDate: new Date().toLocaleDateString('ru-RU'),
-                            comment: this.newAccountComment,
-                            paused: false
-                        });
-                    });
 
-                    this.newAccountIds = '';
-                    this.newAccountComment = '';
-                    this.showAddAccountModal = false;
-                    
-                    alert(`Добавлено ${ids.length} анкет`);
+                    // Отправляем на сервер
+                    fetch(`${API_BASE}/api/profiles/bulk`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            profiles: ids,
+                            note: this.newAccountComment || '',
+                            adminId: this.currentUser.role === 'director' ? null : this.currentUser.id,
+                            userId: this.currentUser.id,
+                            userName: this.currentUser.username
+                        })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.success) {
+                            this.newAccountIds = '';
+                            this.newAccountComment = '';
+                            this.showAddAccountModal = false;
+                            alert(`Добавлено ${ids.length} анкет`);
+                            this.loadAccounts(); // Перезагружаем список с сервера
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось добавить анкеты'));
+                        }
+                    })
+                    .catch(err => {
+                        console.error('saveAccounts error:', err);
+                        alert('Ошибка сети при добавлении анкет');
+                    });
                 },
                 
                 async editAdmin(admin) {
