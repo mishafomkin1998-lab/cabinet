@@ -593,6 +593,7 @@
                                 this.myTranslators = [];
                                 // Для директора: все переводчики с информацией об админе
                                 this.allTranslators = translatorsList.map(t => {
+                                    // Проверяем, есть ли owner среди админов (а не директор)
                                     const admin = adminsList.find(a => a.id === t.owner_id);
                                     return {
                                         id: t.id,
@@ -601,7 +602,8 @@
                                         conversion: t.conversion || 0,
                                         accounts: t.accounts || [],
                                         accountsCount: t.accounts_count || 0,
-                                        adminId: t.owner_id,
+                                        // adminId только если владелец - админ, а не директор
+                                        adminId: admin ? t.owner_id : null,
                                         adminName: admin ? admin.username : null,
                                         aiEnabled: t.ai_enabled || false
                                     };
