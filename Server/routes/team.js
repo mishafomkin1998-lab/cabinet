@@ -35,6 +35,7 @@ router.get('/', async (req, res) => {
                 u.salary,
                 u.balance,
                 u.is_restricted,
+                u.ai_enabled,
                 u.created_at,
                 COALESCE(profiles.accounts_count, 0) as accounts_count,
                 COALESCE(stats.letters_today, 0) as letters_today,
@@ -90,6 +91,7 @@ router.get('/', async (req, res) => {
                 salary: row.salary,
                 balance: parseFloat(row.balance) || 0,
                 is_restricted: row.is_restricted || false,
+                ai_enabled: row.ai_enabled || false,
                 accounts_count: parseInt(row.accounts_count) || 0,
                 letters_today: lettersToday,
                 chats_today: parseInt(row.chats_today) || 0,
@@ -143,7 +145,7 @@ router.delete('/:id', async (req, res) => {
 // Редактирование пользователя
 router.put('/:id', async (req, res) => {
     const userId = req.params.id;
-    const { username, password, salary } = req.body;
+    const { username, password, salary, aiEnabled, is_restricted } = req.body;
     try {
         const updates = [];
         const params = [];
@@ -164,6 +166,16 @@ router.put('/:id', async (req, res) => {
         if (salary !== undefined) {
             updates.push(`salary = $${paramIndex++}`);
             params.push(salary);
+        }
+
+        if (aiEnabled !== undefined) {
+            updates.push(`ai_enabled = $${paramIndex++}`);
+            params.push(aiEnabled);
+        }
+
+        if (is_restricted !== undefined) {
+            updates.push(`is_restricted = $${paramIndex++}`);
+            params.push(is_restricted);
         }
 
         if (updates.length === 0) {

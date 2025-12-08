@@ -75,6 +75,7 @@
                 selectedTranslatorForProfiles: null,
                 selectedTranslatorProfileIds: [],
                 showViewAdminModal: false,
+                expandedAdminId: null, // ID развёрнутого админа в аккордеоне
                 sortBy: 'date',
                 sortDirection: 'desc',
                 searchQuery: '',
@@ -558,7 +559,8 @@
                                     login: t.username,
                                     conversion: t.conversion || 0,
                                     accounts: t.accounts || [],
-                                    accountsCount: t.accounts_count || 0
+                                    accountsCount: t.accounts_count || 0,
+                                    aiEnabled: t.ai_enabled || false
                                 }));
                             } else {
                                 // Для директора: показываем всех админов с их переводчиками
@@ -570,6 +572,7 @@
                                     accounts: a.accounts_count || 0,
                                     conversion: a.conversion || 0,
                                     isMyAdmin: a.is_restricted || false,
+                                    aiEnabled: a.ai_enabled || false,
                                     salary: a.salary !== null && a.salary !== undefined ? a.salary : null,
                                     balance: a.balance || 0,
                                     translators: translatorsList.filter(t => t.owner_id === a.id).map(t => ({
@@ -578,7 +581,8 @@
                                         login: t.username,
                                         conversion: t.conversion || 0,
                                         accounts: t.accounts || [],
-                                        accountsCount: t.accounts_count || 0
+                                        accountsCount: t.accounts_count || 0,
+                                        aiEnabled: t.ai_enabled || false
                                     }))
                                 }));
                                 this.myTranslators = [];
@@ -593,7 +597,8 @@
                                         accounts: t.accounts || [],
                                         accountsCount: t.accounts_count || 0,
                                         adminId: t.owner_id,
-                                        adminName: admin ? admin.username : null
+                                        adminName: admin ? admin.username : null,
+                                        aiEnabled: t.ai_enabled || false
                                     };
                                 });
                             }
@@ -684,7 +689,59 @@
                 setActiveSubmenu(submenu) {
                     this.activeSubmenu = submenu;
                 },
-                
+
+                // Аккордеон для админов
+                toggleAdminExpanded(adminId) {
+                    this.expandedAdminId = this.expandedAdminId === adminId ? null : adminId;
+                },
+
+                // Переключить AI для пользователя
+                async toggleAiEnabled(user) {
+                    try {
+                        const newValue = !user.aiEnabled;
+                        const res = await fetch(`${API_BASE}/api/users/${user.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ aiEnabled: newValue })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            user.aiEnabled = newValue;
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось обновить'));
+                        }
+                    } catch (e) {
+                        console.error('toggleAiEnabled error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
+                // Переключить "Мой админ" (is_restricted)
+                async toggleIsRestricted(admin) {
+                    try {
+                        const newValue = !admin.isMyAdmin;
+                        const res = await fetch(`${API_BASE}/api/users/${admin.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ is_restricted: newValue })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            admin.isMyAdmin = newValue;
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось обновить'));
+                        }
+                    } catch (e) {
+                        console.error('toggleIsRestricted error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
+                // Переводчики напрямую под директором (без админа)
+                get directTranslators() {
+                    return this.allTranslators.filter(t => !t.adminId);
+                },
+
                 getPageTitle() {
                     const page = this.t('pages.' + this.activeMenu);
                     return page?.title || this.activeMenu;

@@ -66,6 +66,13 @@
                             <span class="ml-3 font-medium" x-text="t('menu.profiles')"></span>
                         </div>
                     </div>
+                    <!-- Команда - для директора и админа -->
+                    <div x-show="currentUser.role === 'director' || currentUser.role === 'admin'">
+                        <div @click="setActiveMenu('team')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'team' ? 'active' : ''">
+                            <i class="fas fa-users w-5 text-gray-600"></i>
+                            <span class="ml-3 font-medium">Команда</span>
+                        </div>
+                    </div>
                     <!-- Управление - только для директора -->
                     <div x-show="currentUser.role === 'director'">
                         <div @click="setActiveMenu('control')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'control' ? 'active' : ''">
@@ -447,106 +454,231 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Анкеты -->
-            <div x-show="activeMenu === 'accounts'" x-cloak class="fade-in">
-                <!-- Управление командой - скрыто для переводчиков -->
-                <div x-show="currentUser.role !== 'translator'" class="glass rounded-2xl p-5 mb-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-bold" x-text="t('team.teamManagement')"></h3>
-                        <div class="flex gap-3">
-                            <!-- Кнопка добавить переводчика (видна админам) -->
-                            <button @click="openAddTranslatorModal()" class="w-52 px-5 py-2.5 rounded-xl text-sm font-medium bg-purple-500 hover:bg-purple-600 text-white transition-all text-center">
-                                <i class="fas fa-language mr-2"></i>Добавить переводчика
-                            </button>
-                            <!-- Кнопка добавить админа (видна директорам) -->
-                            <button x-show="currentUser.role === 'director'" @click="showAddAdminModal = true" class="w-52 px-5 py-2.5 rounded-xl text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white transition-all text-center">
-                                <i class="fas fa-user-plus mr-2"></i><span x-text="t('team.addAdmin')"></span>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="flex flex-wrap gap-3">
-                        <template x-for="admin in admins" :key="admin.id">
-                            <div class="glass rounded-xl p-3 flex items-center space-x-3 min-w-64">
-                                <div class="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center flex-shrink-0">
-                                    <span class="text-white font-medium text-sm" x-text="admin.initials"></span>
-                                </div>
-                                <div class="flex-1 min-w-0">
-                                    <div class="font-medium truncate" x-text="admin.name"></div>
-                                    <div class="text-xs text-gray-500"><span x-text="admin.accounts"></span> <span x-text="t('team.profiles')"></span></div>
-                                </div>
-                                <div class="flex items-center space-x-1">
-                                    <button @click="editAdmin(admin)" class="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center" :title="t('common.edit')">
-                                        <i class="fas fa-edit text-gray-600 text-xs"></i>
-                                    </button>
-                                    <button @click="viewAdminDetails(admin)" class="w-8 h-8 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center" :title="t('team.viewBtn')">
-                                        <i class="fas fa-eye text-blue-600 text-xs"></i>
-                                    </button>
-                                    <!-- Кнопка пополнения баланса (только для директора и не "мой админ") -->
-                                    <button x-show="currentUser.role === 'director' && !admin.isMyAdmin"
-                                            @click="openTopupModal(admin.id)"
-                                            class="w-8 h-8 rounded-lg bg-green-100 hover:bg-green-200 flex items-center justify-center"
-                                            title="Пополнить баланс">
-                                        <i class="fas fa-dollar-sign text-green-600 text-xs"></i>
-                                    </button>
-                                    <!-- Кнопка удаления админа (только для директора) -->
-                                    <button x-show="currentUser.role === 'director'"
-                                            @click="deleteAdmin(admin)"
-                                            class="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center"
-                                            title="Удалить админа">
-                                        <i class="fas fa-trash text-red-600 text-xs"></i>
-                                    </button>
-                                </div>
-                                <!-- Переводчики -->
-                                <div x-show="admin.translators.length > 0" class="flex items-center -space-x-2">
-                                    <template x-for="translator in admin.translators.slice(0, 3)" :key="translator.id">
-                                        <div class="w-7 h-7 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 flex items-center justify-center border-2 border-white" :title="translator.name">
-                                            <span class="text-white text-xs font-medium" x-text="translator.name.charAt(0)"></span>
+
+            <!-- Команда -->
+            <div x-show="activeMenu === 'team'" x-cloak class="fade-in">
+                <!-- Для директора -->
+                <template x-if="currentUser.role === 'director'">
+                    <div>
+                        <!-- Секция Админы -->
+                        <div class="glass rounded-2xl p-5 mb-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-bold">
+                                    <i class="fas fa-user-tie text-indigo-500 mr-2"></i>Админы
+                                </h3>
+                                <button @click="showAddAdminModal = true" class="px-4 py-2 rounded-xl text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white transition-all">
+                                    <i class="fas fa-plus mr-2"></i>Добавить админа
+                                </button>
+                            </div>
+
+                            <div class="space-y-3">
+                                <template x-for="admin in admins" :key="admin.id">
+                                    <div class="border border-gray-200 rounded-xl overflow-hidden">
+                                        <!-- Карточка админа -->
+                                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 flex items-center justify-between cursor-pointer hover:from-blue-100 hover:to-indigo-100 transition-colors"
+                                             @click="toggleAdminExpanded(admin.id)">
+                                            <div class="flex items-center">
+                                                <div class="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
+                                                    <span class="text-white font-bold" x-text="admin.initials"></span>
+                                                </div>
+                                                <div class="ml-4">
+                                                    <div class="font-semibold text-gray-800" x-text="admin.name"></div>
+                                                    <div class="text-sm text-gray-500">
+                                                        <span x-text="admin.translators.length"></span> переводчиков •
+                                                        <span x-text="admin.accounts"></span> анкет
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="flex items-center gap-2">
+                                                <!-- Мой админ -->
+                                                <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/50 cursor-pointer" @click.stop>
+                                                    <input type="checkbox" :checked="admin.isMyAdmin" @change="toggleIsRestricted(admin)" class="w-4 h-4 text-indigo-600 rounded">
+                                                    <span class="text-sm text-gray-600">Мой админ</span>
+                                                </label>
+
+                                                <!-- AI toggle -->
+                                                <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/50 cursor-pointer" @click.stop>
+                                                    <input type="checkbox" :checked="admin.aiEnabled" @change="toggleAiEnabled(admin)" class="w-4 h-4 text-purple-600 rounded">
+                                                    <span class="text-sm text-gray-600">AI</span>
+                                                </label>
+
+                                                <!-- Пополнить баланс (если не мой админ) -->
+                                                <button x-show="!admin.isMyAdmin" @click.stop="openTopupModal(admin.id)"
+                                                        class="w-9 h-9 rounded-lg bg-green-100 hover:bg-green-200 flex items-center justify-center"
+                                                        title="Пополнить баланс">
+                                                    <i class="fas fa-dollar-sign text-green-600"></i>
+                                                </button>
+
+                                                <!-- Редактировать -->
+                                                <button @click.stop="editAdmin(admin)"
+                                                        class="w-9 h-9 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center"
+                                                        title="Редактировать">
+                                                    <i class="fas fa-edit text-blue-600"></i>
+                                                </button>
+
+                                                <!-- Удалить -->
+                                                <button @click.stop="deleteAdmin(admin)"
+                                                        class="w-9 h-9 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center"
+                                                        title="Удалить">
+                                                    <i class="fas fa-trash text-red-600"></i>
+                                                </button>
+
+                                                <!-- Стрелка раскрытия -->
+                                                <div class="w-9 h-9 flex items-center justify-center">
+                                                    <i class="fas fa-chevron-down text-gray-400 transition-transform" :class="expandedAdminId === admin.id ? 'rotate-180' : ''"></i>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </template>
-                                    <div x-show="admin.translators.length > 3" class="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center border-2 border-white">
-                                        <span class="text-gray-600 text-xs">+<span x-text="admin.translators.length - 3"></span></span>
+
+                                        <!-- Переводчики админа (раскрывающийся список) -->
+                                        <div x-show="expandedAdminId === admin.id" x-collapse class="bg-gray-50 p-4 border-t border-gray-200">
+                                            <div x-show="admin.translators.length === 0" class="text-center text-gray-500 py-4">
+                                                <i class="fas fa-users text-gray-300 text-2xl mb-2"></i>
+                                                <div>Нет переводчиков</div>
+                                            </div>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                <template x-for="translator in admin.translators" :key="translator.id">
+                                                    <div class="bg-white rounded-lg p-3 border border-gray-200 flex items-center justify-between">
+                                                        <div class="flex items-center">
+                                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
+                                                                <span class="text-white font-medium" x-text="translator.name.charAt(0).toUpperCase()"></span>
+                                                            </div>
+                                                            <div class="ml-3">
+                                                                <div class="font-medium text-gray-800" x-text="translator.name"></div>
+                                                                <div class="text-xs text-gray-500"><span x-text="translator.accountsCount || 0"></span> анкет</div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="flex items-center gap-1">
+                                                            <!-- AI toggle -->
+                                                            <label class="flex items-center gap-1 px-2 py-1 rounded bg-gray-50 cursor-pointer" @click.stop>
+                                                                <input type="checkbox" :checked="translator.aiEnabled" @change="toggleAiEnabled(translator)" class="w-3.5 h-3.5 text-purple-600 rounded">
+                                                                <span class="text-xs text-gray-500">AI</span>
+                                                            </label>
+                                                            <button @click="openTranslatorProfilesModal(translator)"
+                                                                    class="w-8 h-8 rounded-lg bg-purple-100 hover:bg-purple-200 flex items-center justify-center"
+                                                                    title="Анкеты">
+                                                                <i class="fas fa-folder text-purple-600 text-xs"></i>
+                                                            </button>
+                                                            <button @click="editTranslator(translator)"
+                                                                    class="w-8 h-8 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center"
+                                                                    title="Редактировать">
+                                                                <i class="fas fa-edit text-blue-600 text-xs"></i>
+                                                            </button>
+                                                            <button @click="deleteTranslator(translator)"
+                                                                    class="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center"
+                                                                    title="Удалить">
+                                                                <i class="fas fa-trash text-red-600 text-xs"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
                                     </div>
+                                </template>
+
+                                <div x-show="admins.length === 0" class="text-center text-gray-500 py-8">
+                                    <i class="fas fa-user-tie text-gray-300 text-4xl mb-3"></i>
+                                    <div>Нет админов</div>
                                 </div>
                             </div>
-                        </template>
-                        <!-- Добавить админа -->
-                        <div @click="showAddAdminModal = true" class="glass rounded-xl p-3 flex items-center justify-center min-w-32 cursor-pointer border-2 border-dashed border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors">
-                            <i class="fas fa-plus text-gray-400 mr-2"></i>
-                            <span class="text-gray-500 text-sm" x-text="t('common.add')"></span>
+                        </div>
+
+                        <!-- Секция Мои переводчики (напрямую под директором) -->
+                        <div class="glass rounded-2xl p-5">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-bold">
+                                    <i class="fas fa-language text-purple-500 mr-2"></i>Мои переводчики
+                                </h3>
+                                <button @click="openAddTranslatorModal()" class="px-4 py-2 rounded-xl text-sm font-medium bg-purple-500 hover:bg-purple-600 text-white transition-all">
+                                    <i class="fas fa-plus mr-2"></i>Добавить переводчика
+                                </button>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                <template x-for="translator in directTranslators" :key="translator.id">
+                                    <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-100">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center">
+                                                <div class="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
+                                                    <span class="text-white font-bold" x-text="translator.name.charAt(0).toUpperCase()"></span>
+                                                </div>
+                                                <div class="ml-3">
+                                                    <div class="font-semibold text-gray-800" x-text="translator.name"></div>
+                                                    <div class="text-sm text-gray-500"><span x-text="translator.accountsCount || 0"></span> анкет</div>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center gap-1">
+                                                <!-- AI toggle -->
+                                                <label class="flex items-center gap-1 px-2 py-1 rounded bg-white/50 cursor-pointer">
+                                                    <input type="checkbox" :checked="translator.aiEnabled" @change="toggleAiEnabled(translator)" class="w-4 h-4 text-purple-600 rounded">
+                                                    <span class="text-xs text-gray-600">AI</span>
+                                                </label>
+                                                <button @click="openTranslatorProfilesModal(translator)"
+                                                        class="w-8 h-8 rounded-lg bg-purple-100 hover:bg-purple-200 flex items-center justify-center"
+                                                        title="Анкеты">
+                                                    <i class="fas fa-folder text-purple-600 text-xs"></i>
+                                                </button>
+                                                <button @click="editTranslator(translator)"
+                                                        class="w-8 h-8 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center"
+                                                        title="Редактировать">
+                                                    <i class="fas fa-edit text-blue-600 text-xs"></i>
+                                                </button>
+                                                <button @click="deleteTranslator(translator)"
+                                                        class="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center"
+                                                        title="Удалить">
+                                                    <i class="fas fa-trash text-red-600 text-xs"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <div x-show="directTranslators.length === 0" class="text-center text-gray-500 py-8">
+                                <i class="fas fa-language text-gray-300 text-4xl mb-3"></i>
+                                <div>Нет переводчиков напрямую под вами</div>
+                            </div>
                         </div>
                     </div>
-                </div>
+                </template>
 
-                <!-- Секция переводчиков для админа -->
-                <template x-if="currentUser.role === 'admin' && myTranslators.length > 0">
-                    <div class="glass rounded-2xl p-4 mb-4">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-lg font-semibold text-gray-800">
+                <!-- Для админа -->
+                <template x-if="currentUser.role === 'admin'">
+                    <div class="glass rounded-2xl p-5">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold">
                                 <i class="fas fa-users text-indigo-500 mr-2"></i>Мои переводчики
                             </h3>
-                            <span class="text-sm text-gray-500" x-text="myTranslators.length + ' переводчик(ов)'"></span>
+                            <button @click="openAddTranslatorModal()" class="px-4 py-2 rounded-xl text-sm font-medium bg-purple-500 hover:bg-purple-600 text-white transition-all">
+                                <i class="fas fa-plus mr-2"></i>Добавить переводчика
+                            </button>
                         </div>
-                        <div class="flex flex-wrap gap-3">
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                             <template x-for="translator in myTranslators" :key="translator.id">
-                                <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-3 min-w-48 border border-indigo-100">
+                                <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-100">
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center">
-                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold mr-3">
-                                                <span x-text="translator.name.charAt(0).toUpperCase()"></span>
+                                            <div class="w-12 h-12 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center">
+                                                <span class="text-white font-bold" x-text="translator.name.charAt(0).toUpperCase()"></span>
                                             </div>
-                                            <div>
-                                                <div class="font-medium text-gray-800" x-text="translator.name"></div>
-                                                <div class="text-xs text-gray-500">
-                                                    <span x-text="translator.accountsCount || 0"></span> анкет
-                                                </div>
+                                            <div class="ml-3">
+                                                <div class="font-semibold text-gray-800" x-text="translator.name"></div>
+                                                <div class="text-sm text-gray-500"><span x-text="translator.accountsCount || 0"></span> анкет</div>
                                             </div>
                                         </div>
-                                        <div class="flex items-center gap-1 ml-3">
+                                        <div class="flex items-center gap-1">
+                                            <!-- AI toggle -->
+                                            <label class="flex items-center gap-1 px-2 py-1 rounded bg-white/50 cursor-pointer">
+                                                <input type="checkbox" :checked="translator.aiEnabled" @change="toggleAiEnabled(translator)" class="w-4 h-4 text-purple-600 rounded">
+                                                <span class="text-xs text-gray-600">AI</span>
+                                            </label>
                                             <button @click="openTranslatorProfilesModal(translator)"
                                                     class="w-8 h-8 rounded-lg bg-indigo-100 hover:bg-indigo-200 flex items-center justify-center"
-                                                    title="Назначить анкеты">
-                                                <i class="fas fa-plus text-indigo-600 text-xs"></i>
+                                                    title="Анкеты">
+                                                <i class="fas fa-folder text-indigo-600 text-xs"></i>
                                             </button>
                                             <button @click="editTranslator(translator)"
                                                     class="w-8 h-8 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center"
@@ -555,7 +687,7 @@
                                             </button>
                                             <button @click="deleteTranslator(translator)"
                                                     class="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center"
-                                                    title="Удалить переводчика">
+                                                    title="Удалить">
                                                 <i class="fas fa-trash text-red-600 text-xs"></i>
                                             </button>
                                         </div>
@@ -563,59 +695,17 @@
                                 </div>
                             </template>
                         </div>
-                    </div>
-                </template>
 
-                <!-- Секция переводчиков для директора -->
-                <template x-if="currentUser.role === 'director' && allTranslators.length > 0">
-                    <div class="glass rounded-2xl p-4 mb-4">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-lg font-semibold text-gray-800">
-                                <i class="fas fa-language text-purple-500 mr-2"></i>Все переводчики
-                            </h3>
-                            <span class="text-sm text-gray-500" x-text="allTranslators.length + ' переводчик(ов)'"></span>
-                        </div>
-                        <div class="flex flex-wrap gap-3">
-                            <template x-for="translator in allTranslators" :key="translator.id">
-                                <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-3 min-w-56 border border-purple-100">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center">
-                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold mr-3">
-                                                <span x-text="translator.name.charAt(0).toUpperCase()"></span>
-                                            </div>
-                                            <div>
-                                                <div class="font-medium text-gray-800" x-text="translator.name"></div>
-                                                <div class="text-xs text-gray-500">
-                                                    <span x-text="translator.adminName || 'Без админа'"></span>
-                                                    <span class="mx-1">•</span>
-                                                    <span x-text="(translator.accountsCount || 0) + ' анкет'"></span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="flex items-center gap-1 ml-3">
-                                            <button @click="openTranslatorProfilesModal(translator)"
-                                                    class="w-8 h-8 rounded-lg bg-purple-100 hover:bg-purple-200 flex items-center justify-center"
-                                                    title="Назначить анкеты">
-                                                <i class="fas fa-plus text-purple-600 text-xs"></i>
-                                            </button>
-                                            <button @click="editTranslator(translator)"
-                                                    class="w-8 h-8 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center"
-                                                    title="Редактировать">
-                                                <i class="fas fa-edit text-blue-600 text-xs"></i>
-                                            </button>
-                                            <button @click="deleteTranslator(translator)"
-                                                    class="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center"
-                                                    title="Удалить переводчика">
-                                                <i class="fas fa-trash text-red-600 text-xs"></i>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
+                        <div x-show="myTranslators.length === 0" class="text-center text-gray-500 py-8">
+                            <i class="fas fa-users text-gray-300 text-4xl mb-3"></i>
+                            <div>У вас пока нет переводчиков</div>
                         </div>
                     </div>
                 </template>
+            </div>
 
+            <!-- Анкеты -->
+            <div x-show="activeMenu === 'accounts'" x-cloak class="fade-in">
                 <!-- Список анкет -->
                 <!-- Панель фильтров и действий -->
                 <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
