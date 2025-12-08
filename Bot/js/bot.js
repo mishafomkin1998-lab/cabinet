@@ -726,6 +726,7 @@
 
             const bot = bots[minichatBotId];
             const inputEl = document.getElementById('minichat-input');
+            if(!inputEl) return;
             const message = inputEl.value.trim();
 
             if (!message || !bot) return;
@@ -1123,6 +1124,7 @@
         }
 
         function validateInput(textarea) {
+            if(!textarea) return;
             let val = textarea.value;
             let original = val;
             let errorMsg = null;
@@ -1138,7 +1140,9 @@
 
         function showToast(text) {
             const t = document.getElementById('error-toast');
-            document.getElementById('error-toast-text').innerText = text;
+            const textEl = document.getElementById('error-toast-text');
+            if(!t || !textEl) return;
+            textEl.innerText = text;
             t.classList.add('show');
             if(t.hideTimer) clearTimeout(t.hideTimer);
             t.hideTimer = setTimeout(() => { t.classList.remove('show'); }, 3000);
@@ -1443,15 +1447,22 @@
             if(activeTabId && bots[activeTabId]) updateInterfaceForMode(activeTabId);
         }
 
-        function updateBotCount() { document.getElementById('global-bot-count').innerText = `Анкет: ${Object.keys(bots).length}`; }
-        function openModal(id) { const el=document.getElementById(id); el.style.display='flex'; setTimeout(()=>{el.classList.add('show');},10); }
-        function closeModal(id) { const el=document.getElementById(id); el.classList.remove('show'); setTimeout(()=>{el.style.display='none';},300); }
+        function updateBotCount() { const el = document.getElementById('global-bot-count'); if(el) el.innerText = `Анкет: ${Object.keys(bots).length}`; }
+        function openModal(id) { const el=document.getElementById(id); if(!el) return; el.style.display='flex'; setTimeout(()=>{el.classList.add('show');},10); }
+        function closeModal(id) { const el=document.getElementById(id); if(!el) return; el.classList.remove('show'); setTimeout(()=>{el.style.display='none';},300); }
 
-        function checkVarTrigger(textarea, dropdownId) { if(textarea.value.endsWith('{')) document.getElementById(dropdownId).style.display='block'; }
+        function checkVarTrigger(textarea, dropdownId) {
+            if(!textarea) return;
+            const dd = document.getElementById(dropdownId);
+            if(textarea.value.endsWith('{') && dd) dd.style.display='block';
+        }
         function applyVar(textareaId, text, dropdownId) {
             const ta = document.getElementById(textareaId);
+            if(!ta) return;
             ta.value = ta.value.endsWith('{') ? ta.value.slice(0, -1) + text : ta.value + text;
-            document.getElementById(dropdownId).style.display='none'; ta.focus();
+            const dd = document.getElementById(dropdownId);
+            if(dd) dd.style.display='none';
+            ta.focus();
         }
 
         class AccountBot {
@@ -2901,46 +2912,91 @@
             const bot = bots[id];
             if(!bot) return;
             editingBotId = id;
-            document.getElementById('add-modal-title').innerHTML = '<i class="fa fa-pencil text-warning"></i> Изменить анкету';
-            document.getElementById('newLogin').value = bot.login; document.getElementById('newPass').value = bot.pass; document.getElementById('newId').value = bot.displayId;
-            document.getElementById('btnLoginText').innerText = "Сохранить"; document.getElementById('loginError').innerText = "";
+            const titleEl = document.getElementById('add-modal-title');
+            const loginEl = document.getElementById('newLogin');
+            const passEl = document.getElementById('newPass');
+            const idEl = document.getElementById('newId');
+            const btnEl = document.getElementById('btnLoginText');
+            const errorEl = document.getElementById('loginError');
+            if(titleEl) titleEl.innerHTML = '<i class="fa fa-pencil text-warning"></i> Изменить анкету';
+            if(loginEl) loginEl.value = bot.login;
+            if(passEl) passEl.value = bot.pass;
+            if(idEl) idEl.value = bot.displayId;
+            if(btnEl) btnEl.innerText = "Сохранить";
+            if(errorEl) errorEl.innerText = "";
         }
         function openAddModal() {
             editingBotId = null;
-            document.getElementById('add-modal-title').innerHTML = '<i class="fa fa-plus text-success"></i> Добавить анкету';
-            document.getElementById('newLogin').value = ""; document.getElementById('newPass').value = ""; document.getElementById('newId').value = "";
-            document.getElementById('btnLoginText').innerText = "Добавить"; document.getElementById('loginError').innerText = "";
+            const titleEl = document.getElementById('add-modal-title');
+            const loginEl = document.getElementById('newLogin');
+            const passEl = document.getElementById('newPass');
+            const idEl = document.getElementById('newId');
+            const btnEl = document.getElementById('btnLoginText');
+            const errorEl = document.getElementById('loginError');
+            if(titleEl) titleEl.innerHTML = '<i class="fa fa-plus text-success"></i> Добавить анкету';
+            if(loginEl) loginEl.value = "";
+            if(passEl) passEl.value = "";
+            if(idEl) idEl.value = "";
+            if(btnEl) btnEl.innerText = "Добавить";
+            if(errorEl) errorEl.innerText = "";
             renderManagerList();
             openModal('add-modal');
         }
         function openStatsModal(botId, type) {
             currentModalBotId = botId; currentStatsType = type;
-            document.getElementById('stats-title').innerText = (type === 'sent') ? "Отправленные" : "Ошибки";
+            const titleEl = document.getElementById('stats-title');
+            if(titleEl) titleEl.innerText = (type === 'sent') ? "Отправленные" : "Ошибки";
             renderStatsList(); openModal('stats-modal');
         }
         function renderStatsList() {
-            const list = document.getElementById('stats-list-content'); list.innerHTML = '';
+            const list = document.getElementById('stats-list-content');
+            if(!list) return;
+            list.innerHTML = '';
+            const bot = bots[currentModalBotId];
+            if(!bot) return;
             const isChat = globalMode === 'chat';
-            const data = isChat ? bots[currentModalBotId].chatHistory[currentStatsType] : bots[currentModalBotId].mailHistory[currentStatsType];
-            if(!data.length) list.innerHTML = '<div class="text-center text-muted p-2">Пусто</div>';
+            const data = isChat ? bot.chatHistory[currentStatsType] : bot.mailHistory[currentStatsType];
+            if(!data || !data.length) list.innerHTML = '<div class="text-center text-muted p-2">Пусто</div>';
             else data.forEach(item => { const d = document.createElement('div'); d.className = 'list-item'; d.innerText = item; list.appendChild(d); });
         }
-        function copyStats() { navigator.clipboard.writeText((globalMode==='chat' ? bots[currentModalBotId].chatHistory[currentStatsType] : bots[currentModalBotId].mailHistory[currentStatsType]).join('\n')); }
-        function clearStats() { if(confirm("Очистить?")){ const b = bots[currentModalBotId]; if(globalMode==='chat') { b.chatHistory[currentStatsType]=[]; b.chatStats[currentStatsType]=0; } else { b.mailHistory[currentStatsType]=[]; b.mailStats[currentStatsType]=0; } b.updateUI(); renderStatsList(); } }
-        
+        function copyStats() {
+            const bot = bots[currentModalBotId];
+            if(!bot) return;
+            const data = globalMode==='chat' ? bot.chatHistory[currentStatsType] : bot.mailHistory[currentStatsType];
+            if(data) navigator.clipboard.writeText(data.join('\n'));
+        }
+        function clearStats() {
+            if(!confirm("Очистить?")) return;
+            const b = bots[currentModalBotId];
+            if(!b) return;
+            if(globalMode==='chat') { b.chatHistory[currentStatsType]=[]; b.chatStats[currentStatsType]=0; }
+            else { b.mailHistory[currentStatsType]=[]; b.mailStats[currentStatsType]=0; }
+            b.updateUI(); renderStatsList();
+        }
+
         function openTemplateModal(botId, isEdit) {
             currentModalBotId = botId;
             const bot = bots[botId];
+            if(!bot) return;
             const isChat = globalMode === 'chat';
             const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
-            
-            document.getElementById('tpl-modal-title').innerText = isChat ? "Шаблон Чата" : "Шаблон Письма";
+
+            const titleEl = document.getElementById('tpl-modal-title');
+            const nameEl = document.getElementById('tpl-modal-name');
+            const textEl = document.getElementById('tpl-modal-text');
+            if(titleEl) titleEl.innerText = isChat ? "Шаблон Чата" : "Шаблон Письма";
             if(isEdit) {
-                const idx = document.getElementById(`tpl-select-${botId}`).value;
+                const selEl = document.getElementById(`tpl-select-${botId}`);
+                const idx = selEl ? selEl.value : "";
                 if(idx==="") return alert("Выберите шаблон");
                 editingTemplateIndex = idx;
-                document.getElementById('tpl-modal-name').value = tpls[idx].name; document.getElementById('tpl-modal-text').value = tpls[idx].text;
-            } else { editingTemplateIndex = null; document.getElementById('tpl-modal-name').value=""; document.getElementById('tpl-modal-text').value=""; }
+                if(nameEl && tpls[idx]) nameEl.value = tpls[idx].name;
+                if(textEl && tpls[idx]) textEl.value = tpls[idx].text;
+            } else {
+                editingTemplateIndex = null;
+                if(nameEl) nameEl.value="";
+                if(textEl) textEl.value="";
+            }
             openModal('tpl-modal');
         }
 
@@ -2949,6 +3005,8 @@
             const promptInput = document.getElementById('tpl-ai-prompt');
             const textArea = document.getElementById('tpl-modal-text');
             const btn = document.getElementById('tpl-ai-btn');
+
+            if (!promptInput || !btn) return;
             const userPrompt = promptInput.value.trim();
 
             if (!userPrompt) {
@@ -3073,11 +3131,14 @@
             tpls.forEach((t,i)=> sel.innerHTML+=`<option value="${i}">${t.favorite?'❤ ':''}${t.name}</option>`);
             
             const btnFav = document.getElementById(`btn-fav-${botId}`);
+            const area = document.getElementById(`msg-${botId}`);
             if(val !== null && val !== "" && val !== undefined && tpls[val]) {
                  sel.value = val;
-                 const area=document.getElementById(`msg-${botId}`);
-                 area.disabled=false;
-                 area.value=tpls[val].text;
+                 if(area) {
+                     area.disabled=false;
+                     area.value=tpls[val].text;
+                     validateInput(area);
+                 }
                  if(isChat) bots[botId].lastTplChat = val; else bots[botId].lastTplMail = val;
 
                  // Сохраняем выбор шаблона
@@ -3088,19 +3149,20 @@
                  saveSession();
 
                  if(btnFav) { if(tpls[val].favorite) { btnFav.classList.add('btn-heart-active','btn-danger'); btnFav.classList.remove('btn-outline-danger'); } else { btnFav.classList.remove('btn-heart-active','btn-danger'); btnFav.classList.add('btn-outline-danger'); } }
-                 validateInput(area);
-            } else { 
-                 sel.value=""; 
-                 const area = document.getElementById(`msg-${botId}`);
-                 area.disabled=true; area.value=""; 
-                 if(btnFav) btnFav.classList.remove('btn-heart-active'); 
-                 bots[botId].updateUI(); 
+            } else {
+                 sel.value="";
+                 if(area) { area.disabled=true; area.value=""; }
+                 if(btnFav) btnFav.classList.remove('btn-heart-active');
+                 if(bots[botId]) bots[botId].updateUI();
             }
         }
 
         function onTemplateSelect(botId) {
-            const idx = document.getElementById(`tpl-select-${botId}`).value;
+            const sel = document.getElementById(`tpl-select-${botId}`);
+            if(!sel) return;
+            const idx = sel.value;
             const bot = bots[botId];
+            if(!bot) return;
             const isChat = globalMode === 'chat';
 
             if(!accountPreferences[bot.login]) accountPreferences[bot.login] = {};
@@ -3113,9 +3175,12 @@
         }
 
         async function toggleTemplateFavorite(botId) {
-            const idx = document.getElementById(`tpl-select-${botId}`).value;
+            const sel = document.getElementById(`tpl-select-${botId}`);
+            if(!sel) return;
+            const idx = sel.value;
             if(idx === "") return;
             const bot = bots[botId];
+            if(!bot) return;
             const tpls = getBotTemplates(bot.login)['mail'];
             if(tpls[idx]) {
                 const wasNotFavorite = !tpls[idx].favorite;
@@ -3160,25 +3225,39 @@
         function deleteTemplate(botId) {
             const isChat = globalMode === 'chat';
             const bot = bots[botId];
+            if(!bot) return;
             let tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
-            const idx=document.getElementById(`tpl-select-${botId}`).value;
+            const sel = document.getElementById(`tpl-select-${botId}`);
+            if(!sel) return;
+            const idx = sel.value;
             if(idx!=="" && confirm("Удалить?")) { tpls.splice(idx,1); localStorage.setItem('botTemplates', JSON.stringify(botTemplates)); updateTemplateDropdown(botId); onTemplateSelect(botId); }
         }
 
-        function openBlacklistModal(botId) { currentModalBotId=botId; document.getElementById('bl-modal-input').value=''; openModal('bl-modal'); }
+        function openBlacklistModal(botId) {
+            currentModalBotId=botId;
+            const input = document.getElementById('bl-modal-input');
+            if(input) input.value='';
+            openModal('bl-modal');
+        }
         function saveBlacklistID() {
-            const val = document.getElementById('bl-modal-input').value.trim();
+            const input = document.getElementById('bl-modal-input');
+            const val = input ? input.value.trim() : '';
             if(val && currentModalBotId) {
                 const bot = bots[currentModalBotId];
-                const list = globalMode === 'chat' ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
-                if(!list.includes(val)) { list.push(val); renderBlacklist(currentModalBotId); }
+                if(bot) {
+                    const list = globalMode === 'chat' ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
+                    if(!list.includes(val)) { list.push(val); renderBlacklist(currentModalBotId); }
+                }
             }
             closeModal('bl-modal');
         }
 
         function renderBlacklist(botId) {
-            const listEl=document.getElementById(`bl-list-${botId}`); listEl.innerHTML="";
+            const listEl=document.getElementById(`bl-list-${botId}`);
+            if(!listEl) return;
+            listEl.innerHTML="";
             const bot = bots[botId];
+            if(!bot) return;
             const data = globalMode === 'chat' ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
             
             data.forEach(id => {
@@ -3212,7 +3291,9 @@
         }
 
         function toggleVipStatus(botId) {
-            const bot = bots[botId]; const s = bot.selectedBlacklistId;
+            const bot = bots[botId];
+            if(!bot) return;
+            const s = bot.selectedBlacklistId;
             if(!s) return alert("Выберите ID из списка");
             
             if(bot.vipList.includes(s)) {
@@ -3227,25 +3308,58 @@
 
         function onPhotoSelect(botId) {
             const fi=document.getElementById(`photo-input-${botId}`);
-            if(fi.files.length) {
-                bots[botId].photoName=fi.files[0].name; document.getElementById(`photo-name-${botId}`).innerText=fi.files[0].name; document.getElementById(`photo-label-${botId}`).classList.add('file-selected');
-                const r=new FileReader(); r.onload=e=>{ document.getElementById(`preview-img-${botId}`).src=e.target.result; document.getElementById(`preview-box-${botId}`).classList.add('has-img'); }; r.readAsDataURL(fi.files[0]);
-            }
+            if(!fi || !fi.files.length) return;
+            const bot = bots[botId];
+            if(!bot) return;
+            bot.photoName=fi.files[0].name;
+            const nameEl = document.getElementById(`photo-name-${botId}`);
+            const labelEl = document.getElementById(`photo-label-${botId}`);
+            if(nameEl) nameEl.innerText=fi.files[0].name;
+            if(labelEl) labelEl.classList.add('file-selected');
+            const r=new FileReader();
+            r.onload=e=>{
+                const imgEl = document.getElementById(`preview-img-${botId}`);
+                const boxEl = document.getElementById(`preview-box-${botId}`);
+                if(imgEl) imgEl.src=e.target.result;
+                if(boxEl) boxEl.classList.add('has-img');
+            };
+            r.readAsDataURL(fi.files[0]);
         }
         function removePhoto(botId) {
-            document.getElementById(`photo-input-${botId}`).value=""; document.getElementById(`photo-name-${botId}`).innerText="Прикрепить фото"; document.getElementById(`preview-box-${botId}`).classList.remove('has-img'); document.getElementById(`photo-label-${botId}`).classList.remove('file-selected'); bots[botId].photoName=null;
+            const fi = document.getElementById(`photo-input-${botId}`);
+            const nameEl = document.getElementById(`photo-name-${botId}`);
+            const boxEl = document.getElementById(`preview-box-${botId}`);
+            const labelEl = document.getElementById(`photo-label-${botId}`);
+            if(fi) fi.value="";
+            if(nameEl) nameEl.innerText="Прикрепить фото";
+            if(boxEl) boxEl.classList.remove('has-img');
+            if(labelEl) labelEl.classList.remove('file-selected');
+            if(bots[botId]) bots[botId].photoName=null;
         }
 
         async function handleLoginOrUpdate() {
-            const l=document.getElementById('newLogin').value.trim(); const p=document.getElementById('newPass').value.trim(); const i=document.getElementById('newId').value.trim()||'ID';
-            document.getElementById('loginError').innerText = "";
+            const loginEl = document.getElementById('newLogin');
+            const passEl = document.getElementById('newPass');
+            const idEl = document.getElementById('newId');
+            const errorEl = document.getElementById('loginError');
+
+            const l = loginEl ? loginEl.value.trim() : '';
+            const p = passEl ? passEl.value.trim() : '';
+            const i = (idEl ? idEl.value.trim() : '') || 'ID';
+            if(errorEl) errorEl.innerText = "";
+
             if(editingBotId) {
                 const bot = bots[editingBotId];
-                if(bot) { bot.login = l; bot.pass = p; bot.displayId = i; document.getElementById(`tab-${bot.id}`).innerHTML = `<div class="status-dot online"></div> ${i} <span class="tab-close" onclick="closeTab(event, '${bot.id}')"><i class="fa fa-times"></i></span>`; saveSession(); }
+                if(bot) {
+                    bot.login = l; bot.pass = p; bot.displayId = i;
+                    const tabEl = document.getElementById(`tab-${bot.id}`);
+                    if(tabEl) tabEl.innerHTML = `<div class="status-dot online"></div> ${i} <span class="tab-close" onclick="closeTab(event, '${bot.id}')"><i class="fa fa-times"></i></span>`;
+                    saveSession();
+                }
                 closeModal('add-modal'); return;
             }
-            if(checkDuplicate(l, i)) { document.getElementById('loginError').innerText = "Этот аккаунт уже добавлен"; return; }
-            if(await performLogin(l,p,i)) { document.getElementById('newLogin').value=''; document.getElementById('newPass').value=''; closeModal('add-modal'); }
+            if(checkDuplicate(l, i)) { if(errorEl) errorEl.innerText = "Этот аккаунт уже добавлен"; return; }
+            if(await performLogin(l,p,i)) { if(loginEl) loginEl.value=''; if(passEl) passEl.value=''; closeModal('add-modal'); }
         }
 
         async function performLogin(login, pass, displayId) {
@@ -3405,7 +3519,10 @@
                 
                 delete bots[id]; 
             }
-            document.getElementById(`tab-${id}`).remove(); document.getElementById(`ws-${id}`).remove();
+            const tabEl = document.getElementById(`tab-${id}`);
+            const wsEl = document.getElementById(`ws-${id}`);
+            if(tabEl) tabEl.remove();
+            if(wsEl) wsEl.remove();
 
             if(activeTabId === id) {
                 const remainingIds = Object.keys(bots);
@@ -3424,13 +3541,16 @@
 
         function toggleBot(id) {
             const bot = bots[id];
-            const text = document.getElementById(`msg-${id}`).value;
-            if (globalMode === 'chat') { if(bot.isChatRunning) bot.stopChat(); else bot.startChat(text); } 
+            if(!bot) return;
+            const msgEl = document.getElementById(`msg-${id}`);
+            const text = msgEl ? msgEl.value : '';
+            if (globalMode === 'chat') { if(bot.isChatRunning) bot.stopChat(); else bot.startChat(text); }
             else { if(bot.isMailRunning) bot.stopMail(); else bot.startMail(text); }
         }
         function startAll() {
             Object.values(bots).forEach(b => {
-                const text = document.getElementById(`msg-${b.id}`).value;
+                const msgEl = document.getElementById(`msg-${b.id}`);
+                const text = msgEl ? msgEl.value : '';
                 if (globalMode === 'chat') { if(!b.isChatRunning) b.startChat(text); } else { if(!b.isMailRunning) b.startMail(text); }
             });
         }
