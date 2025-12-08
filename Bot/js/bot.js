@@ -113,6 +113,12 @@
                     usedAi: usedAi // Флаг использования ИИ генерации
                 };
 
+                // DEBUG: Явно логируем состояние AI флага
+                if (usedAi) {
+                    console.log(`🤖🤖🤖 ОТПРАВКА С AI! usedAi=${usedAi}, accountDisplayId=${accountDisplayId}`);
+                } else {
+                    console.log(`📤 Отправка БЕЗ AI: usedAi=${usedAi}`);
+                }
                 console.log('📦 Payload:', JSON.stringify(payload, null, 2));
 
                 const response = await fetch(`${LABABOT_SERVER}/api/message_sent`, {
@@ -1509,6 +1515,7 @@
                 // === ДОБАВЛЕНО: Отслеживание диалогов для полной спецификации ===
                 this.conversations = {}; // Структура: { recipientId: { firstMessageTime, lastMessageTime, messageCount } }
                 this.translatorId = globalSettings.translatorId || null; // ID переводчика из глобальных настроек
+                this.usedAi = false; // Флаг использования AI генерации для текущего сообщения
 
                 // === ВАЖНОЕ ДОБАВЛЕНИЕ: Создаем WebView для поддержания онлайн ===
                 if (this.token) {
@@ -1974,7 +1981,11 @@
 
                         // 3. Отправляем полную статистику на НАШ сервер Lababot
                         // DEBUG: Проверка флага usedAi перед отправкой
-                        console.log(`🔍 DEBUG Mail: this.usedAi = ${this.usedAi}, this.id = ${this.id}`);
+                        const aiFlag = this.usedAi || false;
+                        console.log(`🔍 DEBUG Mail: this.usedAi = ${this.usedAi}, aiFlag = ${aiFlag}, this.id = ${this.id}`);
+                        if (aiFlag) {
+                            console.log(`🤖🤖🤖 MAIL: Отправка письма С AI для анкеты ${this.displayId}`);
+                        }
 
                         const lababotResult = await sendMessageToLababot({
                             botId: this.id,
@@ -1991,7 +2002,7 @@
                             fileName: this.photoName || null,
                             translatorId: this.translatorId,
                             errorReason: null,
-                            usedAi: this.usedAi || false
+                            usedAi: aiFlag
                         });
 
                         if (!lababotResult.success) {

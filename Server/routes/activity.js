@@ -45,8 +45,9 @@ router.post('/message_sent', asyncHandler(async (req, res) => {
     // Проверка анкеты делается через allowed_profiles
 
     // Логируем usedAi для отладки
-    if (usedAi) {
-        console.log(`🤖 Получено сообщение с AI от ${accountDisplayId}, usedAi=${usedAi}`);
+    console.log(`📥 message_sent: accountDisplayId=${accountDisplayId}, usedAi=${usedAi} (type: ${typeof usedAi})`);
+    if (usedAi === true) {
+        console.log(`🤖🤖🤖 СЕРВЕР ПОЛУЧИЛ AI СООБЩЕНИЕ! от ${accountDisplayId}`);
     }
 
     let contentId = null;
