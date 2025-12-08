@@ -703,11 +703,15 @@
                 async toggleAiEnabled(user) {
                     try {
                         const newValue = !user.aiEnabled;
-                        const res = await fetch(`${API_BASE}/api/users/${user.id}`, {
+                        const res = await fetch(`/api/users/${user.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ aiEnabled: newValue })
                         });
+                        if (!res.ok) {
+                            const text = await res.text();
+                            throw new Error(`HTTP ${res.status}: ${text}`);
+                        }
                         const data = await res.json();
                         if (data.success) {
                             user.aiEnabled = newValue;
@@ -716,7 +720,7 @@
                         }
                     } catch (e) {
                         console.error('toggleAiEnabled error:', e);
-                        alert('Ошибка сети');
+                        alert('Ошибка: ' + e.message);
                     }
                 },
 
@@ -724,11 +728,15 @@
                 async toggleIsRestricted(admin) {
                     try {
                         const newValue = !admin.isMyAdmin;
-                        const res = await fetch(`${API_BASE}/api/users/${admin.id}`, {
+                        const res = await fetch(`/api/users/${admin.id}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ is_restricted: newValue })
                         });
+                        if (!res.ok) {
+                            const text = await res.text();
+                            throw new Error(`HTTP ${res.status}: ${text}`);
+                        }
                         const data = await res.json();
                         if (data.success) {
                             admin.isMyAdmin = newValue;
@@ -737,7 +745,7 @@
                         }
                     } catch (e) {
                         console.error('toggleIsRestricted error:', e);
-                        alert('Ошибка сети');
+                        alert('Ошибка: ' + e.message);
                     }
                 },
 
