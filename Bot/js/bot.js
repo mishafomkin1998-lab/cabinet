@@ -360,6 +360,104 @@
             });
         }
 
+        // ============= СЕРВЕРНОЕ СОХРАНЕНИЕ СОСТОЯНИЯ АНКЕТЫ =============
+
+        // 9. Загрузка состояния анкеты с сервера
+        async function loadBotStateFromServer(profileId) {
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/bot-state/${profileId}`);
+                const data = await response.json();
+
+                if (data.success && data.exists) {
+                    console.log(`📥 Загружено состояние анкеты ${profileId} с сервера`);
+                    return data.state;
+                }
+                return null;
+            } catch (error) {
+                console.error(`❌ Ошибка загрузки состояния с сервера:`, error);
+                return null;
+            }
+        }
+
+        // 10. Сохранение состояния анкеты на сервер
+        async function saveBotStateToServer(profileId, state) {
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/bot-state/${profileId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(state)
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    console.log(`📤 Состояние анкеты ${profileId} сохранено на сервер`);
+                }
+                return data.success;
+            } catch (error) {
+                console.error(`❌ Ошибка сохранения состояния на сервер:`, error);
+                return false;
+            }
+        }
+
+        // 11. Сохранение состояния ВСЕХ анкет на сервер (вызывается периодически и при закрытии)
+        async function saveAllBotsStateToServer() {
+            const botIds = Object.keys(bots);
+            if (botIds.length === 0) return;
+
+            console.log(`💾 Сохранение состояния ${botIds.length} анкет на сервер...`);
+
+            for (const botId of botIds) {
+                const bot = bots[botId];
+                if (!bot || !bot.displayId) continue;
+
+                // Собираем текущий текст из textarea
+                const textarea = document.getElementById(`msg-${botId}`);
+                const currentText = textarea ? textarea.value : '';
+
+                if (globalMode === 'chat') {
+                    bot.currentChatText = currentText;
+                } else {
+                    bot.currentMailText = currentText;
+                }
+
+                const state = {
+                    currentMailText: bot.currentMailText || '',
+                    currentChatText: bot.currentChatText || '',
+                    lastTplMail: bot.lastTplMail,
+                    lastTplChat: bot.lastTplChat,
+                    mailStats: bot.mailStats,
+                    chatStats: bot.chatStats,
+                    mailHistory: bot.mailHistory,
+                    chatHistory: bot.chatHistory,
+                    mailBlacklist: bot.mailSettings.blacklist || [],
+                    chatBlacklist: bot.chatSettings.blacklist || [],
+                    vipList: bot.vipList || [],
+                    chatSettings: {
+                        rotationHours: bot.chatSettings.rotationHours,
+                        cyclic: bot.chatSettings.cyclic,
+                        currentInviteIndex: bot.chatSettings.currentInviteIndex,
+                        target: bot.chatSettings.target
+                    },
+                    mailSettings: {
+                        auto: bot.mailSettings.auto,
+                        target: bot.mailSettings.target,
+                        photoOnly: bot.mailSettings.photoOnly
+                    },
+                    templatesMail: getBotTemplates(bot.login).mail || [],
+                    templatesChat: getBotTemplates(bot.login).chat || []
+                };
+
+                await saveBotStateToServer(bot.displayId, state);
+            }
+        }
+
+        // Автосохранение на сервер каждые 30 секунд
+        setInterval(() => {
+            if (Object.keys(bots).length > 0) {
+                saveAllBotsStateToServer();
+            }
+        }, 30000);
+
         // === КРИТИЧЕСКИ ВАЖНО: Скрипт "Анти-сон" ===
         const KEEP_ALIVE_SCRIPT = `
             console.log("%c[Lababot] Анти-сон активирован", "color: green; font-weight: bold");
@@ -994,7 +1092,55 @@
                     saveCurrentText(activeTabId);
                 }
                 saveSession();
-                console.log('[beforeunload] Сессия сохранена при закрытии');
+
+                // КРИТИЧНО: Сохраняем на сервер через sendBeacon (синхронно)
+                Object.values(bots).forEach(bot => {
+                    if (!bot || !bot.displayId) return;
+
+                    const textarea = document.getElementById(`msg-${bot.id}`);
+                    const currentText = textarea ? textarea.value : '';
+
+                    if (globalMode === 'chat') {
+                        bot.currentChatText = currentText;
+                    } else {
+                        bot.currentMailText = currentText;
+                    }
+
+                    const state = {
+                        currentMailText: bot.currentMailText || '',
+                        currentChatText: bot.currentChatText || '',
+                        lastTplMail: bot.lastTplMail,
+                        lastTplChat: bot.lastTplChat,
+                        mailStats: bot.mailStats,
+                        chatStats: bot.chatStats,
+                        mailHistory: bot.mailHistory,
+                        chatHistory: bot.chatHistory,
+                        mailBlacklist: bot.mailSettings.blacklist || [],
+                        chatBlacklist: bot.chatSettings.blacklist || [],
+                        vipList: bot.vipList || [],
+                        chatSettings: {
+                            rotationHours: bot.chatSettings.rotationHours,
+                            cyclic: bot.chatSettings.cyclic,
+                            currentInviteIndex: bot.chatSettings.currentInviteIndex,
+                            target: bot.chatSettings.target
+                        },
+                        mailSettings: {
+                            auto: bot.mailSettings.auto,
+                            target: bot.mailSettings.target,
+                            photoOnly: bot.mailSettings.photoOnly
+                        },
+                        templatesMail: getBotTemplates(bot.login).mail || [],
+                        templatesChat: getBotTemplates(bot.login).chat || []
+                    };
+
+                    // sendBeacon гарантирует отправку даже при закрытии
+                    navigator.sendBeacon(
+                        `${LABABOT_SERVER}/api/bot-state/${bot.displayId}`,
+                        new Blob([JSON.stringify(state)], { type: 'application/json' })
+                    );
+                });
+
+                console.log('[beforeunload] Сессия сохранена при закрытии (localStorage + сервер)');
             });
 
             // КРИТИЧНО: Периодическое автосохранение каждые 30 секунд
@@ -1636,14 +1782,16 @@
             createWebview() {
                 const webview = document.createElement('webview');
                 webview.id = `webview-${this.id}`;
-                webview.src = "https://ladadate.com/login"; 
-                webview.partition = `persist:${this.id}`; 
+                webview.src = "https://ladadate.com/login";
+                webview.partition = `persist:${this.id}`;
                 webview.useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+                const self = this;
 
                 webview.addEventListener('dom-ready', () => {
                     // 1. Внедрение скрипта "Анти-сон" (Keep-Alive)
                     webview.executeJavaScript(KEEP_ALIVE_SCRIPT);
-                    
+
                     // 2. Скрипт авто-входа (если токен есть, все равно создаем сессию)
                     const script = `
                         setTimeout(() => {
@@ -1653,7 +1801,7 @@
 
                             if(emailInput && passInput) {
                                 const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                
+
                                 nativeInputValueSetter.call(emailInput, "${this.login}");
                                 emailInput.dispatchEvent(new Event('input', { bubbles: true }));
                                 emailInput.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1668,6 +1816,63 @@
                         }, 2000);
                     `;
                     webview.executeJavaScript(script);
+
+                    // 3. КРИТИЧНО: Скрипт перехвата уведомлений о чатах
+                    setTimeout(() => {
+                        const chatNotificationScript = `
+                            (function() {
+                                // Отслеживаем появление уведомлений в DOM
+                                let lastNotificationCount = 0;
+
+                                function checkChatNotifications() {
+                                    // Ищем индикатор непрочитанных сообщений (обычно в шапке или меню)
+                                    const chatBadge = document.querySelector('.chat-badge, .unread-count, [class*="notification"], [class*="badge"], .messages-counter');
+                                    const chatLink = document.querySelector('a[href*="/chat"], a[href*="/messages"], [class*="chat"]');
+
+                                    if (chatBadge) {
+                                        const count = parseInt(chatBadge.textContent) || 0;
+                                        if (count > lastNotificationCount) {
+                                            console.log('[LABABOT] Обнаружено новое уведомление чата: ' + count);
+                                            // Отправляем сообщение в основное окно
+                                            window.postMessage({ type: 'LABABOT_CHAT_NOTIFICATION', count: count }, '*');
+                                        }
+                                        lastNotificationCount = count;
+                                    }
+
+                                    // Также проверяем звуковые уведомления
+                                    const audioElements = document.querySelectorAll('audio');
+                                    audioElements.forEach(audio => {
+                                        if (!audio._lababotTracked) {
+                                            audio._lababotTracked = true;
+                                            audio.addEventListener('play', () => {
+                                                console.log('[LABABOT] Звук уведомления проигран');
+                                                window.postMessage({ type: 'LABABOT_SOUND_NOTIFICATION' }, '*');
+                                            });
+                                        }
+                                    });
+                                }
+
+                                // Проверяем каждые 2 секунды
+                                setInterval(checkChatNotifications, 2000);
+                                console.log('[LABABOT] Перехват уведомлений активирован');
+                            })();
+                        `;
+                        webview.executeJavaScript(chatNotificationScript);
+                    }, 5000);
+                });
+
+                // Перехват консольных сообщений из webview
+                webview.addEventListener('console-message', (e) => {
+                    if (e.message.includes('[LABABOT]')) {
+                        console.log(`[WebView ${self.displayId}] ${e.message}`);
+
+                        // Если обнаружено уведомление о чате
+                        if (e.message.includes('новое уведомление чата') || e.message.includes('Звук уведомления')) {
+                            console.log(`[${self.displayId}] 🔔 Обнаружено уведомление через WebView!`);
+                            // Принудительно запускаем проверку чатов
+                            self.checkChatSync();
+                        }
+                    }
                 });
 
                 // ВАЖНО: Добавляем webview в скрытый контейнер
@@ -1765,26 +1970,47 @@
                 try {
                     const res = await makeApiRequest(this, 'POST', '/chat-sync', {});
                     const data = res.data;
+
+                    // DEBUG: Полный лог ответа (раз в минуту)
+                    if (!this._lastChatSyncLog || Date.now() - this._lastChatSyncLog > 60000) {
+                        console.log(`[${this.displayId}] 📨 chat-sync ответ:`, JSON.stringify(data, null, 2).substring(0, 500));
+                        this._lastChatSyncLog = Date.now();
+                    }
+
                     if(data) {
                         const currentSessions = data.ChatSessions || [];
                         const unreadSessionsNow = [];
 
                         // DEBUG: Логируем количество сессий
                         if (currentSessions.length > 0) {
-                            console.log(`[${this.displayId}] Chat sessions: ${currentSessions.length}, с непрочитанными: ${currentSessions.filter(s => (s.UnreadMessageCount || 0) > 0).length}`);
+                            const unreadSessions = currentSessions.filter(s => (s.UnreadMessageCount || 0) > 0);
+                            if (unreadSessions.length > 0) {
+                                console.log(`[${this.displayId}] 💬 Chat sessions: ${currentSessions.length}, с непрочитанными: ${unreadSessions.length}`);
+                            }
                         }
 
                         for(const session of currentSessions) {
                             const sessionId = session.Id || session.ChatId;
                             const unreadCount = session.UnreadMessageCount || 0;
-                            const partnerId = session.TargetUserId || session.PartnerId || "Unknown";
-                            const partnerName = session.Name || "Неизвестный";
+                            const partnerId = session.TargetUserId || session.PartnerId || session.UserId || "Unknown";
+                            const partnerName = session.Name || session.UserName || "Неизвестный";
+
+                            // ВАЖНО: Также проверяем LastMessage на новые сообщения
+                            const lastMessageId = session.LastMessageId || session.LastMessage?.Id || 0;
 
                             if (unreadCount > 0) {
                                 unreadSessionsNow.push(sessionId);
 
-                                if (!this.unreadChatSessions.includes(sessionId)) {
-                                    console.log(`[${this.displayId}] 💬 НОВЫЙ ЧАТ: ${partnerName} (ID: ${partnerId}), непрочитано: ${unreadCount}`);
+                                // Проверяем новый sessionId ИЛИ новый lastMessageId
+                                const isNewSession = !this.unreadChatSessions.includes(sessionId);
+                                const isNewMessage = lastMessageId > (this._lastMessageIds?.[sessionId] || 0);
+
+                                if (isNewSession || isNewMessage) {
+                                    console.log(`[${this.displayId}] 💬 НОВЫЙ ЧАТ: ${partnerName} (ID: ${partnerId}), непрочитано: ${unreadCount}, lastMsgId: ${lastMessageId}`);
+
+                                    // Сохраняем lastMessageId
+                                    if (!this._lastMessageIds) this._lastMessageIds = {};
+                                    this._lastMessageIds[sessionId] = lastMessageId;
 
                                     // Отправляем входящее сообщение чата на сервер статистики
                                     sendIncomingMessageToLababot({
@@ -1792,11 +2018,12 @@
                                         profileId: this.displayId,
                                         manId: partnerId,
                                         manName: partnerName,
-                                        messageId: `chat_${sessionId}`,
+                                        messageId: `chat_${sessionId}_${lastMessageId}`,
                                         type: 'chat'
                                     });
 
                                     Logger.add(`💬 Новое сообщение в чате с <b>${partnerName}</b>`, 'chat', this.id, { partnerId, partnerName });
+                                    playSound('chat');
                                 }
                             }
                         }
@@ -3346,18 +3573,107 @@
             const e=document.getElementById('loginError'); const s=document.getElementById('loginSpinner'); if(s) s.style.display='inline-block';
             try {
                 const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: login, Password: pass });
-                
+
                 if(res.data.Token) {
                     const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
                     const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
-                    bots[bid] = bot; createInterface(bot); selectTab(bid); saveSession(); 
-                    
+                    bots[bid] = bot; createInterface(bot); selectTab(bid);
+
+                    // КРИТИЧНО: Загружаем состояние с сервера
+                    const serverState = await loadBotStateFromServer(displayId);
+                    if (serverState) {
+                        console.log(`📥 Применяю серверное состояние для ${displayId}`);
+
+                        // Применяем текст
+                        bot.currentMailText = serverState.currentMailText || '';
+                        bot.currentChatText = serverState.currentChatText || '';
+
+                        // Применяем выбранные шаблоны
+                        if (serverState.lastTplMail !== null && serverState.lastTplMail !== undefined) {
+                            bot.lastTplMail = serverState.lastTplMail;
+                        }
+                        if (serverState.lastTplChat !== null && serverState.lastTplChat !== undefined) {
+                            bot.lastTplChat = serverState.lastTplChat;
+                        }
+
+                        // КРИТИЧНО: Применяем статистику
+                        if (serverState.mailStats) {
+                            bot.mailStats = { ...serverState.mailStats, waiting: 0 };
+                        }
+                        if (serverState.chatStats) {
+                            bot.chatStats = { ...serverState.chatStats, waiting: 0 };
+                        }
+
+                        // КРИТИЧНО: Применяем историю
+                        if (serverState.mailHistory) {
+                            bot.mailHistory = {
+                                sent: [...(serverState.mailHistory.sent || [])],
+                                errors: [...(serverState.mailHistory.errors || [])],
+                                waiting: []
+                            };
+                        }
+                        if (serverState.chatHistory) {
+                            bot.chatHistory = {
+                                sent: [...(serverState.chatHistory.sent || [])],
+                                errors: [...(serverState.chatHistory.errors || [])],
+                                waiting: []
+                            };
+                        }
+
+                        // КРИТИЧНО: Применяем черные списки
+                        if (serverState.mailBlacklist && serverState.mailBlacklist.length > 0) {
+                            bot.mailSettings.blacklist = [...serverState.mailBlacklist];
+                        }
+                        if (serverState.chatBlacklist && serverState.chatBlacklist.length > 0) {
+                            bot.chatSettings.blacklist = [...serverState.chatBlacklist];
+                        }
+
+                        // VIP список
+                        if (serverState.vipList && serverState.vipList.length > 0) {
+                            bot.vipList = [...serverState.vipList];
+                        }
+
+                        // Настройки чата
+                        if (serverState.chatSettings) {
+                            bot.chatSettings.rotationHours = serverState.chatSettings.rotationHours || 3;
+                            bot.chatSettings.cyclic = serverState.chatSettings.cyclic || false;
+                            bot.chatSettings.currentInviteIndex = serverState.chatSettings.currentInviteIndex || 0;
+                            bot.chatSettings.target = serverState.chatSettings.target || 'payers';
+                        }
+
+                        // Настройки рассылки
+                        if (serverState.mailSettings) {
+                            bot.mailSettings.auto = serverState.mailSettings.auto || false;
+                            bot.mailSettings.target = serverState.mailSettings.target || 'online';
+                            bot.mailSettings.photoOnly = serverState.mailSettings.photoOnly || false;
+                        }
+
+                        // Шаблоны с сервера (если есть)
+                        if (serverState.templatesMail && serverState.templatesMail.length > 0) {
+                            if (!botTemplates[login]) botTemplates[login] = { mail: [], chat: [] };
+                            botTemplates[login].mail = [...serverState.templatesMail];
+                        }
+                        if (serverState.templatesChat && serverState.templatesChat.length > 0) {
+                            if (!botTemplates[login]) botTemplates[login] = { mail: [], chat: [] };
+                            botTemplates[login].chat = [...serverState.templatesChat];
+                        }
+
+                        // Обновляем интерфейс с сохранённым текстом
+                        updateInterfaceForMode(bid, true);
+                        bot.updateUI();
+                        renderBlacklist(bid);
+
+                        console.log(`✅ Состояние анкеты ${displayId} восстановлено с сервера: mailStats=${JSON.stringify(bot.mailStats)}, blacklist=${bot.mailSettings.blacklist.length}`);
+                    }
+
+                    saveSession();
+
                     // Отправляем первый heartbeat после создания бота
                     setTimeout(() => sendHeartbeatToLababot(bid, displayId, 'online'), 2000);
                     return true;
                 }
-            } catch(err) { 
-                if(e) e.innerText = err.response ? (err.response.data.Error || `Ошибка входа: ${err.response.status}`) : "Ошибка входа. Проверьте Proxy для Ladadate."; 
+            } catch(err) {
+                if(e) e.innerText = err.response ? (err.response.data.Error || `Ошибка входа: ${err.response.status}`) : "Ошибка входа. Проверьте Proxy для Ladadate.";
             }
             finally { if(s) s.style.display='none'; }
             return false;

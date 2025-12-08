@@ -20,7 +20,8 @@ const {
     statsRoutes,
     dashboardRoutes,
     favoriteTemplatesRoutes,
-    billingRoutes
+    billingRoutes,
+    botStateRoutes
 } = require('./routes');
 
 const app = express();
@@ -108,6 +109,7 @@ app.use('/api/stats', statsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/favorite-templates', favoriteTemplatesRoutes);
 app.use('/api/billing', billingRoutes);
+app.use('/api/bot-state', botStateRoutes);
 
 // Activity маршруты (с разными префиксами для совместимости)
 app.use('/api', activityRoutes);
