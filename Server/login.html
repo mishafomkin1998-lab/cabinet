@@ -392,7 +392,8 @@
                             username: data.user.username,
                             role: data.user.role,
                             salary: data.user.salary,
-                            isRestricted: data.user.isRestricted,
+                            isRestricted: data.user.isRestricted || false,
+                            aiEnabled: data.user.aiEnabled || false,
                             loggedIn: true,
                             loginTime: new Date().toISOString()
                         };

@@ -550,8 +550,8 @@
                                                             </div>
                                                         </div>
                                                         <div class="flex items-center gap-1">
-                                                            <!-- AI toggle -->
-                                                            <label class="flex items-center gap-1 px-2 py-1 rounded bg-gray-50 cursor-pointer" @click.stop>
+                                                            <!-- AI toggle (только если у админа включен AI) -->
+                                                            <label x-show="admin.aiEnabled" class="flex items-center gap-1 px-2 py-1 rounded bg-gray-50 cursor-pointer" @click.stop>
                                                                 <input type="checkbox" :checked="translator.aiEnabled" @change="toggleAiEnabled(translator)" class="w-3.5 h-3.5 text-purple-600 rounded">
                                                                 <span class="text-xs text-gray-500">AI</span>
                                                             </label>
@@ -670,8 +670,8 @@
                                             </div>
                                         </div>
                                         <div class="flex items-center gap-1">
-                                            <!-- AI toggle -->
-                                            <label class="flex items-center gap-1 px-2 py-1 rounded bg-white/50 cursor-pointer">
+                                            <!-- AI toggle (только если у текущего админа включен AI) -->
+                                            <label x-show="currentUser.aiEnabled" class="flex items-center gap-1 px-2 py-1 rounded bg-white/50 cursor-pointer">
                                                 <input type="checkbox" :checked="translator.aiEnabled" @change="toggleAiEnabled(translator)" class="w-4 h-4 text-purple-600 rounded">
                                                 <span class="text-xs text-gray-600">AI</span>
                                             </label>

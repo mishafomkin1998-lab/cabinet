@@ -324,20 +324,26 @@ router.delete('/:profileId', async (req, res) => {
 
 /**
  * GET /api/profiles/:profileId/ai-status
- * Проверяет, включен ли AI для анкеты (по флагу ai_enabled у переводчика)
+ * Проверяет, включен ли AI для анкеты
+ * AI доступен только если включен И у переводчика И у его админа
  */
 router.get('/:profileId/ai-status', async (req, res) => {
     const { profileId } = req.params;
     try {
-        // Получаем анкету и её переводчика
+        // Получаем анкету, переводчика и его админа
         const result = await pool.query(`
             SELECT
                 ap.profile_id,
                 ap.assigned_translator_id,
-                u.ai_enabled,
-                u.username as translator_name
+                ap.assigned_admin_id,
+                t.ai_enabled as translator_ai_enabled,
+                t.username as translator_name,
+                t.owner_id as translator_owner_id,
+                a.ai_enabled as admin_ai_enabled,
+                a.username as admin_name
             FROM allowed_profiles ap
-            LEFT JOIN users u ON ap.assigned_translator_id = u.id
+            LEFT JOIN users t ON ap.assigned_translator_id = t.id
+            LEFT JOIN users a ON t.owner_id = a.id
             WHERE ap.profile_id = $1
         `, [profileId]);
 
@@ -352,13 +358,36 @@ router.get('/:profileId/ai-status', async (req, res) => {
             return res.json({ success: true, aiEnabled: false, reason: 'no_translator' });
         }
 
-        // Возвращаем статус AI переводчика
+        // Проверяем AI у админа (если есть)
+        if (row.translator_owner_id && row.admin_ai_enabled !== true) {
+            return res.json({
+                success: true,
+                aiEnabled: false,
+                reason: 'disabled_by_admin',
+                translatorId: row.assigned_translator_id,
+                translatorName: row.translator_name,
+                adminName: row.admin_name
+            });
+        }
+
+        // Проверяем AI у переводчика
+        if (row.translator_ai_enabled !== true) {
+            return res.json({
+                success: true,
+                aiEnabled: false,
+                reason: 'disabled_for_translator',
+                translatorId: row.assigned_translator_id,
+                translatorName: row.translator_name
+            });
+        }
+
+        // AI включен и у админа и у переводчика
         res.json({
             success: true,
-            aiEnabled: row.ai_enabled === true,
+            aiEnabled: true,
             translatorId: row.assigned_translator_id,
             translatorName: row.translator_name,
-            reason: row.ai_enabled ? 'enabled' : 'disabled_by_admin'
+            reason: 'enabled'
         });
     } catch (e) {
         console.error('AI status check error:', e.message);
