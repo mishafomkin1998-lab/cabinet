@@ -1748,22 +1748,29 @@
             async checkChatSync() {
                 if (!this.token || !this.isMonitoring) return;
                 try {
-                    const res = await makeApiRequest(this, 'POST', '/chat-sync', {}); 
+                    const res = await makeApiRequest(this, 'POST', '/chat-sync', {});
                     const data = res.data;
                     if(data) {
                         const currentSessions = data.ChatSessions || [];
                         const unreadSessionsNow = [];
-                        
+
+                        // DEBUG: Логируем количество сессий
+                        if (currentSessions.length > 0) {
+                            console.log(`[${this.displayId}] Chat sessions: ${currentSessions.length}, с непрочитанными: ${currentSessions.filter(s => (s.UnreadMessageCount || 0) > 0).length}`);
+                        }
+
                         for(const session of currentSessions) {
                             const sessionId = session.Id || session.ChatId;
-                            const unreadCount = session.UnreadMessageCount || 0; 
+                            const unreadCount = session.UnreadMessageCount || 0;
                             const partnerId = session.TargetUserId || session.PartnerId || "Unknown";
                             const partnerName = session.Name || "Неизвестный";
-                            
+
                             if (unreadCount > 0) {
                                 unreadSessionsNow.push(sessionId);
 
                                 if (!this.unreadChatSessions.includes(sessionId)) {
+                                    console.log(`[${this.displayId}] 💬 НОВЫЙ ЧАТ: ${partnerName} (ID: ${partnerId}), непрочитано: ${unreadCount}`);
+
                                     // Отправляем входящее сообщение чата на сервер статистики
                                     sendIncomingMessageToLababot({
                                         botId: this.id,
@@ -1778,10 +1785,12 @@
                                 }
                             }
                         }
-                        
+
                         this.unreadChatSessions = unreadSessionsNow;
                     }
-                } catch(e) {}
+                } catch(e) {
+                    console.error(`[${this.displayId}] Ошибка checkChatSync:`, e.message || e);
+                }
                 finally {
                      const nextRun = Math.floor(Math.random() * (7000 - 3000 + 1)) + 3000;
                      if(this.isMonitoring) setTimeout(() => this.checkChatSync(), nextRun);
