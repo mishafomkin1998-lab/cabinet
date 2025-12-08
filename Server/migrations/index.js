@@ -338,6 +338,8 @@ async function initDatabase() {
         `);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_billing_history_admin ON billing_history(admin_id)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_billing_history_date ON billing_history(created_at)`);
+        // Разрешаем NULL для admin_id (чтобы сохранять историю при удалении админа)
+        await pool.query(`ALTER TABLE billing_history ALTER COLUMN admin_id DROP NOT NULL`);
         await fixSerialSequence('billing_history');
 
         // 18. История оплаты анкет
