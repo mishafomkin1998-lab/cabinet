@@ -113,10 +113,10 @@ const LOCALES = {
             commentCol: 'Комментарий',
             notAssigned: 'Не назначен',
             profileStatuses: {
-                online: 'Свободна',
-                working: 'В работе',
-                offline: 'Оффлайн',
-                inactive: 'Неактивна'
+                online: 'Online',
+                working: 'Online',
+                offline: 'Offline',
+                inactive: 'Offline'
             }
         },
 
@@ -430,10 +430,10 @@ const LOCALES = {
             commentCol: 'Comment',
             notAssigned: 'Not assigned',
             profileStatuses: {
-                online: 'Available',
-                working: 'Working',
+                online: 'Online',
+                working: 'Online',
                 offline: 'Offline',
-                inactive: 'Inactive'
+                inactive: 'Offline'
             }
         },
 

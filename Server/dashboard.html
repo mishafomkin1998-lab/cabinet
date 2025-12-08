@@ -914,7 +914,7 @@
                                                   x-text="getStatusText(account.status)">
                                             </span>
                                         </td>
-                                        <td class="py-2 px-3 text-gray-500" x-text="account.lastOnline"></td>
+                                        <td class="py-2 px-3 text-gray-500" x-text="(account.status === 'online' || account.status === 'working') ? '' : account.lastOnline"></td>
                                         <td class="py-2 px-3">
                                             <span class="px-2 py-0.5 rounded text-xs"
                                                   :class="account.incoming > 0 ? 'bg-white text-green-600 font-medium shadow-sm' : 'bg-gray-100 text-gray-400'"
@@ -966,12 +966,6 @@
                                         </td>
                                         <td class="py-2 px-3">
                                             <div class="flex items-center space-x-2">
-                                                <button @click="toggleAccountAccess(account)"
-                                                        class="p-1 rounded hover:bg-gray-100"
-                                                        :class="account.paused ? 'text-green-500 hover:text-green-700' : 'text-gray-500 hover:text-gray-700'"
-                                                        :title="account.paused ? 'Запустить' : 'Остановить'">
-                                                    <i class="fas" :class="account.paused ? 'fa-play' : 'fa-pause'"></i>
-                                                </button>
                                                 <button @click="deleteAccount(account)"
                                                         class="p-1 rounded text-red-500 hover:text-red-700 hover:bg-red-50"
                                                         title="Удалить">
