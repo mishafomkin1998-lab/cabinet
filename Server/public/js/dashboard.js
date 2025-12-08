@@ -273,6 +273,8 @@
                     await this.loadAllData();
                     // Автообновление каждые 30 секунд
                     setInterval(() => this.loadDashboardStats(), 30000);
+                    // Очищаем поле поиска после загрузки (против автозаполнения браузера)
+                    setTimeout(() => { this.searchQuery = ''; }, 200);
                 },
 
                 // Инициализация Flatpickr календарей
@@ -351,8 +353,7 @@
                     try {
                         const loadPromises = [
                             this.loadDashboardStats(),
-                            this.loadAccounts(),
-                            this.loadBotsStatus(),
+                            this.loadAccounts().then(() => this.loadBotsStatus()), // Боты после анкет!
                             this.loadTeam(),
                             this.loadRecentActivity(),
                             this.loadFavoriteTemplates(),
@@ -405,8 +406,7 @@
                             this.loadHourlyActivity(),
                             this.loadTranslatorStats(),
                             this.loadRecentActivity(),
-                            this.loadAccounts(),
-                            this.loadBotsStatus()
+                            this.loadAccounts().then(() => this.loadBotsStatus()) // Боты после анкет!
                         ]);
                         console.log('✅ Статистика обновлена');
                     } catch (e) {
@@ -691,6 +691,12 @@
                     this.activeMenu = menu;
                     this.activeSubmenu = 'general';
                     window.location.hash = menu;
+                    // Очищаем поиск при переходе на вкладку Анкеты
+                    if (menu === 'accounts') {
+                        this.searchQuery = '';
+                        // Дополнительная очистка через задержку (против автозаполнения браузера)
+                        setTimeout(() => { this.searchQuery = ''; }, 100);
+                    }
                 },
                 
                 setActiveSubmenu(submenu) {
