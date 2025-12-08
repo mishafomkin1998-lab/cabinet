@@ -475,38 +475,32 @@
                             this.botsStatus = data.summary;
 
                             // Группируем по botId чтобы получить уникальные боты
-                            // Показываем только активные боты (heartbeat за последний час)
+                            // Показываем онлайн боты (статус online или idle от сервера)
                             const botsMap = {};
-                            const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
                             data.bots.forEach(b => {
                                 const botId = b.botId || b.bot_id || b.profileId || b.profile_id;
                                 if (botId && botId !== 'null' && botId !== 'undefined') {
-                                    const lastHeartbeat = b.lastHeartbeat ? new Date(b.lastHeartbeat).getTime() : 0;
-                                    const isRecentlyActive = lastHeartbeat > oneHourAgo;
-
-                                    // Показываем только недавно активные боты
-                                    if (!isRecentlyActive) return;
-
                                     const isActive = b.status === 'online' || b.status === 'active' || b.status === 'idle';
+
+                                    // Показываем только активные (сервер уже проверил heartbeat)
+                                    if (!isActive) return;
 
                                     if (!botsMap[botId]) {
                                         botsMap[botId] = {
                                             id: botId,
-                                            name: b.name || `Бот ${botId}`,
+                                            name: b.name || `Бот ${botId.substring(0, 8)}...`,
                                             icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
-                                            status: isActive ? 'active' : 'inactive',
+                                            status: 'active',
                                             os: b.platform || 'Unknown',
                                             ip: b.ip || '-',
                                             version: b.version || '-',
                                             lastHeartbeat: b.lastHeartbeat,
-                                            profilesCount: b.profilesCount || 1
+                                            profilesCount: 1,
+                                            profileId: b.profileId || b.profile_id
                                         };
                                     } else {
                                         botsMap[botId].profilesCount = (botsMap[botId].profilesCount || 0) + 1;
-                                        if (isActive) {
-                                            botsMap[botId].status = 'active';
-                                        }
                                     }
                                 }
                             });

@@ -315,14 +315,14 @@
 
                 <!-- Bots and work time -->
                 <div class="grid gap-6 mb-8" :class="currentUser.role === 'translator' ? 'grid-cols-1' : 'grid-cols-2'">
-                    <!-- Статус ботов - только для директора -->
+                    <!-- Статус анкет - только для директора -->
                     <div x-show="currentUser.role === 'director'" class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-4" x-text="t('stats.botsStatus')"></h3>
-                        <div class="text-3xl font-bold leading-tight mb-3" x-text="bots.length">0</div>
+                        <h3 class="text-lg font-bold mb-4">Статус анкет</h3>
+                        <div class="text-3xl font-bold leading-tight mb-3 text-green-600" x-text="botsStatus.online || 0">0</div>
                         <div class="text-sm text-gray-500 flex gap-3 flex-wrap">
-                            <span class="text-green-600"><span x-text="t('stats.online')"></span>: <span x-text="botsStatus.online"></span></span>
-                            <span class="text-yellow-500"><span x-text="t('stats.idle')"></span>: <span x-text="botsStatus.idle"></span></span>
-                            <span class="text-red-500"><span x-text="t('stats.offline')"></span>: <span x-text="botsStatus.offline + botsStatus.never_connected"></span></span>
+                            <span class="text-green-600">Online: <span x-text="botsStatus.online || 0"></span></span>
+                            <span class="text-yellow-500">Idle: <span x-text="botsStatus.idle || 0"></span></span>
+                            <span class="text-gray-500">Offline: <span x-text="(botsStatus.offline || 0) + (botsStatus.never_connected || 0)"></span></span>
                         </div>
                     </div>
 
