@@ -194,7 +194,7 @@ const api = {
 
     stats: {
         async dashboard(userId, role, params = {}) {
-            return api.get('/api/stats/dashboard', { userId, role, ...params });
+            return api.get('/api/dashboard', { userId, role, ...params });
         },
 
         async hourlyActivity(userId, role, days = 7) {
