@@ -114,6 +114,10 @@
                 // Последняя активность
                 recentActivity: [],
 
+                // История ошибок
+                errorLogs: [],
+                errorLogsOffset: 0,
+
                 // Избранные шаблоны
                 favoriteTemplates: [],
 
@@ -367,9 +371,10 @@
                             this.loadControlSettings()
                         ];
 
-                        // Загружаем финансовые данные только для директора
+                        // Загружаем финансовые данные и ошибки только для директора
                         if (this.currentUser.role === 'director') {
                             loadPromises.push(this.loadFinanceData());
+                            loadPromises.push(this.loadErrorLogs());
                         }
 
                         await Promise.all(loadPromises);
@@ -601,6 +606,51 @@
                             this.recentActivity = data.activity;
                         }
                     } catch (e) { console.error('loadRecentActivity error:', e); }
+                },
+
+                // Загрузка истории ошибок
+                async loadErrorLogs(reset = true) {
+                    try {
+                        if (reset) {
+                            this.errorLogsOffset = 0;
+                            this.errorLogs = [];
+                        }
+                        const res = await fetch(`${API_BASE}/api/error_logs?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=20&offset=${this.errorLogsOffset}`);
+                        const data = await res.json();
+                        if (data.success) {
+                            if (reset) {
+                                this.errorLogs = data.logs;
+                            } else {
+                                this.errorLogs = [...this.errorLogs, ...data.logs];
+                            }
+                        }
+                    } catch (e) { console.error('loadErrorLogs error:', e); }
+                },
+
+                // Загрузить больше ошибок
+                async loadMoreErrors() {
+                    this.errorLogsOffset += 20;
+                    await this.loadErrorLogs(false);
+                },
+
+                // Форматирование времени ошибки
+                formatErrorTime(timestamp) {
+                    if (!timestamp) return '';
+                    const date = new Date(timestamp);
+                    const now = new Date();
+                    const diff = now - date;
+
+                    // Сегодня - показываем время
+                    if (diff < 24 * 60 * 60 * 1000 && date.getDate() === now.getDate()) {
+                        return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                    }
+                    // Вчера
+                    if (diff < 48 * 60 * 60 * 1000) {
+                        return 'Вчера ' + date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                    }
+                    // Иначе дата
+                    return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + ' ' +
+                           date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
                 },
 
                 async loadFavoriteTemplates() {
