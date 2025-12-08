@@ -68,6 +68,13 @@
             return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
         }
 
+        // Форматирование таймера для кнопки Стоп (прошедшее время с момента startTime)
+        function formatElapsedTimer(startTime) {
+            if (!startTime) return '00:00:00';
+            const elapsed = Date.now() - startTime;
+            return millisecondsToInterval(elapsed) || '00:00:00';
+        }
+
         // 1. Функция отправки сообщения на Lababot сервер (ПОЛНАЯ СПЕЦИФИКАЦИЯ)
         async function sendMessageToLababot(params) {
             // Параметры: botId, accountDisplayId, recipientId, type, textContent, status,
@@ -934,13 +941,29 @@
             document.removeEventListener('mouseup', stopTabDrag);
         }
 
-        window.onload = async function() { 
-            restoreSession(); 
-            loadGlobalSettingsUI(); 
+        window.onload = async function() {
+            restoreSession();
+            loadGlobalSettingsUI();
             toggleExtendedFeatures();
             initHotkeys();
             initTooltips();
-            
+
+            // Глобальный таймер для обновления кнопок Стоп каждую секунду
+            setInterval(() => {
+                Object.values(bots).forEach(bot => {
+                    const isChat = globalMode === 'chat';
+                    const running = isChat ? bot.isChatRunning : bot.isMailRunning;
+                    if (running) {
+                        const btn = document.getElementById(`btn-start-${bot.id}`);
+                        if (btn) {
+                            const startTime = isChat ? bot.chatStartTime : bot.mailStartTime;
+                            const timerText = formatElapsedTimer(startTime);
+                            btn.innerHTML = `<i class="fa fa-stop"></i> ${timerText}`;
+                        }
+                    }
+                });
+            }, 1000);
+
             document.addEventListener('click', (e) => {
                 if(!e.target.closest('.ai-container')) {
                     document.querySelectorAll('.ai-options').forEach(el => el.classList.remove('show'));
@@ -1462,18 +1485,20 @@
                 
                 this.lastTplMail = null; 
                 this.lastTplChat = null;
-                this.isMailRunning = false; 
+                this.isMailRunning = false;
                 this.mailTimeout = null;
                 this.mailStats = { sent: 0, errors: 0, waiting: 0 };
                 this.mailHistory = { sent: [], errors: [], waiting: [] };
-                this.mailSettings = { target: 'online', speed: 'smart', blacklist: [], photoOnly: false, auto: false }; 
+                this.mailSettings = { target: 'online', speed: 'smart', blacklist: [], photoOnly: false, auto: false };
                 this.photoName = null;
+                this.mailStartTime = null; // Время старта рассылки для таймера
 
-                this.isChatRunning = false; 
+                this.isChatRunning = false;
                 this.chatTimeout = null;
                 this.chatStats = { sent: 0, errors: 0, waiting: 0 };
                 this.chatHistory = { sent: [], errors: [], waiting: [] };
-                this.chatSettings = { target: 'payers', speed: 'smart', blacklist: [], rotationHours: 3, cyclic: false, currentInviteIndex: 0, rotationStartTime: 0 }; 
+                this.chatSettings = { target: 'payers', speed: 'smart', blacklist: [], rotationHours: 3, cyclic: false, currentInviteIndex: 0, rotationStartTime: 0 };
+                this.chatStartTime = null; // Время старта чата для таймера 
                 
                 this.vipList = []; 
                 this.vipStatus = {}; 
@@ -1825,6 +1850,7 @@
                 }
 
                 this.isMailRunning = true;
+                this.mailStartTime = Date.now(); // Запоминаем время старта для таймера
                 this.updateUI();
                 this.log(`🚀 MAIL Started`);
                 this.scheduleNextMail(text, 0);
@@ -1832,6 +1858,7 @@
 
             stopMail() {
                 this.isMailRunning = false;
+                this.mailStartTime = null; // Сбрасываем таймер
                 clearTimeout(this.mailTimeout);
                 this.log("⏹ MAIL Stopped");
                 this.updateUI();
@@ -2200,6 +2227,7 @@
 
                 if (this.chatSettings.rotationStartTime === 0) this.chatSettings.rotationStartTime = Date.now();
                 this.isChatRunning = true;
+                this.chatStartTime = Date.now(); // Запоминаем время старта для таймера
                 this.updateUI();
                 this.log(`🚀 CHAT Started`);
                 this.scheduleNextChat(fullText, 0);
@@ -2207,6 +2235,7 @@
             }
             stopChat() {
                 this.isChatRunning = false;
+                this.chatStartTime = null; // Сбрасываем таймер
                 clearTimeout(this.chatTimeout);
                 this.log("⏹ CHAT Stopped");
                 this.updateUI();
@@ -2542,12 +2571,14 @@
             updateUI() {
                 const isChat = globalMode === 'chat';
                 const running = isChat ? this.isChatRunning : this.isMailRunning;
+                const startTime = isChat ? this.chatStartTime : this.mailStartTime;
                 const stats = isChat ? this.chatStats : this.mailStats;
                 const btn = document.getElementById(`btn-start-${this.id}`);
                 const dot = document.querySelector(`#tab-${this.id} .status-dot`);
                 if(btn) {
                     if(running) {
-                        btn.innerHTML = `<i class="fa fa-stop"></i> Стоп`;
+                        const timerText = formatElapsedTimer(startTime);
+                        btn.innerHTML = `<i class="fa fa-stop"></i> ${timerText}`;
                         btn.classList.replace('btn-primary', 'btn-danger');
                         if(dot) dot.style.boxShadow = "0 0 8px #28a745";
                     } else {
