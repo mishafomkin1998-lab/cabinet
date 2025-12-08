@@ -1699,12 +1699,31 @@
                 
                 <div>
                     <label class="block text-sm font-medium mb-2">Комментарий</label>
-                    <input type="text" 
+                    <input type="text"
                            class="glass w-full px-4 py-3 rounded-xl"
                            placeholder="Общий комментарий для всех анкет"
                            x-model="newAccountComment">
                 </div>
-                
+
+                <!-- Назначить кому (только для директора) -->
+                <div x-show="currentUser.role === 'director'">
+                    <label class="block text-sm font-medium mb-2">Назначить кому (опционально)</label>
+                    <select x-model="newAccountAssignTo" class="glass w-full px-4 py-3 rounded-xl">
+                        <option value="">— Не назначать —</option>
+                        <optgroup label="Админы">
+                            <template x-for="admin in admins" :key="'admin_' + admin.id">
+                                <option :value="'admin_' + admin.id" x-text="admin.name"></option>
+                            </template>
+                        </optgroup>
+                        <optgroup label="Переводчики">
+                            <template x-for="translator in allTranslators" :key="'translator_' + translator.id">
+                                <option :value="'translator_' + translator.id" x-text="translator.name + (translator.adminName ? ' (' + translator.adminName + ')' : '')"></option>
+                            </template>
+                        </optgroup>
+                    </select>
+                    <p class="text-sm text-gray-500 mt-1">Выберите админа или переводчика для назначения анкет</p>
+                </div>
+
                 <div class="flex justify-end space-x-3 pt-4">
                     <button @click="showAddAccountModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
                         Отмена

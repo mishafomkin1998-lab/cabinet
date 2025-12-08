@@ -138,7 +138,7 @@ router.get('/', async (req, res) => {
 
 // Массовое добавление анкет
 router.post('/bulk', async (req, res) => {
-    const { profiles, note, adminId, userId, userName } = req.body;
+    const { profiles, note, adminId, translatorId, userId, userName } = req.body;
     try {
         for (const id of profiles) {
             if (id.trim().length > 2) {
@@ -159,8 +159,8 @@ router.post('/bulk', async (req, res) => {
                     }
 
                     await pool.query(
-                        `INSERT INTO allowed_profiles (profile_id, note, assigned_admin_id, paid_until) VALUES ($1, $2, $3, $4)`,
-                        [profileId, note, adminId || null, paidUntil]
+                        `INSERT INTO allowed_profiles (profile_id, note, assigned_admin_id, assigned_translator_id, paid_until) VALUES ($1, $2, $3, $4, $5)`,
+                        [profileId, note, adminId || null, translatorId || null, paidUntil]
                     );
                     // Логируем добавление
                     const logNote = paidUntil
@@ -168,10 +168,18 @@ router.post('/bulk', async (req, res) => {
                         : (note || 'Добавлена новая анкета');
                     await logProfileAction(profileId, 'add', userId, userName, logNote);
                 } else {
-                    await pool.query(
-                        `UPDATE allowed_profiles SET assigned_admin_id = $1 WHERE profile_id = $2`,
-                        [adminId || null, profileId]
-                    );
+                    // Обновляем существующую анкету
+                    if (translatorId) {
+                        await pool.query(
+                            `UPDATE allowed_profiles SET assigned_admin_id = $1, assigned_translator_id = $2 WHERE profile_id = $3`,
+                            [adminId || null, translatorId, profileId]
+                        );
+                    } else if (adminId) {
+                        await pool.query(
+                            `UPDATE allowed_profiles SET assigned_admin_id = $1 WHERE profile_id = $2`,
+                            [adminId, profileId]
+                        );
+                    }
                 }
             }
         }

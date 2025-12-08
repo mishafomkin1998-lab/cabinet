@@ -175,6 +175,7 @@
 
                 newAccountIds: '',
                 newAccountComment: '',
+                newAccountAssignTo: '', // формат: 'admin_123' или 'translator_456' или ''
 
                 newAdmin: {
                     id: null,
@@ -1241,6 +1242,25 @@
                         return;
                     }
 
+                    // Парсим выбранного назначаемого (admin_123 или translator_456)
+                    let assignAdminId = this.currentUser.role === 'director' ? null : this.currentUser.id;
+                    let assignTranslatorId = null;
+
+                    if (this.newAccountAssignTo) {
+                        const [type, id] = this.newAccountAssignTo.split('_');
+                        if (type === 'admin') {
+                            assignAdminId = parseInt(id);
+                            assignTranslatorId = null;
+                        } else if (type === 'translator') {
+                            assignTranslatorId = parseInt(id);
+                            // Найдём админа этого переводчика
+                            const translator = this.allTranslators.find(t => t.id === parseInt(id));
+                            if (translator && translator.adminId) {
+                                assignAdminId = translator.adminId;
+                            }
+                        }
+                    }
+
                     // Отправляем на сервер
                     fetch(`${API_BASE}/api/profiles/bulk`, {
                         method: 'POST',
@@ -1248,7 +1268,8 @@
                         body: JSON.stringify({
                             profiles: ids,
                             note: this.newAccountComment || '',
-                            adminId: this.currentUser.role === 'director' ? null : this.currentUser.id,
+                            adminId: assignAdminId,
+                            translatorId: assignTranslatorId,
                             userId: this.currentUser.id,
                             userName: this.currentUser.username
                         })
@@ -1258,6 +1279,7 @@
                         if (data.success) {
                             this.newAccountIds = '';
                             this.newAccountComment = '';
+                            this.newAccountAssignTo = '';
                             this.showAddAccountModal = false;
                             alert(`Добавлено ${ids.length} анкет`);
                             this.loadAccounts(); // Перезагружаем список с сервера
