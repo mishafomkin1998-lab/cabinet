@@ -338,8 +338,12 @@ async function initDatabase() {
         `);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_billing_history_admin ON billing_history(admin_id)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_billing_history_date ON billing_history(created_at)`);
-        // Разрешаем NULL для admin_id (чтобы сохранять историю при удалении админа)
+
+        // Исправляем FK для billing_history - разрешаем удаление админов с сохранением истории
+        await pool.query(`ALTER TABLE billing_history DROP CONSTRAINT IF EXISTS billing_history_admin_id_fkey`);
         await pool.query(`ALTER TABLE billing_history ALTER COLUMN admin_id DROP NOT NULL`);
+        await pool.query(`ALTER TABLE billing_history ADD CONSTRAINT billing_history_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE SET NULL`);
+
         await fixSerialSequence('billing_history');
 
         // 18. История оплаты анкет

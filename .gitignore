@@ -23,4 +23,6 @@ Thumbs.db
 # Build
 dist/
 build/
+
+# Backups
 Server/backup_before_merge/
