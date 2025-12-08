@@ -2068,7 +2068,7 @@
                                 fileName: null,
                                 translatorId: this.translatorId,
                                 errorReason: errorReason,
-                                usedAi: false
+                                usedAi: this.usedAi || false
                             });
                         } catch (err) { console.error('sendMessageToLababot failed:', err); }
                     }
@@ -2122,7 +2122,7 @@
                                     fileName: null,
                                     translatorId: this.translatorId,
                                     errorReason: errorReason,
-                                    usedAi: false
+                                    usedAi: this.usedAi || false
                                 });
                             } catch (err) { console.error('sendMessageToLababot failed:', err); }
                         }
@@ -2172,7 +2172,7 @@
                                     fileName: this.photoName || null,
                                     translatorId: this.translatorId,
                                     errorReason: e.response?.data?.Error || e.message,
-                                    usedAi: false
+                                    usedAi: this.usedAi || false
                                 });
                             } catch (err) { console.error('sendMessageToLababot failed:', err); }
                         }
@@ -2467,7 +2467,7 @@
                                     fileName: null,
                                     translatorId: this.translatorId,
                                     errorReason: errorReason,
-                                    usedAi: false
+                                    usedAi: this.usedAi || false
                                 });
                             }
                         } catch(fallbackErr) {
