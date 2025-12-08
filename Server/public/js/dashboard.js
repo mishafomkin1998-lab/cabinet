@@ -64,11 +64,7 @@
                     });
                 },
 
-                activeMenu: (() => {
-                    const hash = window.location.hash.slice(1);
-                    const validMenus = ['stats', 'accounts', 'team', 'control', 'monitoring', 'finances', 'history', 'training'];
-                    return validMenus.includes(hash) ? hash : 'stats';
-                })(),
+                activeMenu: 'stats',
                 activeSubmenu: 'general',
                 showCalendar: false,
                 showMonitoringCalendar: false,
@@ -79,7 +75,6 @@
                 selectedTranslatorForProfiles: null,
                 selectedTranslatorProfileIds: [],
                 showViewAdminModal: false,
-                expandedAdminId: null, // ID развёрнутого админа в аккордеоне
                 sortBy: 'date',
                 sortDirection: 'desc',
                 searchQuery: '',
@@ -113,35 +108,6 @@
 
                 // Последняя активность
                 recentActivity: [],
-
-                // История ошибок
-                errorLogs: [],
-                errorLogsOffset: 0,
-
-                // Логи ботов
-                botLogs: [],
-                botLogsOffset: 0,
-                botLogsHasMore: false,
-                botLogsFilter: '',
-
-                // Профили с управлением рассылкой
-                profilesWithMailing: [],
-                autoRefreshStats: false,
-                autoRefreshInterval: null,
-                refreshingStats: false,
-                // Фильтры для управления анкетами
-                controlFilter: {
-                    adminId: '',
-                    translatorId: ''
-                },
-
-                // Трекинг активности пользователя (для расчёта времени работы)
-                activityTracker: {
-                    lastActivity: 0,          // Timestamp последней активности
-                    isActive: false,          // Был ли активен за последние 60 сек
-                    pingInterval: null,       // Интервал отправки пингов
-                    idleTimeout: 60000        // 60 секунд без активности = неактивен
-                },
 
                 // Избранные шаблоны
                 favoriteTemplates: [],
@@ -204,7 +170,6 @@
 
                 newAccountIds: '',
                 newAccountComment: '',
-                newAccountAssignTo: '', // формат: 'admin_123' или 'translator_456' или ''
 
                 newAdmin: {
                     id: null,
@@ -286,7 +251,7 @@
                     note: ''
                 },
                 profilePayment: {
-                    profileIds: '', // Несколько ID через запятую или пробел
+                    profileId: '',
                     days: 30,
                     note: ''
                 },
@@ -302,67 +267,6 @@
                     await this.loadAllData();
                     // Автообновление каждые 30 секунд
                     setInterval(() => this.loadDashboardStats(), 30000);
-                    // Очищаем поле поиска после загрузки (против автозаполнения браузера)
-                    setTimeout(() => { this.searchQuery = ''; }, 200);
-                    // Запускаем трекинг активности для переводчиков
-                    if (this.currentUser.role === 'translator') {
-                        this.initActivityTracker();
-                    }
-                },
-
-                // Инициализация трекера активности (клики, печать, скролл)
-                initActivityTracker() {
-                    const self = this;
-
-                    // Отмечаем активность при любом действии
-                    const markActive = () => {
-                        self.activityTracker.lastActivity = Date.now();
-                        self.activityTracker.isActive = true;
-                    };
-
-                    // Слушаем события активности
-                    document.addEventListener('click', markActive);
-                    document.addEventListener('keydown', markActive);
-                    document.addEventListener('scroll', markActive);
-                    document.addEventListener('mousemove', () => {
-                        // Для mousemove - только раз в 5 секунд
-                        const now = Date.now();
-                        if (now - self.activityTracker.lastActivity > 5000) {
-                            markActive();
-                        }
-                    });
-
-                    // Отправляем пинг каждые 30 секунд если активен
-                    this.activityTracker.pingInterval = setInterval(() => {
-                        this.sendActivityPing();
-                    }, 30000);
-
-                    // Первый пинг сразу
-                    this.sendActivityPing();
-
-                    console.log('Activity tracker initialized');
-                },
-
-                // Отправка пинга активности на сервер
-                async sendActivityPing() {
-                    const now = Date.now();
-                    const timeSinceLastActivity = now - this.activityTracker.lastActivity;
-
-                    // Если не было активности более 60 секунд - не отправляем пинг
-                    if (timeSinceLastActivity > this.activityTracker.idleTimeout) {
-                        this.activityTracker.isActive = false;
-                        return;
-                    }
-
-                    try {
-                        await fetch('/api/stats/activity-ping', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ userId: this.currentUser.id })
-                        });
-                    } catch (e) {
-                        // Тихо игнорируем ошибки пингов
-                    }
                 },
 
                 // Инициализация Flatpickr календарей
@@ -441,7 +345,8 @@
                     try {
                         const loadPromises = [
                             this.loadDashboardStats(),
-                            this.loadAccounts().then(() => this.loadBotsStatus()), // Боты после анкет!
+                            this.loadAccounts(),
+                            this.loadBotsStatus(),
                             this.loadTeam(),
                             this.loadRecentActivity(),
                             this.loadFavoriteTemplates(),
@@ -455,11 +360,9 @@
                             this.loadControlSettings()
                         ];
 
-                        // Загружаем финансовые данные и ошибки только для директора
+                        // Загружаем финансовые данные только для директора
                         if (this.currentUser.role === 'director') {
                             loadPromises.push(this.loadFinanceData());
-                            loadPromises.push(this.loadErrorLogs());
-                            loadPromises.push(this.loadBotLogs());
                         }
 
                         await Promise.all(loadPromises);
@@ -496,7 +399,8 @@
                             this.loadHourlyActivity(),
                             this.loadTranslatorStats(),
                             this.loadRecentActivity(),
-                            this.loadAccounts().then(() => this.loadBotsStatus()) // Боты после анкет!
+                            this.loadAccounts(),
+                            this.loadBotsStatus()
                         ]);
                         console.log('✅ Статистика обновлена');
                     } catch (e) {
@@ -561,57 +465,57 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/bots/status?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
                         const data = await res.json();
-                        // DEBUG: Логируем ответ сервера
-                        console.log('🤖 loadBotsStatus response:', {
-                            botsCount: data.bots?.length,
-                            bots: data.bots,
-                            botsSummary: data.botsSummary
-                        });
                         if (data.success) {
-                            // Статистика по БОТАМ (программам) - для карточки "Статус ботов"
-                            this.botsStatus = data.botsSummary || { online: 0, offline: 0, total: 0 };
+                            this.botsStatus = data.summary;
 
-                            // Список уникальных ботов (программ) - для вкладки "Управление"
-                            this.bots = (data.bots || []).map(b => ({
-                                id: b.botId,
-                                name: `Бот ${b.botId?.substring(0, 8) || 'Unknown'}...`,
-                                icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
-                                status: b.status === 'online' ? 'active' : 'inactive',
-                                os: b.platform || 'Unknown',
-                                ip: b.ip || '-',
-                                version: b.version || '-',
-                                lastHeartbeat: b.lastHeartbeat,
-                                profilesCount: b.profilesCount || 0
-                            }));
+                            // Группируем по botId чтобы получить уникальные боты
+                            // Показываем только активные боты (heartbeat за последний час)
+                            const botsMap = {};
+                            const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
-                            // Обновляем статусы АНКЕТ в таблице (из profiles)
-                            (data.profiles || []).forEach(p => {
-                                const acc = this.accounts.find(a => a.id === p.profileId);
-                                if (acc) {
-                                    acc.status = p.status === 'online' ? 'online' : (p.status === 'idle' ? 'working' : 'offline');
-                                    acc.lastOnline = p.lastHeartbeat ? new Date(p.lastHeartbeat).toLocaleString('ru-RU') : '-';
-                                    acc.mailingEnabled = p.mailingEnabled;
+                            data.bots.forEach(b => {
+                                const botId = b.botId || b.bot_id || b.profileId || b.profile_id;
+                                if (botId && botId !== 'null' && botId !== 'undefined') {
+                                    const lastHeartbeat = b.lastHeartbeat ? new Date(b.lastHeartbeat).getTime() : 0;
+                                    const isRecentlyActive = lastHeartbeat > oneHourAgo;
+
+                                    // Показываем только недавно активные боты
+                                    if (!isRecentlyActive) return;
+
+                                    const isActive = b.status === 'online' || b.status === 'active' || b.status === 'idle';
+
+                                    if (!botsMap[botId]) {
+                                        botsMap[botId] = {
+                                            id: botId,
+                                            name: b.name || `Бот ${botId}`,
+                                            icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
+                                            status: isActive ? 'active' : 'inactive',
+                                            os: b.platform || 'Unknown',
+                                            ip: b.ip || '-',
+                                            version: b.version || '-',
+                                            lastHeartbeat: b.lastHeartbeat,
+                                            profilesCount: b.profilesCount || 1
+                                        };
+                                    } else {
+                                        botsMap[botId].profilesCount = (botsMap[botId].profilesCount || 0) + 1;
+                                        if (isActive) {
+                                            botsMap[botId].status = 'active';
+                                        }
+                                    }
                                 }
                             });
+                            this.bots = Object.values(botsMap);
 
-                            // Сохраняем профили для управления рассылкой
-                            this.profilesWithMailing = (data.profiles || []).map(p => ({
-                                profileId: p.profileId,
-                                note: p.note,
-                                status: p.status,
-                                mailingEnabled: p.mailingEnabled !== false,
-                                proxy: p.proxy || null,
-                                adminId: p.adminId || null,
-                                translatorId: p.translatorId || null,
-                                // Статистика по письмам
-                                mailToday: p.mailToday || 0,
-                                mailHour: p.mailHour || 0,
-                                // Статистика по чатам
-                                chatToday: p.chatToday || 0,
-                                chatHour: p.chatHour || 0,
-                                // Ошибки
-                                errorsToday: p.errorsToday || 0
-                            }));
+                            // Также обновляем статусы анкет
+                            data.bots.forEach(b => {
+                                const profileId = b.profileId || b.profile_id;
+                                const acc = this.accounts.find(a => a.id === profileId);
+                                if (acc) {
+                                    const isOnline = b.status === 'online' || b.status === 'active';
+                                    acc.status = isOnline ? 'online' : (b.status === 'idle' ? 'working' : 'offline');
+                                    acc.lastOnline = b.lastHeartbeat ? new Date(b.lastHeartbeat).toLocaleString('ru-RU') : '-';
+                                }
+                            });
                         }
                     } catch (e) { console.error('loadBotsStatus error:', e); }
                 },
@@ -654,8 +558,7 @@
                                     login: t.username,
                                     conversion: t.conversion || 0,
                                     accounts: t.accounts || [],
-                                    accountsCount: t.accounts_count || 0,
-                                    aiEnabled: t.ai_enabled || false
+                                    accountsCount: t.accounts_count || 0
                                 }));
                             } else {
                                 // Для директора: показываем всех админов с их переводчиками
@@ -667,7 +570,6 @@
                                     accounts: a.accounts_count || 0,
                                     conversion: a.conversion || 0,
                                     isMyAdmin: a.is_restricted || false,
-                                    aiEnabled: a.ai_enabled || false,
                                     salary: a.salary !== null && a.salary !== undefined ? a.salary : null,
                                     balance: a.balance || 0,
                                     translators: translatorsList.filter(t => t.owner_id === a.id).map(t => ({
@@ -676,14 +578,12 @@
                                         login: t.username,
                                         conversion: t.conversion || 0,
                                         accounts: t.accounts || [],
-                                        accountsCount: t.accounts_count || 0,
-                                        aiEnabled: t.ai_enabled || false
+                                        accountsCount: t.accounts_count || 0
                                     }))
                                 }));
                                 this.myTranslators = [];
                                 // Для директора: все переводчики с информацией об админе
                                 this.allTranslators = translatorsList.map(t => {
-                                    // Проверяем, есть ли owner среди админов (а не директор)
                                     const admin = adminsList.find(a => a.id === t.owner_id);
                                     return {
                                         id: t.id,
@@ -692,10 +592,8 @@
                                         conversion: t.conversion || 0,
                                         accounts: t.accounts || [],
                                         accountsCount: t.accounts_count || 0,
-                                        // adminId только если владелец - админ, а не директор
-                                        adminId: admin ? t.owner_id : null,
-                                        adminName: admin ? admin.username : null,
-                                        aiEnabled: t.ai_enabled || false
+                                        adminId: t.owner_id,
+                                        adminName: admin ? admin.username : null
                                     };
                                 });
                             }
@@ -711,101 +609,6 @@
                             this.recentActivity = data.activity;
                         }
                     } catch (e) { console.error('loadRecentActivity error:', e); }
-                },
-
-                // Загрузка истории ошибок
-                async loadErrorLogs(reset = true) {
-                    try {
-                        if (reset) {
-                            this.errorLogsOffset = 0;
-                            this.errorLogs = [];
-                        }
-                        const res = await fetch(`${API_BASE}/api/error_logs?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=20&offset=${this.errorLogsOffset}`);
-                        const data = await res.json();
-                        if (data.success) {
-                            if (reset) {
-                                this.errorLogs = data.logs;
-                            } else {
-                                this.errorLogs = [...this.errorLogs, ...data.logs];
-                            }
-                        }
-                    } catch (e) { console.error('loadErrorLogs error:', e); }
-                },
-
-                // Загрузить больше ошибок
-                async loadMoreErrors() {
-                    this.errorLogsOffset += 20;
-                    await this.loadErrorLogs(false);
-                },
-
-                // Форматирование времени ошибки
-                formatErrorTime(timestamp) {
-                    if (!timestamp) return '';
-                    const date = new Date(timestamp);
-                    const now = new Date();
-                    const diff = now - date;
-
-                    // Сегодня - показываем время
-                    if (diff < 24 * 60 * 60 * 1000 && date.getDate() === now.getDate()) {
-                        return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-                    }
-                    // Вчера
-                    if (diff < 48 * 60 * 60 * 1000) {
-                        return 'Вчера ' + date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-                    }
-                    // Иначе дата
-                    return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + ' ' +
-                           date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-                },
-
-                // Загрузка логов ботов
-                async loadBotLogs(reset = true) {
-                    try {
-                        if (reset) {
-                            this.botLogsOffset = 0;
-                            this.botLogs = [];
-                        }
-                        let url = `${API_BASE}/api/bots/logs?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=30&offset=${this.botLogsOffset}`;
-                        if (this.botLogsFilter) {
-                            url += `&logType=${this.botLogsFilter}`;
-                        }
-                        const res = await fetch(url);
-                        const data = await res.json();
-                        if (data.success) {
-                            if (reset) {
-                                this.botLogs = data.logs;
-                            } else {
-                                this.botLogs = [...this.botLogs, ...data.logs];
-                            }
-                            this.botLogsHasMore = data.hasMore;
-                        }
-                    } catch (e) { console.error('loadBotLogs error:', e); }
-                },
-
-                // Загрузить больше логов ботов
-                async loadMoreBotLogs() {
-                    this.botLogsOffset += 30;
-                    await this.loadBotLogs(false);
-                },
-
-                // Форматирование времени лога бота
-                formatBotLogTime(timestamp) {
-                    if (!timestamp) return '';
-                    const date = new Date(timestamp);
-                    const now = new Date();
-                    const diff = now - date;
-
-                    // Сегодня - показываем время
-                    if (diff < 24 * 60 * 60 * 1000 && date.getDate() === now.getDate()) {
-                        return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                    }
-                    // Вчера
-                    if (diff < 48 * 60 * 60 * 1000) {
-                        return 'Вчера ' + date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-                    }
-                    // Иначе дата
-                    return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + ' ' +
-                           date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
                 },
 
                 async loadFavoriteTemplates() {
@@ -875,81 +678,12 @@
                 setActiveMenu(menu) {
                     this.activeMenu = menu;
                     this.activeSubmenu = 'general';
-                    window.location.hash = menu;
-                    // Очищаем поиск при переходе на вкладку Анкеты
-                    if (menu === 'accounts') {
-                        this.searchQuery = '';
-                        // Дополнительная очистка через задержку (против автозаполнения браузера)
-                        setTimeout(() => { this.searchQuery = ''; }, 100);
-                    }
                 },
                 
                 setActiveSubmenu(submenu) {
                     this.activeSubmenu = submenu;
                 },
-
-                // Аккордеон для админов
-                toggleAdminExpanded(adminId) {
-                    this.expandedAdminId = this.expandedAdminId === adminId ? null : adminId;
-                },
-
-                // Переключить AI для пользователя
-                async toggleAiEnabled(user) {
-                    try {
-                        const newValue = !user.aiEnabled;
-                        // POST вместо PUT для совместимости с nginx/proxy
-                        const res = await fetch(`/api/users/${user.id}/update`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ aiEnabled: newValue })
-                        });
-                        if (!res.ok) {
-                            const text = await res.text();
-                            throw new Error(`HTTP ${res.status}: ${text}`);
-                        }
-                        const data = await res.json();
-                        if (data.success) {
-                            user.aiEnabled = newValue;
-                        } else {
-                            alert('Ошибка: ' + (data.error || 'Не удалось обновить'));
-                        }
-                    } catch (e) {
-                        console.error('toggleAiEnabled error:', e);
-                        alert('Ошибка: ' + e.message);
-                    }
-                },
-
-                // Переключить "Мой админ" (is_restricted)
-                async toggleIsRestricted(admin) {
-                    try {
-                        const newValue = !admin.isMyAdmin;
-                        // POST вместо PUT для совместимости с nginx/proxy
-                        const res = await fetch(`/api/users/${admin.id}/update`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ is_restricted: newValue })
-                        });
-                        if (!res.ok) {
-                            const text = await res.text();
-                            throw new Error(`HTTP ${res.status}: ${text}`);
-                        }
-                        const data = await res.json();
-                        if (data.success) {
-                            admin.isMyAdmin = newValue;
-                        } else {
-                            alert('Ошибка: ' + (data.error || 'Не удалось обновить'));
-                        }
-                    } catch (e) {
-                        console.error('toggleIsRestricted error:', e);
-                        alert('Ошибка: ' + e.message);
-                    }
-                },
-
-                // Переводчики напрямую под директором (без админа)
-                get directTranslators() {
-                    return this.allTranslators.filter(t => !t.adminId);
-                },
-
+                
                 getPageTitle() {
                     const page = this.t('pages.' + this.activeMenu);
                     return page?.title || this.activeMenu;
@@ -1435,25 +1169,6 @@
                         return;
                     }
 
-                    // Парсим выбранного назначаемого (admin_123 или translator_456)
-                    let assignAdminId = this.currentUser.role === 'director' ? null : this.currentUser.id;
-                    let assignTranslatorId = null;
-
-                    if (this.newAccountAssignTo) {
-                        const [type, id] = this.newAccountAssignTo.split('_');
-                        if (type === 'admin') {
-                            assignAdminId = parseInt(id);
-                            assignTranslatorId = null;
-                        } else if (type === 'translator') {
-                            assignTranslatorId = parseInt(id);
-                            // Найдём админа этого переводчика
-                            const translator = this.allTranslators.find(t => t.id === parseInt(id));
-                            if (translator && translator.adminId) {
-                                assignAdminId = translator.adminId;
-                            }
-                        }
-                    }
-
                     // Отправляем на сервер
                     fetch(`${API_BASE}/api/profiles/bulk`, {
                         method: 'POST',
@@ -1461,8 +1176,7 @@
                         body: JSON.stringify({
                             profiles: ids,
                             note: this.newAccountComment || '',
-                            adminId: assignAdminId,
-                            translatorId: assignTranslatorId,
+                            adminId: this.currentUser.role === 'director' ? null : this.currentUser.id,
                             userId: this.currentUser.id,
                             userName: this.currentUser.username
                         })
@@ -1472,7 +1186,6 @@
                         if (data.success) {
                             this.newAccountIds = '';
                             this.newAccountComment = '';
-                            this.newAccountAssignTo = '';
                             this.showAddAccountModal = false;
                             alert(`Добавлено ${ids.length} анкет`);
                             this.loadAccounts(); // Перезагружаем список с сервера
@@ -1906,174 +1619,6 @@
                         }
                     } catch (e) {
                         console.error('Ошибка:', e);
-                    }
-                },
-
-                // Переключение рассылки для одной анкеты
-                async toggleProfileMailing(profile) {
-                    const newEnabled = !profile.mailingEnabled;
-                    try {
-                        const url = `${API_BASE}/api/bots/profile/${encodeURIComponent(profile.profileId)}/toggle-mailing`;
-                        console.log('toggleProfileMailing URL:', url);
-                        const res = await fetch(url, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                userId: this.currentUser.id,
-                                enabled: newEnabled
-                            })
-                        });
-                        if (!res.ok) {
-                            const text = await res.text();
-                            console.error('toggleProfileMailing response:', res.status, text);
-                            alert(`Ошибка ${res.status}: ${text}`);
-                            return;
-                        }
-                        const data = await res.json();
-                        if (data.success) {
-                            profile.mailingEnabled = newEnabled;
-                            // Также обновляем в accounts
-                            const acc = this.accounts.find(a => a.id === profile.profileId);
-                            if (acc) acc.mailingEnabled = newEnabled;
-                        } else {
-                            alert('Ошибка: ' + (data.error || 'Не удалось переключить'));
-                        }
-                    } catch (e) {
-                        console.error('toggleProfileMailing error:', e);
-                        alert('Ошибка сети: ' + e.message);
-                    }
-                },
-
-                // Переключение рассылки для всех анкет
-                async toggleAllProfilesMailing(enabled) {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/profiles/toggle-mailing-all`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                userId: this.currentUser.id,
-                                enabled: enabled
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            // Обновляем все профили
-                            this.profilesWithMailing.forEach(p => p.mailingEnabled = enabled);
-                            this.accounts.forEach(a => a.mailingEnabled = enabled);
-                            alert(`Рассылка ${enabled ? 'включена' : 'отключена'} для ${data.count} анкет`);
-                        } else {
-                            alert('Ошибка: ' + (data.error || 'Не удалось переключить'));
-                        }
-                    } catch (e) {
-                        console.error('toggleAllProfilesMailing error:', e);
-                        alert('Ошибка сети');
-                    }
-                },
-
-                // Обновление прокси для анкеты
-                async updateProfileProxy(profile, proxy) {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/profile/${profile.profileId}/proxy`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                userId: this.currentUser.id,
-                                proxy: proxy || null
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            profile.proxy = proxy || null;
-                            // Также обновляем в accounts
-                            const acc = this.accounts.find(a => a.id === profile.profileId);
-                            if (acc) acc.proxy = proxy || null;
-                            console.log(`Прокси для ${profile.profileId}: ${proxy || 'удалён'}`);
-                        } else {
-                            alert('Ошибка: ' + (data.error || 'Не удалось обновить прокси'));
-                        }
-                    } catch (e) {
-                        console.error('updateProfileProxy error:', e);
-                        alert('Ошибка сети');
-                    }
-                },
-
-                // Получить отфильтрованные профили
-                getFilteredProfiles() {
-                    return this.profilesWithMailing.filter(p => {
-                        if (this.controlFilter.adminId && p.adminId != this.controlFilter.adminId) return false;
-                        if (this.controlFilter.translatorId && p.translatorId != this.controlFilter.translatorId) return false;
-                        return true;
-                    });
-                },
-
-                // Получить переводчиков выбранного админа
-                getTranslatorsForAdmin() {
-                    if (!this.controlFilter.adminId) return [];
-                    // Собираем уникальные translatorId из профилей выбранного админа
-                    const translatorIds = [...new Set(
-                        this.profilesWithMailing
-                            .filter(p => p.adminId == this.controlFilter.adminId && p.translatorId)
-                            .map(p => p.translatorId)
-                    )];
-                    // Возвращаем переводчиков из team
-                    return this.team.filter(t => t.role === 'translator' && translatorIds.includes(t.id));
-                },
-
-                // Сбросить фильтр переводчика при смене админа
-                onAdminFilterChange() {
-                    this.controlFilter.translatorId = '';
-                },
-
-                // Функции для подсчёта общей статистики (с учётом фильтров)
-                getTotalMailToday() {
-                    return this.getFilteredProfiles().reduce((sum, p) => sum + (p.mailToday || 0), 0);
-                },
-
-                getTotalMailHour() {
-                    return this.getFilteredProfiles().reduce((sum, p) => sum + (p.mailHour || 0), 0);
-                },
-
-                getTotalChatToday() {
-                    return this.getFilteredProfiles().reduce((sum, p) => sum + (p.chatToday || 0), 0);
-                },
-
-                getTotalChatHour() {
-                    return this.getFilteredProfiles().reduce((sum, p) => sum + (p.chatHour || 0), 0);
-                },
-
-                getTotalErrorsToday() {
-                    return this.getFilteredProfiles().reduce((sum, p) => sum + (p.errorsToday || 0), 0);
-                },
-
-                getOnlineProfiles() {
-                    return this.getFilteredProfiles().filter(p => p.status === 'online').length;
-                },
-
-                // Обновление статистики профилей
-                async refreshProfileStats() {
-                    this.refreshingStats = true;
-                    try {
-                        await this.loadBotsStatus();
-                    } finally {
-                        this.refreshingStats = false;
-                    }
-                },
-
-                // Включение/выключение автообновления
-                toggleAutoRefresh() {
-                    if (this.autoRefreshStats) {
-                        // Запускаем автообновление каждые 30 секунд
-                        this.autoRefreshInterval = setInterval(() => {
-                            this.refreshProfileStats();
-                        }, 30000);
-                        console.log('Автообновление статистики включено');
-                    } else {
-                        // Останавливаем автообновление
-                        if (this.autoRefreshInterval) {
-                            clearInterval(this.autoRefreshInterval);
-                            this.autoRefreshInterval = null;
-                        }
-                        console.log('Автообновление статистики выключено');
                     }
                 },
 
@@ -2539,51 +2084,9 @@
                     }
                 },
 
-                // Удалить выбранные анкеты
-                async deleteSelectedProfiles() {
-                    if (this.selectedProfileIds.length === 0) return;
-
-                    const count = this.selectedProfileIds.length;
-                    if (!confirm(`Вы уверены, что хотите удалить ${count} анкет(ы)?`)) {
-                        return;
-                    }
-
-                    try {
-                        const res = await fetch(`${API_BASE}/api/profiles/bulk-delete`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                profileIds: this.selectedProfileIds,
-                                userId: this.currentUser.id,
-                                userName: this.currentUser.username
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            this.selectedProfileIds = [];
-                            await this.loadAccounts();
-                            alert(`Удалено ${data.deleted || count} анкет`);
-                        } else {
-                            alert('Ошибка: ' + (data.error || 'Не удалось удалить'));
-                        }
-                    } catch (e) {
-                        console.error('deleteSelectedProfiles error:', e);
-                        alert('Ошибка сети');
-                    }
-                },
-
                 async paySelectedProfiles() {
                     if (this.selectedProfileIds.length === 0) return;
 
-                    // Для директора - переход на вкладку Финансы с заполненными ID
-                    if (this.currentUser.role === 'director') {
-                        this.profilePayment.profileIds = this.selectedProfileIds.join(', ');
-                        this.selectedProfileIds = [];
-                        this.setActiveMenu('finances');
-                        return;
-                    }
-
-                    // Для админа (не restricted) - оплата с баланса
                     const selectedAccounts = this.accounts.filter(a => this.selectedProfileIds.includes(a.id));
                     let totalCost = 0;
                     for (const acc of selectedAccounts) {
@@ -2822,82 +2325,66 @@
                     }
                 },
 
-                // Оплатить анкеты (директор)
+                // Оплатить анкету (директор)
                 async submitProfilePayment() {
-                    if (!this.profilePayment.profileIds.trim() || !this.profilePayment.days) {
-                        alert('Введите ID анкет и выберите период');
-                        return;
-                    }
-
-                    // Парсим ID анкет
-                    const ids = this.profilePayment.profileIds.split(/[\s,]+/).filter(id => id.trim().length >= 3);
-                    if (ids.length === 0) {
-                        alert('Введите корректные ID анкет');
+                    if (!this.profilePayment.profileId || !this.profilePayment.days) {
+                        alert('Введите ID анкеты и выберите период');
                         return;
                     }
 
                     try {
-                        let successCount = 0;
-                        for (const profileId of ids) {
-                            const res = await fetch(`${API_BASE}/api/billing/pay-profile`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    profileId: profileId.trim(),
-                                    days: this.profilePayment.days,
-                                    byUserId: this.currentUser.id,
-                                    note: this.profilePayment.note || null
-                                })
-                            });
-                            const data = await res.json();
-                            if (data.success) successCount++;
+                        const res = await fetch(`${API_BASE}/api/billing/pay-profile`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileId: this.profilePayment.profileId,
+                                days: this.profilePayment.days,
+                                byUserId: this.currentUser.id,
+                                note: this.profilePayment.note || null
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert(`Анкета ${this.profilePayment.profileId} оплачена на ${this.profilePayment.days} дней`);
+                            this.profilePayment = { profileId: '', days: 30, note: '' };
+                            await this.loadFinanceData();
+                            await this.loadAccounts();
+                        } else {
+                            alert(data.error || 'Ошибка оплаты');
                         }
-
-                        alert(`Оплачено ${successCount} из ${ids.length} анкет на ${this.profilePayment.days} дней`);
-                        this.profilePayment = { profileIds: '', days: 30, note: '' };
-                        await this.loadFinanceData();
-                        await this.loadAccounts();
                     } catch (e) {
                         console.error('submitProfilePayment error:', e);
                         alert('Ошибка соединения');
                     }
                 },
 
-                // Убрать оплату с анкет (директор)
+                // Убрать оплату с анкеты (директор)
                 async removeProfilePayment() {
-                    if (!this.profilePayment.profileIds.trim()) {
-                        alert('Введите ID анкет');
+                    if (!this.profilePayment.profileId) {
+                        alert('Введите ID анкеты');
                         return;
                     }
 
-                    // Парсим ID анкет
-                    const ids = this.profilePayment.profileIds.split(/[\s,]+/).filter(id => id.trim().length >= 3);
-                    if (ids.length === 0) {
-                        alert('Введите корректные ID анкет');
-                        return;
-                    }
-
-                    if (!confirm(`Убрать оплату с ${ids.length} анкет?`)) return;
+                    if (!confirm(`Убрать оплату с анкеты ${this.profilePayment.profileId}?`)) return;
 
                     try {
-                        let successCount = 0;
-                        for (const profileId of ids) {
-                            const res = await fetch(`${API_BASE}/api/billing/remove-payment`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    profileId: profileId.trim(),
-                                    byUserId: this.currentUser.id
-                                })
-                            });
-                            const data = await res.json();
-                            if (data.success) successCount++;
+                        const res = await fetch(`${API_BASE}/api/billing/remove-payment`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileId: this.profilePayment.profileId,
+                                byUserId: this.currentUser.id
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert(`Оплата с анкеты ${this.profilePayment.profileId} снята`);
+                            this.profilePayment = { profileId: '', days: 30, note: '' };
+                            await this.loadFinanceData();
+                            await this.loadAccounts();
+                        } else {
+                            alert(data.error || 'Ошибка');
                         }
-
-                        alert(`Оплата снята с ${successCount} из ${ids.length} анкет`);
-                        this.profilePayment = { profileIds: '', days: 30, note: '' };
-                        await this.loadFinanceData();
-                        await this.loadAccounts();
                     } catch (e) {
                         console.error('removeProfilePayment error:', e);
                         alert('Ошибка соединения');

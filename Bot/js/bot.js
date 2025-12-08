@@ -46,27 +46,6 @@
         let minichatLastMessageId = 0;
         let minichatType = 'mail'; // 'mail' или 'chat'
 
-        // Глобальный ID бота (программы) - один на всю программу, не меняется
-        // Используется для heartbeat чтобы сервер видел это как ОДИН бот
-        function getMachineId() {
-            let machineId = localStorage.getItem('lababot_machine_id');
-            if (!machineId) {
-                // Генерируем новый ID только ОДИН раз при первом запуске
-                machineId = 'bot_' + Date.now();
-                localStorage.setItem('lababot_machine_id', machineId);
-                console.log('🤖 Создан новый Machine ID:', machineId);
-            }
-            return machineId;
-        }
-        const MACHINE_ID = getMachineId();
-        console.log('🤖 Bot Machine ID:', MACHINE_ID);
-
-        // Хранилище статусов рассылки для каждого профиля (заполняется из heartbeat ответов)
-        const mailingStatusByProfile = {};
-
-        // Хранилище прокси для каждого профиля (заполняется из heartbeat ответов)
-        const proxyByProfile = {};
-
         // ============= API ДЛЯ ОТПРАВКИ ДАННЫХ НА LABABOT SERVER =============
         const LABABOT_SERVER = 'http://188.137.253.169:3000';
 
@@ -190,11 +169,9 @@
         }
 
         // 3. Функция отправки heartbeat
-        // ВАЖНО: Используем MACHINE_ID вместо индивидуального botId
-        // чтобы все анкеты отображались как один бот (программа)
         async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
-            console.log(`❤️ Отправляю heartbeat для ${displayId} (Machine ID: ${MACHINE_ID})`);
-
+            console.log(`❤️ Отправляю heartbeat для ${displayId}`);
+            
             try {
                 const response = await fetch(`${LABABOT_SERVER}/api/heartbeat`, {
                     method: 'POST',
@@ -202,7 +179,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        botId: MACHINE_ID,  // Используем глобальный ID программы!
+                        botId: botId,
                         accountDisplayId: displayId,
                         status: status,
                         timestamp: new Date().toISOString(),
@@ -216,39 +193,6 @@
 
                 const data = await response.json();
                 console.log(`✅ Heartbeat отправлен:`, data);
-
-                // Обработка команд от сервера
-                if (data && data.commands) {
-                    const prevStatus = mailingStatusByProfile[displayId];
-                    mailingStatusByProfile[displayId] = data.commands.mailingEnabled;
-
-                    // Если рассылка была отключена удалённо - останавливаем
-                    if (prevStatus === true && data.commands.mailingEnabled === false) {
-                        console.log(`🛑 Рассылка для ${displayId} отключена удалённо`);
-                        // Найти и остановить бота (bots - объект, не массив)
-                        const bot = Object.values(bots).find(b => b.displayId === displayId);
-                        if (bot && bot.isMailRunning) {
-                            bot.log('⛔ Рассылка остановлена удалённо из кабинета');
-                            bot.stopMail();
-                        }
-                        if (bot && bot.isChatRunning) {
-                            bot.log('⛔ Чат остановлен удалённо из кабинета');
-                            bot.stopChat();
-                        }
-                    }
-                    // Логируем изменение статуса
-                    if (prevStatus !== undefined && prevStatus !== data.commands.mailingEnabled) {
-                        console.log(`📡 Статус рассылки ${displayId}: ${data.commands.mailingEnabled ? 'включена' : 'выключена'}`);
-                    }
-
-                    // Обработка прокси от сервера
-                    const prevProxy = proxyByProfile[displayId];
-                    proxyByProfile[displayId] = data.commands.proxy || null;
-                    if (prevProxy !== data.commands.proxy) {
-                        console.log(`🌐 Прокси для ${displayId}: ${data.commands.proxy || 'отключен'}`);
-                    }
-                }
-
                 return data;
             } catch (error) {
                 console.error(`❌ Ошибка heartbeat:`, error);
@@ -285,64 +229,6 @@
                 return null;
             }
         }
-
-        // 4. Функция отправки операционных логов на сервер
-        const pendingLogs = [];  // Буфер для логов
-        let logSendTimer = null;
-
-        function queueLogForServer(profileId, type, message, details = null) {
-            pendingLogs.push({
-                profileId,
-                type,
-                message,
-                details,
-                timestamp: new Date().toISOString()
-            });
-
-            // Если накопилось много логов или прошло время - отправляем
-            if (pendingLogs.length >= 10) {
-                flushLogsToServer();
-            } else if (!logSendTimer) {
-                logSendTimer = setTimeout(flushLogsToServer, 30000); // Отправляем каждые 30 секунд
-            }
-        }
-
-        async function flushLogsToServer() {
-            if (logSendTimer) {
-                clearTimeout(logSendTimer);
-                logSendTimer = null;
-            }
-
-            if (pendingLogs.length === 0) return;
-
-            const logsToSend = pendingLogs.splice(0, 50); // Берём максимум 50 логов
-
-            try {
-                await fetch(`${LABABOT_SERVER}/api/bots/logs`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        botId: MACHINE_ID,
-                        logs: logsToSend
-                    })
-                });
-                console.log(`📤 Отправлено ${logsToSend.length} логов на сервер`);
-            } catch (error) {
-                console.error(`❌ Ошибка отправки логов:`, error);
-                // Возвращаем логи в очередь
-                pendingLogs.unshift(...logsToSend);
-            }
-        }
-
-        // Отправляем логи перед закрытием страницы
-        window.addEventListener('beforeunload', () => {
-            if (pendingLogs.length > 0) {
-                navigator.sendBeacon(`${LABABOT_SERVER}/api/bots/logs`, JSON.stringify({
-                    botId: MACHINE_ID,
-                    logs: pendingLogs
-                }));
-            }
-        });
 
         // 5. Функция проверки статуса профиля (paused и allowed)
         async function checkProfileStatus(profileId) {
@@ -506,15 +392,15 @@
             add: function(text, type, botId, data = null) {
                 const now = Date.now();
                 const logItem = { id: now, text, type, botId, data, time: new Date() };
-
-                this.logs.unshift(logItem);
-
+                
+                this.logs.unshift(logItem); 
+                
                 if (this.logs.length > 300) {
                     this.logs = this.logs.slice(0, 300);
                 }
 
                 this.render();
-
+                
                 const win = document.getElementById('logger-window');
                 if(!win.classList.contains('show')) {
                     document.getElementById('btn-logger-main').classList.add('blinking');
@@ -523,12 +409,7 @@
                 if (type === 'chat') playSound('chat');
                 else if (type === 'mail') playSound('message');
                 else if (type === 'bday') playSound('online');
-                else if (type === 'vip-online') playSound('online');
-
-                // Отправляем лог на сервер (убираем HTML теги из текста)
-                const cleanText = text.replace(/<[^>]*>/g, '');
-                const profileId = bots[botId] ? bots[botId].displayId : null;
-                queueLogForServer(profileId, type, cleanText, data);
+                else if (type === 'vip-online') playSound('online'); 
             },
             render: function() {
                 const container = document.getElementById('logger-content');
@@ -965,15 +846,14 @@
             } catch (e) { return null; }
         }
 
-        // Парсинг простого формата ip:port или ip:port:user:pass
+        // Парсинг простого формата ip:port
         function parseSimpleProxy(proxyString) {
             if (!proxyString) return null;
             const trimmed = proxyString.trim();
             if (!trimmed) return null;
 
             const parts = trimmed.split(':');
-            // Поддерживаем 2 формата: ip:port и ip:port:user:pass
-            if (parts.length !== 2 && parts.length !== 4) return null;
+            if (parts.length !== 2) return null;
 
             const [host, portStr] = parts;
             const port = parseInt(portStr);
@@ -984,21 +864,11 @@
                 return null;
             }
 
-            const proxyConfig = {
+            return {
                 host: host,
                 port: port,
                 protocol: 'http'
             };
-
-            // Если есть авторизация (4 части: ip:port:user:pass)
-            if (parts.length === 4) {
-                proxyConfig.auth = {
-                    username: parts[2],
-                    password: parts[3]
-                };
-            }
-
-            return proxyConfig;
         }
         
         const LADADATE_BASE_URL = 'https://ladadate.com';
@@ -1111,23 +981,13 @@
             // Определяем прокси для запроса
             let proxyConfig = null;
 
-            // 0. ПРИОРИТЕТ: Прокси от сервера (удалённое управление из кабинета)
-            if (bot && bot.displayId && proxyByProfile[bot.displayId]) {
-                const serverProxy = proxyByProfile[bot.displayId];
-                // Формат: ip:port или ip:port:user:pass
-                proxyConfig = parseSimpleProxy(serverProxy) || parseProxyUrl(serverProxy);
-                if (proxyConfig) {
-                    console.log(`🌐 Прокси от сервера для ${bot.displayId}: ${serverProxy}`);
-                }
-            }
-
-            // 1. Если нет прокси от сервера - пробуем прокси по позиции бота (ip:port)
-            if (!proxyConfig && bot && bot.id) {
+            // 1. Сначала пробуем прокси по позиции бота (ip:port)
+            if (bot && bot.id) {
                 const positionProxy = getProxyForBot(bot.id);
                 if (positionProxy) {
                     proxyConfig = parseSimpleProxy(positionProxy);
                     if (proxyConfig) {
-                        console.log(`🌐 Прокси по позиции для ${bot.displayId || bot.id}: ${positionProxy}`);
+                        console.log(`🌐 Прокси для ${bot.displayId || bot.id}: ${positionProxy}`);
                     }
                 }
             }
@@ -1752,16 +1612,10 @@
                 }, 30000);
             }
 
-            log(text, sendToServer = false, logType = 'info') {
+            log(text) {
                 const box = document.getElementById(`log-${this.id}`);
                 const modePrefix = globalMode === 'chat' ? '[CHAT]' : '[MAIL]';
                 if(box) box.innerHTML = `<div><span style="opacity:0.6">${new Date().toLocaleTimeString()}</span> <b>${modePrefix}</b> ${text}</div>` + box.innerHTML;
-
-                // Отправляем важные логи на сервер
-                if (sendToServer) {
-                    const cleanText = text.replace(/<[^>]*>/g, '');
-                    queueLogForServer(this.displayId, logType, `${modePrefix} ${cleanText}`, null);
-                }
             }
 
             startMonitoring() {
@@ -1972,14 +1826,14 @@
 
                 this.isMailRunning = true;
                 this.updateUI();
-                this.log(`🚀 MAIL Started`, true, 'mail_start');
+                this.log(`🚀 MAIL Started`);
                 this.scheduleNextMail(text, 0);
             }
 
             stopMail() {
                 this.isMailRunning = false;
                 clearTimeout(this.mailTimeout);
-                this.log("⏹ MAIL Stopped", true, 'mail_stop');
+                this.log("⏹ MAIL Stopped");
                 this.updateUI();
             }
 
@@ -1987,14 +1841,6 @@
                 if (!this.isMailRunning) return;
                 this.mailTimeout = setTimeout(async () => {
                     if (!this.isMailRunning) return;
-
-                    // Проверка удалённого отключения рассылки
-                    if (mailingStatusByProfile[this.displayId] === false) {
-                        this.log('⛔ Рассылка приостановлена из личного кабинета');
-                        this.stopMail();
-                        return;
-                    }
-
                     await this.processMailUser(text);
                     let nextDelay = 15000;
                     if (this.mailSettings.speed === 'smart') nextDelay = Math.floor(Math.random() * (120000 - 15000 + 1)) + 15000;
@@ -2355,28 +2201,20 @@
                 if (this.chatSettings.rotationStartTime === 0) this.chatSettings.rotationStartTime = Date.now();
                 this.isChatRunning = true;
                 this.updateUI();
-                this.log(`🚀 CHAT Started`, true, 'chat_start');
+                this.log(`🚀 CHAT Started`);
                 this.scheduleNextChat(fullText, 0);
                 saveSession();
             }
             stopChat() {
                 this.isChatRunning = false;
                 clearTimeout(this.chatTimeout);
-                this.log("⏹ CHAT Stopped", true, 'chat_stop');
+                this.log("⏹ CHAT Stopped");
                 this.updateUI();
             }
             scheduleNextChat(fullText, delay) {
                 if (!this.isChatRunning) return;
                 this.chatTimeout = setTimeout(async () => {
                     if (!this.isChatRunning) return;
-
-                    // Проверка удалённого отключения рассылки
-                    if (mailingStatusByProfile[this.displayId] === false) {
-                        this.log('⛔ Чат приостановлен из личного кабинета');
-                        this.stopChat();
-                        return;
-                    }
-
                     await this.processChatUser(fullText);
                     let nextDelay = 15000;
                     if (this.chatSettings.speed === 'smart') nextDelay = Math.floor(Math.random() * (120000 - 15000 + 1)) + 15000;
