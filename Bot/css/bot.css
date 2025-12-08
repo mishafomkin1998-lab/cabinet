@@ -1,21 +1,27 @@
         /* === ВАЖНОЕ ДОБАВЛЕНИЕ: Стили для скрытых браузеров === */
         #browsers-container {
             display: none; /* Полностью скрываем контейнер! */
+            pointer-events: none; /* Блокируем все события */
         }
-        
+
         /* WEBVIEW теперь позиционируются за пределами экрана */
+        /* КРИТИЧНО: pointer-events: none предотвращает захват фокуса */
         webview {
             position: fixed !important;
-            top: -9999px !important; 
+            top: -9999px !important;
             left: -9999px !important;
             width: 1px !important; /* Минимальный размер */
             height: 1px !important;
-            opacity: 0; 
+            opacity: 0;
             z-index: -100;
+            pointer-events: none !important; /* Блокируем ВСЕ события включая фокус */
+            visibility: hidden; /* Дополнительно скрываем */
         }
         /* Убираем активные стили, они больше не нужны */
         webview.active {
-            opacity: 0; 
+            opacity: 0;
+            pointer-events: none !important;
+            visibility: hidden;
         }
         
         /* === КОНЕЦ ДОБАВЛЕНИЙ === */

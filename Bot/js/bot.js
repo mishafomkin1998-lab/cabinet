@@ -1076,6 +1076,17 @@
                 if(!e.target.closest('.ai-container')) {
                     document.querySelectorAll('.ai-options').forEach(el => el.classList.remove('show'));
                 }
+
+                // КРИТИЧНО: При клике на любое поле ввода - убираем фокус со всех webview
+                if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+                    document.querySelectorAll('webview').forEach(wv => wv.blur());
+                    // Принудительно устанавливаем фокус на элемент
+                    setTimeout(() => {
+                        if (!e.target.disabled) {
+                            e.target.focus();
+                        }
+                    }, 10);
+                }
             });
 
             window.onclick = function(e) {
@@ -1786,9 +1797,29 @@
                 webview.partition = `persist:${this.id}`;
                 webview.useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
+                // КРИТИЧНО: Предотвращаем захват клавиатурного фокуса webview
+                webview.setAttribute('tabindex', '-1');
+                webview.style.pointerEvents = 'none';
+
                 const self = this;
 
+                // Предотвращаем получение фокуса webview
+                webview.addEventListener('focus', (e) => {
+                    e.preventDefault();
+                    webview.blur();
+                    // Возвращаем фокус на активный textarea если есть
+                    if (activeTabId) {
+                        const textarea = document.getElementById(`msg-${activeTabId}`);
+                        if (textarea && !textarea.disabled) {
+                            textarea.focus();
+                        }
+                    }
+                });
+
                 webview.addEventListener('dom-ready', () => {
+                    // КРИТИЧНО: Убираем фокус с webview сразу после загрузки
+                    webview.blur();
+
                     // 1. Внедрение скрипта "Анти-сон" (Keep-Alive)
                     webview.executeJavaScript(KEEP_ALIVE_SCRIPT);
 
@@ -3868,21 +3899,28 @@
         function selectTab(id) {
             document.querySelectorAll('.tab-item').forEach(t=>t.classList.remove('active'));
             document.querySelectorAll('.workspace').forEach(w=>w.classList.remove('active'));
-            // ВАЖНО: Деактивируем/Активируем webview, но они остаются за экраном
-            document.querySelectorAll('webview').forEach(wv => wv.classList.remove('active'));
+            // ВАЖНО: Webview больше не активируем - они всегда скрыты и не получают фокус
+            document.querySelectorAll('webview').forEach(wv => {
+                wv.classList.remove('active');
+                wv.blur(); // Гарантируем что webview не имеет фокуса
+            });
 
             const t=document.getElementById(`tab-${id}`); const w=document.getElementById(`ws-${id}`);
             const wv=document.getElementById(`webview-${id}`);
 
-            if(t&&w) { 
-                t.classList.add('active'); 
-                w.classList.add('active'); 
-                activeTabId=id; 
-                updateInterfaceForMode(id); 
+            if(t&&w) {
+                t.classList.add('active');
+                w.classList.add('active');
+                activeTabId=id;
+                updateInterfaceForMode(id);
             }
-            
-            if(wv) wv.classList.add('active'); // Активируем процесс (попадает под стили position: fixed)
-            
+
+            // КРИТИЧНО: Webview остаётся скрытым, не активируем и убираем фокус
+            if(wv) {
+                wv.classList.add('active'); // Для внутреннего отслеживания (CSS скрывает)
+                wv.blur(); // Принудительно убираем фокус
+            }
+
             document.getElementById('welcome-screen').style.display = 'none';
         }
         
