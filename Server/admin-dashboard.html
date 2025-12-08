@@ -517,6 +517,13 @@
                             <span class="ml-3 font-medium">Команда</span>
                         </div>
                     </div>
+                    <!-- Переводчики - только для админа -->
+                    <div x-show="currentUser.role === 'admin'">
+                        <div @click="setActiveMenu('translators')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'translators' ? 'active' : ''">
+                            <i class="fas fa-language w-5 text-gray-600"></i>
+                            <span class="ml-3 font-medium">Переводчики</span>
+                        </div>
+                    </div>
                     <!-- Финансы - только для директора -->
                     <div x-show="currentUser.role === 'director'">
                         <div @click="setActiveMenu('finances')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'finances' ? 'active' : ''">
@@ -1138,6 +1145,71 @@
                 </div>
             </div>
 
+            <!-- Секция Переводчики (для админа) -->
+            <div x-show="activeMenu === 'translators' && currentUser.role === 'admin'" x-cloak class="fade-in">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold">Мои переводчики</h2>
+                    <button @click="openAddTranslatorModal()" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                        <i class="fas fa-plus mr-2"></i>Добавить переводчика
+                    </button>
+                </div>
+
+                <!-- Список переводчиков -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <template x-for="translator in translators" :key="translator.id">
+                        <div class="glass rounded-2xl p-5">
+                            <div class="flex items-start justify-between mb-4">
+                                <div class="flex items-center">
+                                    <div class="w-12 h-12 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg mr-3">
+                                        <span x-text="translator.name.charAt(0).toUpperCase()"></span>
+                                    </div>
+                                    <div>
+                                        <div class="font-semibold text-lg" x-text="translator.name"></div>
+                                        <div class="text-sm text-gray-500" x-text="translator.accountsCount + ' анкет'"></div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button @click="editTranslator(translator)" class="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Редактировать">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button @click="deleteTranslator(translator)" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Удалить">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-500">Логин:</span>
+                                    <span class="font-mono" x-text="translator.login"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-500">Письма сегодня:</span>
+                                    <span class="text-green-600 font-medium" x-text="translator.lettersToday || 0"></span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-500">Чаты сегодня:</span>
+                                    <span class="text-blue-600 font-medium" x-text="translator.chatsToday || 0"></span>
+                                </div>
+                            </div>
+                            <div class="mt-4 pt-4 border-t border-gray-100">
+                                <button @click="openAssignProfilesToTranslator(translator)" class="w-full py-2 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors">
+                                    <i class="fas fa-folder-plus mr-2"></i>Назначить анкеты
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="translators.length === 0">
+                        <div class="col-span-full glass rounded-2xl p-8 text-center">
+                            <i class="fas fa-users text-4xl text-gray-300 mb-4"></i>
+                            <p class="text-gray-500">У вас пока нет переводчиков</p>
+                            <button @click="openAddTranslatorModal()" class="mt-4 px-5 py-2 bg-purple-100 text-purple-600 rounded-xl hover:bg-purple-200 transition-colors">
+                                Добавить первого переводчика
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
             <!-- Мониторинг -->
             <div x-show="activeMenu === 'monitoring'" x-cloak class="fade-in">
                 <!-- Фильтры для мониторинга (для админа - только переводчики) -->
@@ -1683,6 +1755,109 @@
         </div>
     </div>
 
+    <!-- Модальное окно добавления/редактирования переводчика -->
+    <div x-show="showTranslatorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-md" @click.outside="showTranslatorModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold" x-text="editingTranslator ? 'Редактировать переводчика' : 'Добавить переводчика'"></h3>
+                <button @click="showTranslatorModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Имя</label>
+                    <input type="text"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Введите имя"
+                           x-model="newTranslator.name">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">Логин</label>
+                    <input type="text"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Введите логин"
+                           x-model="newTranslator.login"
+                           :disabled="editingTranslator">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">Пароль</label>
+                    <input type="password"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           :placeholder="editingTranslator ? 'Оставьте пустым, если не хотите менять' : 'Введите пароль'"
+                           x-model="newTranslator.password">
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showTranslatorModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
+                        Отмена
+                    </button>
+                    <button @click="saveTranslator" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                        <span x-text="editingTranslator ? 'Сохранить' : 'Добавить'"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно назначения анкет переводчику -->
+    <div x-show="showAssignTranslatorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" @click.outside="showAssignTranslatorModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">
+                    <i class="fas fa-user-tag text-purple-500 mr-2"></i>
+                    Анкеты для <span x-text="selectedTranslatorForAssign?.name"></span>
+                </h3>
+                <button @click="showAssignTranslatorModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="mb-4 p-3 bg-purple-50 rounded-lg text-sm text-purple-700">
+                <i class="fas fa-info-circle mr-2"></i>
+                Выберите анкеты, которые будут доступны переводчику для работы
+            </div>
+
+            <!-- Список анкет -->
+            <div class="space-y-2 max-h-96 overflow-y-auto mb-4">
+                <template x-for="account in accounts" :key="account.id">
+                    <label class="flex items-center p-3 rounded-lg hover:bg-gray-50 cursor-pointer border border-gray-100"
+                           :class="{ 'bg-purple-50 border-purple-200': translatorProfileIds.includes(String(account.id)) }">
+                        <input type="checkbox"
+                               class="w-4 h-4 rounded mr-3"
+                               :checked="translatorProfileIds.includes(String(account.id))"
+                               @change="toggleTranslatorProfile(account.id)">
+                        <div class="flex-1">
+                            <div class="font-medium">#<span x-text="account.id"></span></div>
+                            <div class="text-xs text-gray-500">
+                                <span :class="account.status === 'online' ? 'text-green-500' : 'text-gray-400'"
+                                      x-text="account.status === 'online' ? 'Онлайн' : 'Оффлайн'"></span>
+                                <span class="mx-1">•</span>
+                                <span x-text="(account.letters || 0) + ' входящих'"></span>
+                            </div>
+                        </div>
+                    </label>
+                </template>
+            </div>
+
+            <div class="text-sm text-gray-500 mb-4">
+                Выбрано: <span class="font-medium text-purple-600" x-text="translatorProfileIds.length"></span> анкет
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+                <button @click="showAssignTranslatorModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
+                    Отмена
+                </button>
+                <button @click="saveTranslatorProfiles" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                    <i class="fas fa-save mr-2"></i>Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Модальное окно настроек -->
     <div x-show="showSettingsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div class="glass rounded-2xl p-6 w-full max-w-lg" @click.outside="showSettingsModal = false">
@@ -1870,6 +2045,12 @@
                 showAddAdminModal: false,
                 showAssignAccountsModal: false,
                 showViewAdminModal: false,
+                showTranslatorModal: false,
+                showAssignTranslatorModal: false,
+                editingTranslator: null,
+                selectedTranslatorForAssign: null,
+                translatorProfileIds: [],
+                newTranslator: { id: null, name: '', login: '', password: '' },
                 sortBy: 'date',
                 sortDirection: 'desc',
                 searchQuery: '',
@@ -2937,7 +3118,155 @@
                         alert('Ошибка сохранения администратора');
                     }
                 },
-                
+
+                // === Функции управления переводчиками ===
+                openAddTranslatorModal() {
+                    this.editingTranslator = null;
+                    this.newTranslator = { id: null, name: '', login: '', password: '' };
+                    this.showTranslatorModal = true;
+                },
+
+                editTranslator(translator) {
+                    this.editingTranslator = translator;
+                    this.newTranslator = {
+                        id: translator.id,
+                        name: translator.name,
+                        login: translator.login,
+                        password: ''
+                    };
+                    this.showTranslatorModal = true;
+                },
+
+                async saveTranslator() {
+                    if (!this.newTranslator.name || !this.newTranslator.login) {
+                        alert('Заполните имя и логин');
+                        return;
+                    }
+
+                    if (!this.editingTranslator && !this.newTranslator.password) {
+                        alert('Введите пароль для нового переводчика');
+                        return;
+                    }
+
+                    try {
+                        if (this.editingTranslator) {
+                            // Редактирование
+                            const body = { username: this.newTranslator.name };
+                            if (this.newTranslator.password) {
+                                body.password = this.newTranslator.password;
+                            }
+                            const res = await fetch(`${API_BASE}/api/users/${this.editingTranslator.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(body)
+                            });
+                            const data = await res.json();
+                            if (!data.success) {
+                                alert('Ошибка: ' + (data.error || 'Не удалось сохранить'));
+                                return;
+                            }
+                        } else {
+                            // Создание
+                            const res = await fetch(`${API_BASE}/api/users`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    username: this.newTranslator.name,
+                                    login: this.newTranslator.login,
+                                    password: this.newTranslator.password,
+                                    role: 'translator',
+                                    ownerId: this.currentUser.id
+                                })
+                            });
+                            const data = await res.json();
+                            if (!data.success) {
+                                alert('Ошибка: ' + (data.error || 'Логин занят'));
+                                return;
+                            }
+                        }
+
+                        await this.loadTeam();
+                        this.showTranslatorModal = false;
+                        alert(this.editingTranslator ? 'Переводчик обновлен' : 'Переводчик создан');
+                    } catch (e) {
+                        console.error('saveTranslator error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
+                async deleteTranslator(translator) {
+                    if (!confirm(`Удалить переводчика "${translator.name}"? Его анкеты станут неназначенными.`)) {
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/users/${translator.id}`, {
+                            method: 'DELETE'
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            await this.loadTeam();
+                            alert('Переводчик удален');
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось удалить'));
+                        }
+                    } catch (e) {
+                        console.error('deleteTranslator error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
+                async openAssignProfilesToTranslator(translator) {
+                    this.selectedTranslatorForAssign = translator;
+                    this.translatorProfileIds = [];
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/team/translator/${translator.id}/profiles`);
+                        const data = await res.json();
+                        if (data.success && data.profileIds) {
+                            this.translatorProfileIds = data.profileIds.map(String);
+                        }
+                    } catch (e) {
+                        console.error('Error loading translator profiles:', e);
+                    }
+
+                    this.showAssignTranslatorModal = true;
+                },
+
+                toggleTranslatorProfile(profileId) {
+                    const id = String(profileId);
+                    const idx = this.translatorProfileIds.indexOf(id);
+                    if (idx > -1) {
+                        this.translatorProfileIds.splice(idx, 1);
+                    } else {
+                        this.translatorProfileIds.push(id);
+                    }
+                },
+
+                async saveTranslatorProfiles() {
+                    if (!this.selectedTranslatorForAssign) return;
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/team/translator/${this.selectedTranslatorForAssign.id}/profiles`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ profileIds: this.translatorProfileIds })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.showAssignTranslatorModal = false;
+                            await this.loadTeam();
+                            await this.loadAccounts();
+                            alert(`Анкеты назначены переводчику ${this.selectedTranslatorForAssign.name}`);
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось назначить'));
+                        }
+                    } catch (e) {
+                        console.error('saveTranslatorProfiles error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
                 toggleBotStatus(bot) {
                     bot.status = bot.status === 'active' ? 'inactive' : 'active';
                     console.log(`Бот ${bot.name} ${bot.status === 'active' ? 'активирован' : 'деактивирован'}`);

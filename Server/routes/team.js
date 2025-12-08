@@ -108,13 +108,15 @@ router.get('/', async (req, res) => {
 
 // Создание пользователя
 router.post('/', async (req, res) => {
-    const { username, password, role, ownerId, salary, isRestricted, aiEnabled } = req.body;
+    const { username, login, password, role, ownerId, salary, isRestricted, aiEnabled } = req.body;
     try {
         const hash = await bcrypt.hash(password, 10);
+        // Если login не передан, используем username
+        const userLogin = login || username;
         const result = await pool.query(
-            `INSERT INTO users (username, password_hash, role, owner_id, salary, ai_enabled)
-             VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-            [username, hash, role, ownerId, isRestricted ? null : salary, aiEnabled || false]
+            `INSERT INTO users (username, login, password_hash, role, owner_id, salary, ai_enabled)
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+            [username, userLogin, hash, role, ownerId, isRestricted ? null : salary, aiEnabled || false]
         );
         res.json({ success: true, userId: result.rows[0].id });
     } catch (e) {
@@ -132,6 +134,47 @@ router.delete('/:id', async (req, res) => {
         await pool.query('DELETE FROM users WHERE id = $1', [userId]);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Редактирование пользователя
+router.put('/:id', async (req, res) => {
+    const userId = req.params.id;
+    const { username, password, salary } = req.body;
+    try {
+        const updates = [];
+        const params = [];
+        let paramIndex = 1;
+
+        if (username) {
+            updates.push(`username = $${paramIndex++}`);
+            params.push(username);
+        }
+
+        if (password) {
+            const bcrypt = require('bcryptjs');
+            const hash = await bcrypt.hash(password, 10);
+            updates.push(`password_hash = $${paramIndex++}`);
+            params.push(hash);
+        }
+
+        if (salary !== undefined) {
+            updates.push(`salary = $${paramIndex++}`);
+            params.push(salary);
+        }
+
+        if (updates.length === 0) {
+            return res.json({ success: true, message: 'Нечего обновлять' });
+        }
+
+        params.push(userId);
+        const query = `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIndex}`;
+        await pool.query(query, params);
+
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Update user error:', e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // Получение списка ID анкет, назначенных админу
