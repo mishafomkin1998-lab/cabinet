@@ -1081,7 +1081,7 @@
                                                    :value="account.id"
                                                    :checked="selectedProfileIds.includes(account.id)"
                                                    :disabled="account.isPaid || account.isFree"
-                                                   @click.stop="toggleProfileSelection(account.id, !selectedProfileIds.includes(account.id))">
+                                                   @change="toggleProfileSelection(account.id, $event.target.checked)">
                                         </td>
                                         <td class="py-2 px-3 font-mono" x-text="account.id"></td>
                                         <td class="py-2 px-3">
@@ -2604,6 +2604,7 @@
                 bots: [],
                 admins: [],
                 team: [],
+                myTranslators: [], // Переводчики текущего админа
                 translatorStats: [],
                 historyActions: [],
 
@@ -2903,24 +2904,60 @@
                             // Формируем admins с переводчиками
                             const adminsList = data.list.filter(u => u.role === 'admin');
                             const translatorsList = data.list.filter(u => u.role === 'translator');
-                            this.admins = adminsList.map(a => ({
-                                id: a.id,
-                                name: a.username,
-                                login: a.username,
-                                initials: a.username.substring(0, 2).toUpperCase(),
-                                accounts: a.accounts_count || 0,
-                                conversion: a.conversion || 0,
-                                isMyAdmin: a.is_restricted || false,
-                                salary: a.salary !== null && a.salary !== undefined ? a.salary : null,
-                                balance: a.balance || 0,
-                                translators: translatorsList.filter(t => t.owner_id === a.id).map(t => ({
+
+                            if (this.currentUser.role === 'admin') {
+                                // Для админа: показываем себя с переводчиками
+                                this.admins = [{
+                                    id: this.currentUser.id,
+                                    name: this.currentUser.username,
+                                    login: this.currentUser.username,
+                                    initials: this.currentUser.username.substring(0, 2).toUpperCase(),
+                                    accounts: 0,
+                                    conversion: 0,
+                                    isMyAdmin: false,
+                                    salary: null,
+                                    balance: 0,
+                                    translators: translatorsList.map(t => ({
+                                        id: t.id,
+                                        name: t.username,
+                                        login: t.username,
+                                        conversion: t.conversion || 0,
+                                        accounts: t.accounts || [],
+                                        accountsCount: t.accounts_count || 0
+                                    }))
+                                }];
+                                // Также сохраняем в отдельный массив для удобства
+                                this.myTranslators = translatorsList.map(t => ({
                                     id: t.id,
                                     name: t.username,
                                     login: t.username,
                                     conversion: t.conversion || 0,
-                                    accounts: t.accounts || []
-                                }))
-                            }));
+                                    accounts: t.accounts || [],
+                                    accountsCount: t.accounts_count || 0
+                                }));
+                            } else {
+                                // Для директора: показываем всех админов с их переводчиками
+                                this.admins = adminsList.map(a => ({
+                                    id: a.id,
+                                    name: a.username,
+                                    login: a.username,
+                                    initials: a.username.substring(0, 2).toUpperCase(),
+                                    accounts: a.accounts_count || 0,
+                                    conversion: a.conversion || 0,
+                                    isMyAdmin: a.is_restricted || false,
+                                    salary: a.salary !== null && a.salary !== undefined ? a.salary : null,
+                                    balance: a.balance || 0,
+                                    translators: translatorsList.filter(t => t.owner_id === a.id).map(t => ({
+                                        id: t.id,
+                                        name: t.username,
+                                        login: t.username,
+                                        conversion: t.conversion || 0,
+                                        accounts: t.accounts || [],
+                                        accountsCount: t.accounts_count || 0
+                                    }))
+                                }));
+                                this.myTranslators = [];
+                            }
                         }
                     } catch (e) { console.error('loadTeam error:', e); }
                 },

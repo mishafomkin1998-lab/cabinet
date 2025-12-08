@@ -200,4 +200,71 @@ router.put('/:id/profiles', async (req, res) => {
     }
 });
 
+// Получение списка анкет переводчика
+router.get('/translator/:id/profiles', async (req, res) => {
+    const translatorId = req.params.id;
+    try {
+        const result = await pool.query(
+            `SELECT profile_id FROM allowed_profiles WHERE assigned_translator_id = $1`,
+            [translatorId]
+        );
+        res.json({
+            success: true,
+            profileIds: result.rows.map(r => r.profile_id)
+        });
+    } catch (e) {
+        console.error('Get translator profiles error:', e.message);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// Обновление списка анкет переводчика
+router.put('/translator/:id/profiles', async (req, res) => {
+    const translatorId = req.params.id;
+    const { profileIds } = req.body;
+
+    try {
+        await pool.query('BEGIN');
+
+        // Убираем все текущие назначения этого переводчика
+        await pool.query(
+            `UPDATE allowed_profiles SET assigned_translator_id = NULL WHERE assigned_translator_id = $1`,
+            [translatorId]
+        );
+
+        // Назначаем новые анкеты (если есть)
+        if (profileIds && profileIds.length > 0) {
+            for (const profileId of profileIds) {
+                // Проверяем, существует ли анкета
+                const exists = await pool.query(
+                    `SELECT profile_id FROM allowed_profiles WHERE profile_id = $1`,
+                    [profileId]
+                );
+
+                if (exists.rows.length > 0) {
+                    // Обновляем существующую
+                    await pool.query(
+                        `UPDATE allowed_profiles SET assigned_translator_id = $1 WHERE profile_id = $2`,
+                        [translatorId, profileId]
+                    );
+                } else {
+                    // Создаем новую запись
+                    await pool.query(
+                        `INSERT INTO allowed_profiles (profile_id, assigned_translator_id, note)
+                         VALUES ($1, $2, 'Добавлено при назначении переводчику')`,
+                        [profileId, translatorId]
+                    );
+                }
+            }
+        }
+
+        await pool.query('COMMIT');
+        res.json({ success: true, count: profileIds ? profileIds.length : 0 });
+    } catch (e) {
+        await pool.query('ROLLBACK');
+        console.error('Update translator profiles error:', e.message);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 module.exports = router;
