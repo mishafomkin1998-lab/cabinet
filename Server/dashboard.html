@@ -109,18 +109,6 @@
                 </div>
             </nav>
 
-            <!-- Balance (visible for admin who is not "мой админ") -->
-            <template x-if="currentUser.role === 'admin' && !isRestricted">
-                <div class="pt-3 border-t border-gray-100 mb-3">
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm text-gray-600">Баланс:</span>
-                        <span class="font-semibold text-lg" :class="userBalance > 0 ? 'text-green-600' : 'text-red-500'">
-                            $<span x-text="userBalance.toFixed(2)"></span>
-                        </span>
-                    </div>
-                </div>
-            </template>
-
             <!-- Кнопка поддержки -->
             <div class="pt-3 border-t border-gray-100 mb-3">
                 <a href="https://t.me/S_Shevil" target="_blank"
