@@ -341,25 +341,27 @@ router.get('/status', asyncHandler(async (req, res) => {
         };
     });
 
-    // 2. Получаем уникальные боты (программы) - группируем по bot_id
+    // 2. Получаем уникальные боты (программы) - один бот = одна строка
     const botsQuery = `
-        SELECT
+        SELECT DISTINCT ON (h.bot_id)
             h.bot_id,
             h.ip,
             h.version,
             h.platform,
-            MAX(h.timestamp) as last_heartbeat,
-            COUNT(DISTINCT h.account_display_id) as profiles_count,
+            h.timestamp as last_heartbeat,
+            (SELECT COUNT(DISTINCT account_display_id)
+             FROM heartbeats
+             WHERE bot_id = h.bot_id
+             AND timestamp > NOW() - INTERVAL '1 hour') as profiles_count,
             CASE
-                WHEN MAX(h.timestamp) > NOW() - INTERVAL '2 minutes' THEN 'online'
+                WHEN h.timestamp > NOW() - INTERVAL '2 minutes' THEN 'online'
                 ELSE 'offline'
             END as bot_status
         FROM heartbeats h
         WHERE h.bot_id IS NOT NULL
           AND h.bot_id != ''
           AND h.timestamp > NOW() - INTERVAL '1 hour'
-        GROUP BY h.bot_id, h.ip, h.version, h.platform
-        ORDER BY last_heartbeat DESC
+        ORDER BY h.bot_id, h.timestamp DESC
     `;
     const botsResult = await pool.query(botsQuery);
 
