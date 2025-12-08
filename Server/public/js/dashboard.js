@@ -135,6 +135,14 @@
                     translatorId: ''
                 },
 
+                // Трекинг активности пользователя (для расчёта времени работы)
+                activityTracker: {
+                    lastActivity: 0,          // Timestamp последней активности
+                    isActive: false,          // Был ли активен за последние 60 сек
+                    pingInterval: null,       // Интервал отправки пингов
+                    idleTimeout: 60000        // 60 секунд без активности = неактивен
+                },
+
                 // Избранные шаблоны
                 favoriteTemplates: [],
 
@@ -296,6 +304,65 @@
                     setInterval(() => this.loadDashboardStats(), 30000);
                     // Очищаем поле поиска после загрузки (против автозаполнения браузера)
                     setTimeout(() => { this.searchQuery = ''; }, 200);
+                    // Запускаем трекинг активности для переводчиков
+                    if (this.currentUser.role === 'translator') {
+                        this.initActivityTracker();
+                    }
+                },
+
+                // Инициализация трекера активности (клики, печать, скролл)
+                initActivityTracker() {
+                    const self = this;
+
+                    // Отмечаем активность при любом действии
+                    const markActive = () => {
+                        self.activityTracker.lastActivity = Date.now();
+                        self.activityTracker.isActive = true;
+                    };
+
+                    // Слушаем события активности
+                    document.addEventListener('click', markActive);
+                    document.addEventListener('keydown', markActive);
+                    document.addEventListener('scroll', markActive);
+                    document.addEventListener('mousemove', () => {
+                        // Для mousemove - только раз в 5 секунд
+                        const now = Date.now();
+                        if (now - self.activityTracker.lastActivity > 5000) {
+                            markActive();
+                        }
+                    });
+
+                    // Отправляем пинг каждые 30 секунд если активен
+                    this.activityTracker.pingInterval = setInterval(() => {
+                        this.sendActivityPing();
+                    }, 30000);
+
+                    // Первый пинг сразу
+                    this.sendActivityPing();
+
+                    console.log('Activity tracker initialized');
+                },
+
+                // Отправка пинга активности на сервер
+                async sendActivityPing() {
+                    const now = Date.now();
+                    const timeSinceLastActivity = now - this.activityTracker.lastActivity;
+
+                    // Если не было активности более 60 секунд - не отправляем пинг
+                    if (timeSinceLastActivity > this.activityTracker.idleTimeout) {
+                        this.activityTracker.isActive = false;
+                        return;
+                    }
+
+                    try {
+                        await fetch('/api/stats/activity-ping', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userId: this.currentUser.id })
+                        });
+                    } catch (e) {
+                        // Тихо игнорируем ошибки пингов
+                    }
                 },
 
                 // Инициализация Flatpickr календарей

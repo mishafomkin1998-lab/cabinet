@@ -584,9 +584,50 @@ router.get('/by-translator', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * POST /api/stats/activity-ping
+ * Записывает пинг активности пользователя (клики, печать)
+ * Вызывается каждые 30 секунд если пользователь активен
+ *
+ * @body {number} userId - ID пользователя
+ */
+router.post('/activity-ping', asyncHandler(async (req, res) => {
+    const { userId } = req.body;
+
+    if (!userId) {
+        return res.status(400).json({ success: false, error: 'userId required' });
+    }
+
+    // Проверяем что не дублируем пинг (минимум 20 секунд между пингами)
+    const lastPing = await pool.query(`
+        SELECT created_at FROM user_activity
+        WHERE user_id = $1
+        ORDER BY created_at DESC
+        LIMIT 1
+    `, [userId]);
+
+    if (lastPing.rows.length > 0) {
+        const lastTime = new Date(lastPing.rows[0].created_at).getTime();
+        const now = Date.now();
+        if (now - lastTime < 20000) {
+            // Слишком частый пинг, игнорируем
+            return res.json({ success: true, skipped: true });
+        }
+    }
+
+    await pool.query(`
+        INSERT INTO user_activity (user_id, activity_type)
+        VALUES ($1, 'active')
+    `, [userId]);
+
+    res.json({ success: true });
+}));
+
+/**
  * GET /api/stats/work-time
  * Расчёт времени работы переводчиков
- * Сессия = непрерывная работа с перерывами не более 5 минут
+ * Использует пинги активности (user_activity) - более точный метод
+ * Fallback на activity_log если пингов нет
+ * Сессия = непрерывная работа с перерывами не более 1 минуты
  *
  * @query {string} dateFrom - Начало периода
  * @query {string} dateTo - Конец периода
@@ -600,39 +641,55 @@ router.get('/work-time', asyncHandler(async (req, res) => {
     let paramIndex = 1;
 
     if (dateFrom) {
-        filter += ` AND a.created_at >= $${paramIndex}::date`;
+        filter += ` AND ua.created_at >= $${paramIndex}::date`;
         params.push(dateFrom);
         paramIndex++;
     }
     if (dateTo) {
-        filter += ` AND a.created_at <= $${paramIndex}::date + INTERVAL '1 day'`;
+        filter += ` AND ua.created_at <= $${paramIndex}::date + INTERVAL '1 day'`;
         params.push(dateTo);
         paramIndex++;
     }
     if (translatorId) {
-        filter += ` AND a.translator_id = $${paramIndex}`;
+        filter += ` AND ua.user_id = $${paramIndex}`;
         params.push(translatorId);
         paramIndex++;
     }
 
-    // Получаем все действия переводчиков с временными метками
-    const query = `
+    // Сначала пробуем получить данные из user_activity (новый метод)
+    const activityQuery = `
         SELECT
-            a.translator_id,
+            ua.user_id as translator_id,
             u.username as translator_name,
-            a.created_at,
-            DATE(a.created_at) as work_date
-        FROM activity_log a
-        JOIN users u ON a.translator_id = u.id
-        WHERE a.translator_id IS NOT NULL ${filter}
-        ORDER BY a.translator_id, a.created_at
+            ua.created_at
+        FROM user_activity ua
+        JOIN users u ON ua.user_id = u.id
+        WHERE u.role = 'translator' ${filter}
+        ORDER BY ua.user_id, ua.created_at
     `;
 
-    const result = await pool.query(query, params);
+    let result = await pool.query(activityQuery, params);
+
+    // Если нет данных в user_activity, используем старый метод (activity_log)
+    if (result.rows.length === 0) {
+        let oldFilter = filter.replace(/ua\./g, 'a.').replace(/ua\.user_id/g, 'a.translator_id');
+        const oldQuery = `
+            SELECT
+                a.translator_id,
+                u.username as translator_name,
+                a.created_at
+            FROM activity_log a
+            JOIN users u ON a.translator_id = u.id
+            WHERE a.translator_id IS NOT NULL ${oldFilter}
+            ORDER BY a.translator_id, a.created_at
+        `;
+        result = await pool.query(oldQuery, params);
+    }
 
     // Группируем по переводчику и считаем сессии
     const workTimeByTranslator = {};
-    const SESSION_TIMEOUT = 5 * 60 * 1000; // 5 минут в миллисекундах
+    // 60 секунд таймаут для пингов (они приходят каждые 30 сек)
+    const SESSION_TIMEOUT = 60 * 1000;
 
     for (const row of result.rows) {
         const tId = row.translator_id;

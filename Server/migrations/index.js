@@ -369,6 +369,19 @@ async function initDatabase() {
         await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS profile_verified_at TIMESTAMP`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_bots_verified_profile ON bots(verified_profile_id)`);
 
+        // 20. Таблица активности пользователей (пинги для расчёта времени работы)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS user_activity (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                activity_type VARCHAR(20) DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_activity_user ON user_activity(user_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_activity_date ON user_activity(created_at)`);
+        await fixSerialSequence('user_activity');
+
         // Очистка старых данных
         await cleanupOldData();
 
@@ -502,6 +515,19 @@ async function cleanupOldData() {
         }
     } catch (e) {
         console.log('Очистка heartbeats:', e.message);
+    }
+
+    // Удаляем старые пинги активности (старше 60 дней)
+    try {
+        const activityCleanup = await pool.query(`
+            DELETE FROM user_activity
+            WHERE created_at < NOW() - INTERVAL '60 days'
+        `);
+        if (activityCleanup.rowCount > 0) {
+            console.log(`🧹 Очищено ${activityCleanup.rowCount} старых пингов активности`);
+        }
+    } catch (e) {
+        console.log('Очистка user_activity:', e.message);
     }
 }
 
