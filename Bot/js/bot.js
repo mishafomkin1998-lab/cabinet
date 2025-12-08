@@ -225,8 +225,8 @@
                     // Если рассылка была отключена удалённо - останавливаем
                     if (prevStatus === true && data.commands.mailingEnabled === false) {
                         console.log(`🛑 Рассылка для ${displayId} отключена удалённо`);
-                        // Найти и остановить бота
-                        const bot = bots.find(b => b.displayId === displayId);
+                        // Найти и остановить бота (bots - объект, не массив)
+                        const bot = Object.values(bots).find(b => b.displayId === displayId);
                         if (bot && bot.isMailRunning) {
                             bot.log('⛔ Рассылка остановлена удалённо из кабинета');
                             bot.stopMail();
@@ -965,14 +965,15 @@
             } catch (e) { return null; }
         }
 
-        // Парсинг простого формата ip:port
+        // Парсинг простого формата ip:port или ip:port:user:pass
         function parseSimpleProxy(proxyString) {
             if (!proxyString) return null;
             const trimmed = proxyString.trim();
             if (!trimmed) return null;
 
             const parts = trimmed.split(':');
-            if (parts.length !== 2) return null;
+            // Поддерживаем 2 формата: ip:port и ip:port:user:pass
+            if (parts.length !== 2 && parts.length !== 4) return null;
 
             const [host, portStr] = parts;
             const port = parseInt(portStr);
@@ -983,11 +984,21 @@
                 return null;
             }
 
-            return {
+            const proxyConfig = {
                 host: host,
                 port: port,
                 protocol: 'http'
             };
+
+            // Если есть авторизация (4 части: ip:port:user:pass)
+            if (parts.length === 4) {
+                proxyConfig.auth = {
+                    username: parts[2],
+                    password: parts[3]
+                };
+            }
+
+            return proxyConfig;
         }
         
         const LADADATE_BASE_URL = 'https://ladadate.com';

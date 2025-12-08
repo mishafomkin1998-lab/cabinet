@@ -1828,7 +1828,9 @@
                 async toggleProfileMailing(profile) {
                     const newEnabled = !profile.mailingEnabled;
                     try {
-                        const res = await fetch(`${API_BASE}/api/bots/profile/${profile.profileId}/toggle-mailing`, {
+                        const url = `${API_BASE}/api/bots/profile/${encodeURIComponent(profile.profileId)}/toggle-mailing`;
+                        console.log('toggleProfileMailing URL:', url);
+                        const res = await fetch(url, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -1836,6 +1838,12 @@
                                 enabled: newEnabled
                             })
                         });
+                        if (!res.ok) {
+                            const text = await res.text();
+                            console.error('toggleProfileMailing response:', res.status, text);
+                            alert(`Ошибка ${res.status}: ${text}`);
+                            return;
+                        }
                         const data = await res.json();
                         if (data.success) {
                             profile.mailingEnabled = newEnabled;
@@ -1847,7 +1855,7 @@
                         }
                     } catch (e) {
                         console.error('toggleProfileMailing error:', e);
-                        alert('Ошибка сети');
+                        alert('Ошибка сети: ' + e.message);
                     }
                 },
 
