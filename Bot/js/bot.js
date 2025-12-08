@@ -1069,7 +1069,10 @@
                 }
             }
 
-            if(!globalSettings.apiKey) return alert("Пожалуйста, введите OpenAI API Key в настройках!");
+            if(!globalSettings.apiKey) {
+                btn.innerHTML = originalHtml;
+                return alert("Пожалуйста, введите OpenAI API Key в настройках!");
+            }
 
             const txtArea = document.getElementById(`msg-${botId}`);
             const currentText = txtArea.value;
@@ -1078,10 +1081,16 @@
             let systemRole = "You are a helpful dating assistant. Write engaging, short, and natural texts for dating sites.";
 
             if(action === 'myprompt') {
-                if(!globalSettings.myPrompt) return alert("Заполните 'My Prompt' в настройках!");
+                if(!globalSettings.myPrompt) {
+                    btn.innerHTML = originalHtml;
+                    return alert("Заполните 'My Prompt' в настройках!");
+                }
                 prompt = `${globalSettings.myPrompt}. \n\nOriginal text: "${currentText}"`;
             } else if (action === 'improve') {
-                if(!currentText) return alert("Напишите хоть что-то, чтобы я мог улучшить!");
+                if(!currentText) {
+                    btn.innerHTML = originalHtml;
+                    return alert("Напишите хоть что-то, чтобы я мог улучшить!");
+                }
                 prompt = `Rewrite the following text to be more engaging, grammatically correct, and flirtatious. Keep it natural. Text: "${currentText}"`;
             } else if (action === 'generate') {
                 prompt = "Write a creative and engaging opening message for a dating site to start a conversation with a man. Keep it short and intriguing.";
