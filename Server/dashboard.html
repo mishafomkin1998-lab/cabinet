@@ -208,8 +208,8 @@
                 <!-- Filters -->
                 <div class="glass rounded-2xl p-5 mb-6">
                     <div class="flex items-center gap-4 flex-wrap">
-                        <!-- Admin filter -->
-                        <div>
+                        <!-- Admin filter (только для директора) -->
+                        <div x-show="currentUser.role === 'director'">
                             <select class="glass px-4 py-2.5 rounded-xl" x-model="statsFilter.admin" @change="statsFilter.translator = ''">
                                 <option value="" x-text="t('filters.allAdmins')"></option>
                                 <template x-for="admin in admins" :key="admin.id">
@@ -218,11 +218,11 @@
                             </select>
                         </div>
 
-                        <!-- Translator filter -->
-                        <div x-show="statsFilter.admin">
+                        <!-- Translator filter (для директора - при выборе админа, для админа - всегда) -->
+                        <div x-show="currentUser.role === 'admin' || statsFilter.admin">
                             <select class="glass px-4 py-2.5 rounded-xl" x-model="statsFilter.translator">
                                 <option value="" x-text="t('filters.allTranslators')"></option>
-                                <template x-for="translator in admins.find(a => a.id == statsFilter.admin)?.translators || []" :key="translator.id">
+                                <template x-for="translator in (currentUser.role === 'admin' ? myTranslators : (admins.find(a => a.id == statsFilter.admin)?.translators || []))" :key="translator.id">
                                     <option :value="translator.id" x-text="translator.name"></option>
                                 </template>
                             </select>
@@ -1391,8 +1391,8 @@
                 <!-- Фильтры для мониторинга -->
                 <div class="glass rounded-2xl p-5 mb-6">
                     <div class="flex items-center gap-4 flex-wrap">
-                        <!-- Выбор админа -->
-                        <div>
+                        <!-- Выбор админа (только для директора) -->
+                        <div x-show="currentUser.role === 'director'">
                             <select class="glass px-4 py-2.5 rounded-xl" x-model="monitoringFilter.admin" @change="monitoringFilter.translator = ''">
                                 <option value="" x-text="t('filters.allAdmins')"></option>
                                 <template x-for="admin in admins" :key="admin.id">
@@ -1401,11 +1401,11 @@
                             </select>
                         </div>
 
-                        <!-- Выбор переводчика (показывается при выборе админа) -->
-                        <div x-show="monitoringFilter.admin">
+                        <!-- Выбор переводчика (для директора - при выборе админа, для админа - всегда) -->
+                        <div x-show="currentUser.role === 'admin' || monitoringFilter.admin">
                             <select class="glass px-4 py-2.5 rounded-xl" x-model="monitoringFilter.translator">
                                 <option value="" x-text="t('filters.allTranslators')"></option>
-                                <template x-for="translator in admins.find(a => a.id == monitoringFilter.admin)?.translators || []" :key="translator.id">
+                                <template x-for="translator in (currentUser.role === 'admin' ? myTranslators : (admins.find(a => a.id == monitoringFilter.admin)?.translators || []))" :key="translator.id">
                                     <option :value="translator.id" x-text="translator.name"></option>
                                 </template>
                             </select>
@@ -1661,8 +1661,8 @@
                                    @keyup.enter="loadProfileHistory()">
                         </div>
 
-                        <!-- Выбор админа -->
-                        <div>
+                        <!-- Выбор админа (только для директора) -->
+                        <div x-show="currentUser.role === 'director'">
                             <select class="glass px-4 py-2.5 rounded-xl" x-model="historyFilter.admin">
                                 <option value="" x-text="t('filters.allAdmins')"></option>
                                 <template x-for="admin in admins" :key="admin.id">

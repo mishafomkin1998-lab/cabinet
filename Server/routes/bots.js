@@ -125,6 +125,12 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
         );
     }
 
+    // 3.5. ВАЖНО: Также обновляем статус в allowed_profiles (API читает оттуда!)
+    await pool.query(
+        `UPDATE allowed_profiles SET status = $1, last_online = NOW() WHERE profile_id = $2`,
+        [profileStatus, accountDisplayId]
+    );
+
     // 4. Обновляем/создаём запись бота в bots для dashboard + верификация ID
     const existsBot = await pool.query(
         `SELECT verified_profile_id FROM bots WHERE bot_id = $1`, [botId]
