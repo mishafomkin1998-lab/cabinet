@@ -1,19 +1,28 @@
         let axios;
         try { axios = require('axios'); } catch(e) { axios = window.axios; }
 
-        const audioFiles = {
-            online: new Audio('Sound/Online.mp3'),
-            message: new Audio('Sound/Message.mp3'),
-            chat: new Audio('Sound/Chat.mp3')
-        };
-        Object.values(audioFiles).forEach(a => a.load());
+        // Безопасная инициализация аудио (не падает если файлы отсутствуют)
+        const audioFiles = {};
+        function initAudio(name, path) {
+            try {
+                const audio = new Audio(path);
+                audio.load();
+                audio.onerror = () => console.warn(`Звуковой файл не найден: ${path}`);
+                audioFiles[name] = audio;
+            } catch(e) {
+                console.warn(`Не удалось загрузить звук: ${path}`);
+                audioFiles[name] = null;
+            }
+        }
+        initAudio('online', 'Sound/Online.mp3');
+        initAudio('message', 'Sound/Message.mp3');
+        initAudio('chat', 'Sound/Chat.mp3');
 
         function playSound(type) {
             if(!globalSettings.soundsEnabled) return;
             try {
-                if(type === 'online') audioFiles.online.play().catch(()=>{});
-                else if(type === 'message') audioFiles.message.play().catch(()=>{});
-                else if (type === 'chat') audioFiles.chat.play().catch(()=>{});
+                const audio = audioFiles[type];
+                if (audio) audio.play().catch(()=>{});
             } catch(e) { console.warn("Audio play error", e); }
         }
 
