@@ -46,6 +46,21 @@
         let minichatLastMessageId = 0;
         let minichatType = 'mail'; // 'mail' или 'chat'
 
+        // Глобальный ID бота (программы) - один на всю программу, не меняется
+        // Используется для heartbeat чтобы сервер видел это как ОДИН бот
+        function getMachineId() {
+            let machineId = localStorage.getItem('lababot_machine_id');
+            if (!machineId) {
+                // Генерируем новый ID только ОДИН раз при первом запуске
+                machineId = 'bot_' + Date.now();
+                localStorage.setItem('lababot_machine_id', machineId);
+                console.log('🤖 Создан новый Machine ID:', machineId);
+            }
+            return machineId;
+        }
+        const MACHINE_ID = getMachineId();
+        console.log('🤖 Bot Machine ID:', MACHINE_ID);
+
         // ============= API ДЛЯ ОТПРАВКИ ДАННЫХ НА LABABOT SERVER =============
         const LABABOT_SERVER = 'http://188.137.253.169:3000';
 
@@ -169,9 +184,11 @@
         }
 
         // 3. Функция отправки heartbeat
+        // ВАЖНО: Используем MACHINE_ID вместо индивидуального botId
+        // чтобы все анкеты отображались как один бот (программа)
         async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
-            console.log(`❤️ Отправляю heartbeat для ${displayId}`);
-            
+            console.log(`❤️ Отправляю heartbeat для ${displayId} (Machine ID: ${MACHINE_ID})`);
+
             try {
                 const response = await fetch(`${LABABOT_SERVER}/api/heartbeat`, {
                     method: 'POST',
@@ -179,7 +196,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        botId: botId,
+                        botId: MACHINE_ID,  // Используем глобальный ID программы!
                         accountDisplayId: displayId,
                         status: status,
                         timestamp: new Date().toISOString(),
