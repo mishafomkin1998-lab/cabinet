@@ -1196,8 +1196,81 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- Логи ботов -->
+                <div class="glass rounded-2xl p-6 mt-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold">
+                            <i class="fas fa-terminal text-blue-500 mr-2"></i>Логи ботов
+                        </h3>
+                        <div class="flex items-center space-x-3">
+                            <select x-model="botLogsFilter" @change="loadBotLogs()" class="text-sm glass px-3 py-1.5 rounded-lg">
+                                <option value="">Все типы</option>
+                                <option value="mail_start">Старт рассылки</option>
+                                <option value="mail_stop">Стоп рассылки</option>
+                                <option value="chat_start">Старт чата</option>
+                                <option value="chat_stop">Стоп чата</option>
+                                <option value="chat">Сообщения чата</option>
+                                <option value="mail">Письма</option>
+                                <option value="vip-online">VIP онлайн</option>
+                                <option value="error">Ошибки</option>
+                            </select>
+                            <button @click="loadBotLogs()" class="text-sm text-blue-600 hover:text-blue-800">
+                                <i class="fas fa-sync-alt mr-1"></i>Обновить
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Лог ботов -->
+                    <div class="bg-gray-50 rounded-xl p-4 max-h-96 overflow-y-auto" id="bot-logs-container">
+                        <div x-show="botLogs.length === 0" class="text-center py-8 text-gray-400">
+                            <i class="fas fa-list-alt text-4xl mb-3 text-gray-300"></i>
+                            <p>Логов пока нет</p>
+                        </div>
+                        <div class="space-y-2">
+                            <template x-for="log in botLogs" :key="log.id">
+                                <div class="flex items-start space-x-3 p-2 bg-white rounded-lg border-l-4"
+                                     :class="{
+                                         'border-green-500': log.log_type.includes('start'),
+                                         'border-red-500': log.log_type.includes('stop') || log.log_type === 'error',
+                                         'border-blue-500': log.log_type === 'chat',
+                                         'border-purple-500': log.log_type === 'mail',
+                                         'border-yellow-500': log.log_type === 'vip-online',
+                                         'border-gray-300': !['start', 'stop', 'chat', 'mail', 'vip-online', 'error'].some(t => log.log_type.includes(t))
+                                     }">
+                                    <div class="flex-shrink-0">
+                                        <i class="fas text-sm"
+                                           :class="{
+                                               'fa-play text-green-500': log.log_type.includes('start'),
+                                               'fa-stop text-red-500': log.log_type.includes('stop'),
+                                               'fa-comment text-blue-500': log.log_type === 'chat',
+                                               'fa-envelope text-purple-500': log.log_type === 'mail',
+                                               'fa-crown text-yellow-500': log.log_type === 'vip-online',
+                                               'fa-exclamation text-red-500': log.log_type === 'error',
+                                               'fa-info-circle text-gray-400': !['start', 'stop', 'chat', 'mail', 'vip-online', 'error'].some(t => log.log_type.includes(t))
+                                           }"></i>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-medium text-gray-500" x-text="log.profile_id || 'Система'"></span>
+                                            <span class="text-xs text-gray-400" x-text="formatBotLogTime(log.created_at)"></span>
+                                        </div>
+                                        <p class="text-sm text-gray-700" x-text="log.message"></p>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Пагинация -->
+                    <div x-show="botLogsHasMore" class="mt-3 text-center">
+                        <button @click="loadMoreBotLogs()" class="text-sm text-gray-500 hover:text-gray-700">
+                            Загрузить ещё...
+                        </button>
+                    </div>
+                </div>
             </div>
-            
+
             <!-- Мониторинг -->
             <div x-show="activeMenu === 'monitoring'" x-cloak class="fade-in">
                 <!-- Фильтры для мониторинга -->

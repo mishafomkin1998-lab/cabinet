@@ -118,6 +118,12 @@
                 errorLogs: [],
                 errorLogsOffset: 0,
 
+                // Логи ботов
+                botLogs: [],
+                botLogsOffset: 0,
+                botLogsHasMore: false,
+                botLogsFilter: '',
+
                 // Профили с управлением рассылкой
                 profilesWithMailing: [],
 
@@ -378,6 +384,7 @@
                         if (this.currentUser.role === 'director') {
                             loadPromises.push(this.loadFinanceData());
                             loadPromises.push(this.loadErrorLogs());
+                            loadPromises.push(this.loadBotLogs());
                         }
 
                         await Promise.all(loadPromises);
@@ -655,6 +662,56 @@
                     // Сегодня - показываем время
                     if (diff < 24 * 60 * 60 * 1000 && date.getDate() === now.getDate()) {
                         return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                    }
+                    // Вчера
+                    if (diff < 48 * 60 * 60 * 1000) {
+                        return 'Вчера ' + date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                    }
+                    // Иначе дата
+                    return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }) + ' ' +
+                           date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                },
+
+                // Загрузка логов ботов
+                async loadBotLogs(reset = true) {
+                    try {
+                        if (reset) {
+                            this.botLogsOffset = 0;
+                            this.botLogs = [];
+                        }
+                        let url = `${API_BASE}/api/bots/logs?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=30&offset=${this.botLogsOffset}`;
+                        if (this.botLogsFilter) {
+                            url += `&logType=${this.botLogsFilter}`;
+                        }
+                        const res = await fetch(url);
+                        const data = await res.json();
+                        if (data.success) {
+                            if (reset) {
+                                this.botLogs = data.logs;
+                            } else {
+                                this.botLogs = [...this.botLogs, ...data.logs];
+                            }
+                            this.botLogsHasMore = data.hasMore;
+                        }
+                    } catch (e) { console.error('loadBotLogs error:', e); }
+                },
+
+                // Загрузить больше логов ботов
+                async loadMoreBotLogs() {
+                    this.botLogsOffset += 30;
+                    await this.loadBotLogs(false);
+                },
+
+                // Форматирование времени лога бота
+                formatBotLogTime(timestamp) {
+                    if (!timestamp) return '';
+                    const date = new Date(timestamp);
+                    const now = new Date();
+                    const diff = now - date;
+
+                    // Сегодня - показываем время
+                    if (diff < 24 * 60 * 60 * 1000 && date.getDate() === now.getDate()) {
+                        return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                     }
                     // Вчера
                     if (diff < 48 * 60 * 60 * 1000) {

@@ -276,6 +276,64 @@
             }
         }
 
+        // 4. Функция отправки операционных логов на сервер
+        const pendingLogs = [];  // Буфер для логов
+        let logSendTimer = null;
+
+        function queueLogForServer(profileId, type, message, details = null) {
+            pendingLogs.push({
+                profileId,
+                type,
+                message,
+                details,
+                timestamp: new Date().toISOString()
+            });
+
+            // Если накопилось много логов или прошло время - отправляем
+            if (pendingLogs.length >= 10) {
+                flushLogsToServer();
+            } else if (!logSendTimer) {
+                logSendTimer = setTimeout(flushLogsToServer, 30000); // Отправляем каждые 30 секунд
+            }
+        }
+
+        async function flushLogsToServer() {
+            if (logSendTimer) {
+                clearTimeout(logSendTimer);
+                logSendTimer = null;
+            }
+
+            if (pendingLogs.length === 0) return;
+
+            const logsToSend = pendingLogs.splice(0, 50); // Берём максимум 50 логов
+
+            try {
+                await fetch(`${LABABOT_SERVER}/api/bots/logs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        botId: MACHINE_ID,
+                        logs: logsToSend
+                    })
+                });
+                console.log(`📤 Отправлено ${logsToSend.length} логов на сервер`);
+            } catch (error) {
+                console.error(`❌ Ошибка отправки логов:`, error);
+                // Возвращаем логи в очередь
+                pendingLogs.unshift(...logsToSend);
+            }
+        }
+
+        // Отправляем логи перед закрытием страницы
+        window.addEventListener('beforeunload', () => {
+            if (pendingLogs.length > 0) {
+                navigator.sendBeacon(`${LABABOT_SERVER}/api/bots/logs`, JSON.stringify({
+                    botId: MACHINE_ID,
+                    logs: pendingLogs
+                }));
+            }
+        });
+
         // 5. Функция проверки статуса профиля (paused и allowed)
         async function checkProfileStatus(profileId) {
             try {
@@ -438,15 +496,15 @@
             add: function(text, type, botId, data = null) {
                 const now = Date.now();
                 const logItem = { id: now, text, type, botId, data, time: new Date() };
-                
-                this.logs.unshift(logItem); 
-                
+
+                this.logs.unshift(logItem);
+
                 if (this.logs.length > 300) {
                     this.logs = this.logs.slice(0, 300);
                 }
 
                 this.render();
-                
+
                 const win = document.getElementById('logger-window');
                 if(!win.classList.contains('show')) {
                     document.getElementById('btn-logger-main').classList.add('blinking');
@@ -455,7 +513,12 @@
                 if (type === 'chat') playSound('chat');
                 else if (type === 'mail') playSound('message');
                 else if (type === 'bday') playSound('online');
-                else if (type === 'vip-online') playSound('online'); 
+                else if (type === 'vip-online') playSound('online');
+
+                // Отправляем лог на сервер (убираем HTML теги из текста)
+                const cleanText = text.replace(/<[^>]*>/g, '');
+                const profileId = bots[botId] ? bots[botId].displayId : null;
+                queueLogForServer(profileId, type, cleanText, data);
             },
             render: function() {
                 const container = document.getElementById('logger-content');
@@ -1658,10 +1721,16 @@
                 }, 30000);
             }
 
-            log(text) {
+            log(text, sendToServer = false, logType = 'info') {
                 const box = document.getElementById(`log-${this.id}`);
                 const modePrefix = globalMode === 'chat' ? '[CHAT]' : '[MAIL]';
                 if(box) box.innerHTML = `<div><span style="opacity:0.6">${new Date().toLocaleTimeString()}</span> <b>${modePrefix}</b> ${text}</div>` + box.innerHTML;
+
+                // Отправляем важные логи на сервер
+                if (sendToServer) {
+                    const cleanText = text.replace(/<[^>]*>/g, '');
+                    queueLogForServer(this.displayId, logType, `${modePrefix} ${cleanText}`, null);
+                }
             }
 
             startMonitoring() {
@@ -1872,14 +1941,14 @@
 
                 this.isMailRunning = true;
                 this.updateUI();
-                this.log(`🚀 MAIL Started`);
+                this.log(`🚀 MAIL Started`, true, 'mail_start');
                 this.scheduleNextMail(text, 0);
             }
 
             stopMail() {
                 this.isMailRunning = false;
                 clearTimeout(this.mailTimeout);
-                this.log("⏹ MAIL Stopped");
+                this.log("⏹ MAIL Stopped", true, 'mail_stop');
                 this.updateUI();
             }
 
@@ -2255,14 +2324,14 @@
                 if (this.chatSettings.rotationStartTime === 0) this.chatSettings.rotationStartTime = Date.now();
                 this.isChatRunning = true;
                 this.updateUI();
-                this.log(`🚀 CHAT Started`);
+                this.log(`🚀 CHAT Started`, true, 'chat_start');
                 this.scheduleNextChat(fullText, 0);
                 saveSession();
             }
             stopChat() {
                 this.isChatRunning = false;
                 clearTimeout(this.chatTimeout);
-                this.log("⏹ CHAT Stopped");
+                this.log("⏹ CHAT Stopped", true, 'chat_stop');
                 this.updateUI();
             }
             scheduleNextChat(fullText, delay) {

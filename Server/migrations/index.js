@@ -446,6 +446,22 @@ async function migrateBotsTable() {
     try {
         await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS bots_bot_id_unique ON bots(bot_id) WHERE bot_id IS NOT NULL`);
     } catch (e) { /* Индекс уже существует */ }
+
+    // Таблица логов бота (операционные логи: старт/стоп, ошибки, события)
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS bot_logs (
+            id SERIAL PRIMARY KEY,
+            bot_id VARCHAR(100) NOT NULL,
+            profile_id VARCHAR(100),
+            log_type VARCHAR(50) NOT NULL,
+            message TEXT NOT NULL,
+            details JSONB,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_bot_logs_profile ON bot_logs(profile_id)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_bot_logs_type ON bot_logs(log_type)`);
+    await pool.query(`CREATE INDEX IF NOT EXISTS idx_bot_logs_created ON bot_logs(created_at)`);
 }
 
 // Исправление SERIAL последовательностей

@@ -883,4 +883,124 @@ router.get('/control/panic-status', asyncHandler(async (req, res) => {
     }
 }));
 
+// ============= BOT LOGS (Операционные логи бота) =============
+
+// Приём логов от бота (пакетная отправка)
+router.post('/logs', asyncHandler(async (req, res) => {
+    const { botId, logs } = req.body;
+
+    if (!botId || !logs || !Array.isArray(logs)) {
+        return res.status(400).json({ success: false, error: 'botId и logs обязательны' });
+    }
+
+    // Вставляем логи пакетно
+    for (const log of logs.slice(0, 50)) { // Максимум 50 логов за раз
+        await pool.query(`
+            INSERT INTO bot_logs (bot_id, profile_id, log_type, message, details, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+        `, [
+            botId,
+            log.profileId || null,
+            log.type || 'info',
+            log.message || '',
+            log.details ? JSON.stringify(log.details) : null,
+            log.timestamp ? new Date(log.timestamp) : new Date()
+        ]);
+    }
+
+    res.json({ success: true, count: Math.min(logs.length, 50) });
+}));
+
+// Получение логов для дашборда
+router.get('/logs', asyncHandler(async (req, res) => {
+    const { userId, role, profileId, logType, limit = 50, offset = 0 } = req.query;
+
+    // Проверяем права
+    if (!userId) {
+        return res.status(401).json({ success: false, error: 'Требуется авторизация' });
+    }
+
+    let whereClause = '1=1';
+    const params = [];
+    let paramIndex = 1;
+
+    // Если указан конкретный профиль
+    if (profileId) {
+        whereClause += ` AND bl.profile_id = $${paramIndex}`;
+        params.push(profileId);
+        paramIndex++;
+    }
+
+    // Если указан тип лога
+    if (logType) {
+        whereClause += ` AND bl.log_type = $${paramIndex}`;
+        params.push(logType);
+        paramIndex++;
+    }
+
+    // Ограничиваем доступ для не-директоров
+    if (role !== 'director') {
+        // Получаем профили, доступные этому пользователю
+        const profilesResult = await pool.query(`
+            SELECT profile_id FROM allowed_profiles WHERE admin_id = $1 OR translator_id = $1
+        `, [userId]);
+
+        if (profilesResult.rows.length > 0) {
+            const profileIds = profilesResult.rows.map(r => r.profile_id);
+            whereClause += ` AND (bl.profile_id = ANY($${paramIndex}) OR bl.profile_id IS NULL)`;
+            params.push(profileIds);
+            paramIndex++;
+        }
+    }
+
+    params.push(parseInt(limit));
+    params.push(parseInt(offset));
+
+    const result = await pool.query(`
+        SELECT
+            bl.id,
+            bl.bot_id,
+            bl.profile_id,
+            bl.log_type,
+            bl.message,
+            bl.details,
+            bl.created_at
+        FROM bot_logs bl
+        WHERE ${whereClause}
+        ORDER BY bl.created_at DESC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `, params);
+
+    // Получаем общее количество
+    const countResult = await pool.query(`
+        SELECT COUNT(*) as total FROM bot_logs bl WHERE ${whereClause}
+    `, params.slice(0, -2)); // Убираем limit и offset
+
+    res.json({
+        success: true,
+        logs: result.rows,
+        total: parseInt(countResult.rows[0].total),
+        hasMore: parseInt(countResult.rows[0].total) > (parseInt(offset) + result.rows.length)
+    });
+}));
+
+// Очистка старых логов (вызывается по расписанию или вручную)
+router.delete('/logs/cleanup', asyncHandler(async (req, res) => {
+    const { userId, role } = req.body;
+
+    // Только директор может очищать логи
+    if (role !== 'director') {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав' });
+    }
+
+    // Удаляем логи старше 7 дней
+    const result = await pool.query(`
+        DELETE FROM bot_logs
+        WHERE created_at < NOW() - INTERVAL '7 days'
+    `);
+
+    console.log(`🧹 Очищено ${result.rowCount} старых логов`);
+    res.json({ success: true, deleted: result.rowCount });
+}));
+
 module.exports = router;
