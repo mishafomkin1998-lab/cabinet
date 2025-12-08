@@ -1041,6 +1041,44 @@
                     </div>
                 </template>
 
+                <!-- Секция переводчиков для директора -->
+                <template x-if="currentUser.role === 'director' && allTranslators.length > 0">
+                    <div class="glass rounded-2xl p-4 mb-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-language text-purple-500 mr-2"></i>Все переводчики
+                            </h3>
+                            <span class="text-sm text-gray-500" x-text="allTranslators.length + ' переводчик(ов)'"></span>
+                        </div>
+                        <div class="flex flex-wrap gap-3">
+                            <template x-for="translator in allTranslators" :key="translator.id">
+                                <div class="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-3 min-w-56 border border-purple-100">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold mr-3">
+                                                <span x-text="translator.name.charAt(0).toUpperCase()"></span>
+                                            </div>
+                                            <div>
+                                                <div class="font-medium text-gray-800" x-text="translator.name"></div>
+                                                <div class="text-xs text-gray-500">
+                                                    <span x-text="translator.adminName || 'Без админа'"></span>
+                                                    <span class="mx-1">•</span>
+                                                    <span x-text="(translator.accountsCount || 0) + ' анкет'"></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button @click="openTranslatorProfilesModal(translator)"
+                                                class="ml-3 px-3 py-1.5 text-xs bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-200 transition-colors"
+                                                title="Назначить анкеты">
+                                            <i class="fas fa-plus mr-1"></i>Анкеты
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
                 <!-- Список анкет -->
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center space-x-3">
@@ -2725,6 +2763,7 @@
                 admins: [],
                 team: [],
                 myTranslators: [], // Переводчики текущего админа
+                allTranslators: [], // Все переводчики (для директора)
                 translatorStats: [],
                 historyActions: [],
 
@@ -3077,6 +3116,20 @@
                                     }))
                                 }));
                                 this.myTranslators = [];
+                                // Для директора: все переводчики с информацией об админе
+                                this.allTranslators = translatorsList.map(t => {
+                                    const admin = adminsList.find(a => a.id === t.owner_id);
+                                    return {
+                                        id: t.id,
+                                        name: t.username,
+                                        login: t.username,
+                                        conversion: t.conversion || 0,
+                                        accounts: t.accounts || [],
+                                        accountsCount: t.accounts_count || 0,
+                                        adminId: t.owner_id,
+                                        adminName: admin ? admin.username : null
+                                    };
+                                });
                             }
                         }
                     } catch (e) { console.error('loadTeam error:', e); }
