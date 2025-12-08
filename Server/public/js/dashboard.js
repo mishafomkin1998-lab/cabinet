@@ -471,6 +471,12 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/bots/status?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
                         const data = await res.json();
+                        // DEBUG: Логируем ответ сервера
+                        console.log('🤖 loadBotsStatus response:', {
+                            botsCount: data.bots?.length,
+                            bots: data.bots,
+                            botsSummary: data.botsSummary
+                        });
                         if (data.success) {
                             // Статистика по БОТАМ (программам) - для карточки "Статус ботов"
                             this.botsStatus = data.botsSummary || { online: 0, offline: 0, total: 0 };
