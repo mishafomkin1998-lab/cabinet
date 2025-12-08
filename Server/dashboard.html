@@ -1243,20 +1243,26 @@
                                     <div class="font-medium" x-text="t('control.enableMailing')"></div>
                                     <div class="text-sm text-gray-500" x-text="t('control.autoMessages')"></div>
                                 </div>
-                                <div class="ios-toggle active" @click="toggleActive(this)"></div>
+                                <div class="ios-toggle"
+                                     :class="{ 'active': controlSettings.mailingEnabled }"
+                                     @click="toggleMailingEnabled()"></div>
                             </div>
                             <div class="flex items-center justify-between">
                                 <div>
                                     <div class="font-medium" x-text="t('control.stopSpam')"></div>
                                     <div class="text-sm text-gray-500" x-text="t('control.onComplaints')"></div>
                                 </div>
-                                <div class="ios-toggle" @click="toggleActive(this)"></div>
+                                <div class="ios-toggle"
+                                     :class="{ 'active': controlSettings.stopSpam }"
+                                     @click="toggleStopSpam()"></div>
                             </div>
                         </div>
-                        
+
                         <div class="mt-8">
-                            <button class="w-full py-3 rounded-xl bg-gradient-to-r from-red-500 to-pink-500 text-white font-medium">
-                                Panic Mode
+                            <button @click="activatePanicMode()"
+                                    class="w-full py-3 rounded-xl text-white font-medium transition-all"
+                                    :class="controlSettings.panicMode ? 'bg-green-500 hover:bg-green-600' : 'bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600'">
+                                <span x-text="controlSettings.panicMode ? '🟢 Отключить Panic Mode' : '🚨 Panic Mode'"></span>
                             </button>
                         </div>
                     </div>
@@ -2576,6 +2582,13 @@
 
                 generationPrompt: '',
 
+                // Настройки управления
+                controlSettings: {
+                    mailingEnabled: true,
+                    stopSpam: false,
+                    panicMode: false
+                },
+
                 // Фильтры истории
                 historyFilter: {
                     admin: '',
@@ -2720,7 +2733,8 @@
                             this.loadProfileHistory(),
                             this.loadSavedPrompt(),
                             this.loadUserBalance(),
-                            this.loadPricing()
+                            this.loadPricing(),
+                            this.loadControlSettings()
                         ];
 
                         // Загружаем финансовые данные только для директора
@@ -3833,6 +3847,76 @@
                         }
                     } catch (e) {
                         console.error('Ошибка:', e);
+                    }
+                },
+
+                // === Настройки управления ===
+                async loadControlSettings() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/control/settings?userId=${this.currentUser.id}`);
+                        const data = await res.json();
+                        if (data.success && data.settings) {
+                            this.controlSettings = data.settings;
+                        }
+                    } catch (e) {
+                        console.error('loadControlSettings error:', e);
+                    }
+                },
+
+                async toggleMailingEnabled() {
+                    this.controlSettings.mailingEnabled = !this.controlSettings.mailingEnabled;
+                    await this.saveControlSettings();
+                },
+
+                async toggleStopSpam() {
+                    this.controlSettings.stopSpam = !this.controlSettings.stopSpam;
+                    await this.saveControlSettings();
+                },
+
+                async saveControlSettings() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/control/settings`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                userId: this.currentUser.id,
+                                settings: this.controlSettings
+                            })
+                        });
+                        const data = await res.json();
+                        if (!data.success) {
+                            alert('Ошибка сохранения настроек');
+                        }
+                    } catch (e) {
+                        console.error('saveControlSettings error:', e);
+                        alert('Ошибка сети при сохранении настроек');
+                    }
+                },
+
+                async activatePanicMode() {
+                    if (!confirm('ВНИМАНИЕ! Это остановит ВСЕ боты немедленно. Продолжить?')) {
+                        return;
+                    }
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/control/panic`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                userId: this.currentUser.id,
+                                activate: !this.controlSettings.panicMode
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.controlSettings.panicMode = !this.controlSettings.panicMode;
+                            alert(data.message);
+                            await this.loadBotsStatus();
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось активировать panic mode'));
+                        }
+                    } catch (e) {
+                        console.error('activatePanicMode error:', e);
+                        alert('Ошибка сети');
                     }
                 },
 
