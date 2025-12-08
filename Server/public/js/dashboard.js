@@ -64,7 +64,11 @@
                     });
                 },
 
-                activeMenu: window.location.hash.slice(1) || 'stats',
+                activeMenu: (() => {
+                    const hash = window.location.hash.slice(1);
+                    const validMenus = ['stats', 'accounts', 'team', 'control', 'monitoring', 'finances', 'history', 'training'];
+                    return validMenus.includes(hash) ? hash : 'stats';
+                })(),
                 activeSubmenu: 'general',
                 showCalendar: false,
                 showMonitoringCalendar: false,

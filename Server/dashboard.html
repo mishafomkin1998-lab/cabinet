@@ -532,7 +532,7 @@
                                         </div>
 
                                         <!-- Переводчики админа (раскрывающийся список) -->
-                                        <div x-show="expandedAdminId === admin.id" x-collapse class="bg-gray-50 p-4 border-t border-gray-200">
+                                        <div x-show="expandedAdminId === admin.id" x-transition class="bg-gray-50 p-4 border-t border-gray-200">
                                             <div x-show="admin.translators.length === 0" class="text-center text-gray-500 py-4">
                                                 <i class="fas fa-users text-gray-300 text-2xl mb-2"></i>
                                                 <div>Нет переводчиков</div>

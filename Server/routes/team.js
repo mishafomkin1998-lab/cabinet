@@ -116,9 +116,9 @@ router.post('/', async (req, res) => {
         // Если login не передан, используем username
         const userLogin = login || username;
         const result = await pool.query(
-            `INSERT INTO users (username, login, password_hash, role, owner_id, salary, ai_enabled)
-             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-            [username, userLogin, hash, role, ownerId, isRestricted ? null : salary, aiEnabled || false]
+            `INSERT INTO users (username, login, password_hash, role, owner_id, salary, is_restricted, ai_enabled)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+            [username, userLogin, hash, role, ownerId, isRestricted ? null : salary, isRestricted || false, aiEnabled || false]
         );
         res.json({ success: true, userId: result.rows[0].id });
     } catch (e) {
