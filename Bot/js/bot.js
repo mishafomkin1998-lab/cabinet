@@ -976,6 +976,15 @@
                     document.querySelectorAll('.vars-dropdown').forEach(d=>d.style.display='none');
                 }
             };
+
+            // КРИТИЧНО: Сохраняем сессию при закрытии окна
+            window.addEventListener('beforeunload', () => {
+                // Сохраняем текст из активной вкладки
+                if (activeTabId && bots[activeTabId]) {
+                    saveCurrentText(activeTabId);
+                }
+                saveSession();
+            });
         };
 
         function setGlobalTarget(targetType) {
@@ -1157,6 +1166,20 @@
             const linkRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.(com|net|org|ru|ua|io)\b)/gi;
             if (linkRegex.test(val)) { val = val.replace(linkRegex, ''); errorMsg = "Запрещено вставлять ссылки"; }
             if (val !== original) { textarea.value = val; if (errorMsg) showToast(errorMsg); }
+        }
+
+        // Сохранение текущего текста из textarea в бота (для восстановления при перезапуске)
+        function saveCurrentText(botId) {
+            const bot = bots[botId];
+            if (!bot) return;
+            const textarea = document.getElementById(`msg-${botId}`);
+            if (!textarea) return;
+            // Сохраняем в зависимости от текущего режима
+            if (globalMode === 'chat') {
+                bot.currentChatText = textarea.value;
+            } else {
+                bot.currentMailText = textarea.value;
+            }
         }
 
         function showToast(text) {
@@ -1483,8 +1506,10 @@
                 this.displayId = displayId; 
                 this.token = token;
                 
-                this.lastTplMail = null; 
+                this.lastTplMail = null;
                 this.lastTplChat = null;
+                this.currentMailText = ''; // Текущий текст рассылки (сохраняется между сессиями)
+                this.currentChatText = ''; // Текущий текст чата (сохраняется между сессиями)
                 this.isMailRunning = false;
                 this.mailTimeout = null;
                 this.mailStats = { sent: 0, errors: 0, waiting: 0 };
@@ -2658,7 +2683,7 @@
                     </div>
                     </div>
                     <div class="relative-box d-flex flex-column flex-grow-1">
-                        <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." oninput="checkVarTrigger(this, 'vars-dropdown-${bot.id}'); bots['${bot.id}'].updateUI(); validateInput(this)"></textarea>
+                        <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." oninput="checkVarTrigger(this, 'vars-dropdown-${bot.id}'); bots['${bot.id}'].updateUI(); validateInput(this); saveCurrentText('${bot.id}')"></textarea>
                         <div id="vars-dropdown-${bot.id}" class="vars-dropdown">
                             <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{City}', 'vars-dropdown-${bot.id}')"><b>{City}</b></div>
                             <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{Name}', 'vars-dropdown-${bot.id}')"><b>{Name}</b></div>
@@ -2757,7 +2782,7 @@
              return botTemplates[login];
         }
 
-        function updateInterfaceForMode(botId) {
+        function updateInterfaceForMode(botId, useSavedText = false) {
             const isChat = globalMode === 'chat';
             const bot = bots[botId];
             document.getElementById(`title-tpl-${botId}`).innerText = isChat ? "Шаблоны ЧАТА" : "Шаблоны ПИСЕМ";
@@ -2769,26 +2794,26 @@
             if(isChat) {
                 ws.querySelectorAll('.hide-in-chat').forEach(el => el.style.display = 'none');
                 ws.querySelectorAll('.hide-in-mail').forEach(el => el.style.display = 'block');
-                
+
                 Array.from(targetSelect.options).forEach(opt => {
                     if (['favorites', 'my-favorites', 'inbox'].includes(opt.value)) { opt.style.display = 'none'; }
                     else { opt.style.display = 'block'; }
                 });
                 targetSelect.value = bot.chatSettings.target;
-                
+
                 document.getElementById(`rot-time-${botId}`).value = bot.chatSettings.rotationHours;
                 document.getElementById(`rot-cyclic-${botId}`).checked = bot.chatSettings.cyclic;
             } else {
                 ws.querySelectorAll('.hide-in-chat').forEach(el => { if(el.classList.contains('photo-block')) el.style.display = 'flex'; else el.style.display = 'block'; });
                 ws.querySelectorAll('.hide-in-chat.d-none').forEach(el => el.style.display = 'none');
                 ws.querySelectorAll('.hide-in-mail').forEach(el => el.style.display = 'none');
-                
+
                 Array.from(targetSelect.options).forEach(opt => opt.style.display = 'block');
                 targetSelect.value = bot.mailSettings.target;
-                
+
                 document.getElementById(`auto-check-${botId}`).checked = bot.mailSettings.auto;
             }
-            
+
             let lastIdx = isChat ? bot.lastTplChat : bot.lastTplMail;
             if (lastIdx === null || lastIdx === undefined || lastIdx === "") {
                 if(accountPreferences[bot.login]) {
@@ -2799,7 +2824,7 @@
                 }
             }
 
-            updateTemplateDropdown(botId, lastIdx);
+            updateTemplateDropdown(botId, lastIdx, useSavedText);
             renderBlacklist(botId);
             bot.updateUI();
         }
@@ -3091,22 +3116,30 @@
             }
         }
 
-        function updateTemplateDropdown(botId, forceSelectIndex = null) {
+        function updateTemplateDropdown(botId, forceSelectIndex = null, useSavedText = false) {
             const sel=document.getElementById(`tpl-select-${botId}`); if(!sel) return;
             const bot = bots[botId];
             const isChat = globalMode === 'chat';
             const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
-            
+
             let val = (forceSelectIndex !== null) ? forceSelectIndex : sel.value;
             sel.innerHTML='<option value="">-- Выберите --</option>';
             tpls.forEach((t,i)=> sel.innerHTML+=`<option value="${i}">${t.favorite?'❤ ':''}${t.name}</option>`);
-            
+
             const btnFav = document.getElementById(`btn-fav-${botId}`);
             if(val !== null && val !== "" && val !== undefined && tpls[val]) {
                  sel.value = val;
                  const area=document.getElementById(`msg-${botId}`);
                  area.disabled=false;
-                 area.value=tpls[val].text;
+
+                 // КРИТИЧНО: Используем сохранённый текст если он есть, иначе текст шаблона
+                 const savedText = isChat ? bot.currentChatText : bot.currentMailText;
+                 if (useSavedText && savedText) {
+                     area.value = savedText;
+                 } else {
+                     area.value = tpls[val].text || '';
+                 }
+
                  if(isChat) bots[botId].lastTplChat = val; else bots[botId].lastTplMail = val;
 
                  // Сохраняем выбор шаблона
@@ -3114,16 +3147,15 @@
                  if(isChat) accountPreferences[bot.login].chatTpl = val;
                  else accountPreferences[bot.login].mailTpl = val;
                  localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
-                 saveSession();
 
                  if(btnFav) { if(tpls[val].favorite) { btnFav.classList.add('btn-heart-active','btn-danger'); btnFav.classList.remove('btn-outline-danger'); } else { btnFav.classList.remove('btn-heart-active','btn-danger'); btnFav.classList.add('btn-outline-danger'); } }
                  validateInput(area);
-            } else { 
-                 sel.value=""; 
+            } else {
+                 sel.value="";
                  const area = document.getElementById(`msg-${botId}`);
-                 area.disabled=true; area.value=""; 
-                 if(btnFav) btnFav.classList.remove('btn-heart-active'); 
-                 bots[botId].updateUI(); 
+                 area.disabled=true; area.value="";
+                 if(btnFav) btnFav.classList.remove('btn-heart-active');
+                 bots[botId].updateUI();
             }
         }
 
@@ -3298,29 +3330,54 @@
             return false;
         }
 
-        async function saveSession() { 
+        async function saveSession() {
             try {
                 // Сохраняем порядок вкладок в localStorage
                 const currentTabOrder = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
                 const localStorageData = currentTabOrder.map(id => {
                     const b = bots[id];
                     if (!b) return null;
+                    // Сохраняем текущий текст из textarea
+                    const textarea = document.getElementById(`msg-${id}`);
+                    const currentText = textarea ? textarea.value : '';
+                    if (globalMode === 'chat') {
+                        b.currentChatText = currentText;
+                    } else {
+                        b.currentMailText = currentText;
+                    }
+
                     return {
                         login: b.login,
                         pass: b.pass,
                         displayId: b.displayId,
                         lastTplMail: b.lastTplMail,
                         lastTplChat: b.lastTplChat,
+                        // КРИТИЧНО: Текст из textarea (сохраняется между сессиями!)
+                        currentMailText: b.currentMailText || '',
+                        currentChatText: b.currentChatText || '',
+                        // Chat settings
                         chatRotationHours: b.chatSettings.rotationHours,
                         chatCyclic: b.chatSettings.cyclic,
                         chatCurrentIndex: b.chatSettings.currentInviteIndex,
                         chatStartTime: b.chatSettings.rotationStartTime,
+                        chatTarget: b.chatSettings.target,
+                        chatBlacklist: b.chatSettings.blacklist || [],
+                        // Mail settings
                         mailAuto: b.mailSettings.auto,
                         mailTarget: b.mailSettings.target,
+                        mailPhotoOnly: b.mailSettings.photoOnly,
+                        mailBlacklist: b.mailSettings.blacklist || [],
+                        // Статистика (КРИТИЧНО - должна сохраняться!)
+                        mailStats: b.mailStats,
+                        chatStats: b.chatStats,
+                        // История отправленных/ошибок (КРИТИЧНО!)
+                        mailHistory: b.mailHistory,
+                        chatHistory: b.chatHistory,
+                        // VIP список
                         vipList: b.vipList
                     };
                 }).filter(item => item !== null);
-                
+
                 localStorage.setItem('savedBots', JSON.stringify(localStorageData));
 
             } catch (error) {
@@ -3343,34 +3400,56 @@
                 // Загружаем из localStorage
                 const s = JSON.parse(localStorage.getItem('savedBots') || '[]');
                 document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} из кэша...` : "";
-                
+
                 for (const a of s) {
                     const ok = await performLogin(a.login, a.pass, a.displayId);
                     if (ok && bots[Object.keys(bots).pop()]) {
                         const botId = Object.keys(bots).pop();
                         const bot = bots[botId];
-                        
-                        // Восстанавливаем остальные настройки из localStorage
+
+                        // Восстанавливаем шаблоны
                         bot.lastTplMail = a.lastTplMail;
                         bot.lastTplChat = a.lastTplChat;
-                        
+
+                        // КРИТИЧНО: Восстанавливаем текст из textarea
+                        if (a.currentMailText) bot.currentMailText = a.currentMailText;
+                        if (a.currentChatText) bot.currentChatText = a.currentChatText;
+
+                        // Восстанавливаем настройки чата
                         if (a.chatRotationHours) bot.chatSettings.rotationHours = a.chatRotationHours;
                         if (a.chatCyclic !== undefined) bot.chatSettings.cyclic = a.chatCyclic;
                         if (a.chatCurrentIndex) bot.chatSettings.currentInviteIndex = a.chatCurrentIndex;
                         if (a.chatStartTime) bot.chatSettings.rotationStartTime = a.chatStartTime;
+                        if (a.chatTarget) bot.chatSettings.target = a.chatTarget;
+                        if (a.chatBlacklist && a.chatBlacklist.length > 0) bot.chatSettings.blacklist = a.chatBlacklist;
+
+                        // Восстанавливаем настройки рассылки
                         if (a.mailAuto !== undefined) bot.mailSettings.auto = a.mailAuto;
                         if (a.mailTarget) bot.mailSettings.target = a.mailTarget;
+                        if (a.mailPhotoOnly !== undefined) bot.mailSettings.photoOnly = a.mailPhotoOnly;
+                        if (a.mailBlacklist && a.mailBlacklist.length > 0) bot.mailSettings.blacklist = a.mailBlacklist;
+
+                        // КРИТИЧНО: Восстанавливаем статистику
+                        if (a.mailStats) bot.mailStats = a.mailStats;
+                        if (a.chatStats) bot.chatStats = a.chatStats;
+
+                        // КРИТИЧНО: Восстанавливаем историю
+                        if (a.mailHistory) bot.mailHistory = a.mailHistory;
+                        if (a.chatHistory) bot.chatHistory = a.chatHistory;
+
+                        // Восстанавливаем VIP список
                         if (a.vipList) bot.vipList = a.vipList;
-                        
-                        updateInterfaceForMode(bot.id);
+
+                        // КРИТИЧНО: передаём useSavedText=true чтобы восстановить сохранённый текст
+                        updateInterfaceForMode(bot.id, true);
+                        bot.updateUI(); // Обновляем UI со статистикой
                     }
                     await new Promise(r => setTimeout(r, 500));
                 }
-                
-                document.getElementById('restore-status').innerText = "";
+
                 document.getElementById('restore-status').innerText = "";
                 document.getElementById('welcome-screen').style.display = Object.keys(bots).length > 0 ? 'none' : 'flex';
-                
+
                 // Сохраняем порядок вкладок
                 const tempBots = { ...bots };
                 bots = {};
@@ -3378,7 +3457,7 @@
                 keys.forEach(id => {
                     if (tempBots[id]) bots[id] = tempBots[id];
                 });
-                
+
             } catch (error) {
                 console.error('Error restoring session:', error);
                 document.getElementById('restore-status').innerText = "Ошибка загрузки. Используется кэш.";
