@@ -1806,7 +1806,12 @@
             }
 
             // === ВАЖНОЕ ДОБАВЛЕНИЕ: Метод для создания скрытого WebView ===
+            // ВРЕМЕННО ОТКЛЮЧЕНО для диагностики проблемы с клавиатурой
             createWebview() {
+                // Отключаем webview - он вызывает проблемы с фокусом клавиатуры
+                console.log(`[WebView] ⚠️ WebView временно отключен для ${this.id}`);
+                return; // ВРЕМЕННО ОТКЛЮЧЕНО
+
                 const webview = document.createElement('webview');
                 webview.id = `webview-${this.id}`;
                 webview.src = "https://ladadate.com/login";
