@@ -2178,6 +2178,39 @@
                     }
                 },
 
+                // Удалить выбранные анкеты
+                async deleteSelectedProfiles() {
+                    if (this.selectedProfileIds.length === 0) return;
+
+                    const count = this.selectedProfileIds.length;
+                    if (!confirm(`Вы уверены, что хотите удалить ${count} анкет(ы)?`)) {
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/profiles/bulk-delete`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileIds: this.selectedProfileIds,
+                                userId: this.currentUser.id,
+                                userName: this.currentUser.username
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.selectedProfileIds = [];
+                            await this.loadAccounts();
+                            alert(`Удалено ${data.deleted || count} анкет`);
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось удалить'));
+                        }
+                    } catch (e) {
+                        console.error('deleteSelectedProfiles error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
                 async paySelectedProfiles() {
                     if (this.selectedProfileIds.length === 0) return;
 

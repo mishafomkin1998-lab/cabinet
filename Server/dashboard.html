@@ -752,7 +752,7 @@
                      x-transition:enter="transition ease-out duration-200"
                      x-transition:enter-start="opacity-0 transform -translate-y-2"
                      x-transition:enter-end="opacity-100 transform translate-y-0"
-                     class="glass rounded-xl p-3 mb-4 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200">
+                     class="glass rounded-xl p-3 mb-4 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 relative z-50">
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-indigo-700">
                             <i class="fas fa-check-square mr-2"></i>
@@ -772,7 +772,7 @@
                                     <i class="fas fa-chevron-down ml-2 text-xs"></i>
                                 </button>
                                 <div x-show="showDropdown" @click.outside="showDropdown = false"
-                                     class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
+                                     class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-[100] max-h-64 overflow-y-auto">
                                     <button @click="assignSelectedToAdmin(null); showDropdown = false"
                                             class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 text-gray-600">
                                         <i class="fas fa-ban mr-2"></i>Снять назначение
@@ -797,7 +797,7 @@
                                     <i class="fas fa-chevron-down ml-2 text-xs"></i>
                                 </button>
                                 <div x-show="showDropdown" @click.outside="showDropdown = false"
-                                     class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
+                                     class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-[100] max-h-64 overflow-y-auto">
                                     <button @click="assignSelectedToTranslator(null); showDropdown = false"
                                             class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 text-gray-600">
                                         <i class="fas fa-ban mr-2"></i>Снять назначение
@@ -822,6 +822,11 @@
                                 <i class="fas fa-credit-card mr-2"></i>Оплатить
                             </button>
                         </template>
+
+                        <!-- Удалить выбранные -->
+                        <button @click="deleteSelectedProfiles()" class="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors">
+                            <i class="fas fa-trash mr-2"></i>Удалить
+                        </button>
                     </div>
                 </div>
                 

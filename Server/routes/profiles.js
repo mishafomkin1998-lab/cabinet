@@ -293,6 +293,45 @@ router.post('/toggle-access', async (req, res) => {
 });
 
 /**
+ * POST /api/profiles/bulk-delete
+ * Массовое удаление анкет
+ */
+router.post('/bulk-delete', async (req, res) => {
+    const { profileIds, userId, userName } = req.body;
+    try {
+        let deleted = 0;
+        for (const profileId of profileIds) {
+            // Сохраняем paid_until перед удалением
+            const profile = await pool.query(
+                `SELECT paid_until FROM allowed_profiles WHERE profile_id = $1`,
+                [profileId]
+            );
+
+            if (profile.rows.length > 0 && profile.rows[0].paid_until) {
+                await pool.query(
+                    `INSERT INTO profile_payment_history (profile_id, days, action_type, by_user_id, note, paid_until_backup)
+                     VALUES ($1, 0, 'deletion_backup', $2, 'Бэкап при массовом удалении', $3)
+                     ON CONFLICT DO NOTHING`,
+                    [profileId, userId, profile.rows[0].paid_until]
+                );
+            }
+
+            // Логируем удаление
+            await logProfileAction(profileId, 'delete', userId, userName, 'Массовое удаление');
+
+            // Удаляем анкету
+            await pool.query(`DELETE FROM allowed_profiles WHERE profile_id = $1`, [profileId]);
+            await pool.query(`DELETE FROM bot_profiles WHERE profile_id = $1`, [profileId]);
+            deleted++;
+        }
+        res.json({ success: true, deleted });
+    } catch (e) {
+        console.error('Bulk delete profiles error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+/**
  * DELETE /api/profiles/:profileId
  * Удаляет анкету из базы данных (сохраняя paid_until в истории для восстановления)
  */
