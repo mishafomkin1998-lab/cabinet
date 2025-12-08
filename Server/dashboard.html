@@ -499,6 +499,32 @@
             user-select: none;
             cursor: col-resize;
         }
+
+        /* Стили для чекбоксов в таблице */
+        .profile-checkbox {
+            width: 18px !important;
+            height: 18px !important;
+            cursor: pointer !important;
+            accent-color: #6366f1;
+            border: 2px solid #d1d5db;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .profile-checkbox:hover:not(:disabled) {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .profile-checkbox:checked {
+            background-color: #6366f1;
+            border-color: #6366f1;
+        }
+
+        .profile-checkbox:disabled {
+            opacity: 0.5;
+            cursor: not-allowed !important;
+        }
     </style>
 </head>
 <body x-data="dashboard()" x-init="init()" :class="{ 'dark': darkMode }" class="text-gray-800">
@@ -979,6 +1005,42 @@
                     </div>
                 </div>
 
+                <!-- Секция переводчиков для админа -->
+                <template x-if="currentUser.role === 'admin' && myTranslators.length > 0">
+                    <div class="glass rounded-2xl p-4 mb-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-lg font-semibold text-gray-800">
+                                <i class="fas fa-users text-indigo-500 mr-2"></i>Мои переводчики
+                            </h3>
+                            <span class="text-sm text-gray-500" x-text="myTranslators.length + ' переводчик(ов)'"></span>
+                        </div>
+                        <div class="flex flex-wrap gap-3">
+                            <template x-for="translator in myTranslators" :key="translator.id">
+                                <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-3 min-w-48 border border-indigo-100">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold mr-3">
+                                                <span x-text="translator.name.charAt(0).toUpperCase()"></span>
+                                            </div>
+                                            <div>
+                                                <div class="font-medium text-gray-800" x-text="translator.name"></div>
+                                                <div class="text-xs text-gray-500">
+                                                    <span x-text="translator.accountsCount || 0"></span> анкет
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button @click="openTranslatorProfilesModal(translator)"
+                                                class="ml-3 px-3 py-1.5 text-xs bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200 transition-colors"
+                                                title="Назначить анкеты">
+                                            <i class="fas fa-plus mr-1"></i>Анкеты
+                                        </button>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+
                 <!-- Список анкет -->
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center space-x-3">
@@ -1019,9 +1081,9 @@
                                     <!-- Чекбокс для выбора (если не "мой админ") -->
                                     <th x-show="!isRestricted" class="text-left py-2 px-3 w-10">
                                         <input type="checkbox"
-                                               class="w-4 h-4 rounded"
+                                               class="profile-checkbox"
                                                x-ref="selectAllCheckbox"
-                                               @click="toggleSelectAllProfiles($event.target.checked)"
+                                               @change="toggleSelectAllProfiles($event.target.checked)"
                                                x-effect="
                                                    const unpaidCount = filteredAccounts.filter(a => !a.isPaid && !a.isFree).length;
                                                    const selectedCount = selectedProfileIds.length;
@@ -1077,7 +1139,7 @@
                                         <!-- Чекбокс для выбора (если не "мой админ") -->
                                         <td x-show="!isRestricted" class="py-2 px-3">
                                             <input type="checkbox"
-                                                   class="w-4 h-4 rounded cursor-pointer"
+                                                   class="profile-checkbox"
                                                    :value="account.id"
                                                    :checked="selectedProfileIds.includes(account.id)"
                                                    :disabled="account.isPaid || account.isFree"
@@ -2119,7 +2181,62 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- Модальное окно назначения анкет переводчику -->
+    <div x-show="showTranslatorProfilesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" @click.outside="showTranslatorProfilesModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">
+                    <i class="fas fa-user-tag text-indigo-500 mr-2"></i>
+                    Анкеты для <span x-text="selectedTranslatorForProfiles?.name"></span>
+                </h3>
+                <button @click="showTranslatorProfilesModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="mb-4 p-3 bg-indigo-50 rounded-lg text-sm text-indigo-700">
+                <i class="fas fa-info-circle mr-2"></i>
+                Выберите анкеты, которые будут доступны переводчику для работы
+            </div>
+
+            <!-- Список анкет -->
+            <div class="space-y-2 max-h-96 overflow-y-auto mb-4">
+                <template x-for="account in accounts" :key="account.id">
+                    <label class="flex items-center p-3 rounded-lg hover:bg-gray-50 cursor-pointer border border-gray-100"
+                           :class="{ 'bg-indigo-50 border-indigo-200': selectedTranslatorProfileIds.includes(String(account.id)) }">
+                        <input type="checkbox"
+                               class="profile-checkbox mr-3"
+                               :checked="selectedTranslatorProfileIds.includes(String(account.id))"
+                               @change="toggleTranslatorProfile(account.id)">
+                        <div class="flex-1">
+                            <div class="font-medium" x-text="'#' + account.id"></div>
+                            <div class="text-xs text-gray-500">
+                                <span :class="account.status === 'online' ? 'text-green-500' : 'text-gray-400'"
+                                      x-text="account.status === 'online' ? 'Онлайн' : 'Оффлайн'"></span>
+                                <span class="mx-1">•</span>
+                                <span x-text="account.incoming || 0"></span> входящих
+                            </div>
+                        </div>
+                    </label>
+                </template>
+            </div>
+
+            <div class="text-sm text-gray-500 mb-4">
+                Выбрано: <span class="font-medium text-indigo-600" x-text="selectedTranslatorProfileIds.length"></span> анкет
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+                <button @click="showTranslatorProfilesModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
+                    Отмена
+                </button>
+                <button @click="saveTranslatorProfiles" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                    <i class="fas fa-save mr-2"></i>Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Модальное окно просмотра деталей админа -->
     <div x-show="showViewAdminModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div class="glass rounded-2xl p-6 w-full max-w-2xl" @click.outside="showViewAdminModal = false">
@@ -2456,6 +2573,9 @@
                 showAddAccountModal: false,
                 showAddAdminModal: false,
                 showAssignAccountsModal: false,
+                showTranslatorProfilesModal: false,
+                selectedTranslatorForProfiles: null,
+                selectedTranslatorProfileIds: [],
                 showViewAdminModal: false,
                 sortBy: 'date',
                 sortDirection: 'desc',
@@ -3641,7 +3761,63 @@
                         alert('Ошибка сети при назначении анкет');
                     }
                 },
-                
+
+                // Открыть модальное окно назначения анкет переводчику
+                async openTranslatorProfilesModal(translator) {
+                    this.selectedTranslatorForProfiles = translator;
+                    this.selectedTranslatorProfileIds = [];
+
+                    // Загружаем уже назначенные анкеты
+                    try {
+                        const res = await fetch(`${API_BASE}/api/team/translator/${translator.id}/profiles`);
+                        const data = await res.json();
+                        if (data.success && data.profileIds) {
+                            this.selectedTranslatorProfileIds = data.profileIds.map(String);
+                        }
+                    } catch (e) {
+                        console.error('Error loading translator profiles:', e);
+                    }
+
+                    this.showTranslatorProfilesModal = true;
+                },
+
+                // Переключить выбор анкеты для переводчика
+                toggleTranslatorProfile(profileId) {
+                    const id = String(profileId);
+                    const idx = this.selectedTranslatorProfileIds.indexOf(id);
+                    if (idx > -1) {
+                        this.selectedTranslatorProfileIds.splice(idx, 1);
+                    } else {
+                        this.selectedTranslatorProfileIds.push(id);
+                    }
+                },
+
+                // Сохранить назначенные анкеты переводчику
+                async saveTranslatorProfiles() {
+                    if (!this.selectedTranslatorForProfiles) return;
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/team/translator/${this.selectedTranslatorForProfiles.id}/profiles`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileIds: this.selectedTranslatorProfileIds
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.showTranslatorProfilesModal = false;
+                            await this.loadTeam();
+                            alert(`Анкеты назначены переводчику ${this.selectedTranslatorForProfiles.name}`);
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось назначить анкеты'));
+                        }
+                    } catch (e) {
+                        console.error('saveTranslatorProfiles error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
                 viewAdminDetails(admin) {
                     this.selectedAdmin = admin;
                     this.showViewAdminModal = true;
