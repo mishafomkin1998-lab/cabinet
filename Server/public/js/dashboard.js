@@ -524,7 +524,8 @@
                                 profileId: p.profileId,
                                 note: p.note,
                                 status: p.status,
-                                mailingEnabled: p.mailingEnabled !== false  // по умолчанию true
+                                mailingEnabled: p.mailingEnabled !== false,  // по умолчанию true
+                                proxy: p.proxy || null  // прокси для анкеты
                             }));
                         }
                     } catch (e) { console.error('loadBotsStatus error:', e); }
@@ -1872,6 +1873,33 @@
                         }
                     } catch (e) {
                         console.error('toggleAllProfilesMailing error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
+                // Обновление прокси для анкеты
+                async updateProfileProxy(profile, proxy) {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/profile/${profile.profileId}/proxy`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                userId: this.currentUser.id,
+                                proxy: proxy || null
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            profile.proxy = proxy || null;
+                            // Также обновляем в accounts
+                            const acc = this.accounts.find(a => a.id === profile.profileId);
+                            if (acc) acc.proxy = proxy || null;
+                            console.log(`Прокси для ${profile.profileId}: ${proxy || 'удалён'}`);
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось обновить прокси'));
+                        }
+                    } catch (e) {
+                        console.error('updateProfileProxy error:', e);
                         alert('Ошибка сети');
                     }
                 },

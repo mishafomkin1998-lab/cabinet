@@ -165,17 +165,19 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
 
     console.log(`❤️ Heartbeat от ${accountDisplayId} (бот ${botId}): ${profileStatus}`);
 
-    // Получаем статус paused для ответа боту
+    // Получаем статус paused и proxy для ответа боту
     const profileSettings = await pool.query(
-        `SELECT paused FROM allowed_profiles WHERE profile_id = $1`,
+        `SELECT paused, proxy FROM allowed_profiles WHERE profile_id = $1`,
         [accountDisplayId]
     );
     const isPaused = profileSettings.rows[0]?.paused || false;
+    const proxy = profileSettings.rows[0]?.proxy || null;
 
     res.json({
         status: 'ok',
         commands: {
-            mailingEnabled: !isPaused  // true = рассылка включена, false = на паузе
+            mailingEnabled: !isPaused,  // true = рассылка включена, false = на паузе
+            proxy: proxy  // прокси для этой анкеты (null = без прокси)
         }
     });
 }));
@@ -279,6 +281,7 @@ router.get('/status', asyncHandler(async (req, res) => {
             p.profile_id,
             p.note,
             p.paused,
+            p.proxy,
             h.bot_id,
             h.status as heartbeat_status,
             h.ip,
@@ -322,7 +325,8 @@ router.get('/status', asyncHandler(async (req, res) => {
             version: row.version,
             status: status,
             lastHeartbeat: row.last_heartbeat,
-            mailingEnabled: !row.paused  // true = рассылка включена
+            mailingEnabled: !row.paused,  // true = рассылка включена
+            proxy: row.proxy || null  // прокси для анкеты
         };
     });
 
@@ -817,6 +821,94 @@ router.post('/profiles/toggle-mailing-all', asyncHandler(async (req, res) => {
         count: result.rowCount,
         mailingEnabled: enabled
     });
+}));
+
+// ============= PROXY MANAGEMENT (Управление прокси) =============
+
+// Обновить прокси для одной анкеты
+router.post('/profile/:profileId/proxy', asyncHandler(async (req, res) => {
+    const { profileId } = req.params;
+    const { userId, proxy } = req.body;
+
+    // Проверяем права (директор или админ анкеты)
+    const user = await pool.query(`SELECT role FROM users WHERE id = $1`, [userId]);
+    if (user.rows.length === 0) {
+        return res.status(403).json({ success: false, error: 'Пользователь не найден' });
+    }
+
+    const role = user.rows[0].role;
+    if (role !== 'director') {
+        // Для не-директоров проверяем, что анкета им назначена
+        const profileCheck = await pool.query(
+            `SELECT id FROM allowed_profiles WHERE profile_id = $1 AND (assigned_admin_id = $2 OR assigned_translator_id = $2)`,
+            [profileId, userId]
+        );
+        if (profileCheck.rows.length === 0) {
+            return res.status(403).json({ success: false, error: 'Нет доступа к этой анкете' });
+        }
+    }
+
+    // Обновляем прокси
+    await pool.query(
+        `UPDATE allowed_profiles SET proxy = $1 WHERE profile_id = $2`,
+        [proxy || null, profileId]
+    );
+
+    console.log(`🌐 Профиль ${profileId}: прокси обновлён на ${proxy || 'отключен'}`);
+
+    res.json({
+        success: true,
+        profileId,
+        proxy: proxy || null
+    });
+}));
+
+// Получить прокси для анкеты (для бота)
+router.get('/profile/:profileId/proxy', asyncHandler(async (req, res) => {
+    const { profileId } = req.params;
+
+    const result = await pool.query(
+        `SELECT proxy FROM allowed_profiles WHERE profile_id = $1`,
+        [profileId]
+    );
+
+    if (result.rows.length === 0) {
+        return res.json({ success: true, proxy: null });
+    }
+
+    res.json({
+        success: true,
+        proxy: result.rows[0].proxy || null
+    });
+}));
+
+// Массовое обновление прокси для всех анкет
+router.post('/profiles/proxy-bulk', asyncHandler(async (req, res) => {
+    const { userId, proxies } = req.body;  // proxies = [{profileId, proxy}, ...]
+
+    // Только директор
+    const user = await pool.query(`SELECT role FROM users WHERE id = $1`, [userId]);
+    if (user.rows.length === 0 || user.rows[0].role !== 'director') {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав' });
+    }
+
+    if (!proxies || !Array.isArray(proxies)) {
+        return res.status(400).json({ success: false, error: 'proxies должен быть массивом' });
+    }
+
+    let updated = 0;
+    for (const item of proxies) {
+        if (item.profileId) {
+            await pool.query(
+                `UPDATE allowed_profiles SET proxy = $1 WHERE profile_id = $2`,
+                [item.proxy || null, item.profileId]
+            );
+            updated++;
+        }
+    }
+
+    console.log(`🌐 Массовое обновление прокси: ${updated} анкет`);
+    res.json({ success: true, updated });
 }));
 
 // PANIC MODE - экстренная остановка всех ботов

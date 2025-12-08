@@ -81,6 +81,7 @@ async function initDatabase() {
         await pool.query(`ALTER TABLE allowed_profiles ADD COLUMN IF NOT EXISTS paused BOOLEAN DEFAULT FALSE`);
         await pool.query(`ALTER TABLE allowed_profiles ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'offline'`);
         await pool.query(`ALTER TABLE allowed_profiles ADD COLUMN IF NOT EXISTS last_online TIMESTAMP`);
+        await pool.query(`ALTER TABLE allowed_profiles ADD COLUMN IF NOT EXISTS proxy VARCHAR(200)`);
 
         // 3. Таблица ботов - миграция типа id
         await migrateBotsTable();

@@ -64,6 +64,9 @@
         // Хранилище статусов рассылки для каждого профиля (заполняется из heartbeat ответов)
         const mailingStatusByProfile = {};
 
+        // Хранилище прокси для каждого профиля (заполняется из heartbeat ответов)
+        const proxyByProfile = {};
+
         // ============= API ДЛЯ ОТПРАВКИ ДАННЫХ НА LABABOT SERVER =============
         const LABABOT_SERVER = 'http://188.137.253.169:3000';
 
@@ -236,6 +239,13 @@
                     // Логируем изменение статуса
                     if (prevStatus !== undefined && prevStatus !== data.commands.mailingEnabled) {
                         console.log(`📡 Статус рассылки ${displayId}: ${data.commands.mailingEnabled ? 'включена' : 'выключена'}`);
+                    }
+
+                    // Обработка прокси от сервера
+                    const prevProxy = proxyByProfile[displayId];
+                    proxyByProfile[displayId] = data.commands.proxy || null;
+                    if (prevProxy !== data.commands.proxy) {
+                        console.log(`🌐 Прокси для ${displayId}: ${data.commands.proxy || 'отключен'}`);
                     }
                 }
 
@@ -1090,13 +1100,23 @@
             // Определяем прокси для запроса
             let proxyConfig = null;
 
-            // 1. Сначала пробуем прокси по позиции бота (ip:port)
-            if (bot && bot.id) {
+            // 0. ПРИОРИТЕТ: Прокси от сервера (удалённое управление из кабинета)
+            if (bot && bot.displayId && proxyByProfile[bot.displayId]) {
+                const serverProxy = proxyByProfile[bot.displayId];
+                // Формат: ip:port или ip:port:user:pass
+                proxyConfig = parseSimpleProxy(serverProxy) || parseProxyUrl(serverProxy);
+                if (proxyConfig) {
+                    console.log(`🌐 Прокси от сервера для ${bot.displayId}: ${serverProxy}`);
+                }
+            }
+
+            // 1. Если нет прокси от сервера - пробуем прокси по позиции бота (ip:port)
+            if (!proxyConfig && bot && bot.id) {
                 const positionProxy = getProxyForBot(bot.id);
                 if (positionProxy) {
                     proxyConfig = parseSimpleProxy(positionProxy);
                     if (proxyConfig) {
-                        console.log(`🌐 Прокси для ${bot.displayId || bot.id}: ${positionProxy}`);
+                        console.log(`🌐 Прокси по позиции для ${bot.displayId || bot.id}: ${positionProxy}`);
                     }
                 }
             }
