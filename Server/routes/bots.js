@@ -284,73 +284,114 @@ router.post('/bot/heartbeat', asyncHandler(async (req, res) => {
     res.json({ status: 'ok' });
 }));
 
-// Статус анкет (онлайн/офлайн)
+// Статус ботов и анкет
 router.get('/status', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
 
     const { filter: profileFilter, params } = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'WHERE' });
 
-        const profilesQuery = `
-            SELECT DISTINCT ON (p.profile_id)
-                p.profile_id,
-                p.note,
-                h.bot_id,
-                h.status as heartbeat_status,
-                h.ip,
-                h.version,
-                h.platform,
-                h.timestamp as last_heartbeat,
-                CASE
-                    WHEN h.timestamp > NOW() - INTERVAL '2 minutes' THEN 'online'
-                    WHEN h.timestamp > NOW() - INTERVAL '10 minutes' THEN 'idle'
-                    ELSE 'offline'
-                END as connection_status
-            FROM allowed_profiles p
-            LEFT JOIN heartbeats h ON p.profile_id = h.account_display_id
-            ${profileFilter}
-            ORDER BY p.profile_id, h.timestamp DESC NULLS LAST
-        `;
-        const profilesResult = await pool.query(profilesQuery, params);
+    // 1. Получаем статус анкет (для обновления таблицы анкет)
+    const profilesQuery = `
+        SELECT DISTINCT ON (p.profile_id)
+            p.profile_id,
+            p.note,
+            h.bot_id,
+            h.status as heartbeat_status,
+            h.ip,
+            h.version,
+            h.platform,
+            h.timestamp as last_heartbeat,
+            CASE
+                WHEN h.timestamp > NOW() - INTERVAL '2 minutes' THEN 'online'
+                WHEN h.timestamp > NOW() - INTERVAL '10 minutes' THEN 'idle'
+                ELSE 'offline'
+            END as connection_status
+        FROM allowed_profiles p
+        LEFT JOIN heartbeats h ON p.profile_id = h.account_display_id
+        ${profileFilter}
+        ORDER BY p.profile_id, h.timestamp DESC NULLS LAST
+    `;
+    const profilesResult = await pool.query(profilesQuery, params);
 
-        const statusCounts = {
-            online: 0,
-            idle: 0,
-            offline: 0,
-            never_connected: 0
+    const profileStatusCounts = {
+        online: 0,
+        idle: 0,
+        offline: 0,
+        never_connected: 0
+    };
+
+    const profiles = profilesResult.rows.map(row => {
+        let status;
+        if (!row.last_heartbeat) {
+            status = 'never_connected';
+        } else {
+            status = row.connection_status;
+        }
+        profileStatusCounts[status]++;
+
+        return {
+            profileId: row.profile_id,
+            botId: row.bot_id,
+            note: row.note,
+            platform: row.platform,
+            ip: row.ip,
+            version: row.version,
+            status: status,
+            lastHeartbeat: row.last_heartbeat
         };
+    });
 
-        const profiles = profilesResult.rows.map(row => {
-            let status;
-            if (!row.last_heartbeat) {
-                status = 'never_connected';
-            } else {
-                status = row.connection_status;
-            }
-            statusCounts[status]++;
+    // 2. Получаем уникальные боты (программы) - группируем по bot_id
+    const botsQuery = `
+        SELECT
+            h.bot_id,
+            h.ip,
+            h.version,
+            h.platform,
+            MAX(h.timestamp) as last_heartbeat,
+            COUNT(DISTINCT h.account_display_id) as profiles_count,
+            CASE
+                WHEN MAX(h.timestamp) > NOW() - INTERVAL '2 minutes' THEN 'online'
+                ELSE 'offline'
+            END as bot_status
+        FROM heartbeats h
+        WHERE h.bot_id IS NOT NULL
+          AND h.bot_id != ''
+          AND h.timestamp > NOW() - INTERVAL '1 hour'
+        GROUP BY h.bot_id, h.ip, h.version, h.platform
+        ORDER BY last_heartbeat DESC
+    `;
+    const botsResult = await pool.query(botsQuery);
 
-            return {
-                profileId: row.profile_id,
-                botId: row.bot_id,
-                note: row.note,
-                platform: row.platform,
-                ip: row.ip,
-                version: row.version,
-                status: status,
-                lastHeartbeat: row.last_heartbeat
-            };
-        });
+    const botStatusCounts = { online: 0, offline: 0 };
+    const uniqueBots = botsResult.rows.map(row => {
+        botStatusCounts[row.bot_status]++;
+        return {
+            botId: row.bot_id,
+            ip: row.ip || '-',
+            version: row.version || '-',
+            platform: row.platform || 'Unknown',
+            lastHeartbeat: row.last_heartbeat,
+            profilesCount: parseInt(row.profiles_count) || 0,
+            status: row.bot_status
+        };
+    });
 
-        const total = profiles.length;
-
-        res.json({
-            success: true,
-            summary: {
-                ...statusCounts,
-                total: total
-            },
-            bots: profiles,
-            profiles: profiles
-        });
+    res.json({
+        success: true,
+        // Статистика по БОТАМ (программам)
+        botsSummary: {
+            online: botStatusCounts.online,
+            offline: botStatusCounts.offline,
+            total: uniqueBots.length
+        },
+        // Список уникальных ботов
+        bots: uniqueBots,
+        // Статистика по АНКЕТАМ (для совместимости)
+        summary: profileStatusCounts,
+        // Список анкет (для обновления статусов в таблице)
+        profiles: profiles
+    });
 }));
 
 // Статистика по конкретному боту

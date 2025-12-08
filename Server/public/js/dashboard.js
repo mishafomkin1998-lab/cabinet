@@ -472,48 +472,28 @@
                         const res = await fetch(`${API_BASE}/api/bots/status?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
                         const data = await res.json();
                         if (data.success) {
-                            this.botsStatus = data.summary;
+                            // Статистика по БОТАМ (программам) - для карточки "Статус ботов"
+                            this.botsStatus = data.botsSummary || { online: 0, offline: 0, total: 0 };
 
-                            // Группируем по botId чтобы получить уникальные боты
-                            // Показываем онлайн боты (статус online или idle от сервера)
-                            const botsMap = {};
+                            // Список уникальных ботов (программ) - для вкладки "Управление"
+                            this.bots = (data.bots || []).map(b => ({
+                                id: b.botId,
+                                name: `Бот ${b.botId?.substring(0, 8) || 'Unknown'}...`,
+                                icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
+                                status: b.status === 'online' ? 'active' : 'inactive',
+                                os: b.platform || 'Unknown',
+                                ip: b.ip || '-',
+                                version: b.version || '-',
+                                lastHeartbeat: b.lastHeartbeat,
+                                profilesCount: b.profilesCount || 0
+                            }));
 
-                            data.bots.forEach(b => {
-                                const botId = b.botId || b.bot_id || b.profileId || b.profile_id;
-                                if (botId && botId !== 'null' && botId !== 'undefined') {
-                                    const isActive = b.status === 'online' || b.status === 'active' || b.status === 'idle';
-
-                                    // Показываем только активные (сервер уже проверил heartbeat)
-                                    if (!isActive) return;
-
-                                    if (!botsMap[botId]) {
-                                        botsMap[botId] = {
-                                            id: botId,
-                                            name: b.name || `Бот ${botId.substring(0, 8)}...`,
-                                            icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
-                                            status: 'active',
-                                            os: b.platform || 'Unknown',
-                                            ip: b.ip || '-',
-                                            version: b.version || '-',
-                                            lastHeartbeat: b.lastHeartbeat,
-                                            profilesCount: 1,
-                                            profileId: b.profileId || b.profile_id
-                                        };
-                                    } else {
-                                        botsMap[botId].profilesCount = (botsMap[botId].profilesCount || 0) + 1;
-                                    }
-                                }
-                            });
-                            this.bots = Object.values(botsMap);
-
-                            // Также обновляем статусы анкет
-                            data.bots.forEach(b => {
-                                const profileId = b.profileId || b.profile_id;
-                                const acc = this.accounts.find(a => a.id === profileId);
+                            // Обновляем статусы АНКЕТ в таблице (из profiles)
+                            (data.profiles || []).forEach(p => {
+                                const acc = this.accounts.find(a => a.id === p.profileId);
                                 if (acc) {
-                                    const isOnline = b.status === 'online' || b.status === 'active';
-                                    acc.status = isOnline ? 'online' : (b.status === 'idle' ? 'working' : 'offline');
-                                    acc.lastOnline = b.lastHeartbeat ? new Date(b.lastHeartbeat).toLocaleString('ru-RU') : '-';
+                                    acc.status = p.status === 'online' ? 'online' : (p.status === 'idle' ? 'working' : 'offline');
+                                    acc.lastOnline = p.lastHeartbeat ? new Date(p.lastHeartbeat).toLocaleString('ru-RU') : '-';
                                 }
                             });
                         }
