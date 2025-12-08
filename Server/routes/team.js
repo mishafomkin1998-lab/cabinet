@@ -129,8 +129,12 @@ router.post('/', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     const userId = req.params.id;
     try {
+        // Обнуляем связи с анкетами
         await pool.query(`UPDATE allowed_profiles SET assigned_translator_id = NULL WHERE assigned_translator_id = $1`, [userId]);
         await pool.query(`UPDATE allowed_profiles SET assigned_admin_id = NULL WHERE assigned_admin_id = $1`, [userId]);
+        // Обнуляем связи с историей биллинга
+        await pool.query(`UPDATE billing_history SET admin_id = NULL WHERE admin_id = $1`, [userId]);
+        // Удаляем пользователя
         await pool.query('DELETE FROM users WHERE id = $1', [userId]);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
