@@ -276,13 +276,15 @@ router.get('/status', asyncHandler(async (req, res) => {
     const { filter: profileFilter, params } = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'WHERE' });
 
     // 1. Получаем статус анкет (для обновления таблицы анкет)
-    // Включаем статистику отправленных сообщений и ошибок за сегодня
+    // Включаем статистику по письмам, чатам и ошибкам за сегодня
     const profilesQuery = `
         SELECT DISTINCT ON (p.profile_id)
             p.profile_id,
             p.note,
             p.paused,
             p.proxy,
+            p.assigned_admin_id as admin_id,
+            p.assigned_translator_id as translator_id,
             h.bot_id,
             h.status as heartbeat_status,
             h.ip,
@@ -294,16 +296,20 @@ router.get('/status', asyncHandler(async (req, res) => {
                 WHEN h.timestamp > NOW() - INTERVAL '10 minutes' THEN 'idle'
                 ELSE 'offline'
             END as connection_status,
-            COALESCE(stats.sent_today, 0) as sent_today,
-            COALESCE(stats.errors_today, 0) as errors_today,
-            COALESCE(stats.sent_hour, 0) as sent_hour
+            COALESCE(stats.mail_today, 0) as mail_today,
+            COALESCE(stats.mail_hour, 0) as mail_hour,
+            COALESCE(stats.chat_today, 0) as chat_today,
+            COALESCE(stats.chat_hour, 0) as chat_hour,
+            COALESCE(stats.errors_today, 0) as errors_today
         FROM allowed_profiles p
         LEFT JOIN heartbeats h ON p.profile_id = h.account_display_id
         LEFT JOIN (
             SELECT
                 profile_id,
-                COUNT(*) FILTER (WHERE action_type = 'message_sent' AND created_at >= CURRENT_DATE) as sent_today,
-                COUNT(*) FILTER (WHERE action_type = 'message_sent' AND created_at >= NOW() - INTERVAL '1 hour') as sent_hour,
+                COUNT(*) FILTER (WHERE action_type = 'message_sent' AND created_at >= CURRENT_DATE) as mail_today,
+                COUNT(*) FILTER (WHERE action_type = 'message_sent' AND created_at >= NOW() - INTERVAL '1 hour') as mail_hour,
+                COUNT(*) FILTER (WHERE action_type = 'chat_sent' AND created_at >= CURRENT_DATE) as chat_today,
+                COUNT(*) FILTER (WHERE action_type = 'chat_sent' AND created_at >= NOW() - INTERVAL '1 hour') as chat_hour,
                 COUNT(*) FILTER (WHERE action_type = 'error' AND created_at >= CURRENT_DATE) as errors_today
             FROM activity_log
             WHERE created_at >= CURRENT_DATE
@@ -341,9 +347,16 @@ router.get('/status', asyncHandler(async (req, res) => {
             lastHeartbeat: row.last_heartbeat,
             mailingEnabled: !row.paused,  // true = рассылка включена
             proxy: row.proxy || null,  // прокси для анкеты
-            sentToday: parseInt(row.sent_today) || 0,  // отправлено сегодня
-            sentHour: parseInt(row.sent_hour) || 0,    // отправлено за час
-            errorsToday: parseInt(row.errors_today) || 0  // ошибок сегодня
+            adminId: row.admin_id || null,        // ID админа
+            translatorId: row.translator_id || null,  // ID переводчика
+            // Статистика по письмам
+            mailToday: parseInt(row.mail_today) || 0,
+            mailHour: parseInt(row.mail_hour) || 0,
+            // Статистика по чатам
+            chatToday: parseInt(row.chat_today) || 0,
+            chatHour: parseInt(row.chat_hour) || 0,
+            // Ошибки
+            errorsToday: parseInt(row.errors_today) || 0
         };
     });
 

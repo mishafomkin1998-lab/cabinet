@@ -129,6 +129,11 @@
                 autoRefreshStats: false,
                 autoRefreshInterval: null,
                 refreshingStats: false,
+                // Фильтры для управления анкетами
+                controlFilter: {
+                    adminId: '',
+                    translatorId: ''
+                },
 
                 // Избранные шаблоны
                 favoriteTemplates: [],
@@ -527,11 +532,18 @@
                                 profileId: p.profileId,
                                 note: p.note,
                                 status: p.status,
-                                mailingEnabled: p.mailingEnabled !== false,  // по умолчанию true
-                                proxy: p.proxy || null,  // прокси для анкеты
-                                sentToday: p.sentToday || 0,   // отправлено сегодня
-                                sentHour: p.sentHour || 0,     // отправлено за час
-                                errorsToday: p.errorsToday || 0  // ошибок сегодня
+                                mailingEnabled: p.mailingEnabled !== false,
+                                proxy: p.proxy || null,
+                                adminId: p.adminId || null,
+                                translatorId: p.translatorId || null,
+                                // Статистика по письмам
+                                mailToday: p.mailToday || 0,
+                                mailHour: p.mailHour || 0,
+                                // Статистика по чатам
+                                chatToday: p.chatToday || 0,
+                                chatHour: p.chatHour || 0,
+                                // Ошибки
+                                errorsToday: p.errorsToday || 0
                             }));
                         }
                     } catch (e) { console.error('loadBotsStatus error:', e); }
@@ -1918,21 +1930,56 @@
                     }
                 },
 
-                // Функции для подсчёта общей статистики
-                getTotalSentToday() {
-                    return this.profilesWithMailing.reduce((sum, p) => sum + (p.sentToday || 0), 0);
+                // Получить отфильтрованные профили
+                getFilteredProfiles() {
+                    return this.profilesWithMailing.filter(p => {
+                        if (this.controlFilter.adminId && p.adminId != this.controlFilter.adminId) return false;
+                        if (this.controlFilter.translatorId && p.translatorId != this.controlFilter.translatorId) return false;
+                        return true;
+                    });
                 },
 
-                getTotalSentHour() {
-                    return this.profilesWithMailing.reduce((sum, p) => sum + (p.sentHour || 0), 0);
+                // Получить переводчиков выбранного админа
+                getTranslatorsForAdmin() {
+                    if (!this.controlFilter.adminId) return [];
+                    // Собираем уникальные translatorId из профилей выбранного админа
+                    const translatorIds = [...new Set(
+                        this.profilesWithMailing
+                            .filter(p => p.adminId == this.controlFilter.adminId && p.translatorId)
+                            .map(p => p.translatorId)
+                    )];
+                    // Возвращаем переводчиков из team
+                    return this.team.filter(t => t.role === 'translator' && translatorIds.includes(t.id));
+                },
+
+                // Сбросить фильтр переводчика при смене админа
+                onAdminFilterChange() {
+                    this.controlFilter.translatorId = '';
+                },
+
+                // Функции для подсчёта общей статистики (с учётом фильтров)
+                getTotalMailToday() {
+                    return this.getFilteredProfiles().reduce((sum, p) => sum + (p.mailToday || 0), 0);
+                },
+
+                getTotalMailHour() {
+                    return this.getFilteredProfiles().reduce((sum, p) => sum + (p.mailHour || 0), 0);
+                },
+
+                getTotalChatToday() {
+                    return this.getFilteredProfiles().reduce((sum, p) => sum + (p.chatToday || 0), 0);
+                },
+
+                getTotalChatHour() {
+                    return this.getFilteredProfiles().reduce((sum, p) => sum + (p.chatHour || 0), 0);
                 },
 
                 getTotalErrorsToday() {
-                    return this.profilesWithMailing.reduce((sum, p) => sum + (p.errorsToday || 0), 0);
+                    return this.getFilteredProfiles().reduce((sum, p) => sum + (p.errorsToday || 0), 0);
                 },
 
                 getOnlineProfiles() {
-                    return this.profilesWithMailing.filter(p => p.status === 'online').length;
+                    return this.getFilteredProfiles().filter(p => p.status === 'online').length;
                 },
 
                 // Обновление статистики профилей
