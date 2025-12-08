@@ -27,6 +27,7 @@
         }
 
         let bots = {};
+        let isRestoring = false; // Флаг для предотвращения сохранения во время восстановления
         let botTemplates = JSON.parse(localStorage.getItem('botTemplates')) || {};
         let accountPreferences = JSON.parse(localStorage.getItem('accountPreferences')) || {};
         
@@ -993,7 +994,21 @@
                     saveCurrentText(activeTabId);
                 }
                 saveSession();
+                console.log('[beforeunload] Сессия сохранена при закрытии');
             });
+
+            // КРИТИЧНО: Периодическое автосохранение каждые 30 секунд
+            // Это гарантирует сохранение данных даже если beforeunload не сработает
+            setInterval(() => {
+                if (Object.keys(bots).length > 0) {
+                    // Сохраняем текст из активной вкладки перед автосохранением
+                    if (activeTabId && bots[activeTabId]) {
+                        saveCurrentText(activeTabId);
+                    }
+                    saveSession();
+                    console.log('[AutoSave] Автосохранение выполнено');
+                }
+            }, 30000); // Каждые 30 секунд
         };
 
         function setGlobalTarget(targetType) {
@@ -3348,10 +3363,23 @@
             return false;
         }
 
-        async function saveSession() {
+        // СИНХРОННАЯ функция для надёжного сохранения в beforeunload
+        function saveSession() {
+            // КРИТИЧНО: Не сохраняем во время восстановления сессии
+            if (isRestoring) {
+                console.log('[SaveSession] ⏸️ Пропуск - идёт восстановление сессии');
+                return;
+            }
+
             try {
                 // Сохраняем порядок вкладок в localStorage
                 const currentTabOrder = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
+
+                if (currentTabOrder.length === 0) {
+                    console.log('[SaveSession] Нет вкладок для сохранения');
+                    return;
+                }
+
                 const localStorageData = currentTabOrder.map(id => {
                     const b = bots[id];
                     if (!b) return null;
@@ -3398,8 +3426,14 @@
 
                 localStorage.setItem('savedBots', JSON.stringify(localStorageData));
 
+                // Логирование для отладки
+                console.log(`[SaveSession] ✅ Сохранено ${localStorageData.length} аккаунтов:`);
+                localStorageData.forEach(d => {
+                    console.log(`  - ${d.displayId}: mailStats=${JSON.stringify(d.mailStats)}, chatStats=${JSON.stringify(d.chatStats)}, blacklistMail=${(d.mailBlacklist||[]).length}, blacklistChat=${(d.chatBlacklist||[]).length}`);
+                });
+
             } catch (error) {
-                console.error('Error saving session:', error);
+                console.error('[SaveSession] ❌ Ошибка сохранения:', error);
                 // Падаем обратно на localStorage при ошибке
                 const fallbackData = Array.from(document.querySelectorAll('.tab-item')).map(t => {
                     const b = bots[t.id.replace('tab-', '')];
@@ -3414,9 +3448,20 @@
         }
         
         async function restoreSession() {
+            // КРИТИЧНО: Блокируем saveSession во время восстановления
+            isRestoring = true;
+            console.log('[RestoreSession] 🔒 Начало восстановления, saveSession заблокирован');
+
             try {
                 // Загружаем из localStorage
                 const s = JSON.parse(localStorage.getItem('savedBots') || '[]');
+
+                // Логирование загруженных данных
+                console.log(`[RestoreSession] 📂 Загружено ${s.length} аккаунтов из localStorage:`);
+                s.forEach(a => {
+                    console.log(`  - ${a.displayId}: mailStats=${JSON.stringify(a.mailStats)}, chatStats=${JSON.stringify(a.chatStats)}, blacklistMail=${(a.mailBlacklist||[]).length}, blacklistChat=${(a.chatBlacklist||[]).length}`);
+                });
+
                 document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} из кэша...` : "";
 
                 for (const a of s) {
@@ -3447,20 +3492,31 @@
                         if (a.mailPhotoOnly !== undefined) bot.mailSettings.photoOnly = a.mailPhotoOnly;
                         if (a.mailBlacklist && a.mailBlacklist.length > 0) bot.mailSettings.blacklist = a.mailBlacklist;
 
-                        // КРИТИЧНО: Восстанавливаем статистику
-                        if (a.mailStats) bot.mailStats = a.mailStats;
-                        if (a.chatStats) bot.chatStats = a.chatStats;
+                        // КРИТИЧНО: Восстанавливаем статистику (глубокое копирование)
+                        if (a.mailStats) bot.mailStats = { ...a.mailStats };
+                        if (a.chatStats) bot.chatStats = { ...a.chatStats };
 
-                        // КРИТИЧНО: Восстанавливаем историю
-                        if (a.mailHistory) bot.mailHistory = a.mailHistory;
-                        if (a.chatHistory) bot.chatHistory = a.chatHistory;
+                        // КРИТИЧНО: Восстанавливаем историю (глубокое копирование)
+                        if (a.mailHistory) bot.mailHistory = {
+                            sent: [...(a.mailHistory.sent || [])],
+                            errors: [...(a.mailHistory.errors || [])],
+                            waiting: [...(a.mailHistory.waiting || [])]
+                        };
+                        if (a.chatHistory) bot.chatHistory = {
+                            sent: [...(a.chatHistory.sent || [])],
+                            errors: [...(a.chatHistory.errors || [])],
+                            waiting: [...(a.chatHistory.waiting || [])]
+                        };
 
                         // Восстанавливаем VIP список
-                        if (a.vipList) bot.vipList = a.vipList;
+                        if (a.vipList) bot.vipList = [...a.vipList];
 
                         // КРИТИЧНО: передаём useSavedText=true чтобы восстановить сохранённый текст
                         updateInterfaceForMode(bot.id, true);
                         bot.updateUI(); // Обновляем UI со статистикой
+
+                        // Логируем результат восстановления
+                        console.log(`[RestoreSession] ✅ ${bot.displayId} восстановлен: mailStats=${JSON.stringify(bot.mailStats)}, chatStats=${JSON.stringify(bot.chatStats)}`);
                     }
                     await new Promise(r => setTimeout(r, 500));
                 }
@@ -3480,6 +3536,16 @@
                 console.error('Error restoring session:', error);
                 document.getElementById('restore-status').innerText = "Ошибка загрузки. Используется кэш.";
                 document.getElementById('welcome-screen').style.display = Object.keys(bots).length > 0 ? 'none' : 'flex';
+            } finally {
+                // КРИТИЧНО: Разблокируем saveSession после восстановления
+                isRestoring = false;
+                console.log('[RestoreSession] 🔓 Восстановление завершено, saveSession разблокирован');
+
+                // Сохраняем восстановленную сессию с правильными данными
+                if (Object.keys(bots).length > 0) {
+                    saveSession();
+                    console.log('[RestoreSession] 💾 Восстановленные данные сохранены');
+                }
             }
         }
 
