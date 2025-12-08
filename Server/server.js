@@ -99,48 +99,6 @@ app.post('/api/users/:id/update', async (req, res) => {
     }
 });
 
-// Прямой маршрут для массового удаления анкет
-app.post('/api/profiles/bulk-delete', async (req, res) => {
-    console.log(`🗑️ [POST /api/profiles/bulk-delete] body=`, req.body);
-    const pool = require('./config/database');
-    const { profileIds, userId, userName } = req.body;
-
-    if (!profileIds || !Array.isArray(profileIds) || profileIds.length === 0) {
-        return res.status(400).json({ error: 'profileIds is required' });
-    }
-
-    try {
-        let deleted = 0;
-        for (const profileId of profileIds) {
-            // Сохраняем paid_until перед удалением
-            const profile = await pool.query(
-                `SELECT paid_until FROM allowed_profiles WHERE profile_id = $1`,
-                [profileId]
-            );
-
-            if (profile.rows.length > 0 && profile.rows[0].paid_until) {
-                await pool.query(
-                    `INSERT INTO profile_payment_history (profile_id, days, action_type, by_user_id, note, paid_until_backup)
-                     VALUES ($1, 0, 'deletion_backup', $2, 'Бэкап при массовом удалении', $3)
-                     ON CONFLICT DO NOTHING`,
-                    [profileId, userId, profile.rows[0].paid_until]
-                );
-            }
-
-            // Удаляем анкету
-            await pool.query(`DELETE FROM allowed_profiles WHERE profile_id = $1`, [profileId]);
-            await pool.query(`DELETE FROM bot_profiles WHERE profile_id = $1`, [profileId]);
-            deleted++;
-        }
-
-        console.log(`✅ Удалено ${deleted} анкет`);
-        res.json({ success: true, deleted });
-    } catch (e) {
-        console.error('Bulk delete profiles error:', e);
-        res.status(500).json({ error: e.message });
-    }
-});
-
 // API маршруты
 app.use('/api/team', teamRoutes);
 app.use('/api/users', teamRoutes); // alias для совместимости

@@ -136,54 +136,93 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Массовое добавление анкет
+// Массовое добавление анкет (оптимизировано batch-запросами)
 router.post('/bulk', async (req, res) => {
     const { profiles, note, adminId, translatorId, userId, userName } = req.body;
     try {
-        for (const id of profiles) {
-            if (id.trim().length > 2) {
-                const profileId = id.trim();
-                const exists = await pool.query(`SELECT 1 FROM allowed_profiles WHERE profile_id = $1`, [profileId]);
-                if (exists.rows.length === 0) {
-                    // Проверяем есть ли сохранённая оплата для этой анкеты
-                    const backupResult = await pool.query(
-                        `SELECT paid_until_backup FROM profile_payment_history
-                         WHERE profile_id = $1 AND action_type = 'deletion_backup' AND paid_until_backup > NOW()
-                         ORDER BY created_at DESC LIMIT 1`,
-                        [profileId]
-                    );
+        // 1. Фильтруем и нормализуем входные данные
+        const profileIds = profiles
+            .map(id => id.trim())
+            .filter(id => id.length > 2);
 
-                    let paidUntil = null;
-                    if (backupResult.rows.length > 0) {
-                        paidUntil = backupResult.rows[0].paid_until_backup;
-                    }
+        if (profileIds.length === 0) {
+            return res.json({ success: true, added: 0, updated: 0 });
+        }
 
-                    await pool.query(
-                        `INSERT INTO allowed_profiles (profile_id, note, assigned_admin_id, assigned_translator_id, paid_until) VALUES ($1, $2, $3, $4, $5)`,
-                        [profileId, note, adminId || null, translatorId || null, paidUntil]
-                    );
-                    // Логируем добавление
-                    const logNote = paidUntil
-                        ? `Добавлена анкета (оплата восстановлена до ${new Date(paidUntil).toLocaleDateString('ru-RU')})`
-                        : (note || 'Добавлена новая анкета');
-                    await logProfileAction(profileId, 'add', userId, userName, logNote);
-                } else {
-                    // Обновляем существующую анкету
-                    if (translatorId) {
-                        await pool.query(
-                            `UPDATE allowed_profiles SET assigned_admin_id = $1, assigned_translator_id = $2 WHERE profile_id = $3`,
-                            [adminId || null, translatorId, profileId]
-                        );
-                    } else if (adminId) {
-                        await pool.query(
-                            `UPDATE allowed_profiles SET assigned_admin_id = $1 WHERE profile_id = $2`,
-                            [adminId, profileId]
-                        );
-                    }
-                }
+        // 2. Одним запросом получаем все существующие анкеты
+        const existingResult = await pool.query(
+            `SELECT profile_id FROM allowed_profiles WHERE profile_id = ANY($1)`,
+            [profileIds]
+        );
+        const existingSet = new Set(existingResult.rows.map(r => r.profile_id));
+
+        const newProfiles = profileIds.filter(id => !existingSet.has(id));
+        const existingProfiles = profileIds.filter(id => existingSet.has(id));
+
+        // 3. Для новых анкет - получаем все бэкапы оплаты одним запросом
+        let backupMap = new Map();
+        if (newProfiles.length > 0) {
+            const backupResult = await pool.query(
+                `SELECT DISTINCT ON (profile_id) profile_id, paid_until_backup
+                 FROM profile_payment_history
+                 WHERE profile_id = ANY($1)
+                   AND action_type = 'deletion_backup'
+                   AND paid_until_backup > NOW()
+                 ORDER BY profile_id, created_at DESC`,
+                [newProfiles]
+            );
+            for (const row of backupResult.rows) {
+                backupMap.set(row.profile_id, row.paid_until_backup);
             }
         }
-        res.json({ success: true });
+
+        // 4. Batch INSERT для новых анкет
+        if (newProfiles.length > 0) {
+            const values = [];
+            const params = [];
+            let paramIndex = 1;
+
+            for (const profileId of newProfiles) {
+                const paidUntil = backupMap.get(profileId) || null;
+                values.push(`($${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++}, $${paramIndex++})`);
+                params.push(profileId, note || null, adminId || null, translatorId || null, paidUntil);
+            }
+
+            await pool.query(
+                `INSERT INTO allowed_profiles (profile_id, note, assigned_admin_id, assigned_translator_id, paid_until)
+                 VALUES ${values.join(', ')}
+                 ON CONFLICT (profile_id) DO NOTHING`,
+                params
+            );
+
+            // Логируем добавления
+            for (const profileId of newProfiles) {
+                const paidUntil = backupMap.get(profileId);
+                const logNote = paidUntil
+                    ? `Добавлена анкета (оплата восстановлена до ${new Date(paidUntil).toLocaleDateString('ru-RU')})`
+                    : (note || 'Добавлена новая анкета');
+                await logProfileAction(profileId, 'add', userId, userName, logNote);
+            }
+        }
+
+        // 5. Batch UPDATE для существующих анкет
+        if (existingProfiles.length > 0 && (adminId || translatorId)) {
+            if (translatorId) {
+                await pool.query(
+                    `UPDATE allowed_profiles
+                     SET assigned_admin_id = $1, assigned_translator_id = $2
+                     WHERE profile_id = ANY($3)`,
+                    [adminId || null, translatorId, existingProfiles]
+                );
+            } else if (adminId) {
+                await pool.query(
+                    `UPDATE allowed_profiles SET assigned_admin_id = $1 WHERE profile_id = ANY($2)`,
+                    [adminId, existingProfiles]
+                );
+            }
+        }
+
+        res.json({ success: true, added: newProfiles.length, updated: existingProfiles.length });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -294,37 +333,52 @@ router.post('/toggle-access', async (req, res) => {
 
 /**
  * POST /api/profiles/bulk-delete
- * Массовое удаление анкет
+ * Массовое удаление анкет (оптимизировано batch-запросами)
  */
 router.post('/bulk-delete', async (req, res) => {
     const { profileIds, userId, userName } = req.body;
-    try {
-        let deleted = 0;
-        for (const profileId of profileIds) {
-            // Сохраняем paid_until перед удалением
-            const profile = await pool.query(
-                `SELECT paid_until FROM allowed_profiles WHERE profile_id = $1`,
-                [profileId]
-            );
 
-            if (profile.rows.length > 0 && profile.rows[0].paid_until) {
-                await pool.query(
-                    `INSERT INTO profile_payment_history (profile_id, days, action_type, by_user_id, note, paid_until_backup)
-                     VALUES ($1, 0, 'deletion_backup', $2, 'Бэкап при массовом удалении', $3)
-                     ON CONFLICT DO NOTHING`,
-                    [profileId, userId, profile.rows[0].paid_until]
-                );
+    if (!profileIds || !Array.isArray(profileIds) || profileIds.length === 0) {
+        return res.status(400).json({ error: 'profileIds is required' });
+    }
+
+    try {
+        // 1. Получаем все анкеты с paid_until одним запросом
+        const profilesResult = await pool.query(
+            `SELECT profile_id, paid_until FROM allowed_profiles WHERE profile_id = ANY($1)`,
+            [profileIds]
+        );
+
+        // 2. Batch INSERT бэкапов оплаты
+        const profilesToBackup = profilesResult.rows.filter(p => p.paid_until);
+        if (profilesToBackup.length > 0) {
+            const values = [];
+            const params = [];
+            let paramIndex = 1;
+
+            for (const profile of profilesToBackup) {
+                values.push(`($${paramIndex++}, 0, 'deletion_backup', $${paramIndex++}, 'Бэкап при массовом удалении', $${paramIndex++})`);
+                params.push(profile.profile_id, userId, profile.paid_until);
             }
 
-            // Логируем удаление
-            await logProfileAction(profileId, 'delete', userId, userName, 'Массовое удаление');
-
-            // Удаляем анкету
-            await pool.query(`DELETE FROM allowed_profiles WHERE profile_id = $1`, [profileId]);
-            await pool.query(`DELETE FROM bot_profiles WHERE profile_id = $1`, [profileId]);
-            deleted++;
+            await pool.query(
+                `INSERT INTO profile_payment_history (profile_id, days, action_type, by_user_id, note, paid_until_backup)
+                 VALUES ${values.join(', ')}
+                 ON CONFLICT DO NOTHING`,
+                params
+            );
         }
-        res.json({ success: true, deleted });
+
+        // 3. Логируем удаления
+        for (const profile of profilesResult.rows) {
+            await logProfileAction(profile.profile_id, 'delete', userId, userName, 'Массовое удаление');
+        }
+
+        // 4. Batch DELETE
+        await pool.query(`DELETE FROM allowed_profiles WHERE profile_id = ANY($1)`, [profileIds]);
+        await pool.query(`DELETE FROM bot_profiles WHERE profile_id = ANY($1)`, [profileIds]);
+
+        res.json({ success: true, deleted: profilesResult.rows.length });
     } catch (e) {
         console.error('Bulk delete profiles error:', e.message);
         res.status(500).json({ error: e.message });
