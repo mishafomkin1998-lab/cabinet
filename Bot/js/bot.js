@@ -1404,7 +1404,9 @@
                 if(isEnabled) el.classList.remove('ai-hidden'); else el.classList.add('ai-hidden');
             });
             const promptContainer = document.getElementById('set-prompt-container');
-            if(isEnabled) promptContainer.classList.remove('ai-hidden'); else promptContainer.classList.add('ai-hidden');
+            if(promptContainer) {
+                if(isEnabled) promptContainer.classList.remove('ai-hidden'); else promptContainer.classList.add('ai-hidden');
+            }
         }
 
         function initHotkeys() {
