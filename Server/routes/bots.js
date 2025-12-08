@@ -342,26 +342,25 @@ router.get('/status', asyncHandler(async (req, res) => {
     });
 
     // 2. Получаем уникальные боты (программы) - один бот = одна строка
+    // Используем GROUP BY для гарантированной уникальности по bot_id
     const botsQuery = `
-        SELECT DISTINCT ON (h.bot_id)
+        SELECT
             h.bot_id,
-            h.ip,
-            h.version,
-            h.platform,
-            h.timestamp as last_heartbeat,
-            (SELECT COUNT(DISTINCT account_display_id)
-             FROM heartbeats
-             WHERE bot_id = h.bot_id
-             AND timestamp > NOW() - INTERVAL '1 hour') as profiles_count,
+            MAX(h.ip) as ip,
+            MAX(h.version) as version,
+            MAX(h.platform) as platform,
+            MAX(h.timestamp) as last_heartbeat,
+            COUNT(DISTINCT h.account_display_id) as profiles_count,
             CASE
-                WHEN h.timestamp > NOW() - INTERVAL '2 minutes' THEN 'online'
+                WHEN MAX(h.timestamp) > NOW() - INTERVAL '2 minutes' THEN 'online'
                 ELSE 'offline'
             END as bot_status
         FROM heartbeats h
         WHERE h.bot_id IS NOT NULL
           AND h.bot_id != ''
           AND h.timestamp > NOW() - INTERVAL '1 hour'
-        ORDER BY h.bot_id, h.timestamp DESC
+        GROUP BY h.bot_id
+        ORDER BY last_heartbeat DESC
     `;
     const botsResult = await pool.query(botsQuery);
 
