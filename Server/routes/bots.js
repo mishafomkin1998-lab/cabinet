@@ -62,23 +62,8 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
     const version = systemInfo?.version || null;
     const platform = systemInfo?.platform || null;
 
-    // 0. Проверка верификации ID анкеты (защита от подмены)
-    const botCheck = await pool.query(
-        `SELECT verified_profile_id FROM bots WHERE bot_id = $1`, [botId]
-    );
-
-    if (botCheck.rows.length > 0 && botCheck.rows[0].verified_profile_id) {
-        // Бот уже зарегистрирован - проверяем соответствие ID
-        const verifiedId = botCheck.rows[0].verified_profile_id;
-        if (verifiedId !== accountDisplayId) {
-            console.log(`🚫 ПОДМЕНА ID! Бот ${botId}: ожидается ${verifiedId}, получен ${accountDisplayId}`);
-            return res.status(403).json({
-                status: 'error',
-                error: 'profile_id_mismatch',
-                message: `ID анкеты не совпадает. Ожидается: ${verifiedId}, получен: ${accountDisplayId}`
-            });
-        }
-    }
+    // Верификация отключена - теперь один MACHINE_ID может обслуживать много анкет
+    // Проверка анкеты делается через allowed_profiles
 
     // 0.5. Проверка оплаты анкеты
     const paymentStatus = await checkProfilePaymentStatus(accountDisplayId);
@@ -187,24 +172,10 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
 router.post('/bot/heartbeat', asyncHandler(async (req, res) => {
     const { botId, profileId, platform, ip, version, status } = req.body;
 
-    // 0. Проверка верификации ID анкеты (защита от подмены)
+    // Верификация отключена - теперь один MACHINE_ID может обслуживать много анкет
+    // Проверка анкеты делается через allowed_profiles
+
     if (profileId) {
-        const botCheck = await pool.query(
-            `SELECT verified_profile_id FROM bots WHERE bot_id = $1`, [botId]
-        );
-
-        if (botCheck.rows.length > 0 && botCheck.rows[0].verified_profile_id) {
-            const verifiedId = botCheck.rows[0].verified_profile_id;
-            if (verifiedId !== profileId) {
-                console.log(`🚫 ПОДМЕНА ID! Бот ${botId}: ожидается ${verifiedId}, получен ${profileId}`);
-                return res.status(403).json({
-                    status: 'error',
-                    error: 'profile_id_mismatch',
-                    message: `ID анкеты не совпадает. Ожидается: ${verifiedId}, получен: ${profileId}`
-                });
-            }
-        }
-
         // Проверка оплаты анкеты
         const paymentStatus = await checkProfilePaymentStatus(profileId);
         if (!paymentStatus.isPaid) {
