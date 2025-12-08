@@ -3260,8 +3260,19 @@
                     setTimeout(() => sendHeartbeatToLababot(bid, displayId, 'online'), 2000);
                     return true;
                 }
-            } catch(err) { 
-                if(e) e.innerText = err.response ? (err.response.data.Error || `Ошибка входа: ${err.response.status}`) : "Ошибка входа. Проверьте Proxy для Ladadate."; 
+            } catch(err) {
+                console.error('❌ Login error:', err);
+                let errorMsg = "Ошибка входа";
+                if (err.response) {
+                    errorMsg = err.response.data?.Error || err.response.data?.Message || `Ошибка сервера: ${err.response.status}`;
+                } else if (err.code === 'ECONNREFUSED') {
+                    errorMsg = "Сервер недоступен. Проверьте подключение к интернету.";
+                } else if (err.code === 'ENOTFOUND') {
+                    errorMsg = "DNS ошибка. Проверьте подключение к интернету.";
+                } else if (err.message) {
+                    errorMsg = `Сетевая ошибка: ${err.message}`;
+                }
+                if(e) e.innerText = errorMsg;
             }
             finally { if(s) s.style.display='none'; }
             return false;
