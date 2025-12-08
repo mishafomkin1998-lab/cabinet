@@ -276,6 +276,7 @@ router.get('/status', asyncHandler(async (req, res) => {
     const { filter: profileFilter, params } = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'WHERE' });
 
     // 1. Получаем статус анкет (для обновления таблицы анкет)
+    // Включаем статистику отправленных сообщений и ошибок за сегодня
     const profilesQuery = `
         SELECT DISTINCT ON (p.profile_id)
             p.profile_id,
@@ -292,9 +293,22 @@ router.get('/status', asyncHandler(async (req, res) => {
                 WHEN h.timestamp > NOW() - INTERVAL '2 minutes' THEN 'online'
                 WHEN h.timestamp > NOW() - INTERVAL '10 minutes' THEN 'idle'
                 ELSE 'offline'
-            END as connection_status
+            END as connection_status,
+            COALESCE(stats.sent_today, 0) as sent_today,
+            COALESCE(stats.errors_today, 0) as errors_today,
+            COALESCE(stats.sent_hour, 0) as sent_hour
         FROM allowed_profiles p
         LEFT JOIN heartbeats h ON p.profile_id = h.account_display_id
+        LEFT JOIN (
+            SELECT
+                profile_id,
+                COUNT(*) FILTER (WHERE action_type = 'message_sent' AND created_at >= CURRENT_DATE) as sent_today,
+                COUNT(*) FILTER (WHERE action_type = 'message_sent' AND created_at >= NOW() - INTERVAL '1 hour') as sent_hour,
+                COUNT(*) FILTER (WHERE action_type = 'error' AND created_at >= CURRENT_DATE) as errors_today
+            FROM activity_log
+            WHERE created_at >= CURRENT_DATE
+            GROUP BY profile_id
+        ) stats ON p.profile_id = stats.profile_id
         ${profileFilter}
         ORDER BY p.profile_id, h.timestamp DESC NULLS LAST
     `;
@@ -326,7 +340,10 @@ router.get('/status', asyncHandler(async (req, res) => {
             status: status,
             lastHeartbeat: row.last_heartbeat,
             mailingEnabled: !row.paused,  // true = рассылка включена
-            proxy: row.proxy || null  // прокси для анкеты
+            proxy: row.proxy || null,  // прокси для анкеты
+            sentToday: parseInt(row.sent_today) || 0,  // отправлено сегодня
+            sentHour: parseInt(row.sent_hour) || 0,    // отправлено за час
+            errorsToday: parseInt(row.errors_today) || 0  // ошибок сегодня
         };
     });
 

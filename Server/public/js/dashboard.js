@@ -126,6 +126,9 @@
 
                 // Профили с управлением рассылкой
                 profilesWithMailing: [],
+                autoRefreshStats: false,
+                autoRefreshInterval: null,
+                refreshingStats: false,
 
                 // Избранные шаблоны
                 favoriteTemplates: [],
@@ -525,7 +528,10 @@
                                 note: p.note,
                                 status: p.status,
                                 mailingEnabled: p.mailingEnabled !== false,  // по умолчанию true
-                                proxy: p.proxy || null  // прокси для анкеты
+                                proxy: p.proxy || null,  // прокси для анкеты
+                                sentToday: p.sentToday || 0,   // отправлено сегодня
+                                sentHour: p.sentHour || 0,     // отправлено за час
+                                errorsToday: p.errorsToday || 0  // ошибок сегодня
                             }));
                         }
                     } catch (e) { console.error('loadBotsStatus error:', e); }
@@ -1909,6 +1915,51 @@
                     } catch (e) {
                         console.error('updateProfileProxy error:', e);
                         alert('Ошибка сети');
+                    }
+                },
+
+                // Функции для подсчёта общей статистики
+                getTotalSentToday() {
+                    return this.profilesWithMailing.reduce((sum, p) => sum + (p.sentToday || 0), 0);
+                },
+
+                getTotalSentHour() {
+                    return this.profilesWithMailing.reduce((sum, p) => sum + (p.sentHour || 0), 0);
+                },
+
+                getTotalErrorsToday() {
+                    return this.profilesWithMailing.reduce((sum, p) => sum + (p.errorsToday || 0), 0);
+                },
+
+                getOnlineProfiles() {
+                    return this.profilesWithMailing.filter(p => p.status === 'online').length;
+                },
+
+                // Обновление статистики профилей
+                async refreshProfileStats() {
+                    this.refreshingStats = true;
+                    try {
+                        await this.loadBotsStatus();
+                    } finally {
+                        this.refreshingStats = false;
+                    }
+                },
+
+                // Включение/выключение автообновления
+                toggleAutoRefresh() {
+                    if (this.autoRefreshStats) {
+                        // Запускаем автообновление каждые 30 секунд
+                        this.autoRefreshInterval = setInterval(() => {
+                            this.refreshProfileStats();
+                        }, 30000);
+                        console.log('Автообновление статистики включено');
+                    } else {
+                        // Останавливаем автообновление
+                        if (this.autoRefreshInterval) {
+                            clearInterval(this.autoRefreshInterval);
+                            this.autoRefreshInterval = null;
+                        }
+                        console.log('Автообновление статистики выключено');
                     }
                 },
 
