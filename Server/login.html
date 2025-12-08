@@ -333,16 +333,10 @@
         const API_BASE = window.location.origin;
 
         document.addEventListener('DOMContentLoaded', function() {
-            // Если уже авторизован - перенаправляем на соответствующий dashboard
+            // Если уже авторизован - перенаправляем на dashboard
             const existingUser = localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser');
             if (existingUser) {
-                const user = JSON.parse(existingUser);
-                if (user.role === 'admin') {
-                    window.location.href = 'admin-dashboard.html';
-                } else {
-                    // director и translator идут на dashboard.html
-                    window.location.href = 'dashboard.html';
-                }
+                window.location.href = 'dashboard.html';
                 return;
             }
 
@@ -410,13 +404,8 @@
                             sessionStorage.setItem('novaUser', JSON.stringify(userData));
                         }
 
-                        // Перенаправляем в зависимости от роли
-                        if (data.user.role === 'admin') {
-                            window.location.href = 'admin-dashboard.html';
-                        } else {
-                            // director и translator идут на dashboard.html
-                            window.location.href = 'dashboard.html';
-                        }
+                        // Перенаправляем на единый dashboard
+                        window.location.href = 'dashboard.html';
                     } else {
                         // Ошибка входа
                         showError(data.error || 'Ошибка авторизации');

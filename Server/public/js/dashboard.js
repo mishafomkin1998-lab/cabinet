@@ -192,6 +192,7 @@
                     aiEnabled: false,
                     adminId: ''
                 },
+                editingTranslator: null,
 
                 showAddTranslatorModal: false,
                 selectedAdmin: null,
@@ -1474,45 +1475,79 @@
                 },
 
                 async saveTranslator() {
-                    if (!this.newTranslator.name || !this.newTranslator.login || !this.newTranslator.password) {
-                        alert('Заполните все обязательные поля');
+                    if (!this.newTranslator.name || !this.newTranslator.login) {
+                        alert('Заполните имя и логин');
                         return;
                     }
 
-                    // Для директора требуем выбор админа
-                    if (this.currentUser.role === 'director' && !this.newTranslator.adminId) {
+                    // Пароль обязателен только для нового переводчика
+                    if (!this.editingTranslator && !this.newTranslator.password) {
+                        alert('Введите пароль для нового переводчика');
+                        return;
+                    }
+
+                    // Для директора требуем выбор админа (только при создании)
+                    if (!this.editingTranslator && this.currentUser.role === 'director' && !this.newTranslator.adminId) {
                         alert('Выберите админа для переводчика');
                         return;
                     }
 
-                    // ownerId = выбранный админ (для директора) или текущий пользователь (для админа)
-                    const ownerId = this.currentUser.role === 'director'
-                        ? this.newTranslator.adminId
-                        : this.currentUser.id;
-
                     try {
-                        // Создание нового переводчика
-                        const res = await fetch(`${API_BASE}/api/users`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                username: this.newTranslator.login,
-                                password: this.newTranslator.password,
-                                role: 'translator',
-                                ownerId: ownerId,
-                                salary: this.newTranslator.salary ? parseFloat(this.newTranslator.salary) : null,
+                        if (this.editingTranslator) {
+                            // Редактирование существующего переводчика
+                            const body = {
+                                username: this.newTranslator.name,
                                 aiEnabled: this.newTranslator.aiEnabled
-                            })
-                        });
-                        const data = await res.json();
-                        if (!data.success) {
-                            alert('Ошибка создания: ' + (data.error || 'Неизвестная ошибка'));
-                            return;
+                            };
+                            if (this.newTranslator.password) {
+                                body.password = this.newTranslator.password;
+                            }
+                            if (this.newTranslator.salary) {
+                                body.salary = parseFloat(this.newTranslator.salary);
+                            }
+
+                            const res = await fetch(`${API_BASE}/api/users/${this.editingTranslator.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(body)
+                            });
+                            const data = await res.json();
+                            if (!data.success) {
+                                alert('Ошибка: ' + (data.error || 'Не удалось сохранить'));
+                                return;
+                            }
+                        } else {
+                            // Создание нового переводчика
+                            const ownerId = this.currentUser.role === 'director'
+                                ? this.newTranslator.adminId
+                                : this.currentUser.id;
+
+                            const res = await fetch(`${API_BASE}/api/users`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    username: this.newTranslator.name,
+                                    login: this.newTranslator.login,
+                                    password: this.newTranslator.password,
+                                    role: 'translator',
+                                    ownerId: ownerId,
+                                    salary: this.newTranslator.salary ? parseFloat(this.newTranslator.salary) : null,
+                                    aiEnabled: this.newTranslator.aiEnabled
+                                })
+                            });
+                            const data = await res.json();
+                            if (!data.success) {
+                                alert('Ошибка создания: ' + (data.error || 'Логин занят'));
+                                return;
+                            }
                         }
 
                         // Перезагружаем команду
                         await this.loadTeam();
 
+                        const wasEditing = !!this.editingTranslator;
+
+                        // Сбрасываем форму
                         this.newTranslator = {
                             id: null,
                             name: '',
@@ -1522,12 +1557,51 @@
                             aiEnabled: false,
                             adminId: ''
                         };
+                        this.editingTranslator = null;
                         this.showAddTranslatorModal = false;
 
-                        alert('Переводчик добавлен');
+                        alert(wasEditing ? 'Переводчик обновлен' : 'Переводчик добавлен');
                     } catch (e) {
                         console.error('saveTranslator error:', e);
                         alert('Ошибка сохранения переводчика');
+                    }
+                },
+
+                // Редактирование переводчика
+                editTranslator(translator) {
+                    this.editingTranslator = translator;
+                    this.newTranslator = {
+                        id: translator.id,
+                        name: translator.name,
+                        login: translator.login,
+                        password: '',
+                        salary: translator.salary || '',
+                        aiEnabled: translator.aiEnabled || false,
+                        adminId: translator.adminId || ''
+                    };
+                    this.showAddTranslatorModal = true;
+                },
+
+                // Удаление переводчика
+                async deleteTranslator(translator) {
+                    if (!confirm(`Удалить переводчика "${translator.name}"? Его анкеты станут неназначенными.`)) {
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/users/${translator.id}`, {
+                            method: 'DELETE'
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            await this.loadTeam();
+                            alert('Переводчик удален');
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось удалить'));
+                        }
+                    } catch (e) {
+                        console.error('deleteTranslator error:', e);
+                        alert('Ошибка сети');
                     }
                 },
 
