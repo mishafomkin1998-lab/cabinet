@@ -257,7 +257,7 @@
                     note: ''
                 },
                 profilePayment: {
-                    profileId: '',
+                    profileIds: '', // Несколько ID через запятую или пробел
                     days: 30,
                     note: ''
                 },
@@ -2214,6 +2214,15 @@
                 async paySelectedProfiles() {
                     if (this.selectedProfileIds.length === 0) return;
 
+                    // Для директора - переход на вкладку Финансы с заполненными ID
+                    if (this.currentUser.role === 'director') {
+                        this.profilePayment.profileIds = this.selectedProfileIds.join(', ');
+                        this.selectedProfileIds = [];
+                        this.setActiveMenu('finances');
+                        return;
+                    }
+
+                    // Для админа (не restricted) - оплата с баланса
                     const selectedAccounts = this.accounts.filter(a => this.selectedProfileIds.includes(a.id));
                     let totalCost = 0;
                     for (const acc of selectedAccounts) {
@@ -2452,66 +2461,82 @@
                     }
                 },
 
-                // Оплатить анкету (директор)
+                // Оплатить анкеты (директор)
                 async submitProfilePayment() {
-                    if (!this.profilePayment.profileId || !this.profilePayment.days) {
-                        alert('Введите ID анкеты и выберите период');
+                    if (!this.profilePayment.profileIds.trim() || !this.profilePayment.days) {
+                        alert('Введите ID анкет и выберите период');
+                        return;
+                    }
+
+                    // Парсим ID анкет
+                    const ids = this.profilePayment.profileIds.split(/[\s,]+/).filter(id => id.trim().length >= 3);
+                    if (ids.length === 0) {
+                        alert('Введите корректные ID анкет');
                         return;
                     }
 
                     try {
-                        const res = await fetch(`${API_BASE}/api/billing/pay-profile`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                profileId: this.profilePayment.profileId,
-                                days: this.profilePayment.days,
-                                byUserId: this.currentUser.id,
-                                note: this.profilePayment.note || null
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            alert(`Анкета ${this.profilePayment.profileId} оплачена на ${this.profilePayment.days} дней`);
-                            this.profilePayment = { profileId: '', days: 30, note: '' };
-                            await this.loadFinanceData();
-                            await this.loadAccounts();
-                        } else {
-                            alert(data.error || 'Ошибка оплаты');
+                        let successCount = 0;
+                        for (const profileId of ids) {
+                            const res = await fetch(`${API_BASE}/api/billing/pay-profile`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    profileId: profileId.trim(),
+                                    days: this.profilePayment.days,
+                                    byUserId: this.currentUser.id,
+                                    note: this.profilePayment.note || null
+                                })
+                            });
+                            const data = await res.json();
+                            if (data.success) successCount++;
                         }
+
+                        alert(`Оплачено ${successCount} из ${ids.length} анкет на ${this.profilePayment.days} дней`);
+                        this.profilePayment = { profileIds: '', days: 30, note: '' };
+                        await this.loadFinanceData();
+                        await this.loadAccounts();
                     } catch (e) {
                         console.error('submitProfilePayment error:', e);
                         alert('Ошибка соединения');
                     }
                 },
 
-                // Убрать оплату с анкеты (директор)
+                // Убрать оплату с анкет (директор)
                 async removeProfilePayment() {
-                    if (!this.profilePayment.profileId) {
-                        alert('Введите ID анкеты');
+                    if (!this.profilePayment.profileIds.trim()) {
+                        alert('Введите ID анкет');
                         return;
                     }
 
-                    if (!confirm(`Убрать оплату с анкеты ${this.profilePayment.profileId}?`)) return;
+                    // Парсим ID анкет
+                    const ids = this.profilePayment.profileIds.split(/[\s,]+/).filter(id => id.trim().length >= 3);
+                    if (ids.length === 0) {
+                        alert('Введите корректные ID анкет');
+                        return;
+                    }
+
+                    if (!confirm(`Убрать оплату с ${ids.length} анкет?`)) return;
 
                     try {
-                        const res = await fetch(`${API_BASE}/api/billing/remove-payment`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                profileId: this.profilePayment.profileId,
-                                byUserId: this.currentUser.id
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            alert(`Оплата с анкеты ${this.profilePayment.profileId} снята`);
-                            this.profilePayment = { profileId: '', days: 30, note: '' };
-                            await this.loadFinanceData();
-                            await this.loadAccounts();
-                        } else {
-                            alert(data.error || 'Ошибка');
+                        let successCount = 0;
+                        for (const profileId of ids) {
+                            const res = await fetch(`${API_BASE}/api/billing/remove-payment`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    profileId: profileId.trim(),
+                                    byUserId: this.currentUser.id
+                                })
+                            });
+                            const data = await res.json();
+                            if (data.success) successCount++;
                         }
+
+                        alert(`Оплата снята с ${successCount} из ${ids.length} анкет`);
+                        this.profilePayment = { profileIds: '', days: 30, note: '' };
+                        await this.loadFinanceData();
+                        await this.loadAccounts();
                     } catch (e) {
                         console.error('removeProfilePayment error:', e);
                         alert('Ошибка соединения');
