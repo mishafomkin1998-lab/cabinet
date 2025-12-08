@@ -45,9 +45,9 @@ app.get('/', (req, res) => {
 // Аутентификация
 app.use('/', authRoutes);
 
-// Прямой маршрут PUT для пользователей (обход проблемы с роутером)
-app.put('/api/users/:id', async (req, res) => {
-    console.log(`📝 [PUT /api/users/:id DIRECT] userId=${req.params.id}, body=`, req.body);
+// Маршрут для обновления пользователей (POST вместо PUT для совместимости с nginx/proxy)
+app.post('/api/users/:id/update', async (req, res) => {
+    console.log(`📝 [POST /api/users/:id/update] userId=${req.params.id}, body=`, req.body);
     const pool = require('./config/database');
     const userId = req.params.id;
     const { username, password, salary, aiEnabled, is_restricted } = req.body;

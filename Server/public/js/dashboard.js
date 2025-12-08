@@ -703,8 +703,9 @@
                 async toggleAiEnabled(user) {
                     try {
                         const newValue = !user.aiEnabled;
-                        const res = await fetch(`/api/users/${user.id}`, {
-                            method: 'PUT',
+                        // POST вместо PUT для совместимости с nginx/proxy
+                        const res = await fetch(`/api/users/${user.id}/update`, {
+                            method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ aiEnabled: newValue })
                         });
@@ -728,8 +729,9 @@
                 async toggleIsRestricted(admin) {
                     try {
                         const newValue = !admin.isMyAdmin;
-                        const res = await fetch(`/api/users/${admin.id}`, {
-                            method: 'PUT',
+                        // POST вместо PUT для совместимости с nginx/proxy
+                        const res = await fetch(`/api/users/${admin.id}/update`, {
+                            method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ is_restricted: newValue })
                         });
