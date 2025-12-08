@@ -365,6 +365,10 @@ router.get('/status', asyncHandler(async (req, res) => {
     `;
     const botsResult = await pool.query(botsQuery);
 
+    // DEBUG: Логируем результат запроса ботов
+    console.log(`🤖 Bots query returned ${botsResult.rows.length} rows:`,
+        botsResult.rows.map(r => ({ botId: r.bot_id, ts: r.last_heartbeat })));
+
     const botStatusCounts = { online: 0, offline: 0 };
     const uniqueBots = botsResult.rows.map(row => {
         botStatusCounts[row.bot_status]++;
