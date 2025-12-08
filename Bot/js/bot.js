@@ -3378,15 +3378,15 @@
             const name = document.getElementById('tpl-modal-name').value;
             const text = document.getElementById('tpl-modal-text').value;
             if (!name) return;
-            
+
             const bot = bots[currentModalBotId];
             const isChat = globalMode === 'chat';
             const type = isChat ? 'chat' : 'mail';
-            
+
             try {
-                // 1. Сохраняем в localStorage
+                // 1. Сохраняем в локальный объект и localStorage
                 let tpls = getBotTemplates(bot.login)[type];
-                
+
                 if (editingTemplateIndex !== null) {
                     const fav = tpls[editingTemplateIndex]?.favorite || false;
                     tpls[editingTemplateIndex] = { name, text, favorite: fav };
@@ -3394,13 +3394,52 @@
                     tpls.push({ name, text, favorite: false });
                     editingTemplateIndex = tpls.length - 1;
                 }
-                
+
                 // 2. Сохраняем в localStorage
                 localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
-                
+
+                // 3. КРИТИЧНО: Сохраняем текст шаблона как текущий текст
+                if (isChat) {
+                    bot.currentChatText = text;
+                } else {
+                    bot.currentMailText = text;
+                }
+
+                // 4. КРИТИЧНО: Немедленно сохраняем на сервер
+                if (bot.displayId) {
+                    const state = {
+                        currentMailText: bot.currentMailText || '',
+                        currentChatText: bot.currentChatText || '',
+                        lastTplMail: bot.lastTplMail,
+                        lastTplChat: bot.lastTplChat,
+                        mailStats: bot.mailStats,
+                        chatStats: bot.chatStats,
+                        mailHistory: bot.mailHistory,
+                        chatHistory: bot.chatHistory,
+                        mailBlacklist: bot.mailSettings.blacklist || [],
+                        chatBlacklist: bot.chatSettings.blacklist || [],
+                        vipList: bot.vipList || [],
+                        chatSettings: {
+                            rotationHours: bot.chatSettings.rotationHours,
+                            cyclic: bot.chatSettings.cyclic,
+                            currentInviteIndex: bot.chatSettings.currentInviteIndex,
+                            target: bot.chatSettings.target
+                        },
+                        mailSettings: {
+                            auto: bot.mailSettings.auto,
+                            target: bot.mailSettings.target,
+                            photoOnly: bot.mailSettings.photoOnly
+                        },
+                        templatesMail: getBotTemplates(bot.login).mail || [],
+                        templatesChat: getBotTemplates(bot.login).chat || []
+                    };
+                    saveBotStateToServer(bot.displayId, state);
+                    console.log(`💾 Шаблон сохранён на сервер для ${bot.displayId}`);
+                }
+
                 updateTemplateDropdown(bot.id, editingTemplateIndex);
                 closeModal('tpl-modal');
-                
+
             } catch (error) {
                 console.error('Error saving template:', error);
                 alert('Ошибка сохранения шаблона');
@@ -3425,10 +3464,19 @@
 
                  // КРИТИЧНО: Используем сохранённый текст если он есть, иначе текст шаблона
                  const savedText = isChat ? bot.currentChatText : bot.currentMailText;
+                 let textToSet;
                  if (useSavedText && savedText) {
-                     area.value = savedText;
+                     textToSet = savedText;
                  } else {
-                     area.value = tpls[val].text || '';
+                     textToSet = tpls[val].text || '';
+                 }
+                 area.value = textToSet;
+
+                 // КРИТИЧНО: Синхронизируем currentText с тем что в textarea
+                 if (isChat) {
+                     bot.currentChatText = textToSet;
+                 } else {
+                     bot.currentMailText = textToSet;
                  }
 
                  if(isChat) bots[botId].lastTplChat = val; else bots[botId].lastTplMail = val;
@@ -3459,9 +3507,21 @@
             if(isChat) accountPreferences[bot.login].chatTpl = idx;
             else accountPreferences[bot.login].mailTpl = idx;
             localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
-            
-            saveSession();
+
+            // Обновляем dropdown (загружает текст шаблона в textarea)
             updateTemplateDropdown(botId, idx);
+
+            // КРИТИЧНО: Сохраняем текст шаблона как текущий текст
+            const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
+            if (idx !== "" && tpls[idx]) {
+                if (isChat) {
+                    bot.currentChatText = tpls[idx].text || '';
+                } else {
+                    bot.currentMailText = tpls[idx].text || '';
+                }
+            }
+
+            saveSession();
         }
 
         async function toggleTemplateFavorite(botId) {
