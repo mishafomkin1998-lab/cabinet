@@ -113,12 +113,6 @@
                     usedAi: usedAi // Флаг использования ИИ генерации
                 };
 
-                // DEBUG: Явно логируем состояние AI флага
-                if (usedAi) {
-                    console.log(`🤖🤖🤖 ОТПРАВКА С AI! usedAi=${usedAi}, accountDisplayId=${accountDisplayId}`);
-                } else {
-                    console.log(`📤 Отправка БЕЗ AI: usedAi=${usedAi}`);
-                }
                 console.log('📦 Payload:', JSON.stringify(payload, null, 2));
 
                 const response = await fetch(`${LABABOT_SERVER}/api/message_sent`, {
@@ -1075,10 +1069,7 @@
                 }
             }
 
-            if(!globalSettings.apiKey) {
-                btn.innerHTML = originalHtml;
-                return alert("Пожалуйста, введите OpenAI API Key в настройках!");
-            }
+            if(!globalSettings.apiKey) return alert("Пожалуйста, введите OpenAI API Key в настройках!");
 
             const txtArea = document.getElementById(`msg-${botId}`);
             const currentText = txtArea.value;
@@ -1087,16 +1078,10 @@
             let systemRole = "You are a helpful dating assistant. Write engaging, short, and natural texts for dating sites.";
 
             if(action === 'myprompt') {
-                if(!globalSettings.myPrompt) {
-                    btn.innerHTML = originalHtml;
-                    return alert("Заполните 'My Prompt' в настройках!");
-                }
+                if(!globalSettings.myPrompt) return alert("Заполните 'My Prompt' в настройках!");
                 prompt = `${globalSettings.myPrompt}. \n\nOriginal text: "${currentText}"`;
             } else if (action === 'improve') {
-                if(!currentText) {
-                    btn.innerHTML = originalHtml;
-                    return alert("Напишите хоть что-то, чтобы я мог улучшить!");
-                }
+                if(!currentText) return alert("Напишите хоть что-то, чтобы я мог улучшить!");
                 prompt = `Rewrite the following text to be more engaging, grammatically correct, and flirtatious. Keep it natural. Text: "${currentText}"`;
             } else if (action === 'generate') {
                 prompt = "Write a creative and engaging opening message for a dating site to start a conversation with a man. Keep it short and intriguing.";
@@ -1515,7 +1500,6 @@
                 // === ДОБАВЛЕНО: Отслеживание диалогов для полной спецификации ===
                 this.conversations = {}; // Структура: { recipientId: { firstMessageTime, lastMessageTime, messageCount } }
                 this.translatorId = globalSettings.translatorId || null; // ID переводчика из глобальных настроек
-                this.usedAi = false; // Флаг использования AI генерации для текущего сообщения
 
                 // === ВАЖНОЕ ДОБАВЛЕНИЕ: Создаем WebView для поддержания онлайн ===
                 if (this.token) {
@@ -1981,11 +1965,7 @@
 
                         // 3. Отправляем полную статистику на НАШ сервер Lababot
                         // DEBUG: Проверка флага usedAi перед отправкой
-                        const aiFlag = this.usedAi || false;
-                        console.log(`🔍 DEBUG Mail: this.usedAi = ${this.usedAi}, aiFlag = ${aiFlag}, this.id = ${this.id}`);
-                        if (aiFlag) {
-                            console.log(`🤖🤖🤖 MAIL: Отправка письма С AI для анкеты ${this.displayId}`);
-                        }
+                        console.log(`🔍 DEBUG Mail: this.usedAi = ${this.usedAi}, this.id = ${this.id}`);
 
                         const lababotResult = await sendMessageToLababot({
                             botId: this.id,
@@ -2002,7 +1982,7 @@
                             fileName: this.photoName || null,
                             translatorId: this.translatorId,
                             errorReason: null,
-                            usedAi: aiFlag
+                            usedAi: this.usedAi || false
                         });
 
                         if (!lababotResult.success) {
@@ -2068,7 +2048,7 @@
                                 fileName: null,
                                 translatorId: this.translatorId,
                                 errorReason: errorReason,
-                                usedAi: this.usedAi || false
+                                usedAi: false
                             });
                         } catch (err) { console.error('sendMessageToLababot failed:', err); }
                     }
@@ -2122,7 +2102,7 @@
                                     fileName: null,
                                     translatorId: this.translatorId,
                                     errorReason: errorReason,
-                                    usedAi: this.usedAi || false
+                                    usedAi: false
                                 });
                             } catch (err) { console.error('sendMessageToLababot failed:', err); }
                         }
@@ -2172,7 +2152,7 @@
                                     fileName: this.photoName || null,
                                     translatorId: this.translatorId,
                                     errorReason: e.response?.data?.Error || e.message,
-                                    usedAi: this.usedAi || false
+                                    usedAi: false
                                 });
                             } catch (err) { console.error('sendMessageToLababot failed:', err); }
                         }
@@ -2467,7 +2447,7 @@
                                     fileName: null,
                                     translatorId: this.translatorId,
                                     errorReason: errorReason,
-                                    usedAi: this.usedAi || false
+                                    usedAi: false
                                 });
                             }
                         } catch(fallbackErr) {

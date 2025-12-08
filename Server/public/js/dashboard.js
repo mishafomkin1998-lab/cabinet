@@ -64,8 +64,8 @@
                     });
                 },
 
-                activeMenu: localStorage.getItem('dashboardActiveMenu') || 'stats',
-                activeSubmenu: localStorage.getItem('dashboardActiveSubmenu') || 'general',
+                activeMenu: 'stats',
+                activeSubmenu: 'general',
                 showCalendar: false,
                 showMonitoringCalendar: false,
                 showAddAccountModal: false,
@@ -678,13 +678,10 @@
                 setActiveMenu(menu) {
                     this.activeMenu = menu;
                     this.activeSubmenu = 'general';
-                    localStorage.setItem('dashboardActiveMenu', menu);
-                    localStorage.setItem('dashboardActiveSubmenu', 'general');
                 },
-
+                
                 setActiveSubmenu(submenu) {
                     this.activeSubmenu = submenu;
-                    localStorage.setItem('dashboardActiveSubmenu', submenu);
                 },
                 
                 getPageTitle() {
