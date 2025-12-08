@@ -954,6 +954,41 @@
                     document.querySelectorAll('.vars-dropdown').forEach(d=>d.style.display='none');
                 }
             };
+
+            // === ВАЖНО: Сохраняем сессию при закрытии окна ===
+            window.addEventListener('beforeunload', () => {
+                // Синхронно сохраняем текст активной вкладки
+                if (activeTabId && bots[activeTabId]) {
+                    const currentBot = bots[activeTabId];
+                    const currentTextarea = document.getElementById(`msg-${activeTabId}`);
+                    if (currentTextarea) {
+                        if (globalMode === 'chat') {
+                            currentBot.currentChatText = currentTextarea.value;
+                        } else {
+                            currentBot.currentMailText = currentTextarea.value;
+                        }
+                    }
+                }
+                // Сохраняем в localStorage
+                const currentTabOrder = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
+                const localStorageData = currentTabOrder.map(id => {
+                    const b = bots[id];
+                    if (!b) return null;
+                    return {
+                        login: b.login, pass: b.pass, displayId: b.displayId,
+                        lastTplMail: b.lastTplMail, lastTplChat: b.lastTplChat,
+                        currentMailText: b.currentMailText || '',
+                        currentChatText: b.currentChatText || '',
+                        chatRotationHours: b.chatSettings.rotationHours,
+                        chatCyclic: b.chatSettings.cyclic,
+                        chatCurrentIndex: b.chatSettings.currentInviteIndex,
+                        chatStartTime: b.chatSettings.rotationStartTime,
+                        mailAuto: b.mailSettings.auto, mailTarget: b.mailSettings.target,
+                        vipList: b.vipList
+                    };
+                }).filter(Boolean);
+                localStorage.setItem('savedBots', JSON.stringify(localStorageData));
+            });
         };
 
         function setGlobalTarget(targetType) {
@@ -1448,6 +1483,19 @@
         }
 
         function updateBotCount() { const el = document.getElementById('global-bot-count'); if(el) el.innerText = `Анкет: ${Object.keys(bots).length}`; }
+
+        // === Сохраняем текст при вводе ===
+        function saveCurrentText(botId) {
+            const bot = bots[botId];
+            if (!bot) return;
+            const textarea = document.getElementById(`msg-${botId}`);
+            if (!textarea) return;
+            if (globalMode === 'chat') {
+                bot.currentChatText = textarea.value;
+            } else {
+                bot.currentMailText = textarea.value;
+            }
+        }
         function openModal(id) { const el=document.getElementById(id); if(!el) return; el.style.display='flex'; setTimeout(()=>{el.classList.add('show');},10); }
         function closeModal(id) { const el=document.getElementById(id); if(!el) return; el.classList.remove('show'); setTimeout(()=>{el.style.display='none';},300); }
 
@@ -1473,8 +1521,10 @@
                 this.displayId = displayId; 
                 this.token = token;
                 
-                this.lastTplMail = null; 
+                this.lastTplMail = null;
                 this.lastTplChat = null;
+                this.currentMailText = ''; // Текущий текст рассылки (сохраняется при переключении)
+                this.currentChatText = ''; // Текущий текст чата (сохраняется при переключении)
                 this.isMailRunning = false; 
                 this.mailTimeout = null;
                 this.mailStats = { sent: 0, errors: 0, waiting: 0 };
@@ -2640,7 +2690,7 @@
                     </div>
                     </div>
                     <div class="relative-box d-flex flex-column flex-grow-1">
-                        <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." oninput="checkVarTrigger(this, 'vars-dropdown-${bot.id}'); bots['${bot.id}'].updateUI(); validateInput(this)"></textarea>
+                        <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." oninput="checkVarTrigger(this, 'vars-dropdown-${bot.id}'); bots['${bot.id}'].updateUI(); validateInput(this); saveCurrentText('${bot.id}')"></textarea>
                         <div id="vars-dropdown-${bot.id}" class="vars-dropdown">
                             <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{City}', 'vars-dropdown-${bot.id}')"><b>{City}</b></div>
                             <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{Name}', 'vars-dropdown-${bot.id}')"><b>{Name}</b></div>
@@ -3120,23 +3170,30 @@
             }
         }
 
-        function updateTemplateDropdown(botId, forceSelectIndex = null) {
+        function updateTemplateDropdown(botId, forceSelectIndex = null, useTemplateText = false) {
             const sel=document.getElementById(`tpl-select-${botId}`); if(!sel) return;
             const bot = bots[botId];
+            if(!bot) return;
             const isChat = globalMode === 'chat';
             const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
-            
+
             let val = (forceSelectIndex !== null) ? forceSelectIndex : sel.value;
             sel.innerHTML='<option value="">-- Выберите --</option>';
             tpls.forEach((t,i)=> sel.innerHTML+=`<option value="${i}">${t.favorite?'❤ ':''}${t.name}</option>`);
-            
+
             const btnFav = document.getElementById(`btn-fav-${botId}`);
             const area = document.getElementById(`msg-${botId}`);
             if(val !== null && val !== "" && val !== undefined && tpls[val]) {
                  sel.value = val;
                  if(area) {
                      area.disabled=false;
-                     area.value=tpls[val].text;
+                     // === ВАЖНО: Используем сохранённый текст если он есть (кроме случаев смены шаблона) ===
+                     const savedText = isChat ? bot.currentChatText : bot.currentMailText;
+                     if (savedText && !useTemplateText) {
+                         area.value = savedText;
+                     } else {
+                         area.value = tpls[val].text;
+                     }
                      validateInput(area);
                  }
                  if(isChat) bots[botId].lastTplChat = val; else bots[botId].lastTplMail = val;
@@ -3151,7 +3208,17 @@
                  if(btnFav) { if(tpls[val].favorite) { btnFav.classList.add('btn-heart-active','btn-danger'); btnFav.classList.remove('btn-outline-danger'); } else { btnFav.classList.remove('btn-heart-active','btn-danger'); btnFav.classList.add('btn-outline-danger'); } }
             } else {
                  sel.value="";
-                 if(area) { area.disabled=true; area.value=""; }
+                 // Даже без шаблона показываем сохранённый текст если он есть
+                 if(area) {
+                     const savedText = isChat ? bot.currentChatText : bot.currentMailText;
+                     if (savedText) {
+                         area.disabled = false;
+                         area.value = savedText;
+                     } else {
+                         area.disabled = true;
+                         area.value = "";
+                     }
+                 }
                  if(btnFav) btnFav.classList.remove('btn-heart-active');
                  if(bots[botId]) bots[botId].updateUI();
             }
@@ -3165,13 +3232,17 @@
             if(!bot) return;
             const isChat = globalMode === 'chat';
 
+            // Сбрасываем сохранённый текст при смене шаблона
+            if(isChat) bot.currentChatText = '';
+            else bot.currentMailText = '';
+
             if(!accountPreferences[bot.login]) accountPreferences[bot.login] = {};
             if(isChat) accountPreferences[bot.login].chatTpl = idx;
             else accountPreferences[bot.login].mailTpl = idx;
             localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
-            
+
             saveSession();
-            updateTemplateDropdown(botId, idx);
+            updateTemplateDropdown(botId, idx, true); // true = использовать текст шаблона
         }
 
         async function toggleTemplateFavorite(botId) {
@@ -3394,8 +3465,21 @@
             return false;
         }
 
-        async function saveSession() { 
+        async function saveSession() {
             try {
+                // === ВАЖНО: Сохраняем текущий текст активной вкладки перед сохранением сессии ===
+                if (activeTabId && bots[activeTabId]) {
+                    const currentBot = bots[activeTabId];
+                    const currentTextarea = document.getElementById(`msg-${activeTabId}`);
+                    if (currentTextarea) {
+                        if (globalMode === 'chat') {
+                            currentBot.currentChatText = currentTextarea.value;
+                        } else {
+                            currentBot.currentMailText = currentTextarea.value;
+                        }
+                    }
+                }
+
                 // Сохраняем порядок вкладок в localStorage
                 const currentTabOrder = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
                 const localStorageData = currentTabOrder.map(id => {
@@ -3407,6 +3491,8 @@
                         displayId: b.displayId,
                         lastTplMail: b.lastTplMail,
                         lastTplChat: b.lastTplChat,
+                        currentMailText: b.currentMailText || '', // Сохраняем текст рассылки
+                        currentChatText: b.currentChatText || '', // Сохраняем текст чата
                         chatRotationHours: b.chatSettings.rotationHours,
                         chatCyclic: b.chatSettings.cyclic,
                         chatCurrentIndex: b.chatSettings.currentInviteIndex,
@@ -3416,7 +3502,7 @@
                         vipList: b.vipList
                     };
                 }).filter(item => item !== null);
-                
+
                 localStorage.setItem('savedBots', JSON.stringify(localStorageData));
 
             } catch (error) {
@@ -3449,7 +3535,11 @@
                         // Восстанавливаем остальные настройки из localStorage
                         bot.lastTplMail = a.lastTplMail;
                         bot.lastTplChat = a.lastTplChat;
-                        
+
+                        // === ВАЖНО: Восстанавливаем сохранённый текст рассылки/чата ===
+                        if (a.currentMailText) bot.currentMailText = a.currentMailText;
+                        if (a.currentChatText) bot.currentChatText = a.currentChatText;
+
                         if (a.chatRotationHours) bot.chatSettings.rotationHours = a.chatRotationHours;
                         if (a.chatCyclic !== undefined) bot.chatSettings.cyclic = a.chatCyclic;
                         if (a.chatCurrentIndex) bot.chatSettings.currentInviteIndex = a.chatCurrentIndex;
@@ -3457,7 +3547,7 @@
                         if (a.mailAuto !== undefined) bot.mailSettings.auto = a.mailAuto;
                         if (a.mailTarget) bot.mailSettings.target = a.mailTarget;
                         if (a.vipList) bot.vipList = a.vipList;
-                        
+
                         updateInterfaceForMode(bot.id);
                     }
                     await new Promise(r => setTimeout(r, 500));
@@ -3483,6 +3573,20 @@
         }
 
         function selectTab(id) {
+            // === ВАЖНО: Сохраняем текст текущей вкладки перед переключением ===
+            if (activeTabId && bots[activeTabId]) {
+                const currentBot = bots[activeTabId];
+                const currentTextarea = document.getElementById(`msg-${activeTabId}`);
+                if (currentTextarea) {
+                    // Сохраняем текст в зависимости от режима
+                    if (globalMode === 'chat') {
+                        currentBot.currentChatText = currentTextarea.value;
+                    } else {
+                        currentBot.currentMailText = currentTextarea.value;
+                    }
+                }
+            }
+
             document.querySelectorAll('.tab-item').forEach(t=>t.classList.remove('active'));
             document.querySelectorAll('.workspace').forEach(w=>w.classList.remove('active'));
             // ВАЖНО: Деактивируем/Активируем webview, но они остаются за экраном
@@ -3491,15 +3595,15 @@
             const t=document.getElementById(`tab-${id}`); const w=document.getElementById(`ws-${id}`);
             const wv=document.getElementById(`webview-${id}`);
 
-            if(t&&w) { 
-                t.classList.add('active'); 
-                w.classList.add('active'); 
-                activeTabId=id; 
-                updateInterfaceForMode(id); 
+            if(t&&w) {
+                t.classList.add('active');
+                w.classList.add('active');
+                activeTabId=id;
+                updateInterfaceForMode(id);
             }
-            
+
             if(wv) wv.classList.add('active'); // Активируем процесс (попадает под стили position: fixed)
-            
+
             document.getElementById('welcome-screen').style.display = 'none';
         }
         
