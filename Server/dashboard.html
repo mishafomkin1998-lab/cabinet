@@ -1080,16 +1080,31 @@
                 </template>
 
                 <!-- Список анкет -->
-                <div class="flex items-center justify-between mb-4">
-                    <div class="flex items-center space-x-3">
-                        <!-- Фильтр по типу админа (только для директора) -->
+                <!-- Панель фильтров и действий -->
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <!-- Фильтр по админу (только для директора) -->
                         <template x-if="currentUser.role === 'director'">
-                            <select class="glass px-4 py-2.5 rounded-xl text-sm font-medium" x-model="adminTypeFilter">
-                                <option value="all">Все анкеты</option>
-                                <option value="our">Наш админ</option>
-                                <option value="other">Другие</option>
+                            <select class="glass px-4 py-2.5 rounded-xl text-sm font-medium" x-model="adminFilter">
+                                <option value="all">Все админы</option>
+                                <option value="unassigned">Без админа</option>
+                                <template x-for="admin in admins" :key="admin.id">
+                                    <option :value="admin.id" x-text="admin.name"></option>
+                                </template>
                             </select>
                         </template>
+
+                        <!-- Фильтр по переводчику (для админа) -->
+                        <template x-if="currentUser.role === 'admin'">
+                            <select class="glass px-4 py-2.5 rounded-xl text-sm font-medium" x-model="translatorFilter">
+                                <option value="all">Все переводчики</option>
+                                <option value="unassigned">Без переводчика</option>
+                                <template x-for="translator in myTranslators" :key="translator.id">
+                                    <option :value="translator.id" x-text="translator.name"></option>
+                                </template>
+                            </select>
+                        </template>
+
                         <!-- Поиск -->
                         <div class="relative">
                             <input type="text" :placeholder="t('profiles.searchPlaceholder')"
@@ -1097,17 +1112,90 @@
                                    x-model="searchQuery">
                             <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
                         </div>
-                        <!-- Кнопка оплаты выбранных анкет (если не "мой админ") -->
-                        <template x-if="!isRestricted && selectedProfileIds.length > 0">
-                            <button @click="paySelectedProfiles()" class="px-5 py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white font-medium transition-all">
-                                <i class="fas fa-credit-card mr-2"></i>Оплатить (<span x-text="selectedProfileIds.length"></span>)
-                            </button>
-                        </template>
                     </div>
-                    <!-- Кнопка добавления - скрыта для переводчиков -->
+
+                    <!-- Кнопка добавления -->
                     <button x-show="currentUser.role !== 'translator'" @click="showAddAccountModal = true" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
                         <i class="fas fa-plus mr-2"></i><span x-text="t('common.add')"></span>
                     </button>
+                </div>
+
+                <!-- Панель массовых действий (появляется при выборе анкет) -->
+                <div x-show="selectedProfileIds.length > 0"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 transform -translate-y-2"
+                     x-transition:enter-end="opacity-100 transform translate-y-0"
+                     class="glass rounded-xl p-3 mb-4 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium text-indigo-700">
+                            <i class="fas fa-check-square mr-2"></i>
+                            Выбрано: <span x-text="selectedProfileIds.length" class="font-bold"></span> анкет
+                        </span>
+                        <button @click="selectedProfileIds = []" class="text-gray-500 hover:text-gray-700 text-sm ml-2">
+                            <i class="fas fa-times"></i> Сбросить
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <!-- Назначить админу (для директора) -->
+                        <template x-if="currentUser.role === 'director'">
+                            <div class="relative" x-data="{ showDropdown: false }">
+                                <button @click="showDropdown = !showDropdown"
+                                        class="px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium transition-colors">
+                                    <i class="fas fa-user-tie mr-2"></i>Назначить админу
+                                    <i class="fas fa-chevron-down ml-2 text-xs"></i>
+                                </button>
+                                <div x-show="showDropdown" @click.outside="showDropdown = false"
+                                     class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
+                                    <button @click="assignSelectedToAdmin(null); showDropdown = false"
+                                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 text-gray-600">
+                                        <i class="fas fa-ban mr-2"></i>Снять назначение
+                                    </button>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    <template x-for="admin in admins" :key="admin.id">
+                                        <button @click="assignSelectedToAdmin(admin.id); showDropdown = false"
+                                                class="w-full px-4 py-2 text-left text-sm hover:bg-indigo-50 hover:text-indigo-700">
+                                            <i class="fas fa-user mr-2"></i><span x-text="admin.name"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Назначить переводчику (для админа) -->
+                        <template x-if="currentUser.role === 'admin'">
+                            <div class="relative" x-data="{ showDropdown: false }">
+                                <button @click="showDropdown = !showDropdown"
+                                        class="px-4 py-2 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium transition-colors">
+                                    <i class="fas fa-language mr-2"></i>Назначить переводчику
+                                    <i class="fas fa-chevron-down ml-2 text-xs"></i>
+                                </button>
+                                <div x-show="showDropdown" @click.outside="showDropdown = false"
+                                     class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
+                                    <button @click="assignSelectedToTranslator(null); showDropdown = false"
+                                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 text-gray-600">
+                                        <i class="fas fa-ban mr-2"></i>Снять назначение
+                                    </button>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    <template x-for="translator in myTranslators" :key="translator.id">
+                                        <button @click="assignSelectedToTranslator(translator.id); showDropdown = false"
+                                                class="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 hover:text-purple-700">
+                                            <i class="fas fa-user mr-2"></i><span x-text="translator.name"></span>
+                                        </button>
+                                    </template>
+                                    <template x-if="myTranslators.length === 0">
+                                        <div class="px-4 py-2 text-sm text-gray-400">Нет переводчиков</div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Оплатить (если не мой админ) -->
+                        <template x-if="!isRestricted">
+                            <button @click="paySelectedProfiles()" class="px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition-colors">
+                                <i class="fas fa-credit-card mr-2"></i>Оплатить
+                            </button>
+                        </template>
+                    </div>
                 </div>
                 
                 <!-- Сортировка -->
@@ -1116,18 +1204,13 @@
                         <table class="w-full resizable-table" id="profiles-table">
                             <thead>
                                 <tr class="border-b border-gray-200 text-xs text-gray-600 uppercase tracking-wide">
-                                    <!-- Чекбокс для выбора (если не "мой админ") -->
-                                    <th x-show="!isRestricted" class="text-left py-2 px-3 w-10">
+                                    <!-- Чекбокс для выбора всех -->
+                                    <th class="text-left py-2 px-3 w-10">
                                         <input type="checkbox"
                                                class="profile-checkbox"
-                                               x-ref="selectAllCheckbox"
                                                @change="toggleSelectAllProfiles($event.target.checked)"
-                                               x-effect="
-                                                   const unpaidCount = filteredAccounts.filter(a => !a.isPaid && !a.isFree).length;
-                                                   const selectedCount = selectedProfileIds.length;
-                                                   $refs.selectAllCheckbox.checked = selectedCount > 0 && selectedCount === unpaidCount;
-                                                   $refs.selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < unpaidCount;
-                                               ">
+                                               :checked="selectedProfileIds.length > 0 && selectedProfileIds.length === filteredAccounts.length"
+                                               :indeterminate="selectedProfileIds.length > 0 && selectedProfileIds.length < filteredAccounts.length">
                                     </th>
                                     <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 100px;" @click="sortAccounts('id')">
                                         <span x-text="t('profiles.id')"></span>
@@ -1154,6 +1237,12 @@
                                         <i class="fas ml-1" :class="sortBy === 'admin' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
+                                    <!-- Колонка Переводчик для админа -->
+                                    <th x-show="currentUser.role === 'admin'" class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('translator')">
+                                        <span>Переводчик</span>
+                                        <i class="fas ml-1" :class="sortBy === 'translator' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
+                                    </th>
                                     <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('date')">
                                         <span x-text="t('profiles.addedDate')"></span>
                                         <i class="fas ml-1" :class="sortBy === 'date' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
@@ -1174,13 +1263,12 @@
                                         :class="{'bg-red-50': account.paused,
                                                 'account-online': account.status === 'online' && !account.paused,
                                                 'account-offline': account.status === 'offline' && !account.paused}">
-                                        <!-- Чекбокс для выбора (если не "мой админ") -->
-                                        <td x-show="!isRestricted" class="py-2 px-3">
+                                        <!-- Чекбокс для выбора -->
+                                        <td class="py-2 px-3">
                                             <input type="checkbox"
                                                    class="profile-checkbox"
                                                    :value="account.id"
-                                                   :checked="selectedProfileIds.includes(account.id)"
-                                                   :disabled="account.isPaid || account.isFree"
+                                                   :checked="selectedProfileIds.includes(String(account.id))"
                                                    @change="toggleProfileSelection(account.id, $event.target.checked)">
                                         </td>
                                         <td class="py-2 px-3 font-mono" x-text="account.id"></td>
@@ -1205,6 +1293,12 @@
                                                     <option :value="admin.login" x-text="admin.name"></option>
                                                 </template>
                                             </select>
+                                        </td>
+                                        <!-- Колонка Переводчик для админа -->
+                                        <td x-show="currentUser.role === 'admin'" class="py-2 px-3">
+                                            <span class="px-2 py-0.5 rounded text-xs"
+                                                  :class="account.translatorName ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'"
+                                                  x-text="account.translatorName || 'Не назначен'"></span>
                                         </td>
                                         <td class="py-2 px-3 text-gray-500" x-text="account.addedDate"></td>
                                         <td class="py-2 px-3 max-w-xs">
@@ -2619,6 +2713,8 @@
                 sortDirection: 'desc',
                 searchQuery: '',
                 adminTypeFilter: 'all', // 'our' = наши админы, 'other' = другие, 'all' = все (по умолчанию)
+                adminFilter: 'all', // Фильтр по конкретному админу (для директора)
+                translatorFilter: 'all', // Фильтр по переводчику (для админа)
                 loading: true,
                 error: null,
 
@@ -2977,8 +3073,11 @@
                                     lastOnline: p.last_online ? new Date(p.last_online).toLocaleString('ru-RU') : '-',
                                     incoming: p.incoming_today || 0,
                                     admin: p.admin_name || '',
+                                    adminId: p.admin_id || null,
                                     adminIsRestricted: p.admin_is_restricted || false,
                                     translator: p.trans_name || '',
+                                    translatorId: p.translator_id || null,
+                                    translatorName: p.trans_name || '',
                                     addedDate: new Date(p.added_at).toLocaleDateString('ru-RU'),
                                     comment: p.note ? p.note.replace(/\s*\[Last seen:.*?\]/g, '').trim() : '',
                                     paused: p.paused || false,
@@ -3500,11 +3599,27 @@
                     // Фильтр по типу админа (только для директора)
                     if (this.currentUser.role === 'director' && this.adminTypeFilter !== 'all') {
                         if (this.adminTypeFilter === 'our') {
-                            // Наш админ - показываем анкеты где админ is_restricted = true
                             filtered = filtered.filter(account => account.adminIsRestricted === true);
                         } else if (this.adminTypeFilter === 'other') {
-                            // Другие - показываем анкеты где админ is_restricted = false или нет админа
                             filtered = filtered.filter(account => account.adminIsRestricted === false);
+                        }
+                    }
+
+                    // Фильтр по конкретному админу (для директора)
+                    if (this.currentUser.role === 'director' && this.adminFilter !== 'all') {
+                        if (this.adminFilter === 'unassigned') {
+                            filtered = filtered.filter(account => !account.adminId);
+                        } else {
+                            filtered = filtered.filter(account => account.adminId == this.adminFilter);
+                        }
+                    }
+
+                    // Фильтр по переводчику (для админа)
+                    if (this.currentUser.role === 'admin' && this.translatorFilter !== 'all') {
+                        if (this.translatorFilter === 'unassigned') {
+                            filtered = filtered.filter(account => !account.translatorId);
+                        } else {
+                            filtered = filtered.filter(account => account.translatorId == this.translatorFilter);
                         }
                     }
 
@@ -3512,10 +3627,10 @@
                         const query = this.searchQuery.toLowerCase();
                         filtered = filtered.filter(account =>
                             account.id.toLowerCase().includes(query) ||
-                            account.login.toLowerCase().includes(query)
+                            account.login?.toLowerCase().includes(query)
                         );
                     }
-                    
+
                     filtered.sort((a, b) => {
                         let result = 0;
                         switch (this.sortBy) {
@@ -3535,6 +3650,9 @@
                             case 'admin':
                                 result = (a.admin || '').localeCompare(b.admin || '');
                                 break;
+                            case 'translator':
+                                result = (a.translatorName || '').localeCompare(b.translatorName || '');
+                                break;
                             case 'date':
                                 result = new Date(a.addedDate || 0) - new Date(b.addedDate || 0);
                                 break;
@@ -3543,7 +3661,7 @@
                         }
                         return this.sortDirection === 'desc' ? -result : result;
                     });
-                    
+
                     return filtered;
                 },
                 
@@ -4449,24 +4567,80 @@
                     }
                 },
 
-                // Выбор анкет для оплаты
+                // Выбор анкет
                 toggleProfileSelection(profileId, checked) {
+                    const id = String(profileId);
                     if (checked) {
-                        if (!this.selectedProfileIds.includes(profileId)) {
-                            this.selectedProfileIds.push(profileId);
+                        if (!this.selectedProfileIds.includes(id)) {
+                            this.selectedProfileIds.push(id);
                         }
                     } else {
-                        this.selectedProfileIds = this.selectedProfileIds.filter(id => id !== profileId);
+                        this.selectedProfileIds = this.selectedProfileIds.filter(pid => pid !== id);
                     }
                 },
 
                 toggleSelectAllProfiles(checked) {
                     if (checked) {
-                        this.selectedProfileIds = this.filteredAccounts
-                            .filter(a => !a.isPaid && !a.isFree)
-                            .map(a => a.id);
+                        this.selectedProfileIds = this.filteredAccounts.map(a => String(a.id));
                     } else {
                         this.selectedProfileIds = [];
+                    }
+                },
+
+                // Назначить выбранные анкеты админу (для директора)
+                async assignSelectedToAdmin(adminId) {
+                    if (this.selectedProfileIds.length === 0) return;
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/profiles/assign-admin`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileIds: this.selectedProfileIds,
+                                adminId: adminId,
+                                userId: this.currentUser.id
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.selectedProfileIds = [];
+                            await this.loadAccounts();
+                            alert(adminId ? `Анкеты назначены админу` : 'Назначение снято');
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось назначить'));
+                        }
+                    } catch (e) {
+                        console.error('assignSelectedToAdmin error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
+                // Назначить выбранные анкеты переводчику (для админа)
+                async assignSelectedToTranslator(translatorId) {
+                    if (this.selectedProfileIds.length === 0) return;
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/profiles/assign-translator`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileIds: this.selectedProfileIds,
+                                translatorId: translatorId,
+                                userId: this.currentUser.id
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            this.selectedProfileIds = [];
+                            await this.loadAccounts();
+                            await this.loadTeam();
+                            alert(translatorId ? `Анкеты назначены переводчику` : 'Назначение снято');
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось назначить'));
+                        }
+                    } catch (e) {
+                        console.error('assignSelectedToTranslator error:', e);
+                        alert('Ошибка сети');
                     }
                 },
 

@@ -208,6 +208,34 @@ router.post('/assign', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Массовое назначение анкет админу (по profile_id)
+router.post('/assign-admin', async (req, res) => {
+    const { profileIds, adminId, userId } = req.body;
+    try {
+        const placeholders = profileIds.map((_, i) => `$${i + 2}`).join(',');
+        const query = `UPDATE allowed_profiles SET assigned_admin_id = $1 WHERE profile_id IN (${placeholders})`;
+        await pool.query(query, [adminId, ...profileIds]);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('assign-admin error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Массовое назначение анкет переводчику (по profile_id)
+router.post('/assign-translator', async (req, res) => {
+    const { profileIds, translatorId, userId } = req.body;
+    try {
+        const placeholders = profileIds.map((_, i) => `$${i + 2}`).join(',');
+        const query = `UPDATE allowed_profiles SET assigned_translator_id = $1 WHERE profile_id IN (${placeholders})`;
+        await pool.query(query, [translatorId, ...profileIds]);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('assign-translator error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 /**
  * GET /api/profiles/:profileId/status
  * Проверяет статус анкеты (paused)
