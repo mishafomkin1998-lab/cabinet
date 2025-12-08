@@ -45,6 +45,60 @@ app.get('/', (req, res) => {
 // Аутентификация
 app.use('/', authRoutes);
 
+// Прямой маршрут PUT для пользователей (обход проблемы с роутером)
+app.put('/api/users/:id', async (req, res) => {
+    console.log(`📝 [PUT /api/users/:id DIRECT] userId=${req.params.id}, body=`, req.body);
+    const pool = require('./config/database');
+    const userId = req.params.id;
+    const { username, password, salary, aiEnabled, is_restricted } = req.body;
+    try {
+        const updates = [];
+        const params = [];
+        let paramIndex = 1;
+
+        if (username) {
+            updates.push(`username = $${paramIndex++}`);
+            params.push(username);
+        }
+
+        if (password) {
+            const bcrypt = require('bcryptjs');
+            const hash = await bcrypt.hash(password, 10);
+            updates.push(`password_hash = $${paramIndex++}`);
+            params.push(hash);
+        }
+
+        if (salary !== undefined) {
+            updates.push(`salary = $${paramIndex++}`);
+            params.push(salary);
+        }
+
+        if (aiEnabled !== undefined) {
+            updates.push(`ai_enabled = $${paramIndex++}`);
+            params.push(aiEnabled);
+        }
+
+        if (is_restricted !== undefined) {
+            updates.push(`is_restricted = $${paramIndex++}`);
+            params.push(is_restricted);
+        }
+
+        if (updates.length === 0) {
+            return res.json({ success: true, message: 'Нечего обновлять' });
+        }
+
+        params.push(userId);
+        const query = `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIndex}`;
+        await pool.query(query, params);
+
+        console.log(`✅ Пользователь ${userId} обновлён`);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Update user error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // API маршруты
 app.use('/api/team', teamRoutes);
 app.use('/api/users', teamRoutes); // alias для совместимости
