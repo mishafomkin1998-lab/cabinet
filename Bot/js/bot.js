@@ -1656,6 +1656,20 @@
 
         function toggleGlobalMode() {
             const btn = document.getElementById('btn-mode-toggle');
+
+            // КРИТИЧНО: Сохраняем текст из текущего режима ПЕРЕД переключением
+            if (activeTabId && bots[activeTabId]) {
+                const bot = bots[activeTabId];
+                const textarea = document.getElementById(`msg-${activeTabId}`);
+                if (textarea && !textarea.disabled) {
+                    if (globalMode === 'chat') {
+                        bot.currentChatText = textarea.value;
+                    } else {
+                        bot.currentMailText = textarea.value;
+                    }
+                }
+            }
+
             if (globalMode === 'mail') {
                 globalMode = 'chat';
                 document.body.classList.remove('mode-mail'); document.body.classList.add('mode-chat');
@@ -1665,7 +1679,9 @@
                 document.body.classList.remove('mode-chat'); document.body.classList.add('mode-mail');
                 btn.innerHTML = '<i class="fa fa-envelope"></i>'; btn.className = 'btn btn-circle btn-mode-switch active-mail';
             }
-            if(activeTabId && bots[activeTabId]) updateInterfaceForMode(activeTabId);
+
+            // КРИТИЧНО: useSavedText=true чтобы показать сохранённый текст для нового режима
+            if(activeTabId && bots[activeTabId]) updateInterfaceForMode(activeTabId, true);
         }
 
         function updateBotCount() { document.getElementById('global-bot-count').innerText = `Анкет: ${Object.keys(bots).length}`; }
@@ -3377,9 +3393,19 @@
         async function saveTemplateFromModal() {
             const name = document.getElementById('tpl-modal-name').value;
             const text = document.getElementById('tpl-modal-text').value;
-            if (!name) return;
+
+            if (!name) {
+                alert('Введите название шаблона');
+                return;
+            }
 
             const bot = bots[currentModalBotId];
+            if (!bot) {
+                alert('Ошибка: бот не найден. Попробуйте снова открыть модальное окно.');
+                console.error('saveTemplateFromModal: bot not found, currentModalBotId=', currentModalBotId);
+                return;
+            }
+
             const isChat = globalMode === 'chat';
             const type = isChat ? 'chat' : 'mail';
 
@@ -3466,18 +3492,19 @@
                  const savedText = isChat ? bot.currentChatText : bot.currentMailText;
                  let textToSet;
                  if (useSavedText && savedText) {
+                     // Используем сохранённый текст - НЕ перезаписываем currentText
                      textToSet = savedText;
                  } else {
+                     // Используем текст шаблона - обновляем currentText
                      textToSet = tpls[val].text || '';
+                     // Синхронизируем currentText только когда берём текст из шаблона
+                     if (isChat) {
+                         bot.currentChatText = textToSet;
+                     } else {
+                         bot.currentMailText = textToSet;
+                     }
                  }
                  area.value = textToSet;
-
-                 // КРИТИЧНО: Синхронизируем currentText с тем что в textarea
-                 if (isChat) {
-                     bot.currentChatText = textToSet;
-                 } else {
-                     bot.currentMailText = textToSet;
-                 }
 
                  if(isChat) bots[botId].lastTplChat = val; else bots[botId].lastTplMail = val;
 
@@ -3872,58 +3899,15 @@
                 document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} из кэша...` : "";
 
                 for (const a of s) {
+                    // performLogin уже загружает всё с сервера - сервер является источником правды
+                    // localStorage используется только для хранения credentials
                     const ok = await performLogin(a.login, a.pass, a.displayId);
                     if (ok && bots[Object.keys(bots).pop()]) {
                         const botId = Object.keys(bots).pop();
                         const bot = bots[botId];
 
-                        // Восстанавливаем шаблоны
-                        bot.lastTplMail = a.lastTplMail;
-                        bot.lastTplChat = a.lastTplChat;
-
-                        // КРИТИЧНО: Восстанавливаем текст из textarea
-                        if (a.currentMailText) bot.currentMailText = a.currentMailText;
-                        if (a.currentChatText) bot.currentChatText = a.currentChatText;
-
-                        // Восстанавливаем настройки чата
-                        if (a.chatRotationHours) bot.chatSettings.rotationHours = a.chatRotationHours;
-                        if (a.chatCyclic !== undefined) bot.chatSettings.cyclic = a.chatCyclic;
-                        if (a.chatCurrentIndex) bot.chatSettings.currentInviteIndex = a.chatCurrentIndex;
-                        if (a.chatStartTime) bot.chatSettings.rotationStartTime = a.chatStartTime;
-                        if (a.chatTarget) bot.chatSettings.target = a.chatTarget;
-                        if (a.chatBlacklist && a.chatBlacklist.length > 0) bot.chatSettings.blacklist = a.chatBlacklist;
-
-                        // Восстанавливаем настройки рассылки
-                        if (a.mailAuto !== undefined) bot.mailSettings.auto = a.mailAuto;
-                        if (a.mailTarget) bot.mailSettings.target = a.mailTarget;
-                        if (a.mailPhotoOnly !== undefined) bot.mailSettings.photoOnly = a.mailPhotoOnly;
-                        if (a.mailBlacklist && a.mailBlacklist.length > 0) bot.mailSettings.blacklist = a.mailBlacklist;
-
-                        // КРИТИЧНО: Восстанавливаем статистику (глубокое копирование)
-                        if (a.mailStats) bot.mailStats = { ...a.mailStats };
-                        if (a.chatStats) bot.chatStats = { ...a.chatStats };
-
-                        // КРИТИЧНО: Восстанавливаем историю (глубокое копирование)
-                        if (a.mailHistory) bot.mailHistory = {
-                            sent: [...(a.mailHistory.sent || [])],
-                            errors: [...(a.mailHistory.errors || [])],
-                            waiting: [...(a.mailHistory.waiting || [])]
-                        };
-                        if (a.chatHistory) bot.chatHistory = {
-                            sent: [...(a.chatHistory.sent || [])],
-                            errors: [...(a.chatHistory.errors || [])],
-                            waiting: [...(a.chatHistory.waiting || [])]
-                        };
-
-                        // Восстанавливаем VIP список
-                        if (a.vipList) bot.vipList = [...a.vipList];
-
-                        // КРИТИЧНО: передаём useSavedText=true чтобы восстановить сохранённый текст
-                        updateInterfaceForMode(bot.id, true);
-                        bot.updateUI(); // Обновляем UI со статистикой
-
                         // Логируем результат восстановления
-                        console.log(`[RestoreSession] ✅ ${bot.displayId} восстановлен: mailStats=${JSON.stringify(bot.mailStats)}, chatStats=${JSON.stringify(bot.chatStats)}`);
+                        console.log(`[RestoreSession] ✅ ${bot.displayId} восстановлен с сервера`);
                     }
                     await new Promise(r => setTimeout(r, 500));
                 }
@@ -3957,6 +3941,19 @@
         }
 
         function selectTab(id) {
+            // КРИТИЧНО: Сохраняем текст из текущей вкладки ПЕРЕД переключением
+            if (activeTabId && bots[activeTabId]) {
+                const bot = bots[activeTabId];
+                const textarea = document.getElementById(`msg-${activeTabId}`);
+                if (textarea && !textarea.disabled) {
+                    if (globalMode === 'chat') {
+                        bot.currentChatText = textarea.value;
+                    } else {
+                        bot.currentMailText = textarea.value;
+                    }
+                }
+            }
+
             document.querySelectorAll('.tab-item').forEach(t=>t.classList.remove('active'));
             document.querySelectorAll('.workspace').forEach(w=>w.classList.remove('active'));
             // ВАЖНО: Webview больше не активируем - они всегда скрыты и не получают фокус
@@ -3972,7 +3969,8 @@
                 t.classList.add('active');
                 w.classList.add('active');
                 activeTabId=id;
-                updateInterfaceForMode(id);
+                // КРИТИЧНО: useSavedText=true чтобы показать сохранённый текст
+                updateInterfaceForMode(id, true);
             }
 
             // КРИТИЧНО: Webview остаётся скрытым, не активируем и убираем фокус
