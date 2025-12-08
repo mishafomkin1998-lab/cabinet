@@ -64,7 +64,7 @@
                     });
                 },
 
-                activeMenu: 'stats',
+                activeMenu: window.location.hash.slice(1) || 'stats',
                 activeSubmenu: 'general',
                 showCalendar: false,
                 showMonitoringCalendar: false,
@@ -678,6 +678,7 @@
                 setActiveMenu(menu) {
                     this.activeMenu = menu;
                     this.activeSubmenu = 'general';
+                    window.location.hash = menu;
                 },
                 
                 setActiveSubmenu(submenu) {
