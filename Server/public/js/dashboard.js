@@ -118,6 +118,9 @@
                 errorLogs: [],
                 errorLogsOffset: 0,
 
+                // Профили с управлением рассылкой
+                profilesWithMailing: [],
+
                 // Избранные шаблоны
                 favoriteTemplates: [],
 
@@ -505,8 +508,17 @@
                                 if (acc) {
                                     acc.status = p.status === 'online' ? 'online' : (p.status === 'idle' ? 'working' : 'offline');
                                     acc.lastOnline = p.lastHeartbeat ? new Date(p.lastHeartbeat).toLocaleString('ru-RU') : '-';
+                                    acc.mailingEnabled = p.mailingEnabled;
                                 }
                             });
+
+                            // Сохраняем профили для управления рассылкой
+                            this.profilesWithMailing = (data.profiles || []).map(p => ({
+                                profileId: p.profileId,
+                                note: p.note,
+                                status: p.status,
+                                mailingEnabled: p.mailingEnabled !== false  // по умолчанию true
+                            }));
                         }
                     } catch (e) { console.error('loadBotsStatus error:', e); }
                 },
@@ -1751,6 +1763,59 @@
                         }
                     } catch (e) {
                         console.error('Ошибка:', e);
+                    }
+                },
+
+                // Переключение рассылки для одной анкеты
+                async toggleProfileMailing(profile) {
+                    const newEnabled = !profile.mailingEnabled;
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/profile/${profile.profileId}/toggle-mailing`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                userId: this.currentUser.id,
+                                enabled: newEnabled
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            profile.mailingEnabled = newEnabled;
+                            // Также обновляем в accounts
+                            const acc = this.accounts.find(a => a.id === profile.profileId);
+                            if (acc) acc.mailingEnabled = newEnabled;
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось переключить'));
+                        }
+                    } catch (e) {
+                        console.error('toggleProfileMailing error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
+                // Переключение рассылки для всех анкет
+                async toggleAllProfilesMailing(enabled) {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/profiles/toggle-mailing-all`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                userId: this.currentUser.id,
+                                enabled: enabled
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            // Обновляем все профили
+                            this.profilesWithMailing.forEach(p => p.mailingEnabled = enabled);
+                            this.accounts.forEach(a => a.mailingEnabled = enabled);
+                            alert(`Рассылка ${enabled ? 'включена' : 'отключена'} для ${data.count} анкет`);
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось переключить'));
+                        }
+                    } catch (e) {
+                        console.error('toggleAllProfilesMailing error:', e);
+                        alert('Ошибка сети');
                     }
                 },
 

@@ -165,7 +165,19 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
 
     console.log(`❤️ Heartbeat от ${accountDisplayId} (бот ${botId}): ${profileStatus}`);
 
-    res.json({ status: 'ok' });
+    // Получаем статус paused для ответа боту
+    const profileSettings = await pool.query(
+        `SELECT paused FROM allowed_profiles WHERE profile_id = $1`,
+        [accountDisplayId]
+    );
+    const isPaused = profileSettings.rows[0]?.paused || false;
+
+    res.json({
+        status: 'ok',
+        commands: {
+            mailingEnabled: !isPaused  // true = рассылка включена, false = на паузе
+        }
+    });
 }));
 
 // Heartbeat по новой схеме (POST /api/bot/heartbeat)
@@ -266,6 +278,7 @@ router.get('/status', asyncHandler(async (req, res) => {
         SELECT DISTINCT ON (p.profile_id)
             p.profile_id,
             p.note,
+            p.paused,
             h.bot_id,
             h.status as heartbeat_status,
             h.ip,
@@ -308,7 +321,8 @@ router.get('/status', asyncHandler(async (req, res) => {
             ip: row.ip,
             version: row.version,
             status: status,
-            lastHeartbeat: row.last_heartbeat
+            lastHeartbeat: row.last_heartbeat,
+            mailingEnabled: !row.paused  // true = рассылка включена
         };
     });
 
@@ -752,6 +766,57 @@ router.post('/control/settings', asyncHandler(async (req, res) => {
             throw e;
         }
     }
+}));
+
+// Переключение рассылки для конкретной анкеты
+router.post('/profile/:profileId/toggle-mailing', asyncHandler(async (req, res) => {
+    const { profileId } = req.params;
+    const { userId, enabled } = req.body;
+
+    // Проверяем права (только директор)
+    const user = await pool.query(`SELECT role FROM users WHERE id = $1`, [userId]);
+    if (user.rows.length === 0 || user.rows[0].role !== 'director') {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав' });
+    }
+
+    // Обновляем статус paused (paused = !enabled)
+    await pool.query(
+        `UPDATE allowed_profiles SET paused = $1 WHERE profile_id = $2`,
+        [!enabled, profileId]
+    );
+
+    console.log(`🔄 Профиль ${profileId}: рассылка ${enabled ? 'включена' : 'отключена'}`);
+
+    res.json({
+        success: true,
+        profileId,
+        mailingEnabled: enabled
+    });
+}));
+
+// Массовое переключение рассылки для всех анкет
+router.post('/profiles/toggle-mailing-all', asyncHandler(async (req, res) => {
+    const { userId, enabled } = req.body;
+
+    // Проверяем права (только директор)
+    const user = await pool.query(`SELECT role FROM users WHERE id = $1`, [userId]);
+    if (user.rows.length === 0 || user.rows[0].role !== 'director') {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав' });
+    }
+
+    // Обновляем статус paused для всех анкет
+    const result = await pool.query(
+        `UPDATE allowed_profiles SET paused = $1`,
+        [!enabled]
+    );
+
+    console.log(`🔄 Все анкеты (${result.rowCount}): рассылка ${enabled ? 'включена' : 'отключена'}`);
+
+    res.json({
+        success: true,
+        count: result.rowCount,
+        mailingEnabled: enabled
+    });
 }));
 
 // PANIC MODE - экстренная остановка всех ботов

@@ -61,6 +61,9 @@
         const MACHINE_ID = getMachineId();
         console.log('🤖 Bot Machine ID:', MACHINE_ID);
 
+        // Хранилище статусов рассылки для каждого профиля (заполняется из heartbeat ответов)
+        const mailingStatusByProfile = {};
+
         // ============= API ДЛЯ ОТПРАВКИ ДАННЫХ НА LABABOT SERVER =============
         const LABABOT_SERVER = 'http://188.137.253.169:3000';
 
@@ -210,6 +213,32 @@
 
                 const data = await response.json();
                 console.log(`✅ Heartbeat отправлен:`, data);
+
+                // Обработка команд от сервера
+                if (data && data.commands) {
+                    const prevStatus = mailingStatusByProfile[displayId];
+                    mailingStatusByProfile[displayId] = data.commands.mailingEnabled;
+
+                    // Если рассылка была отключена удалённо - останавливаем
+                    if (prevStatus === true && data.commands.mailingEnabled === false) {
+                        console.log(`🛑 Рассылка для ${displayId} отключена удалённо`);
+                        // Найти и остановить бота
+                        const bot = bots.find(b => b.displayId === displayId);
+                        if (bot && bot.isMailRunning) {
+                            bot.log('⛔ Рассылка остановлена удалённо из кабинета');
+                            bot.stopMail();
+                        }
+                        if (bot && bot.isChatRunning) {
+                            bot.log('⛔ Чат остановлен удалённо из кабинета');
+                            bot.stopChat();
+                        }
+                    }
+                    // Логируем изменение статуса
+                    if (prevStatus !== undefined && prevStatus !== data.commands.mailingEnabled) {
+                        console.log(`📡 Статус рассылки ${displayId}: ${data.commands.mailingEnabled ? 'включена' : 'выключена'}`);
+                    }
+                }
+
                 return data;
             } catch (error) {
                 console.error(`❌ Ошибка heartbeat:`, error);
@@ -1858,6 +1887,14 @@
                 if (!this.isMailRunning) return;
                 this.mailTimeout = setTimeout(async () => {
                     if (!this.isMailRunning) return;
+
+                    // Проверка удалённого отключения рассылки
+                    if (mailingStatusByProfile[this.displayId] === false) {
+                        this.log('⛔ Рассылка приостановлена из личного кабинета');
+                        this.stopMail();
+                        return;
+                    }
+
                     await this.processMailUser(text);
                     let nextDelay = 15000;
                     if (this.mailSettings.speed === 'smart') nextDelay = Math.floor(Math.random() * (120000 - 15000 + 1)) + 15000;
@@ -2232,6 +2269,14 @@
                 if (!this.isChatRunning) return;
                 this.chatTimeout = setTimeout(async () => {
                     if (!this.isChatRunning) return;
+
+                    // Проверка удалённого отключения рассылки
+                    if (mailingStatusByProfile[this.displayId] === false) {
+                        this.log('⛔ Чат приостановлен из личного кабинета');
+                        this.stopChat();
+                        return;
+                    }
+
                     await this.processChatUser(fullText);
                     let nextDelay = 15000;
                     if (this.chatSettings.speed === 'smart') nextDelay = Math.floor(Math.random() * (120000 - 15000 + 1)) + 15000;
