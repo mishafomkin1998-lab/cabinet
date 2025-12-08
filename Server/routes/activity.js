@@ -19,6 +19,34 @@ const { asyncHandler, buildRoleFilter } = require('../utils/helpers');
 const router = express.Router();
 
 /**
+ * Конвертация времени ответа из разных форматов в секунды (INTEGER)
+ * Поддерживает: "00:06:24" (HH:MM:SS), число секунд, null
+ */
+function parseResponseTimeToSeconds(responseTime) {
+    if (!responseTime) return null;
+
+    // Если уже число - возвращаем как есть
+    if (typeof responseTime === 'number') {
+        return Math.floor(responseTime);
+    }
+
+    // Если строка в формате HH:MM:SS
+    if (typeof responseTime === 'string' && responseTime.includes(':')) {
+        const parts = responseTime.split(':');
+        if (parts.length === 3) {
+            const hours = parseInt(parts[0]) || 0;
+            const minutes = parseInt(parts[1]) || 0;
+            const seconds = parseInt(parts[2]) || 0;
+            return hours * 3600 + minutes * 60 + seconds;
+        }
+    }
+
+    // Попытка распарсить как число
+    const parsed = parseInt(responseTime);
+    return isNaN(parsed) ? null : parsed;
+}
+
+/**
  * POST /api/message_sent
  * Основной эндпоинт для сохранения отправленных сообщений.
  * Вызывается ботом после каждой отправки письма или чата.
@@ -94,10 +122,11 @@ router.post('/message_sent', asyncHandler(async (req, res) => {
 
         // Шаг 4: Основная запись сообщения в таблицу messages
         const msgType = type || 'outgoing';
+        const responseTimeSec = parseResponseTimeToSeconds(responseTime); // Конвертируем в секунды
         await pool.query(
             `INSERT INTO messages (bot_id, account_id, type, sender_id, timestamp, response_time, is_first_message, is_last_message, conversation_id, message_length, status, message_content_id, error_log_id)
              VALUES ($1, $2, $3, $4, NOW(), $5, $6, $7, $8, $9, $10, $11, $12)`,
-            [botId, accountDisplayId, msgType, recipientId, responseTime || null, isFirst || false, isLast || false, convId || null, length || 0, status || 'success', contentId, errorLogId]
+            [botId, accountDisplayId, msgType, recipientId, responseTimeSec, isFirst || false, isLast || false, convId || null, length || 0, status || 'success', contentId, errorLogId]
         );
 
         // Шаг 5: Дублируем в activity_log для быстрых запросов дашборда
@@ -107,7 +136,7 @@ router.post('/message_sent', asyncHandler(async (req, res) => {
         await pool.query(
             `INSERT INTO activity_log (profile_id, bot_id, admin_id, translator_id, action_type, man_id, message_text, response_time_sec, used_ai, created_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
-            [accountDisplayId, botId, adminId, assignedTranslatorId, actionType, recipientId, textContent || null, responseTime || null, usedAi || false]
+            [accountDisplayId, botId, adminId, assignedTranslatorId, actionType, recipientId, textContent || null, responseTimeSec, usedAi || false]
         );
 
         console.log(`✅ Сообщение от бота ${botId} для анкеты ${accountDisplayId} сохранено + activity_log (contentId: ${contentId})`);
@@ -118,6 +147,9 @@ router.post('/message_sent', asyncHandler(async (req, res) => {
 // Логирование активности
 router.post('/log', asyncHandler(async (req, res) => {
     const { botId, profileId, actionType, manId, messageText, responseTimeSec, usedAi } = req.body;
+
+    // Конвертируем время ответа в секунды (на случай если придет в формате HH:MM:SS)
+    const responseTimeSeconds = parseResponseTimeToSeconds(responseTimeSec);
 
     const profileResult = await pool.query(
             `SELECT assigned_admin_id, assigned_translator_id FROM allowed_profiles WHERE profile_id = $1`,
@@ -142,7 +174,7 @@ router.post('/log', asyncHandler(async (req, res) => {
             actionType,
             manId || null,
             messageText || null,
-            responseTimeSec || null,
+            responseTimeSeconds,
             usedAi || false
         ]);
 
@@ -151,7 +183,7 @@ router.post('/log', asyncHandler(async (req, res) => {
         await pool.query(`
             INSERT INTO messages (bot_id, account_id, type, sender_id, response_time, status)
             VALUES ($1, $2, $3, $4, $5, 'success')
-        `, [botId || null, profileId, msgType, manId || null, responseTimeSec || null]);
+        `, [botId || null, profileId, msgType, manId || null, responseTimeSeconds]);
 
         console.log(`📝 Активность: ${actionType} от ${profileId} (бот: ${botId || 'N/A'})`);
 
