@@ -1010,7 +1010,7 @@
         }
         .btn-ai-sub:hover { background: #e9ecef; color: #6f42c1; }
 
-        .textarea-msg { resize: none; flex: 1; font-size: 14px; border-color: #dee2e6; border-radius: 6px; background: #fafafa; user-select: text !important; -webkit-user-select: text !important; cursor: text; }
+        .textarea-msg { resize: none; flex: 1; font-size: 14px; border-color: #dee2e6; border-radius: 6px; background: #fafafa; }
         .textarea-msg:focus { border-color: var(--mode-color); background: #fff; box-shadow: none; }
         
         .action-log { font-size: 11px; color: #555; height: 120px; overflow-y: auto; background: #fafafa; border: 1px solid #eee; margin-top: auto; padding: 5px; font-family: monospace; border-radius: 4px; }
@@ -1059,20 +1059,13 @@
 
         .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); z-index: 2000; display: none; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease; }
         .modal-overlay.show { opacity: 1; }
-        .modal-card {
-            background: white; padding: 25px; border-radius: 12px; width: 400px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.25); transform: scale(0.9); transition: transform 0.3s ease;
+        .modal-card { 
+            background: white; padding: 25px; border-radius: 12px; width: 400px; 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.25); transform: scale(0.9); transition: transform 0.3s ease; 
             display: flex; flex-direction: column;
             max-height: 90vh; overflow-y: auto;
         }
         .modal-overlay.show .modal-card { transform: scale(1); }
-        /* КРИТИЧНО: Разрешаем ввод текста в модальных окнах */
-        .modal-card input, .modal-card textarea, .modal-card select {
-            user-select: text !important;
-            -webkit-user-select: text !important;
-            cursor: text;
-        }
-        .modal-card textarea { cursor: text; }
         .acc-row { border-bottom: 1px solid #eee; padding: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
         .spinner { display: none; width: 1rem; height: 1rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spinner-border .75s linear infinite; }
         @keyframes spinner-border { to { transform: rotate(360deg); } }
@@ -1146,8 +1139,6 @@
             background: #fdfdfd;
             display: flex;
             flex-direction: column-reverse;
-            user-select: text; /* Разрешаем выделение текста в логгере */
-            cursor: text;
         }
         .log-entry {
             margin-bottom: 8px;
@@ -1155,13 +1146,12 @@
             border-bottom: 1px solid #eee;
             font-size: 12px;
             line-height: 1.4;
-            margin-top: 0;
+            margin-top: 0; 
             margin-bottom: 0;
             padding-top: 8px;
             padding-bottom: 0;
             border-top: 1px solid #eee;
             border-bottom: none;
-            user-select: text; /* Разрешаем выделение текста */
         }
         .log-entry:first-child { border-top: none; }
         .log-entry.fresh { color: #198754; font-weight: 600; }
@@ -1252,11 +1242,11 @@
             .proxy-row label { min-width: 100%; }
         }
 
-        .chat-history { flex: 1; overflow-y: auto; background: #fafafa; border: 1px solid #eee; padding: 10px; margin-bottom: 10px; border-radius: 4px; font-size: 13px; user-select: text; cursor: text; }
-        .chat-msg { margin-bottom: 8px; display: flex; flex-direction: column; user-select: text; }
+        .chat-history { flex: 1; overflow-y: auto; background: #fafafa; border: 1px solid #eee; padding: 10px; margin-bottom: 10px; border-radius: 4px; font-size: 13px; }
+        .chat-msg { margin-bottom: 8px; display: flex; flex-direction: column; }
         .chat-msg.me { align-items: flex-end; }
         .chat-msg.partner { align-items: flex-start; }
-        .msg-bubble { max-width: 80%; padding: 6px 10px; border-radius: 12px; position: relative; user-select: text; cursor: text; }
+        .msg-bubble { max-width: 80%; padding: 6px 10px; border-radius: 12px; position: relative; }
         .chat-msg.me .msg-bubble { background: #d1e7dd; color: #0f5132; border-radius: 12px 12px 0 12px; }
         .chat-msg.partner .msg-bubble { background: #fff; border: 1px solid #ddd; color: #333; border-radius: 12px 12px 12px 0; }
         .msg-time { font-size: 10px; color: #999; margin-top: 2px; }

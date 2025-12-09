@@ -196,7 +196,6 @@
 
                 showAddTranslatorModal: false,
                 selectedAdmin: null,
-                expandedAdminId: null, // ID раскрытого админа для списка переводчиков
                 accountsToAssign: '',
                 assignComment: '',
                 selectedAccountIds: [],
@@ -567,8 +566,6 @@
                                     id: a.id,
                                     name: a.username,
                                     login: a.username,
-                                    password: a.password || '',
-                                    aiEnabled: a.ai_enabled || false,
                                     initials: a.username.substring(0, 2).toUpperCase(),
                                     accounts: a.accounts_count || 0,
                                     conversion: a.conversion || 0,
@@ -579,7 +576,6 @@
                                         id: t.id,
                                         name: t.username,
                                         login: t.username,
-                                        password: t.password || '',
                                         conversion: t.conversion || 0,
                                         accounts: t.accounts || [],
                                         accountsCount: t.accounts_count || 0
@@ -1364,16 +1360,7 @@
                     this.selectedAdmin = admin;
                     this.showViewAdminModal = true;
                 },
-
-                // Раскрыть/скрыть список переводчиков админа
-                toggleAdminExpanded(adminId) {
-                    if (this.expandedAdminId === adminId) {
-                        this.expandedAdminId = null;
-                    } else {
-                        this.expandedAdminId = adminId;
-                    }
-                },
-
+                
                 async saveAdmin() {
                     if (!this.newAdmin.name || !this.newAdmin.login || !this.newAdmin.password) {
                         alert('Заполните все обязательные поля');

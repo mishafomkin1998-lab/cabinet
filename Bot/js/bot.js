@@ -1,33 +1,23 @@
         let axios;
         try { axios = require('axios'); } catch(e) { axios = window.axios; }
 
-        // Безопасная инициализация аудио (не падает если файлы отсутствуют)
-        const audioFiles = {};
-        function initAudio(name, path) {
-            try {
-                const audio = new Audio(path);
-                audio.load();
-                audio.onerror = () => console.warn(`Звуковой файл не найден: ${path}`);
-                audioFiles[name] = audio;
-            } catch(e) {
-                console.warn(`Не удалось загрузить звук: ${path}`);
-                audioFiles[name] = null;
-            }
-        }
-        initAudio('online', 'Sound/Online.mp3');
-        initAudio('message', 'Sound/Message.mp3');
-        initAudio('chat', 'Sound/Chat.mp3');
+        const audioFiles = {
+            online: new Audio('Sound/Online.mp3'),
+            message: new Audio('Sound/Message.mp3'),
+            chat: new Audio('Sound/Chat.mp3')
+        };
+        Object.values(audioFiles).forEach(a => a.load());
 
         function playSound(type) {
             if(!globalSettings.soundsEnabled) return;
             try {
-                const audio = audioFiles[type];
-                if (audio) audio.play().catch(()=>{});
+                if(type === 'online') audioFiles.online.play().catch(()=>{});
+                else if(type === 'message') audioFiles.message.play().catch(()=>{});
+                else if (type === 'chat') audioFiles.chat.play().catch(()=>{});
             } catch(e) { console.warn("Audio play error", e); }
         }
 
         let bots = {};
-        let isRestoring = false; // Флаг для предотвращения сохранения во время восстановления
         let botTemplates = JSON.parse(localStorage.getItem('botTemplates')) || {};
         let accountPreferences = JSON.parse(localStorage.getItem('accountPreferences')) || {};
         
@@ -76,13 +66,6 @@
             const seconds = totalSeconds % 60;
 
             return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-        }
-
-        // Форматирование таймера для кнопки Стоп (прошедшее время с момента startTime)
-        function formatElapsedTimer(startTime) {
-            if (!startTime) return '00:00:00';
-            const elapsed = Date.now() - startTime;
-            return millisecondsToInterval(elapsed) || '00:00:00';
         }
 
         // 1. Функция отправки сообщения на Lababot сервер (ПОЛНАЯ СПЕЦИФИКАЦИЯ)
@@ -951,29 +934,13 @@
             document.removeEventListener('mouseup', stopTabDrag);
         }
 
-        window.onload = async function() {
-            restoreSession();
-            loadGlobalSettingsUI();
+        window.onload = async function() { 
+            restoreSession(); 
+            loadGlobalSettingsUI(); 
             toggleExtendedFeatures();
             initHotkeys();
             initTooltips();
-
-            // Глобальный таймер для обновления кнопок Стоп каждую секунду
-            setInterval(() => {
-                Object.values(bots).forEach(bot => {
-                    const isChat = globalMode === 'chat';
-                    const running = isChat ? bot.isChatRunning : bot.isMailRunning;
-                    if (running) {
-                        const btn = document.getElementById(`btn-start-${bot.id}`);
-                        if (btn) {
-                            const startTime = isChat ? bot.chatStartTime : bot.mailStartTime;
-                            const timerText = formatElapsedTimer(startTime);
-                            btn.innerHTML = `<i class="fa fa-stop"></i> ${timerText}`;
-                        }
-                    }
-                });
-            }, 1000);
-
+            
             document.addEventListener('click', (e) => {
                 if(!e.target.closest('.ai-container')) {
                     document.querySelectorAll('.ai-options').forEach(el => el.classList.remove('show'));
@@ -986,29 +953,6 @@
                     document.querySelectorAll('.vars-dropdown').forEach(d=>d.style.display='none');
                 }
             };
-
-            // КРИТИЧНО: Сохраняем сессию при закрытии окна
-            window.addEventListener('beforeunload', () => {
-                // Сохраняем текст из активной вкладки
-                if (activeTabId && bots[activeTabId]) {
-                    saveCurrentText(activeTabId);
-                }
-                saveSession();
-                console.log('[beforeunload] Сессия сохранена при закрытии');
-            });
-
-            // КРИТИЧНО: Периодическое автосохранение каждые 30 секунд
-            // Это гарантирует сохранение данных даже если beforeunload не сработает
-            setInterval(() => {
-                if (Object.keys(bots).length > 0) {
-                    // Сохраняем текст из активной вкладки перед автосохранением
-                    if (activeTabId && bots[activeTabId]) {
-                        saveCurrentText(activeTabId);
-                    }
-                    saveSession();
-                    console.log('[AutoSave] Автосохранение выполнено');
-                }
-            }, 30000); // Каждые 30 секунд
         };
 
         function setGlobalTarget(targetType) {
@@ -1190,20 +1134,6 @@
             const linkRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.(com|net|org|ru|ua|io)\b)/gi;
             if (linkRegex.test(val)) { val = val.replace(linkRegex, ''); errorMsg = "Запрещено вставлять ссылки"; }
             if (val !== original) { textarea.value = val; if (errorMsg) showToast(errorMsg); }
-        }
-
-        // Сохранение текущего текста из textarea в бота (для восстановления при перезапуске)
-        function saveCurrentText(botId) {
-            const bot = bots[botId];
-            if (!bot) return;
-            const textarea = document.getElementById(`msg-${botId}`);
-            if (!textarea) return;
-            // Сохраняем в зависимости от текущего режима
-            if (globalMode === 'chat') {
-                bot.currentChatText = textarea.value;
-            } else {
-                bot.currentMailText = textarea.value;
-            }
         }
 
         function showToast(text) {
@@ -1530,24 +1460,20 @@
                 this.displayId = displayId; 
                 this.token = token;
                 
-                this.lastTplMail = null;
+                this.lastTplMail = null; 
                 this.lastTplChat = null;
-                this.currentMailText = ''; // Текущий текст рассылки (сохраняется между сессиями)
-                this.currentChatText = ''; // Текущий текст чата (сохраняется между сессиями)
-                this.isMailRunning = false;
+                this.isMailRunning = false; 
                 this.mailTimeout = null;
                 this.mailStats = { sent: 0, errors: 0, waiting: 0 };
                 this.mailHistory = { sent: [], errors: [], waiting: [] };
-                this.mailSettings = { target: 'online', speed: 'smart', blacklist: [], photoOnly: false, auto: false };
+                this.mailSettings = { target: 'online', speed: 'smart', blacklist: [], photoOnly: false, auto: false }; 
                 this.photoName = null;
-                this.mailStartTime = null; // Время старта рассылки для таймера
 
-                this.isChatRunning = false;
+                this.isChatRunning = false; 
                 this.chatTimeout = null;
                 this.chatStats = { sent: 0, errors: 0, waiting: 0 };
                 this.chatHistory = { sent: [], errors: [], waiting: [] };
-                this.chatSettings = { target: 'payers', speed: 'smart', blacklist: [], rotationHours: 3, cyclic: false, currentInviteIndex: 0, rotationStartTime: 0 };
-                this.chatStartTime = null; // Время старта чата для таймера 
+                this.chatSettings = { target: 'payers', speed: 'smart', blacklist: [], rotationHours: 3, cyclic: false, currentInviteIndex: 0, rotationStartTime: 0 }; 
                 
                 this.vipList = []; 
                 this.vipStatus = {}; 
@@ -1763,29 +1689,22 @@
             async checkChatSync() {
                 if (!this.token || !this.isMonitoring) return;
                 try {
-                    const res = await makeApiRequest(this, 'POST', '/chat-sync', {});
+                    const res = await makeApiRequest(this, 'POST', '/chat-sync', {}); 
                     const data = res.data;
                     if(data) {
                         const currentSessions = data.ChatSessions || [];
                         const unreadSessionsNow = [];
-
-                        // DEBUG: Логируем количество сессий
-                        if (currentSessions.length > 0) {
-                            console.log(`[${this.displayId}] Chat sessions: ${currentSessions.length}, с непрочитанными: ${currentSessions.filter(s => (s.UnreadMessageCount || 0) > 0).length}`);
-                        }
-
+                        
                         for(const session of currentSessions) {
                             const sessionId = session.Id || session.ChatId;
-                            const unreadCount = session.UnreadMessageCount || 0;
+                            const unreadCount = session.UnreadMessageCount || 0; 
                             const partnerId = session.TargetUserId || session.PartnerId || "Unknown";
                             const partnerName = session.Name || "Неизвестный";
-
+                            
                             if (unreadCount > 0) {
                                 unreadSessionsNow.push(sessionId);
 
                                 if (!this.unreadChatSessions.includes(sessionId)) {
-                                    console.log(`[${this.displayId}] 💬 НОВЫЙ ЧАТ: ${partnerName} (ID: ${partnerId}), непрочитано: ${unreadCount}`);
-
                                     // Отправляем входящее сообщение чата на сервер статистики
                                     sendIncomingMessageToLababot({
                                         botId: this.id,
@@ -1800,12 +1719,10 @@
                                 }
                             }
                         }
-
+                        
                         this.unreadChatSessions = unreadSessionsNow;
                     }
-                } catch(e) {
-                    console.error(`[${this.displayId}] Ошибка checkChatSync:`, e.message || e);
-                }
+                } catch(e) {}
                 finally {
                      const nextRun = Math.floor(Math.random() * (7000 - 3000 + 1)) + 3000;
                      if(this.isMonitoring) setTimeout(() => this.checkChatSync(), nextRun);
@@ -1908,7 +1825,6 @@
                 }
 
                 this.isMailRunning = true;
-                this.mailStartTime = Date.now(); // Запоминаем время старта для таймера
                 this.updateUI();
                 this.log(`🚀 MAIL Started`);
                 this.scheduleNextMail(text, 0);
@@ -1916,7 +1832,6 @@
 
             stopMail() {
                 this.isMailRunning = false;
-                this.mailStartTime = null; // Сбрасываем таймер
                 clearTimeout(this.mailTimeout);
                 this.log("⏹ MAIL Stopped");
                 this.updateUI();
@@ -2285,7 +2200,6 @@
 
                 if (this.chatSettings.rotationStartTime === 0) this.chatSettings.rotationStartTime = Date.now();
                 this.isChatRunning = true;
-                this.chatStartTime = Date.now(); // Запоминаем время старта для таймера
                 this.updateUI();
                 this.log(`🚀 CHAT Started`);
                 this.scheduleNextChat(fullText, 0);
@@ -2293,7 +2207,6 @@
             }
             stopChat() {
                 this.isChatRunning = false;
-                this.chatStartTime = null; // Сбрасываем таймер
                 clearTimeout(this.chatTimeout);
                 this.log("⏹ CHAT Stopped");
                 this.updateUI();
@@ -2629,14 +2542,12 @@
             updateUI() {
                 const isChat = globalMode === 'chat';
                 const running = isChat ? this.isChatRunning : this.isMailRunning;
-                const startTime = isChat ? this.chatStartTime : this.mailStartTime;
                 const stats = isChat ? this.chatStats : this.mailStats;
                 const btn = document.getElementById(`btn-start-${this.id}`);
                 const dot = document.querySelector(`#tab-${this.id} .status-dot`);
                 if(btn) {
                     if(running) {
-                        const timerText = formatElapsedTimer(startTime);
-                        btn.innerHTML = `<i class="fa fa-stop"></i> ${timerText}`;
+                        btn.innerHTML = `<i class="fa fa-stop"></i> Стоп`;
                         btn.classList.replace('btn-primary', 'btn-danger');
                         if(dot) dot.style.boxShadow = "0 0 8px #28a745";
                     } else {
@@ -2716,7 +2627,7 @@
                     </div>
                     </div>
                     <div class="relative-box d-flex flex-column flex-grow-1">
-                        <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." oninput="checkVarTrigger(this, 'vars-dropdown-${bot.id}'); bots['${bot.id}'].updateUI(); validateInput(this); saveCurrentText('${bot.id}')"></textarea>
+                        <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." oninput="checkVarTrigger(this, 'vars-dropdown-${bot.id}'); bots['${bot.id}'].updateUI(); validateInput(this)"></textarea>
                         <div id="vars-dropdown-${bot.id}" class="vars-dropdown">
                             <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{City}', 'vars-dropdown-${bot.id}')"><b>{City}</b></div>
                             <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{Name}', 'vars-dropdown-${bot.id}')"><b>{Name}</b></div>
@@ -2815,7 +2726,7 @@
              return botTemplates[login];
         }
 
-        function updateInterfaceForMode(botId, useSavedText = false) {
+        function updateInterfaceForMode(botId) {
             const isChat = globalMode === 'chat';
             const bot = bots[botId];
             document.getElementById(`title-tpl-${botId}`).innerText = isChat ? "Шаблоны ЧАТА" : "Шаблоны ПИСЕМ";
@@ -2827,26 +2738,26 @@
             if(isChat) {
                 ws.querySelectorAll('.hide-in-chat').forEach(el => el.style.display = 'none');
                 ws.querySelectorAll('.hide-in-mail').forEach(el => el.style.display = 'block');
-
+                
                 Array.from(targetSelect.options).forEach(opt => {
                     if (['favorites', 'my-favorites', 'inbox'].includes(opt.value)) { opt.style.display = 'none'; }
                     else { opt.style.display = 'block'; }
                 });
                 targetSelect.value = bot.chatSettings.target;
-
+                
                 document.getElementById(`rot-time-${botId}`).value = bot.chatSettings.rotationHours;
                 document.getElementById(`rot-cyclic-${botId}`).checked = bot.chatSettings.cyclic;
             } else {
                 ws.querySelectorAll('.hide-in-chat').forEach(el => { if(el.classList.contains('photo-block')) el.style.display = 'flex'; else el.style.display = 'block'; });
                 ws.querySelectorAll('.hide-in-chat.d-none').forEach(el => el.style.display = 'none');
                 ws.querySelectorAll('.hide-in-mail').forEach(el => el.style.display = 'none');
-
+                
                 Array.from(targetSelect.options).forEach(opt => opt.style.display = 'block');
                 targetSelect.value = bot.mailSettings.target;
-
+                
                 document.getElementById(`auto-check-${botId}`).checked = bot.mailSettings.auto;
             }
-
+            
             let lastIdx = isChat ? bot.lastTplChat : bot.lastTplMail;
             if (lastIdx === null || lastIdx === undefined || lastIdx === "") {
                 if(accountPreferences[bot.login]) {
@@ -2857,7 +2768,7 @@
                 }
             }
 
-            updateTemplateDropdown(botId, lastIdx, useSavedText);
+            updateTemplateDropdown(botId, lastIdx);
             renderBlacklist(botId);
             bot.updateUI();
         }
@@ -3149,30 +3060,22 @@
             }
         }
 
-        function updateTemplateDropdown(botId, forceSelectIndex = null, useSavedText = false) {
+        function updateTemplateDropdown(botId, forceSelectIndex = null) {
             const sel=document.getElementById(`tpl-select-${botId}`); if(!sel) return;
             const bot = bots[botId];
             const isChat = globalMode === 'chat';
             const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
-
+            
             let val = (forceSelectIndex !== null) ? forceSelectIndex : sel.value;
             sel.innerHTML='<option value="">-- Выберите --</option>';
             tpls.forEach((t,i)=> sel.innerHTML+=`<option value="${i}">${t.favorite?'❤ ':''}${t.name}</option>`);
-
+            
             const btnFav = document.getElementById(`btn-fav-${botId}`);
             if(val !== null && val !== "" && val !== undefined && tpls[val]) {
                  sel.value = val;
                  const area=document.getElementById(`msg-${botId}`);
                  area.disabled=false;
-
-                 // КРИТИЧНО: Используем сохранённый текст если он есть, иначе текст шаблона
-                 const savedText = isChat ? bot.currentChatText : bot.currentMailText;
-                 if (useSavedText && savedText) {
-                     area.value = savedText;
-                 } else {
-                     area.value = tpls[val].text || '';
-                 }
-
+                 area.value=tpls[val].text;
                  if(isChat) bots[botId].lastTplChat = val; else bots[botId].lastTplMail = val;
 
                  // Сохраняем выбор шаблона
@@ -3180,15 +3083,16 @@
                  if(isChat) accountPreferences[bot.login].chatTpl = val;
                  else accountPreferences[bot.login].mailTpl = val;
                  localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
+                 saveSession();
 
                  if(btnFav) { if(tpls[val].favorite) { btnFav.classList.add('btn-heart-active','btn-danger'); btnFav.classList.remove('btn-outline-danger'); } else { btnFav.classList.remove('btn-heart-active','btn-danger'); btnFav.classList.add('btn-outline-danger'); } }
                  validateInput(area);
-            } else {
-                 sel.value="";
+            } else { 
+                 sel.value=""; 
                  const area = document.getElementById(`msg-${botId}`);
-                 area.disabled=true; area.value="";
-                 if(btnFav) btnFav.classList.remove('btn-heart-active');
-                 bots[botId].updateUI();
+                 area.disabled=true; area.value=""; 
+                 if(btnFav) btnFav.classList.remove('btn-heart-active'); 
+                 bots[botId].updateUI(); 
             }
         }
 
@@ -3363,77 +3267,33 @@
             return false;
         }
 
-        // СИНХРОННАЯ функция для надёжного сохранения в beforeunload
-        function saveSession() {
-            // КРИТИЧНО: Не сохраняем во время восстановления сессии
-            if (isRestoring) {
-                console.log('[SaveSession] ⏸️ Пропуск - идёт восстановление сессии');
-                return;
-            }
-
+        async function saveSession() { 
             try {
                 // Сохраняем порядок вкладок в localStorage
                 const currentTabOrder = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
-
-                if (currentTabOrder.length === 0) {
-                    console.log('[SaveSession] Нет вкладок для сохранения');
-                    return;
-                }
-
                 const localStorageData = currentTabOrder.map(id => {
                     const b = bots[id];
                     if (!b) return null;
-                    // Сохраняем текущий текст из textarea
-                    const textarea = document.getElementById(`msg-${id}`);
-                    const currentText = textarea ? textarea.value : '';
-                    if (globalMode === 'chat') {
-                        b.currentChatText = currentText;
-                    } else {
-                        b.currentMailText = currentText;
-                    }
-
                     return {
                         login: b.login,
                         pass: b.pass,
                         displayId: b.displayId,
                         lastTplMail: b.lastTplMail,
                         lastTplChat: b.lastTplChat,
-                        // КРИТИЧНО: Текст из textarea (сохраняется между сессиями!)
-                        currentMailText: b.currentMailText || '',
-                        currentChatText: b.currentChatText || '',
-                        // Chat settings
                         chatRotationHours: b.chatSettings.rotationHours,
                         chatCyclic: b.chatSettings.cyclic,
                         chatCurrentIndex: b.chatSettings.currentInviteIndex,
                         chatStartTime: b.chatSettings.rotationStartTime,
-                        chatTarget: b.chatSettings.target,
-                        chatBlacklist: b.chatSettings.blacklist || [],
-                        // Mail settings
                         mailAuto: b.mailSettings.auto,
                         mailTarget: b.mailSettings.target,
-                        mailPhotoOnly: b.mailSettings.photoOnly,
-                        mailBlacklist: b.mailSettings.blacklist || [],
-                        // Статистика (КРИТИЧНО - должна сохраняться!)
-                        mailStats: b.mailStats,
-                        chatStats: b.chatStats,
-                        // История отправленных/ошибок (КРИТИЧНО!)
-                        mailHistory: b.mailHistory,
-                        chatHistory: b.chatHistory,
-                        // VIP список
                         vipList: b.vipList
                     };
                 }).filter(item => item !== null);
-
+                
                 localStorage.setItem('savedBots', JSON.stringify(localStorageData));
 
-                // Логирование для отладки
-                console.log(`[SaveSession] ✅ Сохранено ${localStorageData.length} аккаунтов:`);
-                localStorageData.forEach(d => {
-                    console.log(`  - ${d.displayId}: mailStats=${JSON.stringify(d.mailStats)}, chatStats=${JSON.stringify(d.chatStats)}, blacklistMail=${(d.mailBlacklist||[]).length}, blacklistChat=${(d.chatBlacklist||[]).length}`);
-                });
-
             } catch (error) {
-                console.error('[SaveSession] ❌ Ошибка сохранения:', error);
+                console.error('Error saving session:', error);
                 // Падаем обратно на localStorage при ошибке
                 const fallbackData = Array.from(document.querySelectorAll('.tab-item')).map(t => {
                     const b = bots[t.id.replace('tab-', '')];
@@ -3448,82 +3308,38 @@
         }
         
         async function restoreSession() {
-            // КРИТИЧНО: Блокируем saveSession во время восстановления
-            isRestoring = true;
-            console.log('[RestoreSession] 🔒 Начало восстановления, saveSession заблокирован');
-
             try {
                 // Загружаем из localStorage
                 const s = JSON.parse(localStorage.getItem('savedBots') || '[]');
-
-                // Логирование загруженных данных
-                console.log(`[RestoreSession] 📂 Загружено ${s.length} аккаунтов из localStorage:`);
-                s.forEach(a => {
-                    console.log(`  - ${a.displayId}: mailStats=${JSON.stringify(a.mailStats)}, chatStats=${JSON.stringify(a.chatStats)}, blacklistMail=${(a.mailBlacklist||[]).length}, blacklistChat=${(a.chatBlacklist||[]).length}`);
-                });
-
                 document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} из кэша...` : "";
-
+                
                 for (const a of s) {
                     const ok = await performLogin(a.login, a.pass, a.displayId);
                     if (ok && bots[Object.keys(bots).pop()]) {
                         const botId = Object.keys(bots).pop();
                         const bot = bots[botId];
-
-                        // Восстанавливаем шаблоны
+                        
+                        // Восстанавливаем остальные настройки из localStorage
                         bot.lastTplMail = a.lastTplMail;
                         bot.lastTplChat = a.lastTplChat;
-
-                        // КРИТИЧНО: Восстанавливаем текст из textarea
-                        if (a.currentMailText) bot.currentMailText = a.currentMailText;
-                        if (a.currentChatText) bot.currentChatText = a.currentChatText;
-
-                        // Восстанавливаем настройки чата
+                        
                         if (a.chatRotationHours) bot.chatSettings.rotationHours = a.chatRotationHours;
                         if (a.chatCyclic !== undefined) bot.chatSettings.cyclic = a.chatCyclic;
                         if (a.chatCurrentIndex) bot.chatSettings.currentInviteIndex = a.chatCurrentIndex;
                         if (a.chatStartTime) bot.chatSettings.rotationStartTime = a.chatStartTime;
-                        if (a.chatTarget) bot.chatSettings.target = a.chatTarget;
-                        if (a.chatBlacklist && a.chatBlacklist.length > 0) bot.chatSettings.blacklist = a.chatBlacklist;
-
-                        // Восстанавливаем настройки рассылки
                         if (a.mailAuto !== undefined) bot.mailSettings.auto = a.mailAuto;
                         if (a.mailTarget) bot.mailSettings.target = a.mailTarget;
-                        if (a.mailPhotoOnly !== undefined) bot.mailSettings.photoOnly = a.mailPhotoOnly;
-                        if (a.mailBlacklist && a.mailBlacklist.length > 0) bot.mailSettings.blacklist = a.mailBlacklist;
-
-                        // КРИТИЧНО: Восстанавливаем статистику (глубокое копирование)
-                        if (a.mailStats) bot.mailStats = { ...a.mailStats };
-                        if (a.chatStats) bot.chatStats = { ...a.chatStats };
-
-                        // КРИТИЧНО: Восстанавливаем историю (глубокое копирование)
-                        if (a.mailHistory) bot.mailHistory = {
-                            sent: [...(a.mailHistory.sent || [])],
-                            errors: [...(a.mailHistory.errors || [])],
-                            waiting: [...(a.mailHistory.waiting || [])]
-                        };
-                        if (a.chatHistory) bot.chatHistory = {
-                            sent: [...(a.chatHistory.sent || [])],
-                            errors: [...(a.chatHistory.errors || [])],
-                            waiting: [...(a.chatHistory.waiting || [])]
-                        };
-
-                        // Восстанавливаем VIP список
-                        if (a.vipList) bot.vipList = [...a.vipList];
-
-                        // КРИТИЧНО: передаём useSavedText=true чтобы восстановить сохранённый текст
-                        updateInterfaceForMode(bot.id, true);
-                        bot.updateUI(); // Обновляем UI со статистикой
-
-                        // Логируем результат восстановления
-                        console.log(`[RestoreSession] ✅ ${bot.displayId} восстановлен: mailStats=${JSON.stringify(bot.mailStats)}, chatStats=${JSON.stringify(bot.chatStats)}`);
+                        if (a.vipList) bot.vipList = a.vipList;
+                        
+                        updateInterfaceForMode(bot.id);
                     }
                     await new Promise(r => setTimeout(r, 500));
                 }
-
+                
+                document.getElementById('restore-status').innerText = "";
                 document.getElementById('restore-status').innerText = "";
                 document.getElementById('welcome-screen').style.display = Object.keys(bots).length > 0 ? 'none' : 'flex';
-
+                
                 // Сохраняем порядок вкладок
                 const tempBots = { ...bots };
                 bots = {};
@@ -3531,21 +3347,11 @@
                 keys.forEach(id => {
                     if (tempBots[id]) bots[id] = tempBots[id];
                 });
-
+                
             } catch (error) {
                 console.error('Error restoring session:', error);
                 document.getElementById('restore-status').innerText = "Ошибка загрузки. Используется кэш.";
                 document.getElementById('welcome-screen').style.display = Object.keys(bots).length > 0 ? 'none' : 'flex';
-            } finally {
-                // КРИТИЧНО: Разблокируем saveSession после восстановления
-                isRestoring = false;
-                console.log('[RestoreSession] 🔓 Восстановление завершено, saveSession разблокирован');
-
-                // Сохраняем восстановленную сессию с правильными данными
-                if (Object.keys(bots).length > 0) {
-                    saveSession();
-                    console.log('[RestoreSession] 💾 Восстановленные данные сохранены');
-                }
             }
         }
 
