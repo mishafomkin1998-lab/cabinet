@@ -171,8 +171,29 @@ router.get('/', asyncHandler(async (req, res) => {
           AND i.created_at < ($2::date + interval '1 day')
           ${incomingWhereClause}
     `;
+
+    // DEBUG: Логируем запрос входящих
+    console.log('📊 DEBUG incoming_messages:');
+    console.log('   Query params:', incomingParams);
+    console.log('   Role:', role, 'UserId:', userId);
+    console.log('   Period:', periodFrom, '-', periodTo);
+
+    // Также проверим сколько всего записей в таблице
+    const totalIncoming = await pool.query('SELECT COUNT(*) as total FROM incoming_messages');
+    console.log('   Total records in incoming_messages:', totalIncoming.rows[0].total);
+
+    // И проверим записи за последний месяц без фильтра по датам
+    const recentIncoming = await pool.query(`
+        SELECT type, COUNT(*) as cnt, MIN(created_at) as min_date, MAX(created_at) as max_date
+        FROM incoming_messages
+        GROUP BY type
+    `);
+    console.log('   Records by type:', JSON.stringify(recentIncoming.rows));
+
     const incomingResult = await pool.query(incomingQuery, incomingParams);
     const incoming = incomingResult.rows[0] || {};
+
+    console.log('   Query result:', JSON.stringify(incoming));
 
     // Преобразуем значения
     const lettersCount = parseInt(stats.letters_count) || 0;
