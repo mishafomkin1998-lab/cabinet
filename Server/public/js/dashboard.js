@@ -96,11 +96,20 @@
 
                 // Статистика с сервера
                 stats: {
-                    today: { letters: 0, chats: 0, uniqueMen: 0, errors: 0 },
+                    // Новая структура - данные за выбранный период
+                    incomingLetters: 0,
+                    incomingChats: 0,
+                    uniqueMen: 0,
+                    letters: 0,
+                    chats: 0,
+                    errors: 0,
+                    // Метрики
+                    metrics: { totalProfiles: 0, profilesOnline: 0, avgResponseTime: 0, medianResponseTime: 0 },
+                    // Для обратной совместимости
+                    today: { letters: 0, chats: 0, uniqueMen: 0, errors: 0, incomingLetters: 0, incomingChats: 0 },
                     yesterday: { letters: 0, chats: 0 },
                     week: { letters: 0, chats: 0, uniqueMen: 0, errors: 0 },
-                    month: { letters: 0, chats: 0, uniqueMen: 0 },
-                    metrics: { totalProfiles: 0, avgResponseTime: 0, growthPercent: 0 }
+                    month: { letters: 0, chats: 0, uniqueMen: 0, incomingLetters: 0, incomingChats: 0 }
                 },
 
                 // Статус ботов

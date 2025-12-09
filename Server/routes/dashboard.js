@@ -18,16 +18,21 @@ const router = express.Router();
  *
  * @query {string} userId - ID текущего пользователя
  * @query {string} role - Роль пользователя (translator/admin/director)
- * @returns {Object} dashboard - Объект со статистикой:
- *   - today: статистика за сегодня
- *   - yesterday: статистика за вчера
- *   - week: статистика за 7 дней
- *   - month: статистика за 30 дней
- *   - metrics: общие метрики (кол-во анкет, онлайн, время ответа)
- *   - ai: статистика использования AI генерации
+ * @query {string} dateFrom - Начало периода (YYYY-MM-DD)
+ * @query {string} dateTo - Конец периода (YYYY-MM-DD)
+ * @returns {Object} dashboard - Объект со статистикой за выбранный период
  */
 router.get('/', asyncHandler(async (req, res) => {
-    const { userId, role } = req.query;
+    const { userId, role, dateFrom, dateTo } = req.query;
+
+    // Определяем период фильтрации
+    // Если даты не переданы - используем текущий месяц
+    const now = new Date();
+    const defaultDateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const defaultDateTo = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+    const periodFrom = dateFrom || defaultDateFrom;
+    const periodTo = dateTo || defaultDateTo;
 
     // Формируем фильтры для разных таблиц в зависимости от роли
     const profileRoleFilter = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'WHERE' });
@@ -36,198 +41,213 @@ router.get('/', asyncHandler(async (req, res) => {
     const activityFilter = activityRoleFilter.filter;
     const params = profileRoleFilter.params; // Одинаковые params для обоих фильтров
 
-        /**
-         * Запрос 1: Количество анкет
-         * Простой COUNT по таблице allowed_profiles с учётом фильтра по роли
-         */
-        const profilesQuery = `
-            SELECT COUNT(*) as total_profiles
-            FROM allowed_profiles p
-            ${profileFilter}
-        `;
-        const profilesResult = await pool.query(profilesQuery, params);
-        const totalProfiles = parseInt(profilesResult.rows[0]?.total_profiles) || 0;
+    // Определяем индекс для параметров дат в зависимости от наличия userId
+    const hasUserParam = params.length > 0;
+    const dateParamStart = hasUserParam ? 2 : 1;
+    const paramsWithDates = hasUserParam ? [params[0], periodFrom, periodTo] : [periodFrom, periodTo];
 
-        /**
-         * Запрос 2: Онлайн анкеты
-         * Считаем уникальные анкеты, у которых был heartbeat за последние 2 минуты.
-         * Это показывает, сколько анкет сейчас активно работают в боте.
-         */
-        const onlineQuery = `
-            SELECT COUNT(DISTINCT h.account_display_id) as online_count
-            FROM heartbeats h
-            JOIN allowed_profiles p ON h.account_display_id = p.profile_id
-            WHERE h.timestamp > NOW() - INTERVAL '2 minutes'
-            ${profileFilter ? profileFilter.replace('WHERE', 'AND') : ''}
-        `;
-        const onlineResult = await pool.query(onlineQuery, params);
-        const profilesOnline = parseInt(onlineResult.rows[0]?.online_count) || 0;
+    /**
+     * Запрос 1: Количество анкет
+     * Простой COUNT по таблице allowed_profiles с учётом фильтра по роли
+     */
+    const profilesQuery = `
+        SELECT COUNT(*) as total_profiles
+        FROM allowed_profiles p
+        ${profileFilter}
+    `;
+    const profilesResult = await pool.query(profilesQuery, params);
+    const totalProfiles = parseInt(profilesResult.rows[0]?.total_profiles) || 0;
 
-        /**
-         * Запрос 3: Статистика AI генераций
-         * - ai_today: сколько сообщений с AI сегодня
-         * - ai_week/ai_month: за неделю/месяц
-         * - total_today/total_week: всего сообщений (для расчёта процента)
-         */
-        const aiQuery = `
+    /**
+     * Запрос 2: Онлайн анкеты
+     * Считаем уникальные анкеты, у которых был heartbeat за последние 2 минуты.
+     */
+    const onlineQuery = `
+        SELECT COUNT(DISTINCT h.account_display_id) as online_count
+        FROM heartbeats h
+        JOIN allowed_profiles p ON h.account_display_id = p.profile_id
+        WHERE h.timestamp > NOW() - INTERVAL '2 minutes'
+        ${profileFilter ? profileFilter.replace('WHERE', 'AND') : ''}
+    `;
+    const onlineResult = await pool.query(onlineQuery, params);
+    const profilesOnline = parseInt(onlineResult.rows[0]?.online_count) || 0;
+
+    /**
+     * Запрос 3: Статистика AI генераций за выбранный период
+     */
+    let aiQuery, aiParams;
+    if (hasUserParam) {
+        aiQuery = `
             SELECT
-                COUNT(*) FILTER (WHERE used_ai = true AND DATE(created_at) = CURRENT_DATE) as ai_today,
-                COUNT(*) FILTER (WHERE used_ai = true AND created_at >= CURRENT_DATE - INTERVAL '7 days') as ai_week,
-                COUNT(*) FILTER (WHERE used_ai = true AND created_at >= CURRENT_DATE - INTERVAL '30 days') as ai_month,
-                COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as total_today,
-                COUNT(*) FILTER (WHERE created_at >= CURRENT_DATE - INTERVAL '7 days') as total_week
+                COUNT(*) FILTER (WHERE used_ai = true) as ai_count,
+                COUNT(*) as total_count
             FROM activity_log a
-            WHERE 1=1 ${activityFilter}
+            WHERE DATE(a.created_at) >= $2
+              AND DATE(a.created_at) <= $3
+              ${activityFilter}
         `;
-        const aiResult = await pool.query(aiQuery, params);
-        const aiStats = aiResult.rows[0] || {};
-
-        /**
-         * Запрос 4: Основная статистика сообщений
-         * Большой агрегированный запрос, который считает:
-         * - letters/chats за сегодня, вчера, неделю, месяц
-         * - уникальных мужчин за разные периоды
-         * - среднее и медианное время ответа
-         *
-         * FILTER (WHERE ...) - PostgreSQL синтаксис для условной агрегации
-         * PERCENTILE_CONT - вычисление медианы (50-й перцентиль)
-         */
-        const statsQuery = `
+        aiParams = paramsWithDates;
+    } else {
+        aiQuery = `
             SELECT
-                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter' AND DATE(a.created_at) = CURRENT_DATE), 0) as letters_today,
-                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat' AND DATE(a.created_at) = CURRENT_DATE), 0) as chats_today,
-                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter' AND DATE(a.created_at) = CURRENT_DATE - 1), 0) as letters_yesterday,
-                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat' AND DATE(a.created_at) = CURRENT_DATE - 1), 0) as chats_yesterday,
-                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter' AND a.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as letters_week,
-                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat' AND a.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as chats_week,
-                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter' AND a.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as letters_month,
-                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat' AND a.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as chats_month,
-                COUNT(DISTINCT CASE WHEN DATE(a.created_at) = CURRENT_DATE THEN a.man_id END) as unique_men_today,
-                COUNT(DISTINCT CASE WHEN a.created_at >= CURRENT_DATE - INTERVAL '7 days' THEN a.man_id END) as unique_men_week,
-                COUNT(DISTINCT CASE WHEN a.created_at >= CURRENT_DATE - INTERVAL '30 days' THEN a.man_id END) as unique_men_month,
-                COALESCE(AVG(a.response_time_sec) FILTER (WHERE a.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as avg_response_seconds,
-                COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY a.response_time_sec) FILTER (WHERE a.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as median_response_seconds
+                COUNT(*) FILTER (WHERE used_ai = true) as ai_count,
+                COUNT(*) as total_count
             FROM activity_log a
-            WHERE 1=1 ${activityFilter}
+            WHERE DATE(a.created_at) >= $1
+              AND DATE(a.created_at) <= $2
         `;
+        aiParams = [periodFrom, periodTo];
+    }
+    const aiResult = await pool.query(aiQuery, aiParams);
+    const aiStats = aiResult.rows[0] || {};
 
-        const statsResult = await pool.query(statsQuery, params);
-        const stats = statsResult.rows[0] || {};
-
-        /**
-         * Запрос 5: Количество ошибок
-         * Считаем ошибки за сегодня и неделю для отображения в дашборде
-         */
-        const errorsQuery = `
+    /**
+     * Запрос 4: Основная статистика сообщений за выбранный период
+     */
+    let statsQuery, statsParams;
+    if (hasUserParam) {
+        statsQuery = `
             SELECT
-                COALESCE(COUNT(*) FILTER (WHERE DATE(timestamp) = CURRENT_DATE), 0) as errors_today,
-                COALESCE(COUNT(*) FILTER (WHERE timestamp >= CURRENT_DATE - INTERVAL '7 days'), 0) as errors_week
-            FROM error_logs
+                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter'), 0) as letters_count,
+                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat'), 0) as chats_count,
+                COUNT(DISTINCT a.man_id) as unique_men,
+                COALESCE(AVG(a.response_time_sec), 0) as avg_response_seconds,
+                COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY a.response_time_sec), 0) as median_response_seconds
+            FROM activity_log a
+            WHERE DATE(a.created_at) >= $2
+              AND DATE(a.created_at) <= $3
+              ${activityFilter}
         `;
-        const errorsResult = await pool.query(errorsQuery);
-        const errors = errorsResult.rows[0] || {};
-
-        /**
-         * Запрос 6: Входящие сообщения от мужчин
-         * - incoming_letters/chats: количество входящих писем и чатов
-         * - unique_men: уникальные мужчины (те, кто написал первое письмо в периоде)
-         */
-        const incomingRoleFilter = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'AND', paramIndex: 1 });
-        const incomingFilter = incomingRoleFilter.filter.replace('p.assigned', 'i.admin_id IS NOT NULL AND i.admin_id').replace('assigned_translator_id', 'translator_id').replace('assigned_admin_id', 'admin_id') || '';
-
-        // Более простой фильтр для incoming_messages
-        let incomingWhereClause = '';
-        if (role === 'translator') {
-            incomingWhereClause = `AND i.translator_id = $1`;
-        } else if (role === 'admin') {
-            incomingWhereClause = `AND i.admin_id = $1`;
-        }
-
-        const incomingQuery = `
+        statsParams = paramsWithDates;
+    } else {
+        statsQuery = `
             SELECT
-                COALESCE(COUNT(*) FILTER (WHERE i.type = 'letter' AND DATE(i.created_at) = CURRENT_DATE), 0) as incoming_letters_today,
-                COALESCE(COUNT(*) FILTER (WHERE i.type = 'chat' AND DATE(i.created_at) = CURRENT_DATE), 0) as incoming_chats_today,
-                COALESCE(COUNT(*) FILTER (WHERE i.type = 'letter' AND DATE(i.created_at) = CURRENT_DATE - 1), 0) as incoming_letters_yesterday,
-                COALESCE(COUNT(*) FILTER (WHERE i.type = 'chat' AND DATE(i.created_at) = CURRENT_DATE - 1), 0) as incoming_chats_yesterday,
-                COALESCE(COUNT(*) FILTER (WHERE i.type = 'letter' AND i.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as incoming_letters_week,
-                COALESCE(COUNT(*) FILTER (WHERE i.type = 'chat' AND i.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as incoming_chats_week,
-                COALESCE(COUNT(*) FILTER (WHERE i.type = 'letter' AND i.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as incoming_letters_month,
-                COALESCE(COUNT(*) FILTER (WHERE i.type = 'chat' AND i.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as incoming_chats_month,
-                COALESCE(COUNT(*) FILTER (WHERE i.is_first_from_man = true AND DATE(i.created_at) = CURRENT_DATE), 0) as unique_men_today,
-                COALESCE(COUNT(*) FILTER (WHERE i.is_first_from_man = true AND i.created_at >= CURRENT_DATE - INTERVAL '7 days'), 0) as unique_men_week,
-                COALESCE(COUNT(*) FILTER (WHERE i.is_first_from_man = true AND i.created_at >= CURRENT_DATE - INTERVAL '30 days'), 0) as unique_men_month
-            FROM incoming_messages i
-            WHERE 1=1 ${incomingWhereClause}
+                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'letter'), 0) as letters_count,
+                COALESCE(COUNT(*) FILTER (WHERE a.action_type = 'chat'), 0) as chats_count,
+                COUNT(DISTINCT a.man_id) as unique_men,
+                COALESCE(AVG(a.response_time_sec), 0) as avg_response_seconds,
+                COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY a.response_time_sec), 0) as median_response_seconds
+            FROM activity_log a
+            WHERE DATE(a.created_at) >= $1
+              AND DATE(a.created_at) <= $2
         `;
-        const incomingResult = await pool.query(incomingQuery, params);
-        const incoming = incomingResult.rows[0] || {};
+        statsParams = [periodFrom, periodTo];
+    }
+    const statsResult = await pool.query(statsQuery, statsParams);
+    const stats = statsResult.rows[0] || {};
 
-        // Преобразуем строковые значения в числа
-        const lettersToday = parseInt(stats.letters_today) || 0;
-        const chatsToday = parseInt(stats.chats_today) || 0;
-        const lettersYesterday = parseInt(stats.letters_yesterday) || 0;
-        const chatsYesterday = parseInt(stats.chats_yesterday) || 0;
-        const lettersWeek = parseInt(stats.letters_week) || 0;
-        const chatsWeek = parseInt(stats.chats_week) || 0;
-        const lettersMonth = parseInt(stats.letters_month) || 0;
-        const chatsMonth = parseInt(stats.chats_month) || 0;
+    /**
+     * Запрос 5: Количество ошибок за выбранный период
+     */
+    const errorsQuery = `
+        SELECT COUNT(*) as errors_count
+        FROM error_logs
+        WHERE DATE(timestamp) >= $1 AND DATE(timestamp) <= $2
+    `;
+    const errorsResult = await pool.query(errorsQuery, [periodFrom, periodTo]);
+    const errors = errorsResult.rows[0] || {};
 
-        const avgResponseSec = parseFloat(stats.avg_response_seconds) || 0;
-        const medianResponseSec = parseFloat(stats.median_response_seconds) || 0;
+    /**
+     * Запрос 6: Входящие сообщения от мужчин за выбранный период
+     */
+    let incomingWhereClause = '';
+    let incomingParams = [periodFrom, periodTo];
 
-        // Формируем ответ с группировкой по периодам
-        res.json({
-            success: true,
-            dashboard: {
-                today: {
-                    letters: lettersToday,
-                    chats: chatsToday,
-                    incomingLetters: parseInt(incoming.incoming_letters_today) || 0,
-                    incomingChats: parseInt(incoming.incoming_chats_today) || 0,
-                    uniqueMen: parseInt(incoming.unique_men_today) || 0, // Уникальные = первые входящие
-                    errors: parseInt(errors.errors_today) || 0
-                },
-                yesterday: {
-                    letters: lettersYesterday,
-                    chats: chatsYesterday,
-                    incomingLetters: parseInt(incoming.incoming_letters_yesterday) || 0,
-                    incomingChats: parseInt(incoming.incoming_chats_yesterday) || 0
-                },
-                week: {
-                    letters: lettersWeek,
-                    chats: chatsWeek,
-                    incomingLetters: parseInt(incoming.incoming_letters_week) || 0,
-                    incomingChats: parseInt(incoming.incoming_chats_week) || 0,
-                    uniqueMen: parseInt(incoming.unique_men_week) || 0,
-                    errors: parseInt(errors.errors_week) || 0
-                },
-                month: {
-                    letters: lettersMonth,
-                    chats: chatsMonth,
-                    incomingLetters: parseInt(incoming.incoming_letters_month) || 0,
-                    incomingChats: parseInt(incoming.incoming_chats_month) || 0,
-                    uniqueMen: parseInt(incoming.unique_men_month) || 0
-                },
-                metrics: {
-                    totalProfiles: totalProfiles,
-                    profilesOnline: profilesOnline,
-                    avgResponseTime: Math.round(avgResponseSec / 60), // конвертируем секунды в минуты
-                    medianResponseTime: Math.round(medianResponseSec / 60)
-                },
-                ai: {
-                    today: parseInt(aiStats.ai_today) || 0,
-                    week: parseInt(aiStats.ai_week) || 0,
-                    month: parseInt(aiStats.ai_month) || 0,
-                    // Процент AI от всех сообщений
-                    percentToday: aiStats.total_today > 0
-                        ? Math.round((aiStats.ai_today / aiStats.total_today) * 100)
-                        : 0,
-                    percentWeek: aiStats.total_week > 0
-                        ? Math.round((aiStats.ai_week / aiStats.total_week) * 100)
-                        : 0
-                }
+    if (role === 'translator' && userId) {
+        incomingWhereClause = `AND i.translator_id = $3`;
+        incomingParams.push(userId);
+    } else if (role === 'admin' && userId) {
+        incomingWhereClause = `AND i.admin_id = $3`;
+        incomingParams.push(userId);
+    }
+
+    const incomingQuery = `
+        SELECT
+            COALESCE(COUNT(*) FILTER (WHERE i.type = 'letter'), 0) as incoming_letters,
+            COALESCE(COUNT(*) FILTER (WHERE i.type = 'chat'), 0) as incoming_chats,
+            COALESCE(COUNT(*) FILTER (WHERE i.is_first_from_man = true), 0) as unique_men
+        FROM incoming_messages i
+        WHERE DATE(i.created_at) >= $1
+          AND DATE(i.created_at) <= $2
+          ${incomingWhereClause}
+    `;
+    const incomingResult = await pool.query(incomingQuery, incomingParams);
+    const incoming = incomingResult.rows[0] || {};
+
+    // Преобразуем значения
+    const lettersCount = parseInt(stats.letters_count) || 0;
+    const chatsCount = parseInt(stats.chats_count) || 0;
+    const uniqueMenCount = parseInt(stats.unique_men) || 0;
+    const avgResponseSec = parseFloat(stats.avg_response_seconds) || 0;
+    const medianResponseSec = parseFloat(stats.median_response_seconds) || 0;
+    const incomingLettersCount = parseInt(incoming.incoming_letters) || 0;
+    const incomingChatsCount = parseInt(incoming.incoming_chats) || 0;
+    const incomingUniqueMen = parseInt(incoming.unique_men) || 0;
+    const errorsCount = parseInt(errors.errors_count) || 0;
+
+    // Формируем ответ с данными за выбранный период
+    res.json({
+        success: true,
+        dashboard: {
+            // Период за который данные
+            period: {
+                from: periodFrom,
+                to: periodTo
+            },
+            // Данные за выбранный период (новая структура)
+            letters: lettersCount,
+            chats: chatsCount,
+            incomingLetters: incomingLettersCount,
+            incomingChats: incomingChatsCount,
+            uniqueMen: incomingUniqueMen,
+            errors: errorsCount,
+            // Метрики
+            metrics: {
+                totalProfiles: totalProfiles,
+                profilesOnline: profilesOnline,
+                avgResponseTime: Math.round(avgResponseSec / 60),
+                medianResponseTime: Math.round(medianResponseSec / 60)
+            },
+            // AI статистика
+            ai: {
+                count: parseInt(aiStats.ai_count) || 0,
+                total: parseInt(aiStats.total_count) || 0,
+                percent: aiStats.total_count > 0
+                    ? Math.round((aiStats.ai_count / aiStats.total_count) * 100)
+                    : 0
+            },
+            // Для обратной совместимости оставляем старую структуру
+            today: {
+                letters: lettersCount,
+                chats: chatsCount,
+                incomingLetters: incomingLettersCount,
+                incomingChats: incomingChatsCount,
+                uniqueMen: incomingUniqueMen,
+                errors: errorsCount
+            },
+            yesterday: {
+                letters: 0,
+                chats: 0,
+                incomingLetters: 0,
+                incomingChats: 0
+            },
+            week: {
+                letters: lettersCount,
+                chats: chatsCount,
+                incomingLetters: incomingLettersCount,
+                incomingChats: incomingChatsCount,
+                uniqueMen: incomingUniqueMen,
+                errors: errorsCount
+            },
+            month: {
+                letters: lettersCount,
+                chats: chatsCount,
+                incomingLetters: incomingLettersCount,
+                incomingChats: incomingChatsCount,
+                uniqueMen: incomingUniqueMen
             }
-        });
+        }
+    });
 }));
 
 module.exports = router;
