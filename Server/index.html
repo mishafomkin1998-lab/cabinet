@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nova - ИИ для автоматизации на LadaDate</title>
+    <link rel="icon" type="image/png" href="logo.png">
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome Icons -->
@@ -402,22 +403,12 @@
                 card.addEventListener('mouseenter', function() {
                     this.style.transform = 'translateY(-10px)';
                 });
-                
+
                 card.addEventListener('mouseleave', function() {
                     this.style.transform = 'translateY(0)';
                 });
             });
-            
-            // Имитация перехода на страницу входа (для демонстрации)
-            const loginBtn = document.querySelector('a[href="login.html"]');
-            if (loginBtn) {
-                loginBtn.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    alert('Для демонстрации: переход на страницу личного кабинета. В реальном проекте здесь будет загрузка login.html');
-                    // window.location.href = 'login.html';
-                });
-            }
-            
+
             // Имитация скачивания
             const downloadBtns = document.querySelectorAll('a[href="#"]');
             downloadBtns.forEach(btn => {
