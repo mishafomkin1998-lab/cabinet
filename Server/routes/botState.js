@@ -162,7 +162,28 @@ router.post('/:profileId', async (req, res) => {
     const { profileId } = req.params;
     const state = req.body;
 
+    // Проверяем что body не пустой
+    if (!state || Object.keys(state).length === 0) {
+        console.error(`[bot-state] ❌ Пустое тело запроса для ${profileId}`);
+        return res.status(400).json({ success: false, error: 'Empty request body' });
+    }
+
     try {
+        // Безопасное преобразование значений
+        const safeInt = (val) => {
+            if (val === null || val === undefined || val === '') return null;
+            const num = parseInt(val, 10);
+            return isNaN(num) ? null : num;
+        };
+
+        const safeBool = (val) => val === true || val === 'true';
+
+        const safeJson = (val) => {
+            if (!val) return '[]';
+            if (typeof val === 'string') return val;
+            return JSON.stringify(val);
+        };
+
         await pool.query(`
             INSERT INTO bot_state (
                 profile_id,
@@ -211,33 +232,34 @@ router.post('/:profileId', async (req, res) => {
             profileId,
             state.currentMailText || '',
             state.currentChatText || '',
-            state.lastTplMail ?? null,
-            state.lastTplChat ?? null,
-            state.mailStats?.sent || 0,
-            state.mailStats?.errors || 0,
-            state.chatStats?.sent || 0,
-            state.chatStats?.errors || 0,
-            JSON.stringify(state.mailHistory?.sent || []),
-            JSON.stringify(state.mailHistory?.errors || []),
-            JSON.stringify(state.chatHistory?.sent || []),
-            JSON.stringify(state.chatHistory?.errors || []),
-            JSON.stringify(state.mailBlacklist || []),
-            JSON.stringify(state.chatBlacklist || []),
-            JSON.stringify(state.vipList || []),
-            state.chatSettings?.rotationHours || 3,
-            state.chatSettings?.cyclic || false,
-            state.chatSettings?.currentInviteIndex || 0,
+            safeInt(state.lastTplMail),
+            safeInt(state.lastTplChat),
+            safeInt(state.mailStats?.sent) || 0,
+            safeInt(state.mailStats?.errors) || 0,
+            safeInt(state.chatStats?.sent) || 0,
+            safeInt(state.chatStats?.errors) || 0,
+            safeJson(state.mailHistory?.sent || []),
+            safeJson(state.mailHistory?.errors || []),
+            safeJson(state.chatHistory?.sent || []),
+            safeJson(state.chatHistory?.errors || []),
+            safeJson(state.mailBlacklist || []),
+            safeJson(state.chatBlacklist || []),
+            safeJson(state.vipList || []),
+            safeInt(state.chatSettings?.rotationHours) || 3,
+            safeBool(state.chatSettings?.cyclic),
+            safeInt(state.chatSettings?.currentInviteIndex) || 0,
             state.chatSettings?.target || 'payers',
-            state.mailSettings?.auto || false,
+            safeBool(state.mailSettings?.auto),
             state.mailSettings?.target || 'online',
-            state.mailSettings?.photoOnly || false,
-            JSON.stringify(state.templatesMail || []),
-            JSON.stringify(state.templatesChat || [])
+            safeBool(state.mailSettings?.photoOnly),
+            safeJson(state.templatesMail || []),
+            safeJson(state.templatesChat || [])
         ]);
 
         res.json({ success: true });
     } catch (e) {
-        console.error('Ошибка сохранения bot_state:', e.message);
+        console.error(`[bot-state] ❌ Ошибка сохранения для ${profileId}:`, e.message);
+        console.error(`[bot-state] Stack:`, e.stack);
         res.status(500).json({ success: false, error: e.message });
     }
 });

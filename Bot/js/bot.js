@@ -382,19 +382,34 @@
         // 10. Сохранение состояния анкеты на сервер
         async function saveBotStateToServer(profileId, state) {
             try {
+                // Проверяем что state не пустой
+                if (!state || !profileId) {
+                    console.error(`❌ saveBotStateToServer: отсутствует profileId или state`);
+                    return false;
+                }
+
                 const response = await fetch(`${LABABOT_SERVER}/api/bot-state/${profileId}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(state)
                 });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`❌ Сервер вернул ошибку ${response.status} для ${profileId}:`, errorText);
+                    return false;
+                }
+
                 const data = await response.json();
 
                 if (data.success) {
                     console.log(`📤 Состояние анкеты ${profileId} сохранено на сервер`);
+                } else {
+                    console.error(`❌ Сервер отклонил сохранение для ${profileId}:`, data.error);
                 }
                 return data.success;
             } catch (error) {
-                console.error(`❌ Ошибка сохранения состояния на сервер:`, error);
+                console.error(`❌ Ошибка сохранения состояния на сервер для ${profileId}:`, error);
                 return false;
             }
         }
