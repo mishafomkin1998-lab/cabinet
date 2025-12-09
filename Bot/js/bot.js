@@ -3511,9 +3511,19 @@
             const mode = isChat ? 'chat' : 'mail';
             const tpls = getBotTemplates(bot.login)[mode];
 
-            let val = (forceSelectIndex !== null) ? forceSelectIndex : sel.value;
+            // КРИТИЧНО: Логируем для отладки
+            console.log(`[updateTplDropdown] Режим: ${mode}, шаблонов: ${tpls.length}, forceSelectIndex: ${forceSelectIndex}`);
+
+            // КРИТИЧНО: НЕ используем sel.value при смене режима - он от предыдущего режима!
+            // Используем ТОЛЬКО forceSelectIndex который приходит из lastTplChat или lastTplMail
+            let val = forceSelectIndex;
+
+            // Очищаем и заполняем dropdown шаблонами ТЕКУЩЕГО режима
             sel.innerHTML='<option value="">-- Выберите --</option>';
-            tpls.forEach((t,i)=> sel.innerHTML+=`<option value="${i}">${t.favorite?'❤ ':''}${t.name}</option>`);
+            tpls.forEach((t,i)=> {
+                sel.innerHTML+=`<option value="${i}">${t.favorite?'❤ ':''}${t.name}</option>`;
+                console.log(`[updateTplDropdown] Добавлен шаблон ${mode}[${i}]: "${t.name}"`);
+            });
 
             const btnFav = document.getElementById(`btn-fav-${botId}`);
             if(val !== null && val !== "" && val !== undefined && tpls[val]) {
