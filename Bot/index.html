@@ -365,6 +365,18 @@
         </div>
     </div>
     
-    <script src="js/bot.js"></script>
+    <!-- Модули Lababot v10 (разделённая архитектура) -->
+    <!-- Порядок важен: сначала зависимости, потом зависящие модули -->
+    <script src="js/modules/config.js"></script>      <!-- Константы и глобальные переменные -->
+    <script src="js/modules/utils.js"></script>       <!-- Вспомогательные функции -->
+    <script src="js/modules/api.js"></script>         <!-- API функции -->
+    <script src="js/modules/logger.js"></script>      <!-- Система логирования -->
+    <script src="js/modules/ui.js"></script>          <!-- UI функции -->
+    <script src="js/modules/settings.js"></script>    <!-- Настройки -->
+    <script src="js/modules/templates.js"></script>   <!-- Работа с шаблонами -->
+    <script src="js/modules/ai.js"></script>          <!-- AI функции -->
+    <script src="js/modules/miniChat.js"></script>    <!-- MiniChat -->
+    <script src="js/modules/AccountBot.js"></script>  <!-- Класс бота -->
+    <script src="js/modules/main.js"></script>        <!-- Главный модуль -->
 </body>
 </html>
