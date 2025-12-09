@@ -240,9 +240,13 @@
                             <input class="form-check-input" type="checkbox" id="set-hotkeys" onchange="saveGlobalSettings()">
                             <label class="form-check-label small" for="set-hotkeys">Горячие клавиши (Ctrl+Tab)</label>
                         </div>
-                        <div class="form-check form-switch">
+                        <div class="form-check form-switch mb-2">
                             <input class="form-check-input" type="checkbox" id="set-extended" onchange="saveGlobalSettings(); toggleExtendedFeatures()">
                             <label class="form-check-label small" for="set-extended">Расширить возможности (AI)</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="set-skip-delete-confirm" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-skip-delete-confirm">Не спрашивать об удалении шаблона</label>
                         </div>
                     </div>
                 </div>

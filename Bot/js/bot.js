@@ -25,6 +25,7 @@
             lang: 'ru', theme: 'light', proxy: '', proxyURL: '', proxyAI: '',
             hotkeys: true, myPrompt: '', apiKey: '',
             soundsEnabled: true, confirmTabClose: true, extendedFeatures: true,
+            skipDeleteConfirm: false, // Не спрашивать об удалении шаблона
             translatorId: null, // ID переводчика для статистики
             aiReplyPrompt: '', // Промпт для AI ответов на письма
             // Прокси для анкет по позициям (1-10, 11-20, 21-30, 31-40, 41-50, 51-60)
@@ -1366,6 +1367,7 @@
             document.getElementById('set-sounds').checked = globalSettings.soundsEnabled;
             document.getElementById('set-confirm-close').checked = globalSettings.confirmTabClose;
             document.getElementById('set-extended').checked = globalSettings.extendedFeatures;
+            document.getElementById('set-skip-delete-confirm').checked = globalSettings.skipDeleteConfirm;
             document.getElementById('set-translator-id').value = globalSettings.translatorId || '';
             applyTheme(globalSettings.theme);
         }
@@ -1396,6 +1398,7 @@
             globalSettings.soundsEnabled = document.getElementById('set-sounds').checked;
             globalSettings.confirmTabClose = document.getElementById('set-confirm-close').checked;
             globalSettings.extendedFeatures = document.getElementById('set-extended').checked;
+            globalSettings.skipDeleteConfirm = document.getElementById('set-skip-delete-confirm').checked;
 
             // Сохраняем Translator ID
             const translatorIdValue = document.getElementById('set-translator-id').value.trim();
@@ -1654,18 +1657,22 @@
                 
                 this.lastTplMail = null; 
                 this.lastTplChat = null;
-                this.isMailRunning = false; 
+                this.isMailRunning = false;
                 this.mailTimeout = null;
                 this.mailStats = { sent: 0, errors: 0, waiting: 0 };
                 this.mailHistory = { sent: [], errors: [], waiting: [] };
-                this.mailSettings = { target: 'online', speed: 'smart', blacklist: [], photoOnly: false, auto: false }; 
+                this.mailSettings = { target: 'online', speed: 'smart', blacklist: [], photoOnly: false, auto: false };
                 this.photoName = null;
+                this.mailStartTime = null; // Время начала работы Mail
+                this.mailTimerInterval = null; // Интервал обновления таймера Mail
 
-                this.isChatRunning = false; 
+                this.isChatRunning = false;
                 this.chatTimeout = null;
                 this.chatStats = { sent: 0, errors: 0, waiting: 0 };
                 this.chatHistory = { sent: [], errors: [], waiting: [] };
-                this.chatSettings = { target: 'payers', speed: 'smart', blacklist: [], rotationHours: 3, cyclic: false, currentInviteIndex: 0, rotationStartTime: 0 }; 
+                this.chatSettings = { target: 'payers', speed: 'smart', blacklist: [], rotationHours: 3, cyclic: false, currentInviteIndex: 0, rotationStartTime: 0 };
+                this.chatStartTime = null; // Время начала работы Chat
+                this.chatTimerInterval = null; // Интервал обновления таймера Chat 
                 
                 this.vipList = []; 
                 this.vipStatus = {}; 
@@ -2096,6 +2103,8 @@
                 }
 
                 this.isMailRunning = true;
+                this.mailStartTime = Date.now();
+                this.startMailTimer();
                 this.updateUI();
                 this.log(`🚀 MAIL Started`);
                 this.scheduleNextMail(text, 0);
@@ -2104,8 +2113,22 @@
             stopMail() {
                 this.isMailRunning = false;
                 clearTimeout(this.mailTimeout);
+                this.stopMailTimer();
                 this.log("⏹ MAIL Stopped");
                 this.updateUI();
+            }
+
+            startMailTimer() {
+                if (this.mailTimerInterval) clearInterval(this.mailTimerInterval);
+                this.mailTimerInterval = setInterval(() => this.updateUI(), 1000);
+            }
+
+            stopMailTimer() {
+                if (this.mailTimerInterval) {
+                    clearInterval(this.mailTimerInterval);
+                    this.mailTimerInterval = null;
+                }
+                this.mailStartTime = null;
             }
 
             scheduleNextMail(text, delay) {
@@ -2471,17 +2494,35 @@
 
                 if (this.chatSettings.rotationStartTime === 0) this.chatSettings.rotationStartTime = Date.now();
                 this.isChatRunning = true;
+                this.chatStartTime = Date.now();
+                this.startChatTimer();
                 this.updateUI();
                 this.log(`🚀 CHAT Started`);
                 this.scheduleNextChat(fullText, 0);
                 saveSession();
             }
+
             stopChat() {
                 this.isChatRunning = false;
                 clearTimeout(this.chatTimeout);
+                this.stopChatTimer();
                 this.log("⏹ CHAT Stopped");
                 this.updateUI();
             }
+
+            startChatTimer() {
+                if (this.chatTimerInterval) clearInterval(this.chatTimerInterval);
+                this.chatTimerInterval = setInterval(() => this.updateUI(), 1000);
+            }
+
+            stopChatTimer() {
+                if (this.chatTimerInterval) {
+                    clearInterval(this.chatTimerInterval);
+                    this.chatTimerInterval = null;
+                }
+                this.chatStartTime = null;
+            }
+
             scheduleNextChat(fullText, delay) {
                 if (!this.isChatRunning) return;
                 this.chatTimeout = setTimeout(async () => {
@@ -2810,15 +2851,26 @@
                 return res;
             }
 
+            formatElapsedTime(startTime) {
+                if (!startTime) return '';
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const hours = Math.floor(elapsed / 3600);
+                const minutes = Math.floor((elapsed % 3600) / 60);
+                const seconds = elapsed % 60;
+                return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }
+
             updateUI() {
                 const isChat = globalMode === 'chat';
                 const running = isChat ? this.isChatRunning : this.isMailRunning;
+                const startTime = isChat ? this.chatStartTime : this.mailStartTime;
                 const stats = isChat ? this.chatStats : this.mailStats;
                 const btn = document.getElementById(`btn-start-${this.id}`);
                 const dot = document.querySelector(`#tab-${this.id} .status-dot`);
                 if(btn) {
                     if(running) {
-                        btn.innerHTML = `<i class="fa fa-stop"></i> Стоп`;
+                        const timerStr = this.formatElapsedTime(startTime);
+                        btn.innerHTML = `<i class="fa fa-stop"></i> ${timerStr}`;
                         btn.classList.replace('btn-primary', 'btn-danger');
                         if(dot) dot.style.boxShadow = "0 0 8px #28a745";
                     } else {
@@ -3652,7 +3704,7 @@
             const bot = bots[botId];
             let tpls = getBotTemplates(bot.login)[type];
             const idx = document.getElementById(`tpl-select-${botId}`).value;
-            if (idx !== "" && confirm("Удалить?")) {
+            if (idx !== "" && (globalSettings.skipDeleteConfirm || confirm("Удалить?"))) {
                 tpls.splice(idx, 1);
                 localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
                 await saveTemplatesToServer(bot.displayId, type, tpls);
@@ -3663,7 +3715,7 @@
 
         // Удалить выбранный шаблон у ВСЕХ анкет
         async function deleteTemplateFromAll() {
-            if (!confirm("Удалить выбранный шаблон у ВСЕХ анкет?")) return;
+            if (!globalSettings.skipDeleteConfirm && !confirm("Удалить выбранный шаблон у ВСЕХ анкет?")) return;
 
             const isChat = globalMode === 'chat';
             const type = isChat ? 'chat' : 'mail';
