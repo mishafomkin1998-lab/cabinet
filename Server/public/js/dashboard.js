@@ -722,14 +722,20 @@
                 
                 getActivityLevel(hour) {
                     // Используем реальные данные если есть
+                    // API возвращает массив из 24 чисел где индекс = час
                     if (this.hourlyActivity && this.hourlyActivity.length > 0) {
+                        const value = this.hourlyActivity[hour];
+                        if (typeof value === 'number') {
+                            return Math.min(value, 1) || 0.05;
+                        }
+                        // Старый формат с объектами
                         const hourData = this.hourlyActivity.find(h => h.hour === hour);
                         if (hourData) {
-                            return Math.min(hourData.intensity / 100, 1) || 0.1;
+                            return Math.min(hourData.intensity / 100, 1) || 0.05;
                         }
                     }
-                    // Fallback на базовые значения
-                    return 0.1;
+                    // Fallback на минимальные значения
+                    return 0.05;
                 },
 
                 getActivityColor(hour) {
