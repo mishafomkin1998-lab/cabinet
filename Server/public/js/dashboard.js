@@ -299,7 +299,7 @@
                         defaultDate: [this.statsFilter.dateFrom, this.statsFilter.dateTo],
                         onChange: function(selectedDates, dateStr) {
                             if (selectedDates.length === 2) {
-                                const formatDate = (d) => d.toISOString().split('T')[0];
+                                const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                                 self.statsFilter.dateFrom = formatDate(selectedDates[0]);
                                 self.statsFilter.dateTo = formatDate(selectedDates[1]);
                                 self.statsFilter.quickRange = '';
@@ -317,7 +317,7 @@
                         defaultDate: [this.monitoringFilter.dateFrom, this.monitoringFilter.dateTo],
                         onChange: function(selectedDates) {
                             if (selectedDates.length === 2) {
-                                const formatDate = (d) => d.toISOString().split('T')[0];
+                                const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                                 self.monitoringFilter.dateFrom = formatDate(selectedDates[0]);
                                 self.monitoringFilter.dateTo = formatDate(selectedDates[1]);
                                 self.loadMonitoringData();
@@ -331,7 +331,7 @@
                         defaultDate: [this.historyFilter.dateFrom, this.historyFilter.dateTo],
                         onChange: function(selectedDates) {
                             if (selectedDates.length === 2) {
-                                const formatDate = (d) => d.toISOString().split('T')[0];
+                                const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                                 self.historyFilter.dateFrom = formatDate(selectedDates[0]);
                                 self.historyFilter.dateTo = formatDate(selectedDates[1]);
                                 self.loadProfileHistory();
@@ -344,7 +344,13 @@
                 setDefaultDateRange() {
                     const now = new Date();
                     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-                    const formatDate = (d) => d.toISOString().split('T')[0];
+                    // Форматируем без UTC чтобы избежать сдвига дат
+                    const formatDate = (d) => {
+                        const year = d.getFullYear();
+                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                        const day = String(d.getDate()).padStart(2, '0');
+                        return `${year}-${month}-${day}`;
+                    };
 
                     this.statsFilter.dateFrom = formatDate(firstDay);
                     this.statsFilter.dateTo = formatDate(now);
@@ -749,7 +755,7 @@
 
                 setQuickDateRange(range) {
                     const now = new Date();
-                    const formatDate = (d) => d.toISOString().split('T')[0];
+                    const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                     let dateFrom, dateTo;
 
                     this.statsFilter.quickRange = range;
@@ -811,22 +817,23 @@
 
                     // Дни предыдущего месяца
                     let startDay = firstDay.getDay() || 7; // Понедельник = 1
+                    const toDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                     for (let i = startDay - 1; i > 0; i--) {
                         const d = new Date(this.calendarYear, this.calendarMonth, 1 - i);
-                        days.push({ day: d.getDate(), date: d.toISOString().split('T')[0], currentMonth: false });
+                        days.push({ day: d.getDate(), date: toDateStr(d), currentMonth: false });
                     }
 
                     // Дни текущего месяца
                     for (let i = 1; i <= lastDay.getDate(); i++) {
                         const d = new Date(this.calendarYear, this.calendarMonth, i);
-                        days.push({ day: i, date: d.toISOString().split('T')[0], currentMonth: true });
+                        days.push({ day: i, date: toDateStr(d), currentMonth: true });
                     }
 
                     // Дни следующего месяца (до 42 дней = 6 недель)
                     const remaining = 42 - days.length;
                     for (let i = 1; i <= remaining; i++) {
                         const d = new Date(this.calendarYear, this.calendarMonth + 1, i);
-                        days.push({ day: i, date: d.toISOString().split('T')[0], currentMonth: false });
+                        days.push({ day: i, date: toDateStr(d), currentMonth: false });
                     }
 
                     return days;
@@ -903,7 +910,7 @@
 
                 setMonitoringQuickRange(range) {
                     const now = new Date();
-                    const formatDate = (d) => d.toISOString().split('T')[0];
+                    const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
                     if (range === 'today') {
                         this.monitoringFilter.dateFrom = formatDate(now);
@@ -1854,7 +1861,7 @@
 
                 setHistoryQuickRange(range) {
                     const now = new Date();
-                    const formatDate = (d) => d.toISOString().split('T')[0];
+                    const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
                     if (range === 'today') {
                         this.historyFilter.dateFrom = formatDate(now);
