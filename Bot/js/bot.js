@@ -2786,7 +2786,7 @@
                     <div class="col-title" id="title-tpl-${bot.id}">Шаблоны Писем</div>
                     <select id="tpl-select-${bot.id}" class="form-select mb-2" onchange="onTemplateSelect('${bot.id}')"><option value="">-- Выберите --</option></select>
                     <div class="d-flex gap-1 mb-2">
-                        <button class="btn btn-sm btn-success btn-xs flex-fill" onclick="openTemplateModal('${bot.id}', false)" data-tip="Новый шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-success btn-xs flex-fill" onclick="addTemplateInline('${bot.id}')" data-tip="Новый шаблон"><i class="fa fa-plus"></i></button>
                         <button class="btn btn-sm btn-secondary btn-xs flex-fill" onclick="openTemplateModal('${bot.id}', true)" data-tip="Редактировать"><i class="fa fa-edit"></i></button>
                         <button class="btn btn-sm btn-danger btn-xs flex-fill" onclick="deleteTemplate('${bot.id}')" data-tip="Удалить"><i class="fa fa-trash"></i></button>
                         <button class="btn btn-sm btn-outline-danger btn-xs flex-fill hide-in-chat" id="btn-fav-${bot.id}" onclick="toggleTemplateFavorite('${bot.id}')" data-tip="В избранное"><i class="fa fa-heart"></i></button>
@@ -3110,19 +3110,59 @@
         function copyStats() { navigator.clipboard.writeText((globalMode==='chat' ? bots[currentModalBotId].chatHistory[currentStatsType] : bots[currentModalBotId].mailHistory[currentStatsType]).join('\n')); }
         function clearStats() { if(confirm("Очистить?")){ const b = bots[currentModalBotId]; if(globalMode==='chat') { b.chatHistory[currentStatsType]=[]; b.chatStats[currentStatsType]=0; } else { b.mailHistory[currentStatsType]=[]; b.mailStats[currentStatsType]=0; } b.updateUI(); renderStatsList(); } }
         
+        // Инлайн добавление нового шаблона (без модалки)
+        async function addTemplateInline(botId) {
+            const bot = bots[botId];
+            const isChat = globalMode === 'chat';
+            const type = isChat ? 'chat' : 'mail';
+            const tpls = getBotTemplates(bot.login)[type];
+
+            // Генерируем уникальное имя
+            let newNum = 1;
+            while (tpls.some(t => t.name === `Новый шаблон ${newNum}`)) {
+                newNum++;
+            }
+            const newName = `Новый шаблон ${newNum}`;
+
+            // Создаём новый шаблон с пустым текстом
+            const newTemplate = { name: newName, text: '', favorite: false };
+            tpls.push(newTemplate);
+
+            // Сохраняем в localStorage
+            localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+
+            // Сохраняем на сервер
+            await saveTemplatesToServer(bot.displayId, type, tpls);
+
+            // Обновляем dropdown и выбираем новый шаблон
+            const newIdx = tpls.length - 1;
+            updateTemplateDropdown(botId, newIdx);
+
+            // Очищаем textarea для ввода нового текста
+            const textarea = document.getElementById(`msg-${botId}`);
+            if (textarea) {
+                textarea.value = '';
+                textarea.focus();
+            }
+
+            console.log(`➕ Создан новый шаблон "${newName}" для ${bot.displayId}`);
+        }
+
+        // Модальное окно теперь только для редактирования (переименования) шаблона
         function openTemplateModal(botId, isEdit) {
             currentModalBotId = botId;
             const bot = bots[botId];
             const isChat = globalMode === 'chat';
             const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
-            
-            document.getElementById('tpl-modal-title').innerText = isChat ? "Шаблон Чата" : "Шаблон Письма";
-            if(isEdit) {
-                const idx = document.getElementById(`tpl-select-${botId}`).value;
-                if(idx==="") return alert("Выберите шаблон");
-                editingTemplateIndex = idx;
-                document.getElementById('tpl-modal-name').value = tpls[idx].name; document.getElementById('tpl-modal-text').value = tpls[idx].text;
-            } else { editingTemplateIndex = null; document.getElementById('tpl-modal-name').value=""; document.getElementById('tpl-modal-text').value=""; }
+
+            // Модалка только для редактирования
+            const idx = document.getElementById(`tpl-select-${botId}`).value;
+            if(idx === "") return alert("Выберите шаблон для редактирования");
+
+            editingTemplateIndex = idx;
+            document.getElementById('tpl-modal-title').innerText = "Редактировать шаблон";
+            document.getElementById('tpl-modal-name').value = tpls[idx].name;
+            document.getElementById('tpl-modal-text').value = tpls[idx].text;
             openModal('tpl-modal');
         }
 
