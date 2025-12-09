@@ -2052,158 +2052,173 @@
 
             async checkChatSync() {
                 if (!this.token || !this.isMonitoring) {
-                    console.log(`[Lababot] ⏭️ checkChatSync SKIP: token=${!!this.token}, isMonitoring=${this.isMonitoring}`);
                     return;
                 }
                 try {
-                    console.log(`[Lababot] 🔍 checkChatSync ВЫЗОВ для бота #${this.id}, token: ${this.token?.substring(0, 20)}...`);
-                    const res = await makeApiRequest(this, 'POST', '/chat-sync', {});
-                    console.log(`[Lababot] 📥 checkChatSync STATUS: ${res?.status}, Content-Type: ${res?.headers?.['content-type']}`);
-                    console.log(`[Lababot] 📥 checkChatSync DATA TYPE: ${typeof res?.data}, isHTML: ${typeof res?.data === 'string' && res?.data?.includes('<!DOCTYPE')}`);
+                    // Используем WebView для запроса (там есть session cookies)
+                    let data = null;
 
-                    // Если получили HTML вместо JSON - пробуем альтернативный эндпоинт
-                    if (typeof res?.data === 'string' && res?.data?.includes('<!DOCTYPE')) {
-                        console.error(`[Lababot] ❌ /chat-sync вернул HTML! Пробуем /api/chat/sync...`);
-
-                        // Тестируем эндпоинт /chat-messages который используется в minichat
+                    if (this.webview) {
                         try {
-                            // Тест с ID=0 чтобы просто проверить работает ли эндпоинт
-                            const testRes = await makeApiRequest(this, 'POST', '/chat-messages', { id: 0 });
-                            console.log(`[Lababot] 🧪 TEST /chat-messages: status=${testRes?.status}, type=${typeof testRes?.data}`, testRes?.data);
-                        } catch (e) {
-                            console.log(`[Lababot] 🧪 TEST /chat-messages FAILED:`, e.message);
-                        }
+                            const result = await this.webview.executeJavaScript(`
+                                (async () => {
+                                    try {
+                                        const res = await fetch('https://ladadate.com/chat-sync', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({}),
+                                            credentials: 'include'
+                                        });
+                                        const text = await res.text();
+                                        try {
+                                            return { success: true, data: JSON.parse(text) };
+                                        } catch {
+                                            return { success: false, error: 'Not JSON', html: text.substring(0, 200) };
+                                        }
+                                    } catch (e) {
+                                        return { success: false, error: e.message };
+                                    }
+                                })()
+                            `);
 
-                        // Тестируем GET /api/messages (почта) - должен работать
-                        try {
-                            const mailRes = await makeApiRequest(this, 'GET', '/api/messages');
-                            console.log(`[Lababot] 🧪 TEST /api/messages: status=${mailRes?.status}, count=${mailRes?.data?.Messages?.length || 0}`);
+                            if (result.success) {
+                                data = result.data;
+                                console.log(`[Lababot] ✅ chat-sync через WebView: OK`);
+                            } else {
+                                console.log(`[Lababot] ❌ chat-sync через WebView:`, result.error, result.html || '');
+                            }
                         } catch (e) {
-                            console.log(`[Lababot] 🧪 TEST /api/messages FAILED:`, e.message);
+                            console.log(`[Lababot] ⚠️ WebView executeJavaScript error:`, e.message);
                         }
-
-                        return; // Не обрабатываем HTML как данные чата
                     }
-                    const data = res.data;
-                    if(data) {
-                        const currentSessions = data.ChatSessions || [];
-                        const chatRequests = data.ChatRequests || [];
-                        const now = Date.now();
-                        const NOTIFY_COOLDOWN = 30000; // 30 секунд между уведомлениями для одной сессии
-                        const ACTIVE_CHAT_SOUND_INTERVAL = 15000; // 15 секунд - повторный звук для активного чата
 
-                        // DEBUG: Логируем всегда
-                        console.log(`[Lababot] 📡 checkChatSync: ${currentSessions.length} сессий, ${chatRequests.length} запросов`);
-                        if (currentSessions.length > 0) {
-                            currentSessions.forEach(s => {
-                                console.log(`  [SESSION] ${s.Name} (${s.AccountId}): IsMessage=${s.IsMessage}`);
-                            });
+                    // Fallback на axios если webview не работает
+                    if (!data) {
+                        const res = await makeApiRequest(this, 'POST', '/chat-sync', {});
+                        if (typeof res?.data === 'object') {
+                            data = res.data;
                         }
-                        if (chatRequests.length > 0) {
-                            chatRequests.forEach(r => {
-                                console.log(`  [REQUEST] ${r.Name} (${r.AccountId}): IsRead=${r.IsRead}, MsgId=${r.MessageId}`);
+                    }
+
+                    if (!data) return;
+
+                    const currentSessions = data.ChatSessions || [];
+                    const chatRequests = data.ChatRequests || [];
+                    const now = Date.now();
+                    const NOTIFY_COOLDOWN = 30000; // 30 секунд между уведомлениями для одной сессии
+                    const ACTIVE_CHAT_SOUND_INTERVAL = 15000; // 15 секунд - повторный звук для активного чата
+
+                    // DEBUG: Логируем всегда
+                    console.log(`[Lababot] 📡 checkChatSync: ${currentSessions.length} сессий, ${chatRequests.length} запросов`);
+                    if (currentSessions.length > 0) {
+                        currentSessions.forEach(s => {
+                            console.log(`  [SESSION] ${s.Name} (${s.AccountId}): IsMessage=${s.IsMessage}`);
+                        });
+                    }
+                    if (chatRequests.length > 0) {
+                        chatRequests.forEach(r => {
+                            console.log(`  [REQUEST] ${r.Name} (${r.AccountId}): IsRead=${r.IsRead}, MsgId=${r.MessageId}`);
+                        });
+                    }
+
+                    // Инициализируем объекты для хранения времени уведомлений
+                    if (!this.chatNotifyTimes) this.chatNotifyTimes = {};
+                    if (!this.chatRequestNotified) this.chatRequestNotified = {}; // Для отслеживания уведомлённых ChatRequests
+                    if (!this.activeChatSoundTimes) this.activeChatSoundTimes = {}; // Для повторного звука активных чатов
+
+                    // === ОБРАБОТКА ChatRequests (новые запросы на чат) ===
+                    for (const request of chatRequests) {
+                        const requestId = request.MessageId;
+                        const partnerId = request.AccountId || "Unknown";
+                        const partnerName = request.Name || "Неизвестный";
+                        const messageBody = request.Body || "";
+                        const isRead = request.IsRead;
+
+                        // Уведомляем только о непрочитанных запросах, которые ещё не уведомляли
+                        if (!isRead && requestId && !this.chatRequestNotified[requestId]) {
+                            this.chatRequestNotified[requestId] = now;
+
+                            // Обрезаем текст сообщения до 50 символов
+                            const truncatedBody = messageBody.length > 50
+                                ? messageBody.substring(0, 50) + '...'
+                                : messageBody;
+
+                            // Отправляем на сервер статистики
+                            sendIncomingMessageToLababot({
+                                botId: this.id,
+                                profileId: this.displayId,
+                                manId: partnerId,
+                                manName: partnerName,
+                                messageId: requestId,
+                                type: 'chat'
                             });
+
+                            // Уведомление в логгер + звук
+                            console.log(`[Lababot] 🆕 НОВЫЙ ЧАТ! От ${partnerName} (${partnerId}): "${truncatedBody}"`);
+                            Logger.add(
+                                `🆕 Новый чат от <b>${partnerName}</b>: "${truncatedBody}"`,
+                                'chat-request',
+                                this.id,
+                                { partnerId, partnerName, messageBody: truncatedBody }
+                            );
                         }
+                    }
 
-                        // Инициализируем объекты для хранения времени уведомлений
-                        if (!this.chatNotifyTimes) this.chatNotifyTimes = {};
-                        if (!this.chatRequestNotified) this.chatRequestNotified = {}; // Для отслеживания уведомлённых ChatRequests
-                        if (!this.activeChatSoundTimes) this.activeChatSoundTimes = {}; // Для повторного звука активных чатов
+                    // Очищаем старые записи chatRequestNotified (старше 5 минут)
+                    for (const msgId in this.chatRequestNotified) {
+                        if (now - this.chatRequestNotified[msgId] > 300000) {
+                            delete this.chatRequestNotified[msgId];
+                        }
+                    }
 
-                        // === ОБРАБОТКА ChatRequests (новые запросы на чат) ===
-                        for (const request of chatRequests) {
-                            const requestId = request.MessageId;
-                            const partnerId = request.AccountId || "Unknown";
-                            const partnerName = request.Name || "Неизвестный";
-                            const messageBody = request.Body || "";
-                            const isRead = request.IsRead;
+                    // === ОБРАБОТКА ChatSessions (активные чаты) ===
+                    for (const session of currentSessions) {
+                        // Используем AccountId как идентификатор сессии (API LadaDate)
+                        const sessionId = session.AccountId || session.Id || session.ChatId;
+                        // IsMessage = true означает есть непрочитанное сообщение
+                        const hasUnread = session.IsMessage === true || (session.UnreadMessageCount || 0) > 0;
+                        const partnerId = session.AccountId || session.TargetUserId || session.PartnerId || "Unknown";
+                        const partnerName = session.Name || "Неизвестный";
+                        const chatMinutes = session.ChatMinutes || 0;
 
-                            // Уведомляем только о непрочитанных запросах, которые ещё не уведомляли
-                            if (!isRead && requestId && !this.chatRequestNotified[requestId]) {
-                                this.chatRequestNotified[requestId] = now;
+                        if (hasUnread && sessionId) {
+                            const lastNotify = this.chatNotifyTimes[sessionId] || 0;
+                            const lastSound = this.activeChatSoundTimes[sessionId] || 0;
 
-                                // Обрезаем текст сообщения до 50 символов
-                                const truncatedBody = messageBody.length > 50
-                                    ? messageBody.substring(0, 50) + '...'
-                                    : messageBody;
+                            // Первое уведомление (полное - в логгер)
+                            if (now - lastNotify >= NOTIFY_COOLDOWN) {
+                                this.chatNotifyTimes[sessionId] = now;
+                                this.activeChatSoundTimes[sessionId] = now;
 
-                                // Отправляем на сервер статистики
+                                // Отправляем входящее сообщение чата на сервер статистики
                                 sendIncomingMessageToLababot({
                                     botId: this.id,
                                     profileId: this.displayId,
                                     manId: partnerId,
                                     manName: partnerName,
-                                    messageId: requestId,
+                                    messageId: `chat_${sessionId}_${now}`,
                                     type: 'chat'
                                 });
 
                                 // Уведомление в логгер + звук
-                                console.log(`[Lababot] 🆕 НОВЫЙ ЧАТ! От ${partnerName} (${partnerId}): "${truncatedBody}"`);
+                                console.log(`[Lababot] 💬 УВЕДОМЛЕНИЕ! Сообщение от ${partnerName} (${partnerId}), мин: ${chatMinutes}`);
                                 Logger.add(
-                                    `🆕 Новый чат от <b>${partnerName}</b>: "${truncatedBody}"`,
-                                    'chat-request',
+                                    `💬 Сообщение в чате с <b>${partnerName}</b> (${chatMinutes} мин)`,
+                                    'chat',
                                     this.id,
-                                    { partnerId, partnerName, messageBody: truncatedBody }
+                                    { partnerId, partnerName }
                                 );
                             }
-                        }
-
-                        // Очищаем старые записи chatRequestNotified (старше 5 минут)
-                        for (const msgId in this.chatRequestNotified) {
-                            if (now - this.chatRequestNotified[msgId] > 300000) {
-                                delete this.chatRequestNotified[msgId];
+                            // Повторный звук для активного чата (без записи в логгер)
+                            else if (now - lastSound >= ACTIVE_CHAT_SOUND_INTERVAL) {
+                                this.activeChatSoundTimes[sessionId] = now;
+                                console.log(`[Lababot] 🔔 Повторный звук! Активный чат с ${partnerName}, ждёт ответа`);
+                                playSound('chat');
                             }
-                        }
-
-                        // === ОБРАБОТКА ChatSessions (активные чаты) ===
-                        for(const session of currentSessions) {
-                            // Используем AccountId как идентификатор сессии (API LadaDate)
-                            const sessionId = session.AccountId || session.Id || session.ChatId;
-                            // IsMessage = true означает есть непрочитанное сообщение
-                            const hasUnread = session.IsMessage === true || (session.UnreadMessageCount || 0) > 0;
-                            const partnerId = session.AccountId || session.TargetUserId || session.PartnerId || "Unknown";
-                            const partnerName = session.Name || "Неизвестный";
-                            const chatMinutes = session.ChatMinutes || 0;
-
-                            if (hasUnread && sessionId) {
-                                const lastNotify = this.chatNotifyTimes[sessionId] || 0;
-                                const lastSound = this.activeChatSoundTimes[sessionId] || 0;
-
-                                // Первое уведомление (полное - в логгер)
-                                if (now - lastNotify >= NOTIFY_COOLDOWN) {
-                                    this.chatNotifyTimes[sessionId] = now;
-                                    this.activeChatSoundTimes[sessionId] = now;
-
-                                    // Отправляем входящее сообщение чата на сервер статистики
-                                    sendIncomingMessageToLababot({
-                                        botId: this.id,
-                                        profileId: this.displayId,
-                                        manId: partnerId,
-                                        manName: partnerName,
-                                        messageId: `chat_${sessionId}_${now}`,
-                                        type: 'chat'
-                                    });
-
-                                    // Уведомление в логгер + звук
-                                    console.log(`[Lababot] 💬 УВЕДОМЛЕНИЕ! Сообщение от ${partnerName} (${partnerId}), мин: ${chatMinutes}`);
-                                    Logger.add(
-                                        `💬 Сообщение в чате с <b>${partnerName}</b> (${chatMinutes} мин)`,
-                                        'chat',
-                                        this.id,
-                                        { partnerId, partnerName }
-                                    );
-                                }
-                                // Повторный звук для активного чата (без записи в логгер)
-                                else if (now - lastSound >= ACTIVE_CHAT_SOUND_INTERVAL) {
-                                    this.activeChatSoundTimes[sessionId] = now;
-                                    console.log(`[Lababot] 🔔 Повторный звук! Активный чат с ${partnerName}, ждёт ответа`);
-                                    playSound('chat');
-                                }
-                            } else if (!hasUnread && sessionId) {
-                                // Если нет непрочитанных - сбрасываем таймеры для этой сессии
-                                delete this.chatNotifyTimes[sessionId];
-                                delete this.activeChatSoundTimes[sessionId];
-                            }
+                        } else if (!hasUnread && sessionId) {
+                            // Если нет непрочитанных - сбрасываем таймеры для этой сессии
+                            delete this.chatNotifyTimes[sessionId];
+                            delete this.activeChatSoundTimes[sessionId];
                         }
                     }
                 } catch(e) {
