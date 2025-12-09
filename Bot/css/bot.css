@@ -1010,7 +1010,7 @@
         }
         .btn-ai-sub:hover { background: #e9ecef; color: #6f42c1; }
 
-        .textarea-msg { resize: none; flex: 1; font-size: 14px; border-color: #dee2e6; border-radius: 6px; background: #fafafa; user-select: text !important; -webkit-user-select: text !important; cursor: text; }
+        .textarea-msg { resize: none; flex: 1; font-size: 14px; border-color: #dee2e6; border-radius: 6px; background: #fafafa; }
         .textarea-msg:focus { border-color: var(--mode-color); background: #fff; box-shadow: none; }
         
         .action-log { font-size: 11px; color: #555; height: 120px; overflow-y: auto; background: #fafafa; border: 1px solid #eee; margin-top: auto; padding: 5px; font-family: monospace; border-radius: 4px; }
