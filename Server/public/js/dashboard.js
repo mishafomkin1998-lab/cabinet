@@ -81,6 +81,17 @@
                 adminTypeFilter: 'all', // 'our' = наши админы, 'other' = другие, 'all' = все (по умолчанию)
                 adminFilter: 'all', // Фильтр по конкретному админу (для директора)
                 translatorFilter: 'all', // Фильтр по переводчику (для админа)
+                expandedAdminId: null, // ID развёрнутого админа в списке
+                directTranslators: [], // Переводчики напрямую под директором
+                controlFilter: { adminId: '', translatorId: '' }, // Фильтры в панели управления
+                newAccountAssignTo: null, // Кому назначить новую анкету
+                profilesWithMailing: [], // Анкеты с рассылкой
+                autoRefreshStats: false, // Автообновление статистики
+                refreshingStats: false, // Индикатор обновления
+                errorLogs: [], // Логи ошибок
+                botLogs: [], // Логи ботов
+                botLogsFilter: 'all', // Фильтр логов ботов
+                botLogsHasMore: false, // Есть ли ещё логи
                 loading: true,
                 error: null,
 
@@ -96,11 +107,20 @@
 
                 // Статистика с сервера
                 stats: {
-                    today: { letters: 0, chats: 0, uniqueMen: 0, errors: 0 },
+                    // Новая структура - данные за выбранный период
+                    incomingLetters: 0,
+                    incomingChats: 0,
+                    uniqueMen: 0,
+                    letters: 0,
+                    chats: 0,
+                    errors: 0,
+                    // Метрики
+                    metrics: { totalProfiles: 0, profilesOnline: 0, avgResponseTime: 0, medianResponseTime: 0 },
+                    // Для обратной совместимости
+                    today: { letters: 0, chats: 0, uniqueMen: 0, errors: 0, incomingLetters: 0, incomingChats: 0 },
                     yesterday: { letters: 0, chats: 0 },
                     week: { letters: 0, chats: 0, uniqueMen: 0, errors: 0 },
-                    month: { letters: 0, chats: 0, uniqueMen: 0 },
-                    metrics: { totalProfiles: 0, avgResponseTime: 0, growthPercent: 0 }
+                    month: { letters: 0, chats: 0, uniqueMen: 0, incomingLetters: 0, incomingChats: 0 }
                 },
 
                 // Статус ботов
@@ -279,7 +299,7 @@
                         defaultDate: [this.statsFilter.dateFrom, this.statsFilter.dateTo],
                         onChange: function(selectedDates, dateStr) {
                             if (selectedDates.length === 2) {
-                                const formatDate = (d) => d.toISOString().split('T')[0];
+                                const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                                 self.statsFilter.dateFrom = formatDate(selectedDates[0]);
                                 self.statsFilter.dateTo = formatDate(selectedDates[1]);
                                 self.statsFilter.quickRange = '';
@@ -297,7 +317,7 @@
                         defaultDate: [this.monitoringFilter.dateFrom, this.monitoringFilter.dateTo],
                         onChange: function(selectedDates) {
                             if (selectedDates.length === 2) {
-                                const formatDate = (d) => d.toISOString().split('T')[0];
+                                const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                                 self.monitoringFilter.dateFrom = formatDate(selectedDates[0]);
                                 self.monitoringFilter.dateTo = formatDate(selectedDates[1]);
                                 self.loadMonitoringData();
@@ -311,7 +331,7 @@
                         defaultDate: [this.historyFilter.dateFrom, this.historyFilter.dateTo],
                         onChange: function(selectedDates) {
                             if (selectedDates.length === 2) {
-                                const formatDate = (d) => d.toISOString().split('T')[0];
+                                const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                                 self.historyFilter.dateFrom = formatDate(selectedDates[0]);
                                 self.historyFilter.dateTo = formatDate(selectedDates[1]);
                                 self.loadProfileHistory();
@@ -324,7 +344,13 @@
                 setDefaultDateRange() {
                     const now = new Date();
                     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-                    const formatDate = (d) => d.toISOString().split('T')[0];
+                    // Форматируем без UTC чтобы избежать сдвига дат
+                    const formatDate = (d) => {
+                        const year = d.getFullYear();
+                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                        const day = String(d.getDate()).padStart(2, '0');
+                        return `${year}-${month}-${day}`;
+                    };
 
                     this.statsFilter.dateFrom = formatDate(firstDay);
                     this.statsFilter.dateTo = formatDate(now);
@@ -696,14 +722,20 @@
                 
                 getActivityLevel(hour) {
                     // Используем реальные данные если есть
+                    // API возвращает массив из 24 чисел где индекс = час
                     if (this.hourlyActivity && this.hourlyActivity.length > 0) {
+                        const value = this.hourlyActivity[hour];
+                        if (typeof value === 'number') {
+                            return Math.min(value, 1) || 0.05;
+                        }
+                        // Старый формат с объектами
                         const hourData = this.hourlyActivity.find(h => h.hour === hour);
                         if (hourData) {
-                            return Math.min(hourData.intensity / 100, 1) || 0.1;
+                            return Math.min(hourData.intensity / 100, 1) || 0.05;
                         }
                     }
-                    // Fallback на базовые значения
-                    return 0.1;
+                    // Fallback на минимальные значения
+                    return 0.05;
                 },
 
                 getActivityColor(hour) {
@@ -729,7 +761,7 @@
 
                 setQuickDateRange(range) {
                     const now = new Date();
-                    const formatDate = (d) => d.toISOString().split('T')[0];
+                    const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                     let dateFrom, dateTo;
 
                     this.statsFilter.quickRange = range;
@@ -791,22 +823,23 @@
 
                     // Дни предыдущего месяца
                     let startDay = firstDay.getDay() || 7; // Понедельник = 1
+                    const toDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
                     for (let i = startDay - 1; i > 0; i--) {
                         const d = new Date(this.calendarYear, this.calendarMonth, 1 - i);
-                        days.push({ day: d.getDate(), date: d.toISOString().split('T')[0], currentMonth: false });
+                        days.push({ day: d.getDate(), date: toDateStr(d), currentMonth: false });
                     }
 
                     // Дни текущего месяца
                     for (let i = 1; i <= lastDay.getDate(); i++) {
                         const d = new Date(this.calendarYear, this.calendarMonth, i);
-                        days.push({ day: i, date: d.toISOString().split('T')[0], currentMonth: true });
+                        days.push({ day: i, date: toDateStr(d), currentMonth: true });
                     }
 
                     // Дни следующего месяца (до 42 дней = 6 недель)
                     const remaining = 42 - days.length;
                     for (let i = 1; i <= remaining; i++) {
                         const d = new Date(this.calendarYear, this.calendarMonth + 1, i);
-                        days.push({ day: i, date: d.toISOString().split('T')[0], currentMonth: false });
+                        days.push({ day: i, date: toDateStr(d), currentMonth: false });
                     }
 
                     return days;
@@ -883,7 +916,7 @@
 
                 setMonitoringQuickRange(range) {
                     const now = new Date();
-                    const formatDate = (d) => d.toISOString().split('T')[0];
+                    const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
                     if (range === 'today') {
                         this.monitoringFilter.dateFrom = formatDate(now);
@@ -1834,7 +1867,7 @@
 
                 setHistoryQuickRange(range) {
                     const now = new Date();
-                    const formatDate = (d) => d.toISOString().split('T')[0];
+                    const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 
                     if (range === 'today') {
                         this.historyFilter.dateFrom = formatDate(now);
@@ -2392,6 +2425,117 @@
                 },
 
                 // ========== END BILLING FUNCTIONS ==========
+
+                // ========== MAILING CONTROL FUNCTIONS ==========
+
+                // Получить отфильтрованные профили для панели управления рассылкой
+                getFilteredProfiles() {
+                    if (!this.profilesWithMailing || this.profilesWithMailing.length === 0) {
+                        return [];
+                    }
+
+                    let filtered = [...this.profilesWithMailing];
+
+                    // Фильтр по админу
+                    if (this.controlFilter.adminId) {
+                        filtered = filtered.filter(p => p.adminId === this.controlFilter.adminId);
+                    }
+
+                    // Фильтр по переводчику
+                    if (this.controlFilter.translatorId) {
+                        filtered = filtered.filter(p => p.translatorId === this.controlFilter.translatorId);
+                    }
+
+                    return filtered;
+                },
+
+                // Получить количество писем за сегодня
+                getTotalMailToday() {
+                    return this.stats?.today?.letters || 0;
+                },
+
+                // Получить количество писем за последний час
+                getTotalMailHour() {
+                    // Пока возвращаем 0, т.к. нет данных по часам
+                    return 0;
+                },
+
+                // Получить количество чатов за сегодня
+                getTotalChatToday() {
+                    return this.stats?.today?.chats || 0;
+                },
+
+                // Получить количество чатов за последний час
+                getTotalChatHour() {
+                    // Пока возвращаем 0, т.к. нет данных по часам
+                    return 0;
+                },
+
+                // Получить количество ошибок за сегодня
+                getTotalErrorsToday() {
+                    return this.stats?.today?.errors || 0;
+                },
+
+                // Получить количество онлайн профилей из списка рассылки
+                getOnlineProfiles() {
+                    if (!this.profilesWithMailing || this.profilesWithMailing.length === 0) {
+                        return 0;
+                    }
+                    return this.profilesWithMailing.filter(p => p.isOnline).length;
+                },
+
+                // Переключить рассылку для профиля
+                async toggleProfileMailing(profile) {
+                    try {
+                        const newStatus = !profile.mailingEnabled;
+                        const res = await fetch(`${API_BASE}/api/profiles/${profile.profileId}/mailing`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                enabled: newStatus,
+                                userId: this.currentUser.id
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            profile.mailingEnabled = newStatus;
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось изменить статус'));
+                        }
+                    } catch (e) {
+                        console.error('toggleProfileMailing error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
+                // Обновить статистику профилей
+                async refreshProfileStats() {
+                    this.refreshingStats = true;
+                    try {
+                        await this.loadDashboardStats();
+                    } finally {
+                        this.refreshingStats = false;
+                    }
+                },
+
+                // Обработчик изменения фильтра по админу
+                onAdminFilterChange() {
+                    // Сбрасываем фильтр по переводчику при смене админа
+                    this.controlFilter.translatorId = '';
+                },
+
+                // Получить переводчиков для выбранного админа
+                getTranslatorsForAdmin() {
+                    if (!this.controlFilter.adminId) {
+                        // Если админ не выбран - возвращаем всех переводчиков
+                        return this.translators || [];
+                    }
+
+                    // Возвращаем переводчиков только этого админа
+                    return (this.translators || []).filter(t => t.adminId === this.controlFilter.adminId);
+                },
+
+                // ========== END MAILING CONTROL FUNCTIONS ==========
 
                 logout() {
                     // Очищаем данные авторизации
