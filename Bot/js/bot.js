@@ -1000,7 +1000,7 @@
                                         const res = await fetch('https://ladadate.com/chat-send', {
                                             method: 'POST',
                                             headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ recipientId: ${minichatPartnerId}, body: ${JSON.stringify(message)} }),
+                                            body: JSON.stringify({ id: ${minichatPartnerId}, body: ${JSON.stringify(message)} }),
                                             credentials: 'include'
                                         });
                                         // Проверяем HTTP статус
@@ -1040,7 +1040,7 @@
                     // Fallback на axios если WebView не работает
                     if (!sendSuccess) {
                         console.log(`[MiniChat] 📤 Отправка чата через axios (fallback):`, { botId: bot.displayId, partnerId: minichatPartnerId });
-                        const payload = { recipientId: minichatPartnerId, body: message };
+                        const payload = { id: minichatPartnerId, body: message };
                         const response = await makeApiRequest(bot, 'POST', '/chat-send', payload);
                         console.log(`[MiniChat] ✅ chat-send через axios:`, response.data);
                     }
@@ -2286,6 +2286,9 @@
                     if (!this.chatRequestNotified) this.chatRequestNotified = {}; // Для отслеживания уведомлённых ChatRequests
                     if (!this.activeChatSoundTimes) this.activeChatSoundTimes = {}; // Для повторного звука активных чатов
 
+                    // Set для отслеживания partnerId, уведомлённых в этом цикле через ChatRequests
+                    const notifiedPartnersThisCycle = new Set();
+
                     // === ОБРАБОТКА ChatRequests (новые запросы на чат) ===
                     for (const request of chatRequests) {
                         const requestId = request.MessageId;
@@ -2297,6 +2300,7 @@
                         // Уведомляем только о непрочитанных запросах, которые ещё не уведомляли
                         if (!isRead && requestId && !this.chatRequestNotified[requestId]) {
                             this.chatRequestNotified[requestId] = now;
+                            notifiedPartnersThisCycle.add(partnerId); // Запоминаем partnerId
 
                             // Обрезаем текст сообщения до 50 символов
                             const truncatedBody = messageBody.length > 50
@@ -2340,6 +2344,11 @@
                         const partnerId = session.AccountId || session.TargetUserId || session.PartnerId || "Unknown";
                         const partnerName = session.Name || "Неизвестный";
                         const chatMinutes = session.ChatMinutes || 0;
+
+                        // Пропускаем если уже уведомили через ChatRequests в этом цикле
+                        if (notifiedPartnersThisCycle.has(partnerId)) {
+                            continue;
+                        }
 
                         if (hasUnread && sessionId) {
                             const lastNotify = this.chatNotifyTimes[sessionId] || 0;
