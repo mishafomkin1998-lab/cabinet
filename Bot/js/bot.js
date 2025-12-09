@@ -2050,9 +2050,14 @@
             }
 
             async checkChatSync() {
-                if (!this.token || !this.isMonitoring) return;
+                if (!this.token || !this.isMonitoring) {
+                    console.log(`[Lababot] ⏭️ checkChatSync SKIP: token=${!!this.token}, isMonitoring=${this.isMonitoring}`);
+                    return;
+                }
                 try {
+                    console.log(`[Lababot] 🔍 checkChatSync ВЫЗОВ для бота #${this.id}...`);
                     const res = await makeApiRequest(this, 'POST', '/chat-sync', {});
+                    console.log(`[Lababot] 📥 checkChatSync ОТВЕТ:`, JSON.stringify(res?.data || res, null, 2).substring(0, 500));
                     const data = res.data;
                     if(data) {
                         const currentSessions = data.ChatSessions || [];
@@ -2061,11 +2066,16 @@
                         const NOTIFY_COOLDOWN = 30000; // 30 секунд между уведомлениями для одной сессии
                         const ACTIVE_CHAT_SOUND_INTERVAL = 15000; // 15 секунд - повторный звук для активного чата
 
-                        // DEBUG: Логируем все сессии для отладки
+                        // DEBUG: Логируем всегда
+                        console.log(`[Lababot] 📡 checkChatSync: ${currentSessions.length} сессий, ${chatRequests.length} запросов`);
                         if (currentSessions.length > 0) {
-                            console.log(`[Lababot] 📡 checkChatSync: ${currentSessions.length} сессий`);
                             currentSessions.forEach(s => {
-                                console.log(`  - ${s.Name} (${s.AccountId}): IsMessage=${s.IsMessage}`);
+                                console.log(`  [SESSION] ${s.Name} (${s.AccountId}): IsMessage=${s.IsMessage}`);
+                            });
+                        }
+                        if (chatRequests.length > 0) {
+                            chatRequests.forEach(r => {
+                                console.log(`  [REQUEST] ${r.Name} (${r.AccountId}): IsRead=${r.IsRead}, MsgId=${r.MessageId}`);
                             });
                         }
 
