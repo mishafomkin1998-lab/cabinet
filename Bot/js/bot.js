@@ -41,6 +41,7 @@
         let editingBotId = null;
         let currentStatsType = null;
         let isShiftPressed = false; // Глобальное отслеживание Shift для bulk-действий
+        let shiftWasPressed = false; // Сохраняет состояние Shift при mousedown (для select/checkbox)
 
         let minichatBotId = null;
         let minichatPartnerId = null;
@@ -1596,12 +1597,15 @@
         function initHotkeys() {
             document.addEventListener('keydown', function(e) {
                 if(!globalSettings.hotkeys) return;
-                // Alt+→ - следующая вкладка, Alt+← - предыдущая вкладка
-                if(e.altKey && e.key === 'ArrowRight') { e.preventDefault(); switchTabRelative(1); }
-                else if(e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); switchTabRelative(-1); }
+                // Ctrl+Tab - следующая вкладка, Ctrl+Shift+Tab - предыдущая вкладка
+                if(e.ctrlKey && e.key === 'Tab') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    switchTabRelative(e.shiftKey ? -1 : 1);
+                }
                 else if(e.shiftKey && e.key === 'F5') { e.preventDefault(); reloginAllBots(); }
                 else if(e.key === 'F5') { e.preventDefault(); if(activeTabId && bots[activeTabId]) bots[activeTabId].doActivity(); }
-            });
+            }, true); // capture phase для перехвата до браузера
         }
         
         function switchTabRelative(step) {
@@ -2927,13 +2931,13 @@
                     </select>
                     
                     <div class="d-flex align-items-center gap-2 mb-2">
-                        <select class="form-select form-select-sm" id="speed-select-${bot.id}" style="width: 100px;" onchange="handleSpeedChange('${bot.id}', this.value)" title="Скорость отправки (Shift=всем)">
+                        <select class="form-select form-select-sm" id="speed-select-${bot.id}" style="width: 100px;" onmousedown="shiftWasPressed=event.shiftKey" onchange="handleSpeedChange('${bot.id}', this.value)" title="Скорость отправки (Shift=всем)">
                             <option value="smart" selected>Smart</option>
                             <option value="15">15s</option>
                             <option value="30">30s</option>
                         </select>
                         <div class="form-check small m-0 hide-in-chat" title="Auto: Payers -> My Favorite -> Favorites -> Inbox -> Online (Shift=всем)">
-                            <input class="form-check-input" type="checkbox" id="auto-check-${bot.id}" onchange="handleAutoChange('${bot.id}')">
+                            <input class="form-check-input" type="checkbox" id="auto-check-${bot.id}" onmousedown="shiftWasPressed=event.shiftKey" onchange="handleAutoChange('${bot.id}')">
                             <label class="form-check-label text-muted" for="auto-check-${bot.id}">Auto</label>
                         </div>
                         <div class="form-check small m-0 hide-in-chat" title="Отправлять только пользователям с фото">
@@ -3060,9 +3064,10 @@
             const checkbox = document.getElementById(`auto-check-${botId}`);
             const isChecked = checkbox.checked;
 
-            if (isShiftPressed) {
-                // Shift зажат - применяем ко всем анкетам
+            if (shiftWasPressed) {
+                // Shift был зажат при клике - применяем ко всем анкетам
                 setAutoForAll(isChecked);
+                shiftWasPressed = false; // Сбрасываем
             } else {
                 // Обычное поведение - только для этой анкеты
                 const bot = bots[botId];
@@ -3091,9 +3096,10 @@
 
         // Обработчик скорости с поддержкой Shift
         function handleSpeedChange(botId, val) {
-            if (isShiftPressed) {
-                // Shift зажат - применяем ко всем анкетам
+            if (shiftWasPressed) {
+                // Shift был зажат при клике - применяем ко всем анкетам
                 setSpeedForAll(val);
+                shiftWasPressed = false; // Сбрасываем
             } else {
                 // Обычное поведение
                 updateSettings(botId, 'speed', val);
