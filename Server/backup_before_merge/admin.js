@@ -3,11 +3,24 @@
                 // User data from auth
                 currentUser: novaUserData,
 
+                // Settings modal
+                showSettingsModal: false,
+                userSettings: {
+                    newUsername: '',
+                    newPassword: '',
+                    newPasswordConfirm: '',
+                    avatarUrl: ''
+                },
+                settingsSaving: false,
+
                 // Localization
                 language: savedLanguage,
 
                 // Dark mode
                 darkMode: localStorage.getItem('novaDarkMode') === 'true',
+
+                // Balance (for admins without "мой админ")
+                userBalance: 0,
 
                 // Toggle dark mode
                 toggleDarkMode() {
@@ -71,36 +84,27 @@
                 showAddAccountModal: false,
                 showAddAdminModal: false,
                 showAssignAccountsModal: false,
-                showTranslatorProfilesModal: false,
-                selectedTranslatorForProfiles: null,
-                selectedTranslatorProfileIds: [],
                 showViewAdminModal: false,
+                showTranslatorModal: false,
+                showAssignTranslatorModal: false,
+                editingTranslator: null,
+                selectedTranslatorForAssign: null,
+                translatorProfileIds: [],
+                newTranslator: { id: null, name: '', login: '', password: '' },
                 sortBy: 'date',
                 sortDirection: 'desc',
                 searchQuery: '',
-                adminTypeFilter: 'all', // 'our' = наши админы, 'other' = другие, 'all' = все (по умолчанию)
-                adminFilter: 'all', // Фильтр по конкретному админу (для директора)
-                translatorFilter: 'all', // Фильтр по переводчику (для админа)
+                selectedProfileIds: [], // Выбранные анкеты для оплаты
                 loading: true,
                 error: null,
 
-                // Settings modal
-                showSettingsModal: false,
-                userSettings: {
-                    newUsername: '',
-                    newPassword: '',
-                    newPasswordConfirm: '',
-                    avatarUrl: ''
-                },
-                settingsSaving: false,
-
                 // Статистика с сервера
                 stats: {
-                    today: { letters: 0, chats: 0, uniqueMen: 0, errors: 0 },
-                    yesterday: { letters: 0, chats: 0 },
-                    week: { letters: 0, chats: 0, uniqueMen: 0, errors: 0 },
-                    month: { letters: 0, chats: 0, uniqueMen: 0 },
-                    metrics: { totalProfiles: 0, avgResponseTime: 0, growthPercent: 0 }
+                    today: { letters: 0, chats: 0, uniqueMen: 0, income: '0.00', errors: 0 },
+                    yesterday: { letters: 0, chats: 0, income: '0.00' },
+                    week: { letters: 0, chats: 0, uniqueMen: 0, income: '0.00', errors: 0 },
+                    month: { letters: 0, chats: 0, uniqueMen: 0, income: '0.00' },
+                    metrics: { totalProfiles: 0, avgResponseTime: 0, growthPercent: 0, avgDailyIncome: '0.00' }
                 },
 
                 // Статус ботов
@@ -170,6 +174,8 @@
 
                 newAccountIds: '',
                 newAccountComment: '',
+                newAccountLogin: '',
+                newAccountPassword: '',
 
                 newAdmin: {
                     id: null,
@@ -178,42 +184,19 @@
                     password: '',
                     initials: '',
                     isMyAdmin: false,
-                    salary: '',
-                    aiEnabled: false,
-                    profileIds: '' // Список ID анкет через запятую или с новой строки
+                    salary: ''
                 },
 
-                newTranslator: {
-                    id: null,
-                    name: '',
-                    login: '',
-                    password: '',
-                    salary: '',
-                    aiEnabled: false,
-                    adminId: ''
-                },
-                editingTranslator: null,
-
-                showAddTranslatorModal: false,
                 selectedAdmin: null,
                 accountsToAssign: '',
                 assignComment: '',
                 selectedAccountIds: [],
-                selectedProfileIds: [], // Выбранные анкеты для оплаты
 
                 generationPrompt: '',
-
-                // Настройки управления
-                controlSettings: {
-                    mailingEnabled: true,
-                    stopSpam: false,
-                    panicMode: false
-                },
 
                 // Фильтры истории
                 historyFilter: {
                     admin: '',
-                    profileId: '',
                     dateFrom: '',
                     dateTo: ''
                 },
@@ -224,38 +207,17 @@
                 accounts: [],
                 bots: [],
                 admins: [],
+                translators: [], // Переводчики этого админа
                 team: [],
-                myTranslators: [], // Переводчики текущего админа
-                allTranslators: [], // Все переводчики (для директора)
                 translatorStats: [],
                 historyActions: [],
-
-                // Система оплаты
-                userBalance: 0,
-                isRestricted: false, // "мой админ" - бесплатные анкеты
-                pricing: { 15: 1, 30: 2, 45: 3, 60: 4 },
-                showExtendModal: false,
-                extendingProfile: null,
-                selectedDays: 30,
-                showTopupModal: false,
-                topupUserId: null,
-                topupAmount: 10,
 
                 // Финансы (только для директора)
                 financeAdmins: [],
                 financeHistory: [],
                 financeTotalSum: 0,
-                financeTopup: {
-                    adminId: '',
-                    amount: 10,
-                    note: ''
-                },
-                profilePayment: {
-                    profileId: '',
-                    days: 30,
-                    note: ''
-                },
-                profilePaymentHistory: [],
+                financeTopup: { adminId: '', amount: 10, note: '' },
+                profilePayment: { profileId: '', days: 30, note: '' },
 
                 // Инициализация - загрузка данных с сервера
                 async init() {
@@ -265,6 +227,14 @@
                     // Инициализация Flatpickr
                     this.$nextTick(() => this.initFlatpickr());
                     await this.loadAllData();
+                    // Загружаем баланс для админов без "мой админ"
+                    if (!this.currentUser.isRestricted) {
+                        await this.loadUserBalance();
+                    }
+                    // Загружаем финансовые данные для директора
+                    if (this.currentUser.role === 'director') {
+                        await this.loadFinanceData();
+                    }
                     // Автообновление каждые 30 секунд
                     setInterval(() => this.loadDashboardStats(), 30000);
                 },
@@ -343,7 +313,7 @@
                 async loadAllData() {
                     this.loading = true;
                     try {
-                        const loadPromises = [
+                        await Promise.all([
                             this.loadDashboardStats(),
                             this.loadAccounts(),
                             this.loadBotsStatus(),
@@ -353,24 +323,26 @@
                             this.loadHourlyActivity(),
                             this.loadTranslatorStats(),
                             this.loadHistoryActions(),
-                            this.loadProfileHistory(),
-                            this.loadSavedPrompt(),
-                            this.loadUserBalance(),
-                            this.loadPricing(),
-                            this.loadControlSettings()
-                        ];
-
-                        // Загружаем финансовые данные только для директора
-                        if (this.currentUser.role === 'director') {
-                            loadPromises.push(this.loadFinanceData());
-                        }
-
-                        await Promise.all(loadPromises);
+                            this.loadProfileHistory()
+                        ]);
                     } catch (e) {
                         console.error('Error loading data:', e);
                         this.error = 'Ошибка загрузки данных';
                     }
                     this.loading = false;
+                },
+
+                // Загрузка баланса пользователя
+                async loadUserBalance() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/billing/balance/${this.currentUser.id}`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.userBalance = data.balance || 0;
+                        }
+                    } catch (e) {
+                        console.error('loadUserBalance error:', e);
+                    }
                 },
 
                 async loadDashboardStats() {
@@ -414,41 +386,35 @@
                         const res = await fetch(`${API_BASE}/api/profiles?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
                         const data = await res.json();
                         if (data.success) {
-                            // Загружаем статус оплаты для каждой анкеты
-                            const accountsWithPayment = await Promise.all(data.list.map(async p => {
-                                let paymentStatus = { isPaid: true, isFree: false, daysLeft: 999, isTrial: false, trialUsed: false };
+                            // Получаем статус оплаты для каждого профиля
+                            const accountsWithPayment = await Promise.all(data.list.map(async (p) => {
+                                let paymentStatus = { isPaid: false, isFree: false, daysLeft: 0, isTrial: false, trialUsed: false };
                                 try {
-                                    const payRes = await fetch(`${API_BASE}/api/billing/profile-status/${encodeURIComponent(p.profile_id)}`);
+                                    const payRes = await fetch(`${API_BASE}/api/billing/profile-status/${p.profile_id}`);
                                     const payData = await payRes.json();
                                     if (payData.success) {
                                         paymentStatus = {
                                             isPaid: payData.isPaid,
                                             isFree: payData.isFree,
-                                            daysLeft: payData.daysLeft || 0,
-                                            isTrial: payData.isTrial,
-                                            trialUsed: payData.trialUsed
+                                            daysLeft: payData.daysLeft,
+                                            isTrial: payData.isTrial || false,
+                                            trialUsed: payData.trialUsed || false
                                         };
                                     }
-                                } catch (e) { /* ignore */ }
+                                } catch (e) {}
 
                                 return {
                                     id: p.profile_id,
-                                    profile_id: p.profile_id,
                                     login: p.login || p.profile_id,
                                     password: p.password || '',
                                     status: p.status || 'offline',
                                     lastOnline: p.last_online ? new Date(p.last_online).toLocaleString('ru-RU') : '-',
-                                    incoming: p.incoming_today || 0,
+                                    letters: p.letters_today || 0,
                                     admin: p.admin_name || '',
-                                    adminId: p.admin_id || null,
-                                    adminIsRestricted: p.admin_is_restricted || false,
                                     translator: p.trans_name || '',
-                                    translatorId: p.translator_id || null,
-                                    translatorName: p.trans_name || '',
                                     addedDate: new Date(p.added_at).toLocaleDateString('ru-RU'),
                                     comment: p.note ? p.note.replace(/\s*\[Last seen:.*?\]/g, '').trim() : '',
                                     paused: p.paused || false,
-                                    // Payment status
                                     isPaid: paymentStatus.isPaid,
                                     isFree: paymentStatus.isFree,
                                     daysLeft: paymentStatus.daysLeft,
@@ -469,19 +435,12 @@
                             this.botsStatus = data.summary;
 
                             // Группируем по botId чтобы получить уникальные боты
-                            // Показываем только активные боты (heartbeat за последний час)
                             const botsMap = {};
-                            const oneHourAgo = Date.now() - 60 * 60 * 1000;
-
                             data.bots.forEach(b => {
+                                // Используем botId или profileId как ключ
                                 const botId = b.botId || b.bot_id || b.profileId || b.profile_id;
                                 if (botId && botId !== 'null' && botId !== 'undefined') {
-                                    const lastHeartbeat = b.lastHeartbeat ? new Date(b.lastHeartbeat).getTime() : 0;
-                                    const isRecentlyActive = lastHeartbeat > oneHourAgo;
-
-                                    // Показываем только недавно активные боты
-                                    if (!isRecentlyActive) return;
-
+                                    // Определяем активность бота
                                     const isActive = b.status === 'online' || b.status === 'active' || b.status === 'idle';
 
                                     if (!botsMap[botId]) {
@@ -498,6 +457,7 @@
                                         };
                                     } else {
                                         botsMap[botId].profilesCount = (botsMap[botId].profilesCount || 0) + 1;
+                                        // Обновляем статус если хоть одна анкета online
                                         if (isActive) {
                                             botsMap[botId].status = 'active';
                                         }
@@ -505,6 +465,11 @@
                                 }
                             });
                             this.bots = Object.values(botsMap);
+
+                            // Если ботов нет, но есть данные - показываем их
+                            if (this.bots.length === 0 && data.bots.length > 0) {
+                                console.log('Bot data received but not parsed:', data.bots);
+                            }
 
                             // Также обновляем статусы анкет
                             data.bots.forEach(b => {
@@ -526,77 +491,15 @@
                         const data = await res.json();
                         if (data.success) {
                             this.team = data.list;
-                            // Формируем admins с переводчиками
-                            const adminsList = data.list.filter(u => u.role === 'admin');
+                            // Для админа - загружаем только своих переводчиков
                             const translatorsList = data.list.filter(u => u.role === 'translator');
-
-                            if (this.currentUser.role === 'admin') {
-                                // Для админа: показываем себя с переводчиками
-                                this.admins = [{
-                                    id: this.currentUser.id,
-                                    name: this.currentUser.username,
-                                    login: this.currentUser.username,
-                                    initials: this.currentUser.username.substring(0, 2).toUpperCase(),
-                                    accounts: 0,
-                                    conversion: 0,
-                                    isMyAdmin: false,
-                                    salary: null,
-                                    balance: 0,
-                                    translators: translatorsList.map(t => ({
-                                        id: t.id,
-                                        name: t.username,
-                                        login: t.username,
-                                        conversion: t.conversion || 0,
-                                        accounts: t.accounts || [],
-                                        accountsCount: t.accounts_count || 0
-                                    }))
-                                }];
-                                // Также сохраняем в отдельный массив для удобства
-                                this.myTranslators = translatorsList.map(t => ({
-                                    id: t.id,
-                                    name: t.username,
-                                    login: t.username,
-                                    conversion: t.conversion || 0,
-                                    accounts: t.accounts || [],
-                                    accountsCount: t.accounts_count || 0
-                                }));
-                            } else {
-                                // Для директора: показываем всех админов с их переводчиками
-                                this.admins = adminsList.map(a => ({
-                                    id: a.id,
-                                    name: a.username,
-                                    login: a.username,
-                                    initials: a.username.substring(0, 2).toUpperCase(),
-                                    accounts: a.accounts_count || 0,
-                                    conversion: a.conversion || 0,
-                                    isMyAdmin: a.is_restricted || false,
-                                    salary: a.salary !== null && a.salary !== undefined ? a.salary : null,
-                                    balance: a.balance || 0,
-                                    translators: translatorsList.filter(t => t.owner_id === a.id).map(t => ({
-                                        id: t.id,
-                                        name: t.username,
-                                        login: t.username,
-                                        conversion: t.conversion || 0,
-                                        accounts: t.accounts || [],
-                                        accountsCount: t.accounts_count || 0
-                                    }))
-                                }));
-                                this.myTranslators = [];
-                                // Для директора: все переводчики с информацией об админе
-                                this.allTranslators = translatorsList.map(t => {
-                                    const admin = adminsList.find(a => a.id === t.owner_id);
-                                    return {
-                                        id: t.id,
-                                        name: t.username,
-                                        login: t.username,
-                                        conversion: t.conversion || 0,
-                                        accounts: t.accounts || [],
-                                        accountsCount: t.accounts_count || 0,
-                                        adminId: t.owner_id,
-                                        adminName: admin ? admin.username : null
-                                    };
-                                });
-                            }
+                            this.translators = translatorsList.map(t => ({
+                                id: t.id,
+                                name: t.username,
+                                login: t.username,
+                                conversion: t.conversion || 0,
+                                accounts: t.accounts || []
+                            }));
                         }
                     } catch (e) { console.error('loadTeam error:', e); }
                 },
@@ -932,77 +835,25 @@
                     return date.toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
                 },
                 
-                // Объединенная история финансов (пополнения + оплата анкет)
-                get combinedFinanceHistory() {
-                    const combined = [];
-
-                    // Добавляем пополнения
-                    this.financeHistory.forEach((item, idx) => {
-                        combined.push({
-                            ...item,
-                            uniqueId: 'topup_' + (item.id || idx),
-                            type: 'topup'
-                        });
-                    });
-
-                    // Добавляем оплаты анкет
-                    this.profilePaymentHistory.forEach((item, idx) => {
-                        combined.push({
-                            ...item,
-                            uniqueId: 'profile_' + (item.id || idx),
-                            type: item.actionType === 'removal' ? 'profile_removal' : 'profile_payment'
-                        });
-                    });
-
-                    // Сортируем по дате (новые сверху)
-                    combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-                    return combined;
-                },
-
                 get filteredAccounts() {
                     let filtered = this.accounts;
-
-                    // Фильтр по типу админа (только для директора)
-                    if (this.currentUser.role === 'director' && this.adminTypeFilter !== 'all') {
-                        if (this.adminTypeFilter === 'our') {
-                            filtered = filtered.filter(account => account.adminIsRestricted === true);
-                        } else if (this.adminTypeFilter === 'other') {
-                            filtered = filtered.filter(account => account.adminIsRestricted === false);
-                        }
-                    }
-
-                    // Фильтр по конкретному админу (для директора)
-                    if (this.currentUser.role === 'director' && this.adminFilter !== 'all') {
-                        if (this.adminFilter === 'unassigned') {
-                            filtered = filtered.filter(account => !account.adminId);
-                        } else {
-                            filtered = filtered.filter(account => account.adminId == this.adminFilter);
-                        }
-                    }
-
-                    // Фильтр по переводчику (для админа)
-                    if (this.currentUser.role === 'admin' && this.translatorFilter !== 'all') {
-                        if (this.translatorFilter === 'unassigned') {
-                            filtered = filtered.filter(account => !account.translatorId);
-                        } else {
-                            filtered = filtered.filter(account => account.translatorId == this.translatorFilter);
-                        }
-                    }
-
+                    
                     if (this.searchQuery) {
                         const query = this.searchQuery.toLowerCase();
-                        filtered = filtered.filter(account =>
+                        filtered = filtered.filter(account => 
                             account.id.toLowerCase().includes(query) ||
-                            account.login?.toLowerCase().includes(query)
+                            account.login.toLowerCase().includes(query)
                         );
                     }
-
+                    
                     filtered.sort((a, b) => {
                         let result = 0;
                         switch (this.sortBy) {
                             case 'id':
                                 result = (a.id || '').localeCompare(b.id || '');
+                                break;
+                            case 'login':
+                                result = (a.login || '').localeCompare(b.login || '');
                                 break;
                             case 'status':
                                 const statusOrder = { 'online': 1, 'working': 2, 'offline': 3, 'inactive': 4 };
@@ -1011,14 +862,11 @@
                             case 'lastOnline':
                                 result = new Date(a.lastOnline || 0) - new Date(b.lastOnline || 0);
                                 break;
-                            case 'incoming':
-                                result = (a.incoming || 0) - (b.incoming || 0);
+                            case 'letters':
+                                result = (a.letters || 0) - (b.letters || 0);
                                 break;
                             case 'admin':
                                 result = (a.admin || '').localeCompare(b.admin || '');
-                                break;
-                            case 'translator':
-                                result = (a.translatorName || '').localeCompare(b.translatorName || '');
                                 break;
                             case 'date':
                                 result = new Date(a.addedDate || 0) - new Date(b.addedDate || 0);
@@ -1028,7 +876,7 @@
                         }
                         return this.sortDirection === 'desc' ? -result : result;
                     });
-
+                    
                     return filtered;
                 },
                 
@@ -1040,34 +888,7 @@
                         this.sortDirection = 'asc';
                     }
                 },
-
-                // Изменение ширины колонок таблицы
-                initResize(e) {
-                    const th = e.target.parentElement;
-                    const table = th.closest('table');
-                    const handle = e.target;
-                    const startX = e.pageX;
-                    const startWidth = th.offsetWidth;
-
-                    handle.classList.add('resizing');
-                    table.classList.add('resizing');
-
-                    const doResize = (e) => {
-                        const newWidth = Math.max(50, startWidth + (e.pageX - startX));
-                        th.style.width = newWidth + 'px';
-                    };
-
-                    const stopResize = () => {
-                        handle.classList.remove('resizing');
-                        table.classList.remove('resizing');
-                        document.removeEventListener('mousemove', doResize);
-                        document.removeEventListener('mouseup', stopResize);
-                    };
-
-                    document.addEventListener('mousemove', doResize);
-                    document.addEventListener('mouseup', stopResize);
-                },
-
+                
                 getStatusClass(status) {
                     const classes = {
                         'online': 'bg-green-100 text-green-800',
@@ -1083,77 +904,84 @@
                     return statuses[status] || status;
                 },
                 
-                async toggleAccountAccess(account) {
-                    const newPaused = !account.paused;
-                    const profileId = account.profile_id || account.id;
-                    try {
-                        const res = await fetch(`${API_BASE}/api/profiles/toggle-access`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                profileId: profileId,
-                                paused: newPaused
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            // Обновляем в массиве напрямую для реактивности Alpine
-                            const idx = this.accounts.findIndex(a => a.id === account.id);
-                            if (idx > -1) {
-                                this.accounts[idx].paused = newPaused;
-                            }
-                            console.log(`✅ Анкета ${profileId} ${newPaused ? 'приостановлена' : 'возобновлена'}`);
-                        } else {
-                            console.error('Ошибка toggle:', data.error);
-                            alert('Ошибка: ' + (data.error || 'Не удалось изменить статус'));
+                toggleAccountAccess(account) {
+                    account.paused = !account.paused;
+                    console.log(`Анкета ${account.id} ${account.paused ? 'приостановлена' : 'возобновлена'}`);
+                },
+                
+                deleteAccount(account) {
+                    if (confirm(`Удалить анкету ${account.login}?`)) {
+                        const index = this.accounts.findIndex(a => a.id === account.id);
+                        if (index > -1) {
+                            this.accounts.splice(index, 1);
                         }
-                    } catch (e) {
-                        console.error('Ошибка:', e);
-                        alert('Ошибка при изменении статуса анкеты');
                     }
                 },
 
-                async deleteAccount(account) {
-                    if (confirm(this.t('messages.deleteConfirm') + ` ${account.login}?`)) {
-                        try {
-                            const profileId = account.profile_id || account.id;
-                            const res = await fetch(`${API_BASE}/api/profiles/${encodeURIComponent(profileId)}`, {
-                                method: 'DELETE',
-                                headers: { 'Content-Type': 'application/json' }
-                            });
-                            const data = await res.json();
-                            if (data.success) {
-                                this.accounts = this.accounts.filter(a => a.id !== account.id);
-                                console.log(`✅ Анкета ${profileId} удалена`);
-                            } else {
-                                console.error('Ошибка удаления:', data.error);
-                                alert('Ошибка удаления: ' + (data.error || 'Неизвестная ошибка'));
-                            }
-                        } catch (e) {
-                            console.error('Ошибка:', e);
-                            alert('Ошибка при удалении анкеты');
+                // Функции для выделения анкет
+                toggleProfileSelection(profileId, checked) {
+                    if (checked) {
+                        if (!this.selectedProfileIds.includes(profileId)) {
+                            this.selectedProfileIds.push(profileId);
                         }
+                    } else {
+                        this.selectedProfileIds = this.selectedProfileIds.filter(id => id !== profileId);
                     }
                 },
-                
-                async assignAccount(account) {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/profiles/assign-admin`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                profileId: account.profile_id,
-                                adminLogin: account.admin || null,
-                                performedBy: this.currentUser.username
-                            })
-                        });
-                        const data = await res.json();
-                        if (!data.success) {
-                            console.error('Ошибка назначения:', data.error);
-                        }
-                    } catch (e) {
-                        console.error('Ошибка:', e);
+
+                toggleSelectAllProfiles(checked) {
+                    if (checked) {
+                        this.selectedProfileIds = this.filteredAccounts
+                            .filter(a => !a.isPaid && !a.isFree)
+                            .map(a => a.id);
+                    } else {
+                        this.selectedProfileIds = [];
                     }
+                },
+
+                async paySelectedProfiles() {
+                    if (this.selectedProfileIds.length === 0) return;
+
+                    const selectedAccounts = this.accounts.filter(a => this.selectedProfileIds.includes(a.id));
+                    const PRICE_PER_PROFILE = 0.05; // $0.05 за анкету в день
+                    const DAYS = 30;
+                    const totalCost = selectedAccounts.length * PRICE_PER_PROFILE * DAYS;
+
+                    if (this.userBalance < totalCost) {
+                        alert(`Недостаточно средств. Нужно: $${totalCost.toFixed(2)}, На балансе: $${this.userBalance.toFixed(2)}`);
+                        return;
+                    }
+
+                    if (!confirm(`Оплатить ${this.selectedProfileIds.length} анкет на 30 дней за $${totalCost.toFixed(2)}?`)) return;
+
+                    let successCount = 0;
+                    try {
+                        for (const profileId of this.selectedProfileIds) {
+                            const res = await fetch(`${API_BASE}/api/billing/pay-profile`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    userId: this.currentUser.id,
+                                    profileId: profileId,
+                                    days: DAYS
+                                })
+                            });
+                            const data = await res.json();
+                            if (data.success) successCount++;
+                        }
+
+                        alert(`Оплачено ${successCount} из ${this.selectedProfileIds.length} анкет`);
+                        this.selectedProfileIds = [];
+                        await this.loadAccounts();
+                        await this.loadUserBalance();
+                    } catch (e) {
+                        console.error('paySelectedProfiles error:', e);
+                        alert('Ошибка при оплате');
+                    }
+                },
+
+                assignAccount(account) {
+                    console.log(`Анкета ${account.id} назначена админу: ${account.admin}`);
                 },
                 
                 saveAccounts() {
@@ -1186,6 +1014,8 @@
                         if (data.success) {
                             this.newAccountIds = '';
                             this.newAccountComment = '';
+                            this.newAccountLogin = '';
+                            this.newAccountPassword = '';
                             this.showAddAccountModal = false;
                             alert(`Добавлено ${ids.length} анкет`);
                             this.loadAccounts(); // Перезагружаем список с сервера
@@ -1199,50 +1029,19 @@
                     });
                 },
                 
-                async editAdmin(admin) {
-                    // Загружаем список назначенных анкет для этого админа
-                    let assignedIds = '';
-                    try {
-                        const res = await fetch(`/api/team/${admin.id}/profiles`);
-                        const data = await res.json();
-                        if (data.success && data.profileIds) {
-                            assignedIds = data.profileIds.join(', ');
-                        }
-                    } catch (e) {
-                        console.error('Error loading admin profiles:', e);
-                    }
-
-                    this.newAdmin = {
+                editAdmin(admin) {
+                    this.newAdmin = { 
                         id: admin.id,
                         name: admin.name,
                         login: admin.login || '',
                         password: admin.password || '',
                         initials: admin.initials || '',
                         isMyAdmin: admin.isMyAdmin,
-                        salary: admin.salary !== null && admin.salary !== undefined ? admin.salary : '',
-                        aiEnabled: admin.aiEnabled || false,
-                        profileIds: assignedIds
+                        salary: admin.salary || ''
                     };
                     this.showAddAdminModal = true;
                 },
-
-                async deleteAdmin(admin) {
-                    if (!confirm(`Удалить админа "${admin.name}"? Все его анкеты будут откреплены.`)) return;
-                    try {
-                        const response = await fetch(`/api/team/${admin.id}`, { method: 'DELETE' });
-                        const data = await response.json();
-                        if (data.success) {
-                            await this.loadTeam();
-                            await this.loadAccounts();
-                            alert('Админ удалён');
-                        } else {
-                            alert('Ошибка: ' + (data.error || 'Не удалось удалить'));
-                        }
-                    } catch (e) {
-                        alert('Ошибка: ' + e.message);
-                    }
-                },
-
+                
                 assignAccountsToAdmin(admin) {
                     this.selectedAdmin = admin;
                     this.accountsToAssign = '';
@@ -1251,12 +1050,12 @@
                     this.showAssignAccountsModal = true;
                 },
 
-                async assignAccountsToAdminConfirm() {
+                assignAccountsToAdminConfirm() {
                     // Собираем ID из чекбоксов и текстового поля
                     let ids = [...this.selectedAccountIds];
 
                     if (this.accountsToAssign.trim()) {
-                        const manualIds = this.accountsToAssign.split(/[\s,]+/).filter(id => id.length >= 3);
+                        const manualIds = this.accountsToAssign.split(/[\s,]+/).filter(id => id.length >= 5);
                         ids = [...ids, ...manualIds];
                     }
 
@@ -1268,94 +1067,22 @@
                         return;
                     }
 
-                    try {
-                        // Сначала получаем текущие анкеты админа
-                        const currentRes = await fetch(`${API_BASE}/api/team/${this.selectedAdmin.id}/profiles`);
-                        const currentData = await currentRes.json();
-                        const currentIds = currentData.success ? currentData.profileIds : [];
-
-                        // Объединяем с новыми (без дубликатов)
-                        const allIds = [...new Set([...currentIds, ...ids])];
-
-                        // Отправляем на сервер
-                        const res = await fetch(`${API_BASE}/api/team/${this.selectedAdmin.id}/profiles`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ profileIds: allIds })
-                        });
-                        const data = await res.json();
-
-                        if (data.success) {
-                            this.showAssignAccountsModal = false;
-                            this.selectedAccountIds = [];
-                            alert(`Назначено ${ids.length} анкет администратору ${this.selectedAdmin.name}`);
-                            await this.loadAccounts();
-                            await this.loadTeam();
-                        } else {
-                            alert('Ошибка: ' + (data.error || 'Не удалось назначить анкеты'));
+                    // Обновляем анкеты в базе данных
+                    ids.forEach(id => {
+                        const accountIndex = this.accounts.findIndex(a => String(a.id) === String(id));
+                        if (accountIndex > -1) {
+                            this.accounts[accountIndex].admin = this.selectedAdmin.login;
+                            if (this.assignComment) {
+                                this.accounts[accountIndex].comment = this.assignComment;
+                            }
                         }
-                    } catch (e) {
-                        console.error('assignAccountsToAdminConfirm error:', e);
-                        alert('Ошибка сети при назначении анкет');
-                    }
+                    });
+
+                    this.showAssignAccountsModal = false;
+                    this.selectedAccountIds = [];
+                    alert(`Назначено ${ids.length} анкет администратору ${this.selectedAdmin.name}`);
                 },
-
-                // Открыть модальное окно назначения анкет переводчику
-                async openTranslatorProfilesModal(translator) {
-                    this.selectedTranslatorForProfiles = translator;
-                    this.selectedTranslatorProfileIds = [];
-
-                    // Загружаем уже назначенные анкеты
-                    try {
-                        const res = await fetch(`${API_BASE}/api/team/translator/${translator.id}/profiles`);
-                        const data = await res.json();
-                        if (data.success && data.profileIds) {
-                            this.selectedTranslatorProfileIds = data.profileIds.map(String);
-                        }
-                    } catch (e) {
-                        console.error('Error loading translator profiles:', e);
-                    }
-
-                    this.showTranslatorProfilesModal = true;
-                },
-
-                // Переключить выбор анкеты для переводчика
-                toggleTranslatorProfile(profileId) {
-                    const id = String(profileId);
-                    const idx = this.selectedTranslatorProfileIds.indexOf(id);
-                    if (idx > -1) {
-                        this.selectedTranslatorProfileIds.splice(idx, 1);
-                    } else {
-                        this.selectedTranslatorProfileIds.push(id);
-                    }
-                },
-
-                // Сохранить назначенные анкеты переводчику
-                async saveTranslatorProfiles() {
-                    if (!this.selectedTranslatorForProfiles) return;
-
-                    try {
-                        const res = await fetch(`${API_BASE}/api/team/translator/${this.selectedTranslatorForProfiles.id}/profiles`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                profileIds: this.selectedTranslatorProfileIds
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            this.showTranslatorProfilesModal = false;
-                            await this.loadTeam();
-                            alert(`Анкеты назначены переводчику ${this.selectedTranslatorForProfiles.name}`);
-                        } else {
-                            alert('Ошибка: ' + (data.error || 'Не удалось назначить анкеты'));
-                        }
-                    } catch (e) {
-                        console.error('saveTranslatorProfiles error:', e);
-                        alert('Ошибка сети');
-                    }
-                },
-
+                
                 viewAdminDetails(admin) {
                     this.selectedAdmin = admin;
                     this.showViewAdminModal = true;
@@ -1367,19 +1094,12 @@
                         return;
                     }
 
-                    if (!this.newAdmin.isMyAdmin && this.newAdmin.salary === '') {
+                    if (!this.newAdmin.isMyAdmin && !this.newAdmin.salary) {
                         alert('Для не "моего админа" укажите сумму');
                         return;
                     }
 
-                    // Парсим список ID анкет
-                    const profileIds = this.newAdmin.profileIds
-                        ? this.newAdmin.profileIds.split(/[\s,]+/).map(id => id.trim()).filter(id => id)
-                        : [];
-
                     try {
-                        let adminId = this.newAdmin.id;
-
                         if (this.newAdmin.id) {
                             // Редактирование существующего админа
                             const res = await fetch(`${API_BASE}/api/users/${this.newAdmin.id}`, {
@@ -1389,8 +1109,7 @@
                                     username: this.newAdmin.login,
                                     password: this.newAdmin.password,
                                     salary: this.newAdmin.isMyAdmin ? null : parseFloat(this.newAdmin.salary),
-                                    isRestricted: this.newAdmin.isMyAdmin,
-                                    aiEnabled: this.newAdmin.aiEnabled
+                                    isRestricted: this.newAdmin.isMyAdmin
                                 })
                             });
                             const data = await res.json();
@@ -1409,8 +1128,7 @@
                                     role: 'admin',
                                     ownerId: this.currentUser.id,
                                     salary: this.newAdmin.isMyAdmin ? null : parseFloat(this.newAdmin.salary),
-                                    isRestricted: this.newAdmin.isMyAdmin,
-                                    aiEnabled: this.newAdmin.aiEnabled
+                                    isRestricted: this.newAdmin.isMyAdmin
                                 })
                             });
                             const data = await res.json();
@@ -1418,28 +1136,10 @@
                                 alert('Ошибка создания: ' + (data.error || 'Неизвестная ошибка'));
                                 return;
                             }
-                            adminId = data.userId;
                         }
 
-                        // Назначаем анкеты админу (если указаны)
-                        if (adminId && profileIds.length > 0) {
-                            await fetch(`${API_BASE}/api/team/${adminId}/profiles`, {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ profileIds })
-                            });
-                        } else if (adminId && this.newAdmin.id) {
-                            // При редактировании обновляем список (может быть пустым)
-                            await fetch(`${API_BASE}/api/team/${adminId}/profiles`, {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ profileIds })
-                            });
-                        }
-
-                        // Перезагружаем команду и анкеты
+                        // Перезагружаем команду
                         await this.loadTeam();
-                        await this.loadAccounts();
 
                         this.newAdmin = {
                             id: null,
@@ -1448,9 +1148,7 @@
                             password: '',
                             initials: '',
                             isMyAdmin: false,
-                            salary: '',
-                            aiEnabled: false,
-                            profileIds: ''
+                            salary: ''
                         };
                         this.showAddAdminModal = false;
 
@@ -1461,17 +1159,22 @@
                     }
                 },
 
+                // === Функции управления переводчиками ===
                 openAddTranslatorModal() {
+                    this.editingTranslator = null;
+                    this.newTranslator = { id: null, name: '', login: '', password: '' };
+                    this.showTranslatorModal = true;
+                },
+
+                editTranslator(translator) {
+                    this.editingTranslator = translator;
                     this.newTranslator = {
-                        id: null,
-                        name: '',
-                        login: '',
-                        password: '',
-                        salary: '',
-                        aiEnabled: false,
-                        adminId: ''
+                        id: translator.id,
+                        name: translator.name,
+                        login: translator.login,
+                        password: ''
                     };
-                    this.showAddTranslatorModal = true;
+                    this.showTranslatorModal = true;
                 },
 
                 async saveTranslator() {
@@ -1480,32 +1183,18 @@
                         return;
                     }
 
-                    // Пароль обязателен только для нового переводчика
                     if (!this.editingTranslator && !this.newTranslator.password) {
                         alert('Введите пароль для нового переводчика');
                         return;
                     }
 
-                    // Для директора требуем выбор админа (только при создании)
-                    if (!this.editingTranslator && this.currentUser.role === 'director' && !this.newTranslator.adminId) {
-                        alert('Выберите админа для переводчика');
-                        return;
-                    }
-
                     try {
                         if (this.editingTranslator) {
-                            // Редактирование существующего переводчика
-                            const body = {
-                                username: this.newTranslator.name,
-                                aiEnabled: this.newTranslator.aiEnabled
-                            };
+                            // Редактирование
+                            const body = { username: this.newTranslator.name };
                             if (this.newTranslator.password) {
                                 body.password = this.newTranslator.password;
                             }
-                            if (this.newTranslator.salary) {
-                                body.salary = parseFloat(this.newTranslator.salary);
-                            }
-
                             const res = await fetch(`${API_BASE}/api/users/${this.editingTranslator.id}`, {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
@@ -1517,11 +1206,7 @@
                                 return;
                             }
                         } else {
-                            // Создание нового переводчика
-                            const ownerId = this.currentUser.role === 'director'
-                                ? this.newTranslator.adminId
-                                : this.currentUser.id;
-
+                            // Создание
                             const res = await fetch(`${API_BASE}/api/users`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
@@ -1530,59 +1215,25 @@
                                     login: this.newTranslator.login,
                                     password: this.newTranslator.password,
                                     role: 'translator',
-                                    ownerId: ownerId,
-                                    salary: this.newTranslator.salary ? parseFloat(this.newTranslator.salary) : null,
-                                    aiEnabled: this.newTranslator.aiEnabled
+                                    ownerId: this.currentUser.id
                                 })
                             });
                             const data = await res.json();
                             if (!data.success) {
-                                alert('Ошибка создания: ' + (data.error || 'Логин занят'));
+                                alert('Ошибка: ' + (data.error || 'Логин занят'));
                                 return;
                             }
                         }
 
-                        // Перезагружаем команду
                         await this.loadTeam();
-
-                        const wasEditing = !!this.editingTranslator;
-
-                        // Сбрасываем форму
-                        this.newTranslator = {
-                            id: null,
-                            name: '',
-                            login: '',
-                            password: '',
-                            salary: '',
-                            aiEnabled: false,
-                            adminId: ''
-                        };
-                        this.editingTranslator = null;
-                        this.showAddTranslatorModal = false;
-
-                        alert(wasEditing ? 'Переводчик обновлен' : 'Переводчик добавлен');
+                        this.showTranslatorModal = false;
+                        alert(this.editingTranslator ? 'Переводчик обновлен' : 'Переводчик создан');
                     } catch (e) {
                         console.error('saveTranslator error:', e);
-                        alert('Ошибка сохранения переводчика');
+                        alert('Ошибка сети');
                     }
                 },
 
-                // Редактирование переводчика
-                editTranslator(translator) {
-                    this.editingTranslator = translator;
-                    this.newTranslator = {
-                        id: translator.id,
-                        name: translator.name,
-                        login: translator.login,
-                        password: '',
-                        salary: translator.salary || '',
-                        aiEnabled: translator.aiEnabled || false,
-                        adminId: translator.adminId || ''
-                    };
-                    this.showAddTranslatorModal = true;
-                },
-
-                // Удаление переводчика
                 async deleteTranslator(translator) {
                     if (!confirm(`Удалить переводчика "${translator.name}"? Его анкеты станут неназначенными.`)) {
                         return;
@@ -1605,143 +1256,75 @@
                     }
                 },
 
-                async toggleBotStatus(bot) {
-                    const newActive = bot.status !== 'active';
+                async openAssignProfilesToTranslator(translator) {
+                    this.selectedTranslatorForAssign = translator;
+                    this.translatorProfileIds = [];
+
                     try {
-                        const res = await fetch(`${API_BASE}/api/bots/${bot.id}/toggle`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ active: newActive })
-                        });
+                        const res = await fetch(`${API_BASE}/api/team/translator/${translator.id}/profiles`);
                         const data = await res.json();
-                        if (data.success) {
-                            bot.status = newActive ? 'active' : 'inactive';
+                        if (data.success && data.profileIds) {
+                            this.translatorProfileIds = data.profileIds.map(String);
                         }
                     } catch (e) {
-                        console.error('Ошибка:', e);
+                        console.error('Error loading translator profiles:', e);
+                    }
+
+                    this.showAssignTranslatorModal = true;
+                },
+
+                toggleTranslatorProfile(profileId) {
+                    const id = String(profileId);
+                    const idx = this.translatorProfileIds.indexOf(id);
+                    if (idx > -1) {
+                        this.translatorProfileIds.splice(idx, 1);
+                    } else {
+                        this.translatorProfileIds.push(id);
                     }
                 },
 
-                async saveBotName(bot) {
+                async saveTranslatorProfiles() {
+                    if (!this.selectedTranslatorForAssign) return;
+
                     try {
-                        const res = await fetch(`${API_BASE}/api/bots/${bot.id}/name`, {
+                        const res = await fetch(`${API_BASE}/api/team/translator/${this.selectedTranslatorForAssign.id}/profiles`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ name: bot.name })
+                            body: JSON.stringify({ profileIds: this.translatorProfileIds })
                         });
                         const data = await res.json();
                         if (data.success) {
-                            alert(this.t('messages.botNameSaved'));
-                        }
-                    } catch (e) {
-                        console.error('Ошибка:', e);
-                    }
-                },
-
-                async updateAllBots() {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/refresh-all`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' }
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            // Обновляем список ботов
-                            await this.loadBotsStatus();
-                            alert(this.t('messages.botsUpdated'));
-                        }
-                    } catch (e) {
-                        console.error('Ошибка:', e);
-                    }
-                },
-
-                async syncPromptWithBots() {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/sync-prompt`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                prompt: this.generationPrompt,
-                                userId: this.currentUser.id
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            alert(this.t('messages.botsSynced'));
-                        }
-                    } catch (e) {
-                        console.error('Ошибка:', e);
-                    }
-                },
-
-                // === Настройки управления ===
-                async loadControlSettings() {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/control/settings?userId=${this.currentUser.id}`);
-                        const data = await res.json();
-                        if (data.success && data.settings) {
-                            this.controlSettings = data.settings;
-                        }
-                    } catch (e) {
-                        console.error('loadControlSettings error:', e);
-                    }
-                },
-
-                async toggleMailingEnabled() {
-                    this.controlSettings.mailingEnabled = !this.controlSettings.mailingEnabled;
-                    await this.saveControlSettings();
-                },
-
-                async toggleStopSpam() {
-                    this.controlSettings.stopSpam = !this.controlSettings.stopSpam;
-                    await this.saveControlSettings();
-                },
-
-                async saveControlSettings() {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/control/settings`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                userId: this.currentUser.id,
-                                settings: this.controlSettings
-                            })
-                        });
-                        const data = await res.json();
-                        if (!data.success) {
-                            alert('Ошибка сохранения настроек');
-                        }
-                    } catch (e) {
-                        console.error('saveControlSettings error:', e);
-                        alert('Ошибка сети при сохранении настроек');
-                    }
-                },
-
-                async activatePanicMode() {
-                    if (!confirm('ВНИМАНИЕ! Это остановит ВСЕ боты немедленно. Продолжить?')) {
-                        return;
-                    }
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/control/panic`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                userId: this.currentUser.id,
-                                activate: !this.controlSettings.panicMode
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            this.controlSettings.panicMode = !this.controlSettings.panicMode;
-                            alert(data.message);
-                            await this.loadBotsStatus();
+                            this.showAssignTranslatorModal = false;
+                            await this.loadTeam();
+                            await this.loadAccounts();
+                            alert(`Анкеты назначены переводчику ${this.selectedTranslatorForAssign.name}`);
                         } else {
-                            alert('Ошибка: ' + (data.error || 'Не удалось активировать panic mode'));
+                            alert('Ошибка: ' + (data.error || 'Не удалось назначить'));
                         }
                     } catch (e) {
-                        console.error('activatePanicMode error:', e);
+                        console.error('saveTranslatorProfiles error:', e);
                         alert('Ошибка сети');
                     }
+                },
+
+                toggleBotStatus(bot) {
+                    bot.status = bot.status === 'active' ? 'inactive' : 'active';
+                    console.log(`Бот ${bot.name} ${bot.status === 'active' ? 'активирован' : 'деактивирован'}`);
+                },
+                
+                saveBotName(bot) {
+                    console.log(`Название бота сохранено: ${bot.name}`);
+                    alert(`Название бота сохранено: ${bot.name}`);
+                },
+                
+                updateAllBots() {
+                    console.log('Обновление всех ботов...');
+                    alert('Все боты обновлены');
+                },
+                
+                syncPromptWithBots() {
+                    console.log('Промт синхронизирован с ботами:', this.generationPrompt);
+                    alert('Промт синхронизирован с ботами');
                 },
 
                 // === Функции экспорта статистики ===
@@ -1756,6 +1339,7 @@
                     csv += `Письма,${this.stats.today.letters || 0},${this.stats.month.letters || 0}\n`;
                     csv += `Чаты,${this.stats.today.chats || 0},${this.stats.month.chats || 0}\n`;
                     csv += `Уникальные мужчины,${this.stats.today.uniqueMen || 0},${this.stats.month.uniqueMen || 0}\n`;
+                    csv += `Доход,$${this.stats.today.income || '0.00'},$${this.stats.month.income || '0.00'}\n`;
                     csv += `\nВремя работы сегодня: ${this.stats.metrics.workTime || '0ч 0м'}\n`;
                     csv += `Время работы за месяц: ${this.stats.metrics.workTimeMonth || '0ч 0м'}\n`;
 
@@ -1764,33 +1348,6 @@
                     const link = document.createElement('a');
                     link.href = URL.createObjectURL(blob);
                     link.download = `nova_stats_${dateFrom}_${dateTo}.csv`;
-                    link.click();
-                },
-
-                exportFavoriteTemplates() {
-                    if (this.favoriteTemplates.length === 0) {
-                        alert('Нет избранных шаблонов для экспорта');
-                        return;
-                    }
-
-                    let content = '=== ИЗБРАННЫЕ ШАБЛОНЫ РАССЫЛКИ ===\n';
-                    content += `Экспорт: ${new Date().toLocaleString('ru-RU')}\n`;
-                    content += `Всего шаблонов: ${this.favoriteTemplates.length}\n`;
-                    content += '=' .repeat(50) + '\n\n';
-
-                    this.favoriteTemplates.forEach((t, i) => {
-                        content += `--- Шаблон #${i + 1} ---\n`;
-                        content += `Название: ${t.templateName || 'Без названия'}\n`;
-                        content += `Анкета: ${t.profileLogin || t.profileId}\n`;
-                        content += `Дата добавления: ${new Date(t.createdAt).toLocaleString('ru-RU')}\n`;
-                        content += `Текст:\n${t.templateText}\n`;
-                        content += '\n' + '-'.repeat(40) + '\n\n';
-                    });
-
-                    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
-                    const link = document.createElement('a');
-                    link.href = URL.createObjectURL(blob);
-                    link.download = `favorite_templates_${new Date().toISOString().slice(0,10)}.txt`;
                     link.click();
                 },
 
@@ -1866,9 +1423,6 @@
                         if (this.historyFilter.admin) {
                             url += `&adminId=${this.historyFilter.admin}`;
                         }
-                        if (this.historyFilter.profileId) {
-                            url += `&profileId=${this.historyFilter.profileId}`;
-                        }
                         const res = await fetch(url);
                         const data = await res.json();
                         if (data.success) {
@@ -1880,18 +1434,6 @@
                     } catch (e) {
                         console.error('loadProfileHistory error:', e);
                         this.profileHistory = [];
-                    }
-                },
-
-                async loadSavedPrompt() {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/prompt`);
-                        const data = await res.json();
-                        if (data.success && data.prompt) {
-                            this.generationPrompt = data.prompt;
-                        }
-                    } catch (e) {
-                        console.error('loadSavedPrompt error:', e);
                     }
                 },
 
@@ -1911,255 +1453,6 @@
                 getProfileActionLabel(actionType) {
                     const actions = this.t('history.actions');
                     return actions[actionType] || actionType;
-                },
-
-                // ========== BILLING FUNCTIONS ==========
-
-                async loadUserBalance() {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/billing/balance/${this.currentUser.id}`);
-                        const data = await res.json();
-                        if (data.success) {
-                            this.userBalance = data.balance || 0;
-                            this.isRestricted = data.isRestricted || false;
-                        }
-                    } catch (e) {
-                        console.error('loadUserBalance error:', e);
-                    }
-                },
-
-                async loadPricing() {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/billing/pricing`);
-                        const data = await res.json();
-                        if (data.success) {
-                            this.pricing = data.pricing;
-                        }
-                    } catch (e) {
-                        console.error('loadPricing error:', e);
-                    }
-                },
-
-                // Открыть модал продления анкеты
-                openExtendModal(account) {
-                    this.extendingProfile = account;
-                    this.selectedDays = 30;
-                    this.showExtendModal = true;
-                },
-
-                // Продлить анкету
-                async extendProfile() {
-                    if (!this.extendingProfile) return;
-
-                    const cost = this.pricing[this.selectedDays] || 0;
-
-                    if (this.userBalance < cost && !this.isRestricted) {
-                        alert(`Недостаточно средств. Нужно: $${cost}, на балансе: $${this.userBalance.toFixed(2)}`);
-                        return;
-                    }
-
-                    try {
-                        const res = await fetch(`${API_BASE}/api/billing/extend-profile`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                profileId: this.extendingProfile.profile_id,
-                                days: this.selectedDays,
-                                userId: this.currentUser.id
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            this.userBalance = data.newBalance;
-                            alert(`Анкета продлена на ${this.selectedDays} дней. Списано: $${data.cost}`);
-                            this.showExtendModal = false;
-                            await this.loadAccounts();
-                        } else {
-                            alert(data.error || 'Ошибка продления');
-                        }
-                    } catch (e) {
-                        console.error('extendProfile error:', e);
-                        alert('Ошибка соединения');
-                    }
-                },
-
-                // Активировать тестовый период
-                async startTrial(account) {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/billing/start-trial`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                profileId: account.profile_id,
-                                userId: this.currentUser.id
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            alert(`Тестовый период активирован (${data.trialDays || 2} дня)`);
-                            await this.loadAccounts();
-                        } else {
-                            alert(data.error || 'Ошибка активации');
-                        }
-                    } catch (e) {
-                        console.error('startTrial error:', e);
-                        alert('Ошибка соединения');
-                    }
-                },
-
-                // Выбор анкет
-                toggleProfileSelection(profileId, checked) {
-                    const id = String(profileId);
-                    if (checked) {
-                        if (!this.selectedProfileIds.includes(id)) {
-                            this.selectedProfileIds.push(id);
-                        }
-                    } else {
-                        this.selectedProfileIds = this.selectedProfileIds.filter(pid => pid !== id);
-                    }
-                },
-
-                toggleSelectAllProfiles(checked) {
-                    if (checked) {
-                        this.selectedProfileIds = this.filteredAccounts.map(a => String(a.id));
-                    } else {
-                        this.selectedProfileIds = [];
-                    }
-                },
-
-                // Назначить выбранные анкеты админу (для директора)
-                async assignSelectedToAdmin(adminId) {
-                    if (this.selectedProfileIds.length === 0) return;
-
-                    try {
-                        const res = await fetch(`${API_BASE}/api/profiles/assign-admin`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                profileIds: this.selectedProfileIds,
-                                adminId: adminId,
-                                userId: this.currentUser.id
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            this.selectedProfileIds = [];
-                            await this.loadAccounts();
-                            alert(adminId ? `Анкеты назначены админу` : 'Назначение снято');
-                        } else {
-                            alert('Ошибка: ' + (data.error || 'Не удалось назначить'));
-                        }
-                    } catch (e) {
-                        console.error('assignSelectedToAdmin error:', e);
-                        alert('Ошибка сети');
-                    }
-                },
-
-                // Назначить выбранные анкеты переводчику (для админа)
-                async assignSelectedToTranslator(translatorId) {
-                    if (this.selectedProfileIds.length === 0) return;
-
-                    try {
-                        const res = await fetch(`${API_BASE}/api/profiles/assign-translator`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                profileIds: this.selectedProfileIds,
-                                translatorId: translatorId,
-                                userId: this.currentUser.id
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            this.selectedProfileIds = [];
-                            await this.loadAccounts();
-                            await this.loadTeam();
-                            alert(translatorId ? `Анкеты назначены переводчику` : 'Назначение снято');
-                        } else {
-                            alert('Ошибка: ' + (data.error || 'Не удалось назначить'));
-                        }
-                    } catch (e) {
-                        console.error('assignSelectedToTranslator error:', e);
-                        alert('Ошибка сети');
-                    }
-                },
-
-                async paySelectedProfiles() {
-                    if (this.selectedProfileIds.length === 0) return;
-
-                    const selectedAccounts = this.accounts.filter(a => this.selectedProfileIds.includes(a.id));
-                    let totalCost = 0;
-                    for (const acc of selectedAccounts) {
-                        const cost = this.pricing[30] || 2; // Стоимость за 30 дней по умолчанию
-                        totalCost += cost;
-                    }
-
-                    if (this.userBalance < totalCost) {
-                        alert(`Недостаточно средств. Нужно: $${totalCost}, на балансе: $${this.userBalance.toFixed(2)}`);
-                        return;
-                    }
-
-                    if (!confirm(`Оплатить ${this.selectedProfileIds.length} анкет на 30 дней за $${totalCost}?`)) return;
-
-                    try {
-                        let successCount = 0;
-                        for (const profileId of this.selectedProfileIds) {
-                            const res = await fetch(`${API_BASE}/api/billing/pay`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    profileId: profileId,
-                                    days: 30,
-                                    userId: this.currentUser.id
-                                })
-                            });
-                            const data = await res.json();
-                            if (data.success) successCount++;
-                        }
-
-                        alert(`Оплачено ${successCount} из ${this.selectedProfileIds.length} анкет`);
-                        this.selectedProfileIds = [];
-                        await this.loadAccounts();
-                        await this.loadUserBalance();
-                    } catch (e) {
-                        console.error('paySelectedProfiles error:', e);
-                        alert('Ошибка оплаты');
-                    }
-                },
-
-                // Открыть модал пополнения баланса (для директора)
-                openTopupModal(userId) {
-                    this.topupUserId = userId;
-                    this.topupAmount = 10;
-                    this.showTopupModal = true;
-                },
-
-                // Пополнить баланс пользователя
-                async topupBalance() {
-                    if (!this.topupUserId || !this.topupAmount || this.topupAmount <= 0) return;
-
-                    try {
-                        const res = await fetch(`${API_BASE}/api/billing/topup`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                userId: this.topupUserId,
-                                amount: this.topupAmount,
-                                byUserId: this.currentUser.id
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            alert(`Баланс пополнен. Новый баланс: $${data.newBalance.toFixed(2)}`);
-                            this.showTopupModal = false;
-                            await this.loadTeam();
-                        } else {
-                            alert(data.error || 'Ошибка пополнения');
-                        }
-                    } catch (e) {
-                        console.error('topupBalance error:', e);
-                        alert('Ошибка соединения');
-                    }
                 },
 
                 // Сбросить настройки пользователя
@@ -2229,70 +1522,45 @@
                     }
                 },
 
-                // Получить класс для статуса оплаты
-                getPaymentStatusClass(account) {
-                    if (account.isFree) return 'text-green-600';
-                    if (!account.isPaid) return 'text-red-600';
-                    if (account.daysLeft <= 3) return 'text-orange-500';
-                    return 'text-green-600';
+                // ========== ФИНАНСЫ (только для директора) ==========
+                get financeAdminsTotalBalance() {
+                    return this.financeAdmins.reduce((sum, admin) => sum + (admin.balance || 0), 0);
                 },
 
-                // Получить текст статуса оплаты
-                getPaymentStatusText(account) {
-                    if (account.isFree) return 'Бесплатно';
-                    if (!account.isPaid) {
-                        if (account.trialUsed) return 'Истёк';
-                        return 'Не оплачено';
-                    }
-                    if (account.isTrial) return `Trial: ${account.daysLeft} дн.`;
-                    return `${account.daysLeft} дн.`;
+                get combinedFinanceHistory() {
+                    const topups = this.financeHistory.map((h, i) => ({
+                        ...h,
+                        type: 'topup',
+                        uniqueId: 'topup_' + i,
+                        createdAt: h.created_at
+                    }));
+                    return topups.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
                 },
 
-                // ========== FINANCE FUNCTIONS (только для директора) ==========
-
-                // Загрузить данные финансов
                 async loadFinanceData() {
                     if (this.currentUser.role !== 'director') return;
-
                     try {
-                        // Загружаем список админов для пополнения
-                        const adminsRes = await fetch(`${API_BASE}/api/billing/admins?userId=${this.currentUser.id}`);
+                        const adminsRes = await fetch(`${API_BASE}/api/billing/admins`);
                         const adminsData = await adminsRes.json();
                         if (adminsData.success) {
-                            this.financeAdmins = adminsData.admins;
+                            this.financeAdmins = adminsData.admins || [];
                         }
-
-                        // Загружаем историю пополнений админов
-                        const historyRes = await fetch(`${API_BASE}/api/billing/history?userId=${this.currentUser.id}&limit=100`);
+                        const historyRes = await fetch(`${API_BASE}/api/billing/history`);
                         const historyData = await historyRes.json();
                         if (historyData.success) {
-                            this.financeHistory = historyData.history;
-                            this.financeTotalSum = historyData.totalSum;
-                        }
-
-                        // Загружаем историю оплаты анкет
-                        const profileHistoryRes = await fetch(`${API_BASE}/api/billing/profile-payment-history?userId=${this.currentUser.id}&limit=100`);
-                        const profileHistoryData = await profileHistoryRes.json();
-                        if (profileHistoryData.success) {
-                            this.profilePaymentHistory = profileHistoryData.history;
+                            this.financeHistory = historyData.history || [];
+                            this.financeTotalSum = historyData.totalSum || 0;
                         }
                     } catch (e) {
                         console.error('loadFinanceData error:', e);
                     }
                 },
 
-                // Вычисляемое свойство: общий баланс всех админов
-                get financeAdminsTotalBalance() {
-                    return this.financeAdmins.reduce((sum, admin) => sum + admin.balance, 0);
-                },
-
-                // Отправить пополнение
                 async submitFinanceTopup() {
                     if (!this.financeTopup.adminId || !this.financeTopup.amount || this.financeTopup.amount <= 0) {
                         alert('Выберите админа и введите сумму');
                         return;
                     }
-
                     try {
                         const res = await fetch(`${API_BASE}/api/billing/topup`, {
                             method: 'POST',
@@ -2307,17 +1575,11 @@
                         const data = await res.json();
                         if (data.success) {
                             const admin = this.financeAdmins.find(a => a.id == this.financeTopup.adminId);
-                            const adminName = admin ? admin.name : 'Админ';
-                            alert(`Баланс ${adminName} пополнен на $${this.financeTopup.amount}.\nНовый баланс: $${data.newBalance.toFixed(2)}`);
-
-                            // Сбрасываем форму
+                            alert(`Баланс ${admin?.name || 'Админ'} пополнен на $${this.financeTopup.amount}`);
                             this.financeTopup = { adminId: '', amount: 10, note: '' };
-
-                            // Обновляем данные
                             await this.loadFinanceData();
-                            await this.loadTeam();
                         } else {
-                            alert(data.error || 'Ошибка пополнения');
+                            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
                         }
                     } catch (e) {
                         console.error('submitFinanceTopup error:', e);
@@ -2325,13 +1587,11 @@
                     }
                 },
 
-                // Оплатить анкету (директор)
                 async submitProfilePayment() {
                     if (!this.profilePayment.profileId || !this.profilePayment.days) {
                         alert('Введите ID анкеты и выберите период');
                         return;
                     }
-
                     try {
                         const res = await fetch(`${API_BASE}/api/billing/pay-profile`, {
                             method: 'POST',
@@ -2350,7 +1610,7 @@
                             await this.loadFinanceData();
                             await this.loadAccounts();
                         } else {
-                            alert(data.error || 'Ошибка оплаты');
+                            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
                         }
                     } catch (e) {
                         console.error('submitProfilePayment error:', e);
@@ -2358,40 +1618,22 @@
                     }
                 },
 
-                // Убрать оплату с анкеты (директор)
-                async removeProfilePayment() {
-                    if (!this.profilePayment.profileId) {
-                        alert('Введите ID анкеты');
-                        return;
-                    }
-
-                    if (!confirm(`Убрать оплату с анкеты ${this.profilePayment.profileId}?`)) return;
-
+                async deleteAdmin(admin) {
+                    if (!confirm(`Удалить админа "${admin.name}"?`)) return;
                     try {
-                        const res = await fetch(`${API_BASE}/api/billing/remove-payment`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                profileId: this.profilePayment.profileId,
-                                byUserId: this.currentUser.id
-                            })
-                        });
+                        const res = await fetch(`${API_BASE}/api/users/${admin.id}`, { method: 'DELETE' });
                         const data = await res.json();
                         if (data.success) {
-                            alert(`Оплата с анкеты ${this.profilePayment.profileId} снята`);
-                            this.profilePayment = { profileId: '', days: 30, note: '' };
-                            await this.loadFinanceData();
-                            await this.loadAccounts();
+                            await this.loadTeam();
+                            alert('Админ удален');
                         } else {
-                            alert(data.error || 'Ошибка');
+                            alert('Ошибка: ' + (data.error || 'Неизвестная ошибка'));
                         }
                     } catch (e) {
-                        console.error('removeProfilePayment error:', e);
+                        console.error('deleteAdmin error:', e);
                         alert('Ошибка соединения');
                     }
                 },
-
-                // ========== END BILLING FUNCTIONS ==========
 
                 logout() {
                     // Очищаем данные авторизации

@@ -23,7 +23,3 @@ Thumbs.db
 # Build
 dist/
 build/
-
-# Backup files
-Server/backup_before_merge/
-Bot/Sound/1
