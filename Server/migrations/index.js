@@ -290,6 +290,26 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_fav_tpl_translator ON favorite_templates(translator_id)`);
         await fixSerialSequence('favorite_templates');
 
+        // 13.1. Таблица данных бота для анкеты (шаблоны, blacklist, статистика)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS profile_bot_data (
+                id SERIAL PRIMARY KEY,
+                profile_id VARCHAR(50) UNIQUE NOT NULL,
+                templates_mail JSONB DEFAULT '[]',
+                templates_chat JSONB DEFAULT '[]',
+                blacklist_mail JSONB DEFAULT '[]',
+                blacklist_chat JSONB DEFAULT '[]',
+                stats_mail_sent INTEGER DEFAULT 0,
+                stats_mail_errors INTEGER DEFAULT 0,
+                stats_chat_sent INTEGER DEFAULT 0,
+                stats_chat_errors INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW()
+            )
+        `);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_profile_bot_data_profile_id ON profile_bot_data(profile_id)`);
+        await fixSerialSequence('profile_bot_data');
+
         // 14. Таблица истории действий с анкетами
         await pool.query(`
             CREATE TABLE IF NOT EXISTS profile_actions (

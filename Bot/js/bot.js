@@ -230,6 +230,111 @@
             }
         }
 
+        // ============= API ДЛЯ РАБОТЫ С ДАННЫМИ БОТА (шаблоны, blacklist, статистика) =============
+
+        // Загрузка данных бота с сервера
+        async function loadBotDataFromServer(profileId) {
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}`);
+                const result = await response.json();
+                if (result.success) {
+                    console.log(`📥 Данные бота загружены для ${profileId}:`, result.data);
+                    return result.data;
+                }
+                return null;
+            } catch (error) {
+                console.error(`❌ Ошибка загрузки данных бота:`, error);
+                return null;
+            }
+        }
+
+        // Сохранение шаблонов на сервер
+        async function saveTemplatesToServer(profileId, type, templates) {
+            try {
+                const body = type === 'chat'
+                    ? { templatesChat: templates }
+                    : { templatesMail: templates };
+
+                const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const result = await response.json();
+                console.log(`💾 Шаблоны ${type} сохранены для ${profileId}`);
+                return result.success;
+            } catch (error) {
+                console.error(`❌ Ошибка сохранения шаблонов:`, error);
+                return false;
+            }
+        }
+
+        // Сохранение blacklist на сервер
+        async function saveBlacklistToServer(profileId, type, blacklist) {
+            try {
+                const body = type === 'chat'
+                    ? { blacklistChat: blacklist }
+                    : { blacklistMail: blacklist };
+
+                const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const result = await response.json();
+                console.log(`🚫 Blacklist ${type} сохранён для ${profileId}`);
+                return result.success;
+            } catch (error) {
+                console.error(`❌ Ошибка сохранения blacklist:`, error);
+                return false;
+            }
+        }
+
+        // Увеличение счётчика статистики на сервере
+        async function incrementStatsOnServer(profileId, type, field, amount = 1) {
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}/increment-stats`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, field, amount })
+                });
+                const result = await response.json();
+                return result.success;
+            } catch (error) {
+                console.error(`❌ Ошибка обновления статистики:`, error);
+                return false;
+            }
+        }
+
+        // Сброс статистики на сервере
+        async function resetStatsOnServer(profileId, type) {
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}/reset-stats`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type })
+                });
+                const result = await response.json();
+                console.log(`🔄 Статистика ${type} сброшена для ${profileId}`);
+                return result.success;
+            } catch (error) {
+                console.error(`❌ Ошибка сброса статистики:`, error);
+                return false;
+            }
+        }
+
+        // Debounce для автосохранения (3 секунды)
+        const saveDebounceTimers = {};
+        function debounceSaveTemplate(profileId, type, templates, delay = 3000) {
+            const key = `${profileId}_${type}`;
+            if (saveDebounceTimers[key]) {
+                clearTimeout(saveDebounceTimers[key]);
+            }
+            saveDebounceTimers[key] = setTimeout(() => {
+                saveTemplatesToServer(profileId, type, templates);
+            }, delay);
+        }
+
         // 5. Функция проверки статуса профиля (paused и allowed)
         async function checkProfileStatus(profileId) {
             try {
@@ -1513,6 +1618,85 @@
                 }
             }
 
+            // === ЗАГРУЗКА ДАННЫХ С СЕРВЕРА ===
+
+            // Обновление статистики с отправкой на сервер (debounced)
+            incrementStat(type, field) {
+                // type: 'mail' или 'chat'
+                // field: 'sent' или 'errors'
+                const stats = type === 'mail' ? this.mailStats : this.chatStats;
+                stats[field]++;
+                this.updateUI();
+
+                // Debounced сохранение на сервер
+                this.scheduleStatsSync();
+            }
+
+            // Планирование синхронизации статистики (debounce 2 сек)
+            scheduleStatsSync() {
+                if (this.statsSyncTimer) clearTimeout(this.statsSyncTimer);
+                this.statsSyncTimer = setTimeout(() => {
+                    this.syncStatsToServer();
+                }, 2000);
+            }
+
+            // Синхронизация статистики на сервер
+            async syncStatsToServer() {
+                try {
+                    const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(this.displayId)}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            statsMailSent: this.mailStats.sent,
+                            statsMailErrors: this.mailStats.errors,
+                            statsChatSent: this.chatStats.sent,
+                            statsChatErrors: this.chatStats.errors
+                        })
+                    });
+                    console.log(`📊 Статистика синхронизирована для ${this.displayId}`);
+                } catch (error) {
+                    console.error(`❌ Ошибка синхронизации статистики:`, error);
+                }
+            }
+
+            // Метод для загрузки данных с сервера (шаблоны, blacklist, статистика)
+            loadFromServerData(serverData) {
+                if (!serverData) return;
+
+                // Загружаем шаблоны
+                if (serverData.templatesMail && serverData.templatesMail.length > 0) {
+                    if (!botTemplates[this.login]) botTemplates[this.login] = { mail: [], chat: [] };
+                    botTemplates[this.login].mail = serverData.templatesMail;
+                }
+                if (serverData.templatesChat && serverData.templatesChat.length > 0) {
+                    if (!botTemplates[this.login]) botTemplates[this.login] = { mail: [], chat: [] };
+                    botTemplates[this.login].chat = serverData.templatesChat;
+                }
+
+                // Загружаем blacklist
+                if (serverData.blacklistMail && serverData.blacklistMail.length > 0) {
+                    this.mailSettings.blacklist = serverData.blacklistMail;
+                }
+                if (serverData.blacklistChat && serverData.blacklistChat.length > 0) {
+                    this.chatSettings.blacklist = serverData.blacklistChat;
+                }
+
+                // Загружаем статистику
+                this.mailStats.sent = serverData.statsMailSent || 0;
+                this.mailStats.errors = serverData.statsMailErrors || 0;
+                this.chatStats.sent = serverData.statsChatSent || 0;
+                this.chatStats.errors = serverData.statsChatErrors || 0;
+
+                console.log(`📥 Данные загружены для ${this.displayId}:`, {
+                    mailTemplates: botTemplates[this.login]?.mail?.length || 0,
+                    chatTemplates: botTemplates[this.login]?.chat?.length || 0,
+                    mailBlacklist: this.mailSettings.blacklist.length,
+                    chatBlacklist: this.chatSettings.blacklist.length,
+                    mailStats: this.mailStats,
+                    chatStats: this.chatStats
+                });
+            }
+
             // === МЕТОДЫ ДЛЯ ОТСЛЕЖИВАНИЯ ДИАЛОГОВ (полная спецификация) ===
 
             // Инициализация или обновление диалога с получателем
@@ -1995,7 +2179,7 @@
                             this.usedAi = false;
                         }
 
-                        this.mailStats.sent++;
+                        this.incrementStat('mail', 'sent');
                         this.mailHistory.sent.push(`${user.AccountId} (${user.Name})`);
                         this.log(`✅ Письмо отправлено: ${user.Name}`);
 
@@ -2007,7 +2191,7 @@
                     } else {
                         // Нет CheckId - считаем как ошибку
                         const errorReason = checkRes.data?.Message || checkRes.data?.Error || 'нет CheckId';
-                        this.mailStats.errors++;
+                        this.incrementStat('mail', 'errors');
                         this.mailHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                         this.log(`❌ Ошибка: не могу отправить письмо ${user.Name} (${user.AccountId}): ${errorReason}`);
 
@@ -2058,7 +2242,7 @@
                     } else if (e.response && e.response.status === 403) {
                         // 403 = пользователь заблокирован или ограничение - СЧИТАЕМ КАК ОШИБКУ
                         const errorReason = e.response?.data?.Error || e.response?.data?.Message || 'Доступ запрещён (403)';
-                        this.mailStats.errors++;
+                        this.incrementStat('mail', 'errors');
                         this.mailHistory.errors.push(`${user?.AccountId || 'unknown'}: ${errorReason}`);
                         this.log(`❌ Ошибка: ${user?.Name || user?.AccountId || 'unknown'} - ${errorReason}`);
 
@@ -2107,7 +2291,7 @@
                             } catch (err) { console.error('sendMessageToLababot failed:', err); }
                         }
                     } else {
-                        this.mailStats.errors++;
+                        this.incrementStat('mail', 'errors');
                         this.mailHistory.errors.push(e.message);
 
                         // Добавляем в очередь повторов
@@ -2344,7 +2528,7 @@
                             this.usedAi = false;
                         }
 
-                        this.chatStats.sent++;
+                        this.incrementStat('chat', 'sent');
                         this.chatHistory.sent.push(`${user.AccountId} (${user.Name})`);
                         this.log(`💬 Сообщение чата отправлено: ${user.Name}`);
 
@@ -2397,7 +2581,7 @@
                                     console.warn(`⚠️ Не удалось отправить статистику на Lababot (fallback): ${lababotResult.error}`);
                                 }
                                 
-                                this.chatStats.sent++;
+                                this.incrementStat('chat', 'sent');
                                 this.chatHistory.sent.push(`${user.AccountId} (${user.Name})`);
                                 this.log(`💬 Сообщение отправлено через письмо (fallback): ${user.Name}`);
 
@@ -2409,7 +2593,7 @@
                             } else {
                                 // Нет CheckId в fallback - СЧИТАЕМ КАК ОШИБКУ
                                 const errorReason = checkRes.data?.Message || checkRes.data?.Error || 'нет CheckId (fallback)';
-                                this.chatStats.errors++;
+                                this.incrementStat('chat', 'errors');
                                 this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                                 this.log(`❌ Ошибка: не могу отправить чат ${user.Name} (${user.AccountId}): ${errorReason}`);
 
@@ -2456,7 +2640,7 @@
                             } else {
                                 // СЧИТАЕМ КАК ОШИБКУ
                                 const errorReason = fallbackErr.response?.data?.Error || fallbackErr.message;
-                                this.chatStats.errors++;
+                                this.incrementStat('chat', 'errors');
                                 this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                                 this.log(`❌ Ошибка API чата: ${errorReason}`);
 
@@ -2507,7 +2691,7 @@
                     if(e.message === "Network Error" || !e.response) {
                         this.log(`📡 Ошибка сети. Повтор...`);
                     } else {
-                        this.chatStats.errors++;
+                        this.incrementStat('chat', 'errors');
                         this.chatHistory.errors.push(e.message);
 
                         // Добавляем в очередь повторов
@@ -2627,7 +2811,7 @@
                     </div>
                     </div>
                     <div class="relative-box d-flex flex-column flex-grow-1">
-                        <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." oninput="checkVarTrigger(this, 'vars-dropdown-${bot.id}'); bots['${bot.id}'].updateUI(); validateInput(this)"></textarea>
+                        <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." oninput="checkVarTrigger(this, 'vars-dropdown-${bot.id}'); bots['${bot.id}'].updateUI(); validateInput(this); autoSaveTemplateText('${bot.id}')" onblur="saveTemplateTextNow('${bot.id}')"></textarea>
                         <div id="vars-dropdown-${bot.id}" class="vars-dropdown">
                             <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{City}', 'vars-dropdown-${bot.id}')"><b>{City}</b></div>
                             <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{Name}', 'vars-dropdown-${bot.id}')"><b>{Name}</b></div>
@@ -3027,19 +3211,58 @@
             }
         }
 
+        // Таймеры для debounce автосохранения текста
+        const autoSaveTimers = {};
+
+        // Автосохранение текста шаблона (debounce 3 сек)
+        function autoSaveTemplateText(botId) {
+            if (autoSaveTimers[botId]) clearTimeout(autoSaveTimers[botId]);
+            autoSaveTimers[botId] = setTimeout(() => {
+                saveTemplateTextNow(botId);
+            }, 3000);
+        }
+
+        // Немедленное сохранение текста шаблона (при blur или по таймеру)
+        async function saveTemplateTextNow(botId) {
+            const bot = bots[botId];
+            if (!bot) return;
+
+            const isChat = globalMode === 'chat';
+            const type = isChat ? 'chat' : 'mail';
+            const sel = document.getElementById(`tpl-select-${botId}`);
+            const textarea = document.getElementById(`msg-${botId}`);
+
+            if (!sel || !textarea || sel.value === '') return;
+
+            const idx = parseInt(sel.value);
+            const tpls = getBotTemplates(bot.login)[type];
+
+            if (tpls[idx]) {
+                // Обновляем текст в шаблоне
+                tpls[idx].text = textarea.value;
+
+                // Сохраняем в localStorage
+                localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+
+                // Сохраняем на сервер
+                await saveTemplatesToServer(bot.displayId, type, tpls);
+                console.log(`💾 Текст шаблона автосохранён для ${bot.displayId}`);
+            }
+        }
+
         async function saveTemplateFromModal() {
             const name = document.getElementById('tpl-modal-name').value;
             const text = document.getElementById('tpl-modal-text').value;
             if (!name) return;
-            
+
             const bot = bots[currentModalBotId];
             const isChat = globalMode === 'chat';
             const type = isChat ? 'chat' : 'mail';
-            
+
             try {
                 // 1. Сохраняем в localStorage
                 let tpls = getBotTemplates(bot.login)[type];
-                
+
                 if (editingTemplateIndex !== null) {
                     const fav = tpls[editingTemplateIndex]?.favorite || false;
                     tpls[editingTemplateIndex] = { name, text, favorite: fav };
@@ -3047,13 +3270,16 @@
                     tpls.push({ name, text, favorite: false });
                     editingTemplateIndex = tpls.length - 1;
                 }
-                
-                // 2. Сохраняем в localStorage
+
+                // 2. Сохраняем в localStorage (для обратной совместимости)
                 localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
-                
+
+                // 3. ВАЖНО: Сохраняем на сервер
+                await saveTemplatesToServer(bot.displayId, type, tpls);
+
                 updateTemplateDropdown(bot.id, editingTemplateIndex);
                 closeModal('tpl-modal');
-                
+
             } catch (error) {
                 console.error('Error saving template:', error);
                 alert('Ошибка сохранения шаблона');
@@ -3155,21 +3381,35 @@
             }
         }
 
-        function deleteTemplate(botId) {
+        async function deleteTemplate(botId) {
             const isChat = globalMode === 'chat';
+            const type = isChat ? 'chat' : 'mail';
             const bot = bots[botId];
-            let tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
-            const idx=document.getElementById(`tpl-select-${botId}`).value;
-            if(idx!=="" && confirm("Удалить?")) { tpls.splice(idx,1); localStorage.setItem('botTemplates', JSON.stringify(botTemplates)); updateTemplateDropdown(botId); onTemplateSelect(botId); }
+            let tpls = getBotTemplates(bot.login)[type];
+            const idx = document.getElementById(`tpl-select-${botId}`).value;
+            if (idx !== "" && confirm("Удалить?")) {
+                tpls.splice(idx, 1);
+                localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+                // Сохраняем на сервер
+                await saveTemplatesToServer(bot.displayId, type, tpls);
+                updateTemplateDropdown(botId);
+                onTemplateSelect(botId);
+            }
         }
 
         function openBlacklistModal(botId) { currentModalBotId=botId; document.getElementById('bl-modal-input').value=''; openModal('bl-modal'); }
-        function saveBlacklistID() {
+        async function saveBlacklistID() {
             const val = document.getElementById('bl-modal-input').value.trim();
             if(val && currentModalBotId) {
                 const bot = bots[currentModalBotId];
-                const list = globalMode === 'chat' ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
-                if(!list.includes(val)) { list.push(val); renderBlacklist(currentModalBotId); }
+                const isChat = globalMode === 'chat';
+                const list = isChat ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
+                if(!list.includes(val)) {
+                    list.push(val);
+                    renderBlacklist(currentModalBotId);
+                    // Сохраняем на сервер
+                    await saveBlacklistToServer(bot.displayId, isChat ? 'chat' : 'mail', list);
+                }
             }
             closeModal('bl-modal');
         }
@@ -3198,14 +3438,18 @@
             });
         }
         
-        function removeSelectedBlacklist(botId) {
+        async function removeSelectedBlacklist(botId) {
             const bot = bots[botId]; const s = bot.selectedBlacklistId;
-            if(s) { 
-                if(globalMode==='chat') bot.chatSettings.blacklist=bot.chatSettings.blacklist.filter(x=>x!==s); 
-                else bot.mailSettings.blacklist=bot.mailSettings.blacklist.filter(x=>x!==s); 
+            if(s) {
+                const isChat = globalMode === 'chat';
+                if(isChat) bot.chatSettings.blacklist = bot.chatSettings.blacklist.filter(x=>x!==s);
+                else bot.mailSettings.blacklist = bot.mailSettings.blacklist.filter(x=>x!==s);
                 bot.vipList = bot.vipList.filter(x=>x!==s);
-                bot.selectedBlacklistId=null; 
-                renderBlacklist(botId); 
+                bot.selectedBlacklistId = null;
+                renderBlacklist(botId);
+                // Сохраняем на сервер
+                const list = isChat ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
+                await saveBlacklistToServer(bot.displayId, isChat ? 'chat' : 'mail', list);
             }
         }
 
@@ -3250,18 +3494,28 @@
             const e=document.getElementById('loginError'); const s=document.getElementById('loginSpinner'); if(s) s.style.display='inline-block';
             try {
                 const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: login, Password: pass });
-                
+
                 if(res.data.Token) {
                     const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
                     const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
-                    bots[bid] = bot; createInterface(bot); selectTab(bid); saveSession(); 
-                    
+                    bots[bid] = bot; createInterface(bot); selectTab(bid); saveSession();
+
+                    // Загружаем данные с сервера (шаблоны, blacklist, статистику)
+                    const serverData = await loadBotDataFromServer(displayId);
+                    if (serverData) {
+                        bot.loadFromServerData(serverData);
+                        bot.updateUI();
+                        updateTemplateDropdown(bid);
+                        renderBlacklist(bid);
+                        console.log(`✅ Данные загружены с сервера для ${displayId}`);
+                    }
+
                     // Отправляем первый heartbeat после создания бота
                     setTimeout(() => sendHeartbeatToLababot(bid, displayId, 'online'), 2000);
                     return true;
                 }
-            } catch(err) { 
-                if(e) e.innerText = err.response ? (err.response.data.Error || `Ошибка входа: ${err.response.status}`) : "Ошибка входа. Проверьте Proxy для Ladadate."; 
+            } catch(err) {
+                if(e) e.innerText = err.response ? (err.response.data.Error || `Ошибка входа: ${err.response.status}`) : "Ошибка входа. Проверьте Proxy для Ladadate.";
             }
             finally { if(s) s.style.display='none'; }
             return false;
@@ -3356,6 +3610,11 @@
         }
 
         function selectTab(id) {
+            // ВАЖНО: Сохраняем текст текущей вкладки перед переключением
+            if (activeTabId && bots[activeTabId]) {
+                saveTemplateTextNow(activeTabId);
+            }
+
             document.querySelectorAll('.tab-item').forEach(t=>t.classList.remove('active'));
             document.querySelectorAll('.workspace').forEach(w=>w.classList.remove('active'));
             // ВАЖНО: Деактивируем/Активируем webview, но они остаются за экраном
@@ -3364,11 +3623,11 @@
             const t=document.getElementById(`tab-${id}`); const w=document.getElementById(`ws-${id}`);
             const wv=document.getElementById(`webview-${id}`);
 
-            if(t&&w) { 
-                t.classList.add('active'); 
-                w.classList.add('active'); 
-                activeTabId=id; 
-                updateInterfaceForMode(id); 
+            if(t&&w) {
+                t.classList.add('active');
+                w.classList.add('active');
+                activeTabId=id;
+                updateInterfaceForMode(id);
             }
             
             if(wv) wv.classList.add('active'); // Активируем процесс (попадает под стили position: fixed)
@@ -3422,13 +3681,21 @@
             });
         }
         function stopAll() { Object.values(bots).forEach(b => { if (globalMode === 'chat') b.stopChat(); else b.stopMail(); }); }
-        function clearAllStats() {
+        async function clearAllStats() {
             if(!confirm("Очистить статистику на ВСЕХ анкетах?")) return;
-            Object.values(bots).forEach(b => {
-                if (globalMode === 'chat') { b.chatStats={sent:0,errors:0,waiting:0}; b.chatHistory={sent:[],errors:[],waiting:[]}; }
-                else { b.mailStats={sent:0,errors:0,waiting:0}; b.mailHistory={sent:[],errors:[],waiting:[]}; }
+            const type = globalMode === 'chat' ? 'chat' : 'mail';
+            for (const b of Object.values(bots)) {
+                if (globalMode === 'chat') {
+                    b.chatStats = {sent:0, errors:0, waiting:0};
+                    b.chatHistory = {sent:[], errors:[], waiting:[]};
+                } else {
+                    b.mailStats = {sent:0, errors:0, waiting:0};
+                    b.mailHistory = {sent:[], errors:[], waiting:[]};
+                }
                 b.updateUI();
-            });
+                // Сбрасываем на сервере
+                await resetStatsOnServer(b.displayId, type);
+            }
         }
         // Показать загрузку на вкладке
         function showTabLoading(botId) {
