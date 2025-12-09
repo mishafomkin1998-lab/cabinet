@@ -1698,6 +1698,15 @@
 
             // Обновляем ВСЕ открытые вкладки для нового режима
             Object.keys(bots).forEach(botId => {
+                const bot = bots[botId];
+                const textarea = document.getElementById(`msg-${botId}`);
+
+                // КРИТИЧНО: Явно устанавливаем текст для НОВОГО режима
+                if (textarea) {
+                    const newModeText = globalMode === 'chat' ? bot.currentChatText : bot.currentMailText;
+                    console.log(`[toggleMode] ${botId}: новый режим ${globalMode}, текст="${(newModeText || '').substring(0,30)}..."`);
+                }
+
                 updateInterfaceForMode(botId, true);
             });
         }
@@ -3581,7 +3590,8 @@
             const idx = document.getElementById(`tpl-select-${botId}`).value;
             if(idx === "") return;
             const bot = bots[botId];
-            const tpls = getBotTemplates(bot.login)['mail'];
+            const isChat = globalMode === 'chat';
+            const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
             if(tpls[idx]) {
                 const wasNotFavorite = !tpls[idx].favorite;
                 tpls[idx].favorite = wasNotFavorite;
