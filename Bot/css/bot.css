@@ -1254,3 +1254,13 @@
         .bl-actions { display: flex; gap: 5px; margin-top: 8px; }
         .btn-vip { background: #ffc107; border: 1px solid #e0a800; color: #000; }
         .btn-vip:hover { background: #e0a800; }
+
+        /* === Анимации для массовых уведомлений === */
+        @keyframes bulkNotifIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+            to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        @keyframes bulkNotifOut {
+            from { opacity: 1; transform: translateX(-50%) translateY(0); }
+            to { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        }

@@ -1152,7 +1152,14 @@
             }
         }
 
-        async function handleAIAction(botId, action) {
+        async function handleAIAction(botId, action, event) {
+            // Shift + клик = генерация для всех анкет
+            if (event && event.shiftKey) {
+                document.getElementById(`ai-options-${botId}`).classList.remove('show');
+                await generateAIForAll(action);
+                return;
+            }
+
             document.getElementById(`ai-options-${botId}`).classList.remove('show');
             const btn = document.querySelector(`#ai-options-${botId}`).parentElement.querySelector('.btn-ai-main');
             const originalHtml = btn.innerHTML;
@@ -1225,6 +1232,74 @@
             } finally {
                 btn.innerHTML = originalHtml;
             }
+        }
+
+        // Генерация AI текста для ВСЕХ анкет (параллельно, разные тексты)
+        async function generateAIForAll(action) {
+            if(!globalSettings.apiKey) return alert("Пожалуйста, введите OpenAI API Key в настройках!");
+
+            const botIds = Object.keys(bots);
+            if (botIds.length === 0) return;
+
+            const actionLabel = action === 'improve' ? 'Improve' : action === 'generate' ? 'Generate' : 'My Prompt';
+            showBulkNotification(`AI ${actionLabel} запущен для всех...`, botIds.length);
+
+            let config = { headers: { 'Authorization': `Bearer ${globalSettings.apiKey}`, 'Content-Type': 'application/json' } };
+            if (globalSettings.proxyAI) {
+                const proxyConfig = parseProxyUrl(globalSettings.proxyAI);
+                if (proxyConfig) config.proxy = proxyConfig;
+            }
+
+            const systemRole = "You are a helpful dating assistant. Write engaging, short, and natural texts for dating sites.";
+            let successCount = 0;
+
+            // Генерируем для каждой анкеты последовательно чтобы не перегрузить API
+            for (const botId of botIds) {
+                const bot = bots[botId];
+                const txtArea = document.getElementById(`msg-${botId}`);
+                if (!txtArea) continue;
+
+                const currentText = txtArea.value;
+                let prompt = "";
+
+                if(action === 'myprompt') {
+                    if(!globalSettings.myPrompt) continue;
+                    prompt = `${globalSettings.myPrompt}. \n\nOriginal text: "${currentText}"`;
+                } else if (action === 'improve') {
+                    if(!currentText) continue;
+                    prompt = `Rewrite the following text to be more engaging, grammatically correct, and flirtatious. Keep it natural. Text: "${currentText}"`;
+                } else if (action === 'generate') {
+                    // Каждый раз генерируем уникальный текст
+                    prompt = "Write a creative and engaging opening message for a dating site to start a conversation with a man. Keep it short and intriguing. Be unique and creative.";
+                }
+
+                if (!prompt) continue;
+
+                try {
+                    const response = await axios.post(OPENAI_API_ENDPOINT, {
+                        model: "gpt-3.5-turbo",
+                        messages: [ { role: "system", content: systemRole }, { role: "user", content: prompt } ],
+                        temperature: 0.9 // Больше разнообразия
+                    }, config);
+
+                    if(response.data && response.data.choices && response.data.choices.length > 0) {
+                        const result = response.data.choices[0].message.content.replace(/^"|"$/g, '');
+                        txtArea.value = result;
+                        if (bot) {
+                            bot.usedAi = true;
+                        }
+                        validateInput(txtArea);
+                        successCount++;
+                    }
+                } catch (e) {
+                    console.error(`AI error for bot ${botId}:`, e);
+                }
+
+                // Небольшая задержка между запросами
+                await new Promise(r => setTimeout(r, 300));
+            }
+
+            showBulkNotification(`AI ${actionLabel} выполнен`, successCount);
         }
 
         function validateInput(textarea) {
@@ -2786,9 +2861,9 @@
                     <div class="col-title" id="title-tpl-${bot.id}">Шаблоны Писем</div>
                     <select id="tpl-select-${bot.id}" class="form-select mb-2" onchange="onTemplateSelect('${bot.id}')"><option value="">-- Выберите --</option></select>
                     <div class="d-flex gap-1 mb-2">
-                        <button class="btn btn-sm btn-success btn-xs flex-fill" onclick="addTemplateInline('${bot.id}')" data-tip="Новый шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-success btn-xs flex-fill" onclick="addTemplateInline('${bot.id}', event)" data-tip="Новый шаблон (Shift=всем)"><i class="fa fa-plus"></i></button>
                         <button class="btn btn-sm btn-secondary btn-xs flex-fill" onclick="openTemplateModal('${bot.id}', true)" data-tip="Редактировать"><i class="fa fa-edit"></i></button>
-                        <button class="btn btn-sm btn-danger btn-xs flex-fill" onclick="deleteTemplate('${bot.id}')" data-tip="Удалить"><i class="fa fa-trash"></i></button>
+                        <button class="btn btn-sm btn-danger btn-xs flex-fill" onclick="deleteTemplate('${bot.id}', event)" data-tip="Удалить (Shift=всем)"><i class="fa fa-trash"></i></button>
                         <button class="btn btn-sm btn-outline-danger btn-xs flex-fill hide-in-chat" id="btn-fav-${bot.id}" onclick="toggleTemplateFavorite('${bot.id}')" data-tip="В избранное"><i class="fa fa-heart"></i></button>
                     </div>
                     <div class="mt-2 text-center text-primary border-top pt-2"><small>Онлайн: <b id="online-${bot.id}" class="fs-6">...</b></small></div>
@@ -2804,9 +2879,9 @@
                         <div class="ai-container ${globalSettings.extendedFeatures ? '' : 'ai-hidden'}">
                             <button class="btn-ai-main" onclick="toggleAI('${bot.id}')"><i class="fa fa-magic"></i> AI</button>
                             <div class="ai-options" id="ai-options-${bot.id}">
-                                <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'improve')"><i class="fa fa-check"></i> Improve</button>
-                                <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'generate')"><i class="fa fa-pencil"></i> Generate</button>
-                                <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'myprompt')"><i class="fa fa-user"></i> My Prompt</button>
+                                <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'improve', event)" title="Shift=всем"><i class="fa fa-check"></i> Improve</button>
+                                <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'generate', event)" title="Shift=всем"><i class="fa fa-pencil"></i> Generate</button>
+                                <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'myprompt', event)" title="Shift=всем"><i class="fa fa-user"></i> My Prompt</button>
                             </div>
                     </div>
                     </div>
@@ -2844,13 +2919,13 @@
                     </select>
                     
                     <div class="d-flex align-items-center gap-2 mb-2">
-                        <select class="form-select form-select-sm" style="width: 100px;" onchange="updateSettings('${bot.id}', 'speed', this.value)" title="Скорость отправки">
+                        <select class="form-select form-select-sm" id="speed-select-${bot.id}" style="width: 100px;" onchange="handleSpeedChange('${bot.id}', this.value, event)" title="Скорость отправки (Shift=всем)">
                             <option value="smart" selected>Smart</option>
                             <option value="15">15s</option>
                             <option value="30">30s</option>
                         </select>
-                        <div class="form-check small m-0 hide-in-chat" title="Auto: Payers -> My Favorite -> Favorites -> Inbox -> Online">
-                            <input class="form-check-input" type="checkbox" id="auto-check-${bot.id}" onchange="updateSettings('${bot.id}')">
+                        <div class="form-check small m-0 hide-in-chat" title="Auto: Payers -> My Favorite -> Favorites -> Inbox -> Online (Shift=всем)">
+                            <input class="form-check-input" type="checkbox" id="auto-check-${bot.id}" onchange="handleAutoChange('${bot.id}', event)">
                             <label class="form-check-label text-muted" for="auto-check-${bot.id}">Auto</label>
                         </div>
                         <div class="form-check small m-0 hide-in-chat" title="Отправлять только пользователям с фото">
@@ -2969,8 +3044,75 @@
                     bot.mailSettings.auto = document.getElementById(`auto-check-${botId}`).checked;
                 }
             }
-            saveSession(); 
+            saveSession();
         }
+
+        // Обработчик Auto с поддержкой Shift
+        function handleAutoChange(botId, event) {
+            const checkbox = document.getElementById(`auto-check-${botId}`);
+            const isChecked = checkbox.checked;
+
+            if (event && event.shiftKey) {
+                // Применяем ко всем анкетам
+                setAutoForAll(isChecked);
+            } else {
+                // Обычное поведение - только для этой анкеты
+                const bot = bots[botId];
+                bot.mailSettings.auto = isChecked;
+                saveSession();
+            }
+        }
+
+        // Установить Auto для ВСЕХ анкет
+        function setAutoForAll(isChecked) {
+            const botIds = Object.keys(bots);
+            let count = 0;
+
+            for (const botId of botIds) {
+                const bot = bots[botId];
+                bot.mailSettings.auto = isChecked;
+
+                const checkbox = document.getElementById(`auto-check-${botId}`);
+                if (checkbox) checkbox.checked = isChecked;
+                count++;
+            }
+
+            saveSession();
+            showBulkNotification(isChecked ? 'Auto включён для всех' : 'Auto выключен для всех', count);
+        }
+
+        // Обработчик скорости с поддержкой Shift
+        function handleSpeedChange(botId, val, event) {
+            if (event && event.shiftKey) {
+                // Применяем ко всем анкетам
+                setSpeedForAll(val);
+            } else {
+                // Обычное поведение
+                updateSettings(botId, 'speed', val);
+            }
+        }
+
+        // Установить скорость для ВСЕХ анкет
+        function setSpeedForAll(val) {
+            const isChat = globalMode === 'chat';
+            const botIds = Object.keys(bots);
+            let count = 0;
+
+            for (const botId of botIds) {
+                const bot = bots[botId];
+                const set = isChat ? bot.chatSettings : bot.mailSettings;
+                set.speed = val;
+
+                const selector = document.getElementById(`speed-select-${botId}`);
+                if (selector) selector.value = val;
+                count++;
+            }
+
+            saveSession();
+            const speedLabel = val === 'smart' ? 'Smart' : `${val}s`;
+            showBulkNotification(`Скорость ${speedLabel} установлена всем`, count);
+        }
+
         function updateChatRotation(botId) {
             const bot = bots[botId];
             bot.chatSettings.rotationHours = parseInt(document.getElementById(`rot-time-${botId}`).value);
@@ -3110,35 +3252,73 @@
         function copyStats() { navigator.clipboard.writeText((globalMode==='chat' ? bots[currentModalBotId].chatHistory[currentStatsType] : bots[currentModalBotId].mailHistory[currentStatsType]).join('\n')); }
         function clearStats() { if(confirm("Очистить?")){ const b = bots[currentModalBotId]; if(globalMode==='chat') { b.chatHistory[currentStatsType]=[]; b.chatStats[currentStatsType]=0; } else { b.mailHistory[currentStatsType]=[]; b.mailStats[currentStatsType]=0; } b.updateUI(); renderStatsList(); } }
         
+        // Генерация имени шаблона на основе даты
+        function generateTemplateName(tpls) {
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = String(now.getFullYear()).slice(-2);
+            const baseName = `${day}.${month}.${year}`;
+
+            // Проверяем уникальность
+            if (!tpls.some(t => t.name === baseName)) {
+                return baseName;
+            }
+
+            // Добавляем номер если такая дата уже есть
+            let num = 2;
+            while (tpls.some(t => t.name === `${baseName} (${num})`)) {
+                num++;
+            }
+            return `${baseName} (${num})`;
+        }
+
+        // Красивое уведомление для массовых действий
+        function showBulkNotification(message, count) {
+            const existing = document.getElementById('bulk-notification');
+            if (existing) existing.remove();
+
+            const notification = document.createElement('div');
+            notification.id = 'bulk-notification';
+            notification.innerHTML = `<i class="fa fa-check-circle"></i> ${message} <b>(${count})</b>`;
+            notification.style.cssText = `
+                position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+                background: linear-gradient(135deg, #28a745, #20c997); color: white;
+                padding: 12px 24px; border-radius: 25px; font-size: 14px; font-weight: 500;
+                box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4); z-index: 10000;
+                animation: bulkNotifIn 0.3s ease-out;
+            `;
+            document.body.appendChild(notification);
+
+            setTimeout(() => {
+                notification.style.animation = 'bulkNotifOut 0.3s ease-in forwards';
+                setTimeout(() => notification.remove(), 300);
+            }, 2000);
+        }
+
         // Инлайн добавление нового шаблона (без модалки)
-        async function addTemplateInline(botId) {
+        async function addTemplateInline(botId, event) {
+            // Shift + клик = добавить всем анкетам
+            if (event && event.shiftKey) {
+                await addTemplateToAll();
+                return;
+            }
+
             const bot = bots[botId];
             const isChat = globalMode === 'chat';
             const type = isChat ? 'chat' : 'mail';
             const tpls = getBotTemplates(bot.login)[type];
 
-            // Генерируем уникальное имя
-            let newNum = 1;
-            while (tpls.some(t => t.name === `Новый шаблон ${newNum}`)) {
-                newNum++;
-            }
-            const newName = `Новый шаблон ${newNum}`;
-
-            // Создаём новый шаблон с пустым текстом
+            const newName = generateTemplateName(tpls);
             const newTemplate = { name: newName, text: '', favorite: false };
             tpls.push(newTemplate);
 
-            // Сохраняем в localStorage
             localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
-
-            // Сохраняем на сервер
             await saveTemplatesToServer(bot.displayId, type, tpls);
 
-            // Обновляем dropdown и выбираем новый шаблон
             const newIdx = tpls.length - 1;
             updateTemplateDropdown(botId, newIdx);
 
-            // Очищаем textarea для ввода нового текста
             const textarea = document.getElementById(`msg-${botId}`);
             if (textarea) {
                 textarea.value = '';
@@ -3146,6 +3326,31 @@
             }
 
             console.log(`➕ Создан новый шаблон "${newName}" для ${bot.displayId}`);
+        }
+
+        // Добавить шаблон ВСЕМ анкетам
+        async function addTemplateToAll() {
+            const isChat = globalMode === 'chat';
+            const type = isChat ? 'chat' : 'mail';
+            const botIds = Object.keys(bots);
+            let count = 0;
+
+            for (const botId of botIds) {
+                const bot = bots[botId];
+                const tpls = getBotTemplates(bot.login)[type];
+                const newName = generateTemplateName(tpls);
+                const newTemplate = { name: newName, text: '', favorite: false };
+                tpls.push(newTemplate);
+
+                localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+                await saveTemplatesToServer(bot.displayId, type, tpls);
+
+                const newIdx = tpls.length - 1;
+                updateTemplateDropdown(botId, newIdx);
+                count++;
+            }
+
+            showBulkNotification('Шаблон добавлен всем анкетам', count);
         }
 
         // Модальное окно теперь только для редактирования (переименования) шаблона
@@ -3421,7 +3626,13 @@
             }
         }
 
-        async function deleteTemplate(botId) {
+        async function deleteTemplate(botId, event) {
+            // Shift + клик = удалить выбранный шаблон у всех
+            if (event && event.shiftKey) {
+                await deleteTemplateFromAll();
+                return;
+            }
+
             const isChat = globalMode === 'chat';
             const type = isChat ? 'chat' : 'mail';
             const bot = bots[botId];
@@ -3430,28 +3641,87 @@
             if (idx !== "" && confirm("Удалить?")) {
                 tpls.splice(idx, 1);
                 localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
-                // Сохраняем на сервер
                 await saveTemplatesToServer(bot.displayId, type, tpls);
                 updateTemplateDropdown(botId);
                 onTemplateSelect(botId);
             }
         }
 
+        // Удалить выбранный шаблон у ВСЕХ анкет
+        async function deleteTemplateFromAll() {
+            if (!confirm("Удалить выбранный шаблон у ВСЕХ анкет?")) return;
+
+            const isChat = globalMode === 'chat';
+            const type = isChat ? 'chat' : 'mail';
+            const botIds = Object.keys(bots);
+            let count = 0;
+
+            for (const botId of botIds) {
+                const bot = bots[botId];
+                const tpls = getBotTemplates(bot.login)[type];
+                const sel = document.getElementById(`tpl-select-${botId}`);
+                const idx = sel ? sel.value : "";
+
+                if (idx !== "" && tpls[idx]) {
+                    tpls.splice(idx, 1);
+                    localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+                    await saveTemplatesToServer(bot.displayId, type, tpls);
+                    updateTemplateDropdown(botId);
+                    count++;
+                }
+            }
+
+            showBulkNotification('Шаблон удалён у всех анкет', count);
+        }
+
         function openBlacklistModal(botId) { currentModalBotId=botId; document.getElementById('bl-modal-input').value=''; openModal('bl-modal'); }
-        async function saveBlacklistID() {
+        async function saveBlacklistID(event) {
             const val = document.getElementById('bl-modal-input').value.trim();
-            if(val && currentModalBotId) {
+            if (!val) {
+                closeModal('bl-modal');
+                return;
+            }
+
+            // Shift + клик = добавить в ЧС всем анкетам
+            if (event && event.shiftKey) {
+                await addBlacklistToAll(val);
+                closeModal('bl-modal');
+                return;
+            }
+
+            if(currentModalBotId) {
                 const bot = bots[currentModalBotId];
                 const isChat = globalMode === 'chat';
                 const list = isChat ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
                 if(!list.includes(val)) {
                     list.push(val);
                     renderBlacklist(currentModalBotId);
-                    // Сохраняем на сервер
                     await saveBlacklistToServer(bot.displayId, isChat ? 'chat' : 'mail', list);
                 }
             }
             closeModal('bl-modal');
+        }
+
+        // Добавить в ЧС для ВСЕХ анкет
+        async function addBlacklistToAll(val) {
+            const isChat = globalMode === 'chat';
+            const type = isChat ? 'chat' : 'mail';
+            const botIds = Object.keys(bots);
+            let count = 0;
+
+            for (const botId of botIds) {
+                const bot = bots[botId];
+                const list = isChat ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
+
+                if (!list.includes(val)) {
+                    list.push(val);
+                    renderBlacklist(botId);
+                    await saveBlacklistToServer(bot.displayId, type, list);
+                    count++;
+                }
+            }
+
+            showBulkNotification(`ID ${val} добавлен в ЧС всех анкет`, count);
         }
 
         function renderBlacklist(botId) {
