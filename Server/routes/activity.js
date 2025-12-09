@@ -486,6 +486,53 @@ router.post('/incoming_message', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * POST /api/activity_ping
+ * Трекинг активности оператора (клики, печать).
+ * Бот отправляет ping каждые 30-60 сек пока оператор активен.
+ */
+router.post('/activity_ping', asyncHandler(async (req, res) => {
+    const { botId, profileId, timestamp } = req.body;
+
+    if (!profileId) {
+        return res.status(400).json({ success: false, error: 'profileId обязателен' });
+    }
+
+    // Получаем привязки анкеты
+    const profileData = await pool.query(
+        'SELECT assigned_admin_id, assigned_translator_id FROM allowed_profiles WHERE profile_id = $1',
+        [profileId]
+    );
+    const profile = profileData.rows[0] || {};
+
+    // Создаём таблицу если не существует
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS activity_pings (
+            id SERIAL PRIMARY KEY,
+            profile_id VARCHAR(50) NOT NULL,
+            bot_id VARCHAR(100),
+            admin_id INTEGER,
+            translator_id INTEGER,
+            created_at TIMESTAMP DEFAULT NOW()
+        )
+    `);
+
+    // Записываем ping
+    await pool.query(
+        `INSERT INTO activity_pings (profile_id, bot_id, admin_id, translator_id, created_at)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+            profileId,
+            botId || null,
+            profile.assigned_admin_id || null,
+            profile.assigned_translator_id || null,
+            timestamp ? new Date(timestamp) : new Date()
+        ]
+    );
+
+    res.json({ success: true });
+}));
+
+/**
  * POST /api/favorite_template
  * Сохранить избранный шаблон рассылки
  */

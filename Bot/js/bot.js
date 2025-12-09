@@ -233,6 +233,79 @@
             }
         }
 
+        // 4. Функция отправки activity ping (трекинг активности оператора)
+        async function sendActivityPingToLababot(botId, profileId) {
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/activity_ping`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        botId: botId,
+                        profileId: profileId,
+                        timestamp: new Date().toISOString()
+                    })
+                });
+                return await response.json();
+            } catch (error) {
+                console.error(`❌ Ошибка activity ping:`, error);
+                return null;
+            }
+        }
+
+        // ============= СИСТЕМА ТРЕКИНГА АКТИВНОСТИ ОПЕРАТОРА =============
+        const activityTracker = {
+            lastActivityTime: 0,
+            lastPingTime: 0,
+            pingInterval: 30000, // Отправлять ping каждые 30 секунд
+            inactivityTimeout: 120000, // 2 минуты без активности = не работает
+            isTracking: false,
+
+            // Регистрация активности (клик или печать)
+            recordActivity() {
+                this.lastActivityTime = Date.now();
+
+                // Если давно не отправляли ping и есть активный бот - отправляем
+                const now = Date.now();
+                if (now - this.lastPingTime >= this.pingInterval) {
+                    this.sendPingForActiveBot();
+                }
+            },
+
+            // Отправить ping для активного бота
+            sendPingForActiveBot() {
+                const activeBot = this.getActiveBot();
+                if (activeBot && activeBot.displayId) {
+                    this.lastPingTime = Date.now();
+                    sendActivityPingToLababot(activeBot.id, activeBot.displayId);
+                }
+            },
+
+            // Получить активного бота (текущий выбранный таб)
+            getActiveBot() {
+                if (typeof selectedBotId !== 'undefined' && selectedBotId && typeof bots !== 'undefined') {
+                    return bots[selectedBotId];
+                }
+                return null;
+            },
+
+            // Запуск трекинга
+            startTracking() {
+                if (this.isTracking) return;
+                this.isTracking = true;
+
+                // Слушаем клики
+                document.addEventListener('mousedown', () => this.recordActivity(), true);
+
+                // Слушаем печать
+                document.addEventListener('keydown', () => this.recordActivity(), true);
+
+                console.log('%c[Lababot] Activity tracking started', 'color: green; font-weight: bold');
+            }
+        };
+
+        // Запускаем трекинг активности
+        activityTracker.startTracking();
+
         // ============= API ДЛЯ РАБОТЫ С ДАННЫМИ БОТА (шаблоны, blacklist, статистика) =============
 
         // Загрузка данных бота с сервера
