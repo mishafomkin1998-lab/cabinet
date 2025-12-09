@@ -2064,19 +2064,23 @@
                     if (typeof res?.data === 'string' && res?.data?.includes('<!DOCTYPE')) {
                         console.error(`[Lababot] ❌ /chat-sync вернул HTML! Пробуем /api/chat/sync...`);
 
-                        // Пробуем альтернативные эндпоинты
-                        const altEndpoints = ['/api/chat/sync', '/api/chats', '/api/chat-sessions'];
-                        for (const altPath of altEndpoints) {
-                            try {
-                                const altRes = await makeApiRequest(this, 'POST', altPath, {});
-                                console.log(`[Lababot] 🔄 Попытка ${altPath}: status=${altRes?.status}, type=${typeof altRes?.data}`);
-                                if (altRes?.data && typeof altRes?.data === 'object') {
-                                    console.log(`[Lababot] ✅ Найден рабочий эндпоинт: ${altPath}`, altRes.data);
-                                }
-                            } catch (e) {
-                                console.log(`[Lababot] ❌ ${altPath} не работает:`, e.message);
-                            }
+                        // Тестируем эндпоинт /chat-messages который используется в minichat
+                        try {
+                            // Тест с ID=0 чтобы просто проверить работает ли эндпоинт
+                            const testRes = await makeApiRequest(this, 'POST', '/chat-messages', { id: 0 });
+                            console.log(`[Lababot] 🧪 TEST /chat-messages: status=${testRes?.status}, type=${typeof testRes?.data}`, testRes?.data);
+                        } catch (e) {
+                            console.log(`[Lababot] 🧪 TEST /chat-messages FAILED:`, e.message);
                         }
+
+                        // Тестируем GET /api/messages (почта) - должен работать
+                        try {
+                            const mailRes = await makeApiRequest(this, 'GET', '/api/messages');
+                            console.log(`[Lababot] 🧪 TEST /api/messages: status=${mailRes?.status}, count=${mailRes?.data?.Messages?.length || 0}`);
+                        } catch (e) {
+                            console.log(`[Lababot] 🧪 TEST /api/messages FAILED:`, e.message);
+                        }
+
                         return; // Не обрабатываем HTML как данные чата
                     }
                     const data = res.data;
