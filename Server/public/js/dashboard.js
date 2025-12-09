@@ -81,6 +81,17 @@
                 adminTypeFilter: 'all', // 'our' = наши админы, 'other' = другие, 'all' = все (по умолчанию)
                 adminFilter: 'all', // Фильтр по конкретному админу (для директора)
                 translatorFilter: 'all', // Фильтр по переводчику (для админа)
+                expandedAdminId: null, // ID развёрнутого админа в списке
+                directTranslators: [], // Переводчики напрямую под директором
+                controlFilter: { adminId: '', translatorId: '' }, // Фильтры в панели управления
+                newAccountAssignTo: null, // Кому назначить новую анкету
+                profilesWithMailing: [], // Анкеты с рассылкой
+                autoRefreshStats: false, // Автообновление статистики
+                refreshingStats: false, // Индикатор обновления
+                errorLogs: [], // Логи ошибок
+                botLogs: [], // Логи ботов
+                botLogsFilter: 'all', // Фильтр логов ботов
+                botLogsHasMore: false, // Есть ли ещё логи
                 loading: true,
                 error: null,
 
@@ -2401,6 +2412,117 @@
                 },
 
                 // ========== END BILLING FUNCTIONS ==========
+
+                // ========== MAILING CONTROL FUNCTIONS ==========
+
+                // Получить отфильтрованные профили для панели управления рассылкой
+                getFilteredProfiles() {
+                    if (!this.profilesWithMailing || this.profilesWithMailing.length === 0) {
+                        return [];
+                    }
+
+                    let filtered = [...this.profilesWithMailing];
+
+                    // Фильтр по админу
+                    if (this.controlFilter.adminId) {
+                        filtered = filtered.filter(p => p.adminId === this.controlFilter.adminId);
+                    }
+
+                    // Фильтр по переводчику
+                    if (this.controlFilter.translatorId) {
+                        filtered = filtered.filter(p => p.translatorId === this.controlFilter.translatorId);
+                    }
+
+                    return filtered;
+                },
+
+                // Получить количество писем за сегодня
+                getTotalMailToday() {
+                    return this.stats?.today?.letters || 0;
+                },
+
+                // Получить количество писем за последний час
+                getTotalMailHour() {
+                    // Пока возвращаем 0, т.к. нет данных по часам
+                    return 0;
+                },
+
+                // Получить количество чатов за сегодня
+                getTotalChatToday() {
+                    return this.stats?.today?.chats || 0;
+                },
+
+                // Получить количество чатов за последний час
+                getTotalChatHour() {
+                    // Пока возвращаем 0, т.к. нет данных по часам
+                    return 0;
+                },
+
+                // Получить количество ошибок за сегодня
+                getTotalErrorsToday() {
+                    return this.stats?.today?.errors || 0;
+                },
+
+                // Получить количество онлайн профилей из списка рассылки
+                getOnlineProfiles() {
+                    if (!this.profilesWithMailing || this.profilesWithMailing.length === 0) {
+                        return 0;
+                    }
+                    return this.profilesWithMailing.filter(p => p.isOnline).length;
+                },
+
+                // Переключить рассылку для профиля
+                async toggleProfileMailing(profile) {
+                    try {
+                        const newStatus = !profile.mailingEnabled;
+                        const res = await fetch(`${API_BASE}/api/profiles/${profile.profileId}/mailing`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                enabled: newStatus,
+                                userId: this.currentUser.id
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            profile.mailingEnabled = newStatus;
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось изменить статус'));
+                        }
+                    } catch (e) {
+                        console.error('toggleProfileMailing error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
+                // Обновить статистику профилей
+                async refreshProfileStats() {
+                    this.refreshingStats = true;
+                    try {
+                        await this.loadDashboardStats();
+                    } finally {
+                        this.refreshingStats = false;
+                    }
+                },
+
+                // Обработчик изменения фильтра по админу
+                onAdminFilterChange() {
+                    // Сбрасываем фильтр по переводчику при смене админа
+                    this.controlFilter.translatorId = '';
+                },
+
+                // Получить переводчиков для выбранного админа
+                getTranslatorsForAdmin() {
+                    if (!this.controlFilter.adminId) {
+                        // Если админ не выбран - возвращаем всех переводчиков
+                        return this.translators || [];
+                    }
+
+                    // Возвращаем переводчиков только этого админа
+                    return (this.translators || []).filter(t => t.adminId === this.controlFilter.adminId);
+                },
+
+                // ========== END MAILING CONTROL FUNCTIONS ==========
 
                 logout() {
                     // Очищаем данные авторизации
