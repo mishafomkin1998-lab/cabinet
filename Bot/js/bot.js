@@ -238,12 +238,15 @@
         // Загрузка данных бота с сервера
         async function loadBotDataFromServer(profileId) {
             try {
+                console.log(`🔄 Загрузка данных с сервера для ${profileId}...`);
                 const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}`);
                 const result = await response.json();
+                console.log(`📦 Ответ сервера для ${profileId}:`, JSON.stringify(result, null, 2));
                 if (result.success) {
                     console.log(`📥 Данные бота загружены для ${profileId}:`, result.data);
                     return result.data;
                 }
+                console.warn(`⚠️ Сервер вернул success=false для ${profileId}`);
                 return null;
             } catch (error) {
                 console.error(`❌ Ошибка загрузки данных бота:`, error);
@@ -285,7 +288,7 @@
                     body: JSON.stringify(body)
                 });
                 const result = await response.json();
-                console.log(`🚫 Blacklist ${type} сохранён для ${profileId}`);
+                console.log(`📝 Blacklist ${type} сохранён для ${profileId}, ответ:`, result);
                 return result.success;
             } catch (error) {
                 console.error(`❌ Ошибка сохранения blacklist:`, error);
