@@ -276,13 +276,40 @@ router.get('/', asyncHandler(async (req, res) => {
  * Тестовый эндпоинт для проверки данных incoming_messages
  */
 router.get('/debug-incoming', asyncHandler(async (req, res) => {
+    const { userId, role, dateFrom, dateTo } = req.query;
+
     const total = await pool.query('SELECT COUNT(*) as cnt FROM incoming_messages');
     const byType = await pool.query('SELECT type, COUNT(*) as cnt FROM incoming_messages GROUP BY type');
-    const recent = await pool.query('SELECT profile_id, man_id, type, created_at FROM incoming_messages ORDER BY created_at DESC LIMIT 10');
+    // Показываем admin_id и translator_id чтобы понять фильтрацию
+    const recent = await pool.query('SELECT profile_id, man_id, type, admin_id, translator_id, created_at FROM incoming_messages ORDER BY created_at DESC LIMIT 10');
     const dateRange = await pool.query('SELECT MIN(created_at) as min_date, MAX(created_at) as max_date FROM incoming_messages');
 
+    // Проверяем фильтрацию как в основном запросе
+    const now = new Date();
+    const defaultDateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const defaultDateTo = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    const periodFrom = dateFrom || defaultDateFrom;
+    const periodTo = dateTo || defaultDateTo;
+
+    let testParams = [periodFrom, periodTo];
+    let testWhere = '';
+    if (role === 'translator' && userId) {
+        testWhere = 'AND translator_id = $3';
+        testParams.push(userId);
+    } else if (role === 'admin' && userId) {
+        testWhere = 'AND admin_id = $3';
+        testParams.push(userId);
+    }
+
+    const filtered = await pool.query(`
+        SELECT COUNT(*) as cnt FROM incoming_messages
+        WHERE created_at >= $1::date AND created_at < ($2::date + interval '1 day') ${testWhere}
+    `, testParams);
+
     res.json({
+        requestParams: { userId, role, periodFrom, periodTo },
         total: total.rows[0].cnt,
+        filteredByPeriodAndRole: filtered.rows[0].cnt,
         byType: byType.rows,
         recent: recent.rows,
         dateRange: dateRange.rows[0]
