@@ -271,4 +271,22 @@ router.get('/', asyncHandler(async (req, res) => {
     });
 }));
 
+/**
+ * GET /api/dashboard/debug-incoming
+ * Тестовый эндпоинт для проверки данных incoming_messages
+ */
+router.get('/debug-incoming', asyncHandler(async (req, res) => {
+    const total = await pool.query('SELECT COUNT(*) as cnt FROM incoming_messages');
+    const byType = await pool.query('SELECT type, COUNT(*) as cnt FROM incoming_messages GROUP BY type');
+    const recent = await pool.query('SELECT profile_id, man_id, type, created_at FROM incoming_messages ORDER BY created_at DESC LIMIT 10');
+    const dateRange = await pool.query('SELECT MIN(created_at) as min_date, MAX(created_at) as max_date FROM incoming_messages');
+
+    res.json({
+        total: total.rows[0].cnt,
+        byType: byType.rows,
+        recent: recent.rows,
+        dateRange: dateRange.rows[0]
+    });
+}));
+
 module.exports = router;
