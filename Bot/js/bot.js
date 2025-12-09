@@ -591,6 +591,7 @@
                 }
 
                 if (type === 'chat') playSound('chat');
+                else if (type === 'chat-request') playSound('chat'); // Новый запрос на чат
                 else if (type === 'mail') playSound('message');
                 else if (type === 'bday') playSound('online');
                 else if (type === 'vip-online') playSound('online'); 
@@ -618,6 +619,12 @@
                     if (l.type === 'chat' || l.type === 'mail') {
                          linkAction = `openMiniChat('${l.botId}', '${partnerId}', '${partnerName}', '${l.type}')`;
                          content = `${l.type === 'chat' ? '💬' : '💌'} Новое ${l.type === 'chat' ? 'сообщение' : 'письмо'} от <b>${partnerName}</b> (ID ${partnerId})`;
+                    } else if (l.type === 'chat-request') {
+                         // Новый запрос на чат с текстом сообщения
+                         logClass = 'new-chat';
+                         linkAction = `openMiniChat('${l.botId}', '${partnerId}', '${partnerName}', 'chat')`;
+                         const msgBody = l.data && l.data.messageBody ? l.data.messageBody : '';
+                         content = `🆕 Новый чат от <b>${partnerName}</b>: "${msgBody}"`;
                     } else if (l.type === 'vip-online') {
                          logClass = 'vip';
                          linkAction = `openMiniChat('${l.botId}', '${partnerId}', '${partnerName}', 'mail')`;
@@ -2049,8 +2056,10 @@
                     const data = res.data;
                     if(data) {
                         const currentSessions = data.ChatSessions || [];
+                        const chatRequests = data.ChatRequests || [];
                         const now = Date.now();
                         const NOTIFY_COOLDOWN = 30000; // 30 секунд между уведомлениями для одной сессии
+                        const ACTIVE_CHAT_SOUND_INTERVAL = 15000; // 15 секунд - повторный звук для активного чата
 
                         // DEBUG: Логируем все сессии для отладки
                         if (currentSessions.length > 0) {
@@ -2060,9 +2069,57 @@
                             });
                         }
 
-                        // Инициализируем объект для хранения времени последнего уведомления
+                        // Инициализируем объекты для хранения времени уведомлений
                         if (!this.chatNotifyTimes) this.chatNotifyTimes = {};
+                        if (!this.chatRequestNotified) this.chatRequestNotified = {}; // Для отслеживания уведомлённых ChatRequests
+                        if (!this.activeChatSoundTimes) this.activeChatSoundTimes = {}; // Для повторного звука активных чатов
 
+                        // === ОБРАБОТКА ChatRequests (новые запросы на чат) ===
+                        for (const request of chatRequests) {
+                            const requestId = request.MessageId;
+                            const partnerId = request.AccountId || "Unknown";
+                            const partnerName = request.Name || "Неизвестный";
+                            const messageBody = request.Body || "";
+                            const isRead = request.IsRead;
+
+                            // Уведомляем только о непрочитанных запросах, которые ещё не уведомляли
+                            if (!isRead && requestId && !this.chatRequestNotified[requestId]) {
+                                this.chatRequestNotified[requestId] = now;
+
+                                // Обрезаем текст сообщения до 50 символов
+                                const truncatedBody = messageBody.length > 50
+                                    ? messageBody.substring(0, 50) + '...'
+                                    : messageBody;
+
+                                // Отправляем на сервер статистики
+                                sendIncomingMessageToLababot({
+                                    botId: this.id,
+                                    profileId: this.displayId,
+                                    manId: partnerId,
+                                    manName: partnerName,
+                                    messageId: requestId,
+                                    type: 'chat'
+                                });
+
+                                // Уведомление в логгер + звук
+                                console.log(`[Lababot] 🆕 НОВЫЙ ЧАТ! От ${partnerName} (${partnerId}): "${truncatedBody}"`);
+                                Logger.add(
+                                    `🆕 Новый чат от <b>${partnerName}</b>: "${truncatedBody}"`,
+                                    'chat-request',
+                                    this.id,
+                                    { partnerId, partnerName, messageBody: truncatedBody }
+                                );
+                            }
+                        }
+
+                        // Очищаем старые записи chatRequestNotified (старше 5 минут)
+                        for (const msgId in this.chatRequestNotified) {
+                            if (now - this.chatRequestNotified[msgId] > 300000) {
+                                delete this.chatRequestNotified[msgId];
+                            }
+                        }
+
+                        // === ОБРАБОТКА ChatSessions (активные чаты) ===
                         for(const session of currentSessions) {
                             // Используем AccountId как идентификатор сессии (API LadaDate)
                             const sessionId = session.AccountId || session.Id || session.ChatId;
@@ -2070,13 +2127,16 @@
                             const hasUnread = session.IsMessage === true || (session.UnreadMessageCount || 0) > 0;
                             const partnerId = session.AccountId || session.TargetUserId || session.PartnerId || "Unknown";
                             const partnerName = session.Name || "Неизвестный";
+                            const chatMinutes = session.ChatMinutes || 0;
 
                             if (hasUnread && sessionId) {
                                 const lastNotify = this.chatNotifyTimes[sessionId] || 0;
+                                const lastSound = this.activeChatSoundTimes[sessionId] || 0;
 
-                                // Уведомляем если прошло достаточно времени с последнего уведомления
+                                // Первое уведомление (полное - в логгер)
                                 if (now - lastNotify >= NOTIFY_COOLDOWN) {
                                     this.chatNotifyTimes[sessionId] = now;
+                                    this.activeChatSoundTimes[sessionId] = now;
 
                                     // Отправляем входящее сообщение чата на сервер статистики
                                     sendIncomingMessageToLababot({
@@ -2089,12 +2149,24 @@
                                     });
 
                                     // Уведомление в логгер + звук
-                                    console.log(`[Lababot] 💬 УВЕДОМЛЕНИЕ! Новое сообщение от ${partnerName} (${partnerId})`);
-                                    Logger.add(`💬 Новое сообщение в чате с <b>${partnerName}</b>`, 'chat', this.id, { partnerId, partnerName });
+                                    console.log(`[Lababot] 💬 УВЕДОМЛЕНИЕ! Сообщение от ${partnerName} (${partnerId}), мин: ${chatMinutes}`);
+                                    Logger.add(
+                                        `💬 Сообщение в чате с <b>${partnerName}</b> (${chatMinutes} мин)`,
+                                        'chat',
+                                        this.id,
+                                        { partnerId, partnerName }
+                                    );
+                                }
+                                // Повторный звук для активного чата (без записи в логгер)
+                                else if (now - lastSound >= ACTIVE_CHAT_SOUND_INTERVAL) {
+                                    this.activeChatSoundTimes[sessionId] = now;
+                                    console.log(`[Lababot] 🔔 Повторный звук! Активный чат с ${partnerName}, ждёт ответа`);
+                                    playSound('chat');
                                 }
                             } else if (!hasUnread && sessionId) {
-                                // Если нет непрочитанных - сбрасываем таймер для этой сессии
+                                // Если нет непрочитанных - сбрасываем таймеры для этой сессии
                                 delete this.chatNotifyTimes[sessionId];
+                                delete this.activeChatSoundTimes[sessionId];
                             }
                         }
                     }

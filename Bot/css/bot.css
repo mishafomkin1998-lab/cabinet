@@ -568,6 +568,11 @@
             border-color: #4a4025;
         }
 
+        body.theme-dark .log-entry.new-chat {
+            background: #152a1a;
+            border-color: #254a35;
+        }
+
         body.theme-dark .active-invite-box {
             background: #152515;
             border-color: #254525;
@@ -1157,6 +1162,7 @@
         .log-entry.fresh { color: #198754; font-weight: 600; }
         .log-entry.old { color: #777; font-weight: 400; }
         .log-entry.vip { background: #fff3cd; padding: 4px; border-radius: 4px; border: 1px solid #ffecb5; }
+        .log-entry.new-chat { background: #d1e7dd; padding: 4px; border-radius: 4px; border: 1px solid #badbcc; }
         .log-time { opacity: 0.7; font-size: 11px; margin-right: 5px; }
         .log-link { text-decoration: underline; cursor: pointer; color: inherit; }
         .log-link:hover { color: var(--mode-color); }
