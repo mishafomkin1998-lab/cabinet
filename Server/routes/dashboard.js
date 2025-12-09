@@ -82,8 +82,8 @@ router.get('/', asyncHandler(async (req, res) => {
                 COUNT(*) FILTER (WHERE used_ai = true) as ai_count,
                 COUNT(*) as total_count
             FROM activity_log a
-            WHERE DATE(a.created_at) >= $2
-              AND DATE(a.created_at) <= $3
+            WHERE a.created_at >= $2::date
+              AND a.created_at < ($3::date + interval '1 day')
               ${activityFilter}
         `;
         aiParams = paramsWithDates;
@@ -93,8 +93,8 @@ router.get('/', asyncHandler(async (req, res) => {
                 COUNT(*) FILTER (WHERE used_ai = true) as ai_count,
                 COUNT(*) as total_count
             FROM activity_log a
-            WHERE DATE(a.created_at) >= $1
-              AND DATE(a.created_at) <= $2
+            WHERE a.created_at >= $1::date
+              AND a.created_at < ($2::date + interval '1 day')
         `;
         aiParams = [periodFrom, periodTo];
     }
@@ -114,8 +114,8 @@ router.get('/', asyncHandler(async (req, res) => {
                 COALESCE(AVG(a.response_time_sec), 0) as avg_response_seconds,
                 COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY a.response_time_sec), 0) as median_response_seconds
             FROM activity_log a
-            WHERE DATE(a.created_at) >= $2
-              AND DATE(a.created_at) <= $3
+            WHERE a.created_at >= $2::date
+              AND a.created_at < ($3::date + interval '1 day')
               ${activityFilter}
         `;
         statsParams = paramsWithDates;
@@ -128,8 +128,8 @@ router.get('/', asyncHandler(async (req, res) => {
                 COALESCE(AVG(a.response_time_sec), 0) as avg_response_seconds,
                 COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY a.response_time_sec), 0) as median_response_seconds
             FROM activity_log a
-            WHERE DATE(a.created_at) >= $1
-              AND DATE(a.created_at) <= $2
+            WHERE a.created_at >= $1::date
+              AND a.created_at < ($2::date + interval '1 day')
         `;
         statsParams = [periodFrom, periodTo];
     }
@@ -142,7 +142,7 @@ router.get('/', asyncHandler(async (req, res) => {
     const errorsQuery = `
         SELECT COUNT(*) as errors_count
         FROM error_logs
-        WHERE DATE(timestamp) >= $1 AND DATE(timestamp) <= $2
+        WHERE timestamp >= $1::date AND timestamp < ($2::date + interval '1 day')
     `;
     const errorsResult = await pool.query(errorsQuery, [periodFrom, periodTo]);
     const errors = errorsResult.rows[0] || {};
@@ -167,8 +167,8 @@ router.get('/', asyncHandler(async (req, res) => {
             COALESCE(COUNT(*) FILTER (WHERE i.type = 'chat'), 0) as incoming_chats,
             COALESCE(COUNT(*) FILTER (WHERE i.is_first_from_man = true), 0) as unique_men
         FROM incoming_messages i
-        WHERE DATE(i.created_at) >= $1
-          AND DATE(i.created_at) <= $2
+        WHERE i.created_at >= $1::date
+          AND i.created_at < ($2::date + interval '1 day')
           ${incomingWhereClause}
     `;
     const incomingResult = await pool.query(incomingQuery, incomingParams);
