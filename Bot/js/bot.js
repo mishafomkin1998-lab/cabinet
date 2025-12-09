@@ -1682,6 +1682,7 @@
                     } else {
                         bot.currentMailText = textarea.value;
                     }
+                    console.log(`[toggleMode] Сохранён текст для ${globalMode}: "${textarea.value.substring(0,30)}..."`);
                 }
             }
 
@@ -1695,8 +1696,10 @@
                 btn.innerHTML = '<i class="fa fa-envelope"></i>'; btn.className = 'btn btn-circle btn-mode-switch active-mail';
             }
 
-            // КРИТИЧНО: useSavedText=true чтобы показать сохранённый текст для нового режима
-            if(activeTabId && bots[activeTabId]) updateInterfaceForMode(activeTabId, true);
+            // Обновляем ВСЕ открытые вкладки для нового режима
+            Object.keys(bots).forEach(botId => {
+                updateInterfaceForMode(botId, true);
+            });
         }
 
         function updateBotCount() { document.getElementById('global-bot-count').innerText = `Анкет: ${Object.keys(bots).length}`; }
@@ -3496,7 +3499,8 @@
             const sel=document.getElementById(`tpl-select-${botId}`); if(!sel) return;
             const bot = bots[botId];
             const isChat = globalMode === 'chat';
-            const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
+            const mode = isChat ? 'chat' : 'mail';
+            const tpls = getBotTemplates(bot.login)[mode];
 
             let val = (forceSelectIndex !== null) ? forceSelectIndex : sel.value;
             sel.innerHTML='<option value="">-- Выберите --</option>';
@@ -3508,21 +3512,23 @@
                  const area=document.getElementById(`msg-${botId}`);
                  area.disabled=false;
 
-                 // КРИТИЧНО: Используем сохранённый текст если он есть, иначе текст шаблона
+                 // КРИТИЧНО: Используем сохранённый текст ТОЛЬКО для текущего режима
                  const savedText = isChat ? bot.currentChatText : bot.currentMailText;
                  let textToSet;
                  if (useSavedText && savedText) {
-                     // Используем сохранённый текст - НЕ перезаписываем currentText
+                     // Используем сохранённый текст для ЭТОГО режима
                      textToSet = savedText;
+                     console.log(`[updateTplDropdown] ${mode}: используем сохранённый текст "${savedText.substring(0,30)}..."`);
                  } else {
-                     // Используем текст шаблона - обновляем currentText
+                     // Используем текст шаблона
                      textToSet = tpls[val].text || '';
-                     // Синхронизируем currentText только когда берём текст из шаблона
+                     // Синхронизируем currentText
                      if (isChat) {
                          bot.currentChatText = textToSet;
                      } else {
                          bot.currentMailText = textToSet;
                      }
+                     console.log(`[updateTplDropdown] ${mode}: используем текст шаблона "${textToSet.substring(0,30)}..."`);
                  }
                  area.value = textToSet;
 
