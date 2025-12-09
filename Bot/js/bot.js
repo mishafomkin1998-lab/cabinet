@@ -767,7 +767,11 @@
 
                         if (result.success) {
                             data = result.data;
-                            console.log(`[MiniChat] ✅ chat-messages через WebView: OK`);
+                            console.log(`[MiniChat] ✅ chat-messages через WebView: OK`, data);
+                            // Диагностика: показываем структуру первого сообщения
+                            if (data.Messages && data.Messages.length > 0) {
+                                console.log(`[MiniChat] 📋 Пример сообщения:`, JSON.stringify(data.Messages[0], null, 2));
+                            }
                         } else {
                             console.log(`[MiniChat] ❌ chat-messages через WebView:`, result.error, result.html || '');
                         }
@@ -979,9 +983,19 @@
                                             body: JSON.stringify({ recipientId: ${minichatPartnerId}, body: ${JSON.stringify(message)} }),
                                             credentials: 'include'
                                         });
+                                        // Проверяем HTTP статус
+                                        if (!res.ok) {
+                                            return { success: false, error: 'HTTP ' + res.status, status: res.status };
+                                        }
                                         const text = await res.text();
+                                        console.log('[MiniChat WebView] chat-send response:', text);
                                         try {
-                                            return { success: true, data: JSON.parse(text) };
+                                            const json = JSON.parse(text);
+                                            // Проверяем успех в ответе API
+                                            if (json.IsSuccess === false) {
+                                                return { success: false, error: json.Error || 'API error', data: json };
+                                            }
+                                            return { success: true, data: json };
                                         } catch {
                                             return { success: true, data: text };
                                         }
@@ -991,11 +1005,12 @@
                                 })()
                             `);
 
+                            console.log(`[MiniChat] 📤 chat-send result:`, result);
                             if (result.success) {
                                 sendSuccess = true;
                                 console.log(`[MiniChat] ✅ chat-send через WebView: OK`);
                             } else {
-                                console.log(`[MiniChat] ❌ chat-send через WebView:`, result.error);
+                                console.log(`[MiniChat] ❌ chat-send через WebView:`, result.error, result.data || '');
                             }
                         } catch (e) {
                             console.log(`[MiniChat] ⚠️ WebView chat-send error:`, e.message);
@@ -2004,15 +2019,43 @@
             createWebview() {
                 const webview = document.createElement('webview');
                 webview.id = `webview-${this.id}`;
-                webview.src = "https://ladadate.com/login"; 
-                webview.partition = `persist:${this.id}`; 
+                webview.src = "https://ladadate.com/login";
+                webview.partition = `persist:${this.id}`;
                 webview.useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+                // Функция для отключения звука и внедрения скрипта блокировки Audio
+                const muteWebview = () => {
+                    if (webview.setAudioMuted) {
+                        webview.setAudioMuted(true);
+                        console.log(`[WebView ${this.id}] 🔇 Звук отключен`);
+                    }
+                    // Дополнительно: блокируем Audio API внутри страницы
+                    webview.executeJavaScript(`
+                        // Блокируем воспроизведение звука на странице
+                        if (!window.__audioMuted) {
+                            window.__audioMuted = true;
+                            const originalPlay = Audio.prototype.play;
+                            Audio.prototype.play = function() {
+                                console.log('[Lababot] Audio.play() заблокирован');
+                                return Promise.resolve();
+                            };
+                            // Блокируем HTMLMediaElement (video/audio теги)
+                            const origMediaPlay = HTMLMediaElement.prototype.play;
+                            HTMLMediaElement.prototype.play = function() {
+                                console.log('[Lababot] MediaElement.play() заблокирован');
+                                return Promise.resolve();
+                            };
+                            console.log('[Lababot] 🔇 Audio API заблокирован');
+                        }
+                    `).catch(() => {});
+                };
+
+                // Отключаем звук при каждой загрузке страницы
+                webview.addEventListener('did-finish-load', muteWebview);
 
                 webview.addEventListener('dom-ready', () => {
                     // 0. Отключаем звук в WebView (чтобы не дублировался со звуком бота)
-                    if (webview.setAudioMuted) {
-                        webview.setAudioMuted(true);
-                    }
+                    muteWebview();
 
                     // 1. Внедрение скрипта "Анти-сон" (Keep-Alive)
                     webview.executeJavaScript(KEEP_ALIVE_SCRIPT);
