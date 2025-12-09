@@ -2049,7 +2049,11 @@
                     const data = res.data;
                     if(data) {
                         const currentSessions = data.ChatSessions || [];
-                        const unreadSessionsNow = [];
+                        const now = Date.now();
+                        const NOTIFY_COOLDOWN = 30000; // 30 секунд между уведомлениями для одной сессии
+
+                        // Инициализируем объект для хранения времени последнего уведомления
+                        if (!this.chatNotifyTimes) this.chatNotifyTimes = {};
 
                         for(const session of currentSessions) {
                             // Используем AccountId как идентификатор сессии (API LadaDate)
@@ -2059,28 +2063,36 @@
                             const partnerId = session.AccountId || session.TargetUserId || session.PartnerId || "Unknown";
                             const partnerName = session.Name || "Неизвестный";
 
-                            if (hasUnread) {
-                                unreadSessionsNow.push(sessionId);
+                            if (hasUnread && sessionId) {
+                                const lastNotify = this.chatNotifyTimes[sessionId] || 0;
 
-                                if (!this.unreadChatSessions.includes(sessionId)) {
+                                // Уведомляем если прошло достаточно времени с последнего уведомления
+                                if (now - lastNotify >= NOTIFY_COOLDOWN) {
+                                    this.chatNotifyTimes[sessionId] = now;
+
                                     // Отправляем входящее сообщение чата на сервер статистики
                                     sendIncomingMessageToLababot({
                                         botId: this.id,
                                         profileId: this.displayId,
                                         manId: partnerId,
                                         manName: partnerName,
-                                        messageId: `chat_${sessionId}_${Date.now()}`,
+                                        messageId: `chat_${sessionId}_${now}`,
                                         type: 'chat'
                                     });
 
+                                    // Уведомление в логгер + звук
+                                    console.log(`[Lababot] 💬 Новое сообщение от ${partnerName} (${partnerId})`);
                                     Logger.add(`💬 Новое сообщение в чате с <b>${partnerName}</b>`, 'chat', this.id, { partnerId, partnerName });
                                 }
+                            } else if (!hasUnread && sessionId) {
+                                // Если нет непрочитанных - сбрасываем таймер для этой сессии
+                                delete this.chatNotifyTimes[sessionId];
                             }
                         }
-
-                        this.unreadChatSessions = unreadSessionsNow;
                     }
-                } catch(e) {}
+                } catch(e) {
+                    console.error('[Lababot] checkChatSync error:', e);
+                }
                 finally {
                      const nextRun = Math.floor(Math.random() * (7000 - 3000 + 1)) + 3000;
                      if(this.isMonitoring) setTimeout(() => this.checkChatSync(), nextRun);
