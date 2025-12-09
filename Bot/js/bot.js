@@ -2045,19 +2045,21 @@
             async checkChatSync() {
                 if (!this.token || !this.isMonitoring) return;
                 try {
-                    const res = await makeApiRequest(this, 'POST', '/chat-sync', {}); 
+                    const res = await makeApiRequest(this, 'POST', '/chat-sync', {});
                     const data = res.data;
                     if(data) {
                         const currentSessions = data.ChatSessions || [];
                         const unreadSessionsNow = [];
-                        
+
                         for(const session of currentSessions) {
-                            const sessionId = session.Id || session.ChatId;
-                            const unreadCount = session.UnreadMessageCount || 0; 
-                            const partnerId = session.TargetUserId || session.PartnerId || "Unknown";
+                            // Используем AccountId как идентификатор сессии (API LadaDate)
+                            const sessionId = session.AccountId || session.Id || session.ChatId;
+                            // IsMessage = true означает есть непрочитанное сообщение
+                            const hasUnread = session.IsMessage === true || (session.UnreadMessageCount || 0) > 0;
+                            const partnerId = session.AccountId || session.TargetUserId || session.PartnerId || "Unknown";
                             const partnerName = session.Name || "Неизвестный";
-                            
-                            if (unreadCount > 0) {
+
+                            if (hasUnread) {
                                 unreadSessionsNow.push(sessionId);
 
                                 if (!this.unreadChatSessions.includes(sessionId)) {
@@ -2067,7 +2069,7 @@
                                         profileId: this.displayId,
                                         manId: partnerId,
                                         manName: partnerName,
-                                        messageId: `chat_${sessionId}`,
+                                        messageId: `chat_${sessionId}_${Date.now()}`,
                                         type: 'chat'
                                     });
 
@@ -2075,7 +2077,7 @@
                                 }
                             }
                         }
-                        
+
                         this.unreadChatSessions = unreadSessionsNow;
                     }
                 } catch(e) {}
