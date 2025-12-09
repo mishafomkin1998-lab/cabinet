@@ -739,11 +739,50 @@
             const chatHistoryEl = document.getElementById('minichat-history');
 
             try {
-                // Используем chat-messages API с id мужчины
-                const res = await makeApiRequest(bot, 'POST', '/chat-messages', { id: minichatPartnerId });
-                const data = res.data;
+                // Используем WebView для запроса (там есть session cookies)
+                let data = null;
 
-                if (!data.IsSuccess) {
+                if (bot.webview) {
+                    try {
+                        const result = await bot.webview.executeJavaScript(`
+                            (async () => {
+                                try {
+                                    const res = await fetch('https://ladadate.com/chat-messages', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ id: ${minichatPartnerId} }),
+                                        credentials: 'include'
+                                    });
+                                    const text = await res.text();
+                                    try {
+                                        return { success: true, data: JSON.parse(text) };
+                                    } catch {
+                                        return { success: false, error: 'Not JSON', html: text.substring(0, 200) };
+                                    }
+                                } catch (e) {
+                                    return { success: false, error: e.message };
+                                }
+                            })()
+                        `);
+
+                        if (result.success) {
+                            data = result.data;
+                            console.log(`[MiniChat] ✅ chat-messages через WebView: OK`);
+                        } else {
+                            console.log(`[MiniChat] ❌ chat-messages через WebView:`, result.error, result.html || '');
+                        }
+                    } catch (e) {
+                        console.log(`[MiniChat] ⚠️ WebView executeJavaScript error:`, e.message);
+                    }
+                }
+
+                // Fallback на axios если WebView не работает
+                if (!data) {
+                    const res = await makeApiRequest(bot, 'POST', '/chat-messages', { id: minichatPartnerId });
+                    data = res.data;
+                }
+
+                if (!data || !data.IsSuccess) {
                     chatHistoryEl.innerHTML = '<div class="text-center text-danger small mt-5">Ошибка загрузки чата.</div>';
                     return;
                 }
@@ -926,9 +965,48 @@
 
             try {
                 if (minichatType === 'chat') {
-                    // Отправка через чат API
-                    const payload = { recipientId: minichatPartnerId, body: message };
-                    await makeApiRequest(bot, 'POST', '/chat-send', payload);
+                    // Отправка через чат API (используем WebView для session cookies)
+                    let sendSuccess = false;
+
+                    if (bot.webview) {
+                        try {
+                            const result = await bot.webview.executeJavaScript(`
+                                (async () => {
+                                    try {
+                                        const res = await fetch('https://ladadate.com/chat-send', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ recipientId: ${minichatPartnerId}, body: ${JSON.stringify(message)} }),
+                                            credentials: 'include'
+                                        });
+                                        const text = await res.text();
+                                        try {
+                                            return { success: true, data: JSON.parse(text) };
+                                        } catch {
+                                            return { success: true, data: text };
+                                        }
+                                    } catch (e) {
+                                        return { success: false, error: e.message };
+                                    }
+                                })()
+                            `);
+
+                            if (result.success) {
+                                sendSuccess = true;
+                                console.log(`[MiniChat] ✅ chat-send через WebView: OK`);
+                            } else {
+                                console.log(`[MiniChat] ❌ chat-send через WebView:`, result.error);
+                            }
+                        } catch (e) {
+                            console.log(`[MiniChat] ⚠️ WebView chat-send error:`, e.message);
+                        }
+                    }
+
+                    // Fallback на axios если WebView не работает
+                    if (!sendSuccess) {
+                        const payload = { recipientId: minichatPartnerId, body: message };
+                        await makeApiRequest(bot, 'POST', '/chat-send', payload);
+                    }
                 } else {
                     // Отправка через почтовый API
                     const checkRes = await makeApiRequest(bot, 'GET', `/api/messages/check-send/${minichatPartnerId}`);
@@ -1931,6 +2009,11 @@
                 webview.useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
                 webview.addEventListener('dom-ready', () => {
+                    // 0. Отключаем звук в WebView (чтобы не дублировался со звуком бота)
+                    if (webview.setAudioMuted) {
+                        webview.setAudioMuted(true);
+                    }
+
                     // 1. Внедрение скрипта "Анти-сон" (Keep-Alive)
                     webview.executeJavaScript(KEEP_ALIVE_SCRIPT);
                     
