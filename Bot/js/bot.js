@@ -2055,9 +2055,30 @@
                     return;
                 }
                 try {
-                    console.log(`[Lababot] 🔍 checkChatSync ВЫЗОВ для бота #${this.id}...`);
+                    console.log(`[Lababot] 🔍 checkChatSync ВЫЗОВ для бота #${this.id}, token: ${this.token?.substring(0, 20)}...`);
                     const res = await makeApiRequest(this, 'POST', '/chat-sync', {});
-                    console.log(`[Lababot] 📥 checkChatSync ОТВЕТ:`, JSON.stringify(res?.data || res, null, 2).substring(0, 500));
+                    console.log(`[Lababot] 📥 checkChatSync STATUS: ${res?.status}, Content-Type: ${res?.headers?.['content-type']}`);
+                    console.log(`[Lababot] 📥 checkChatSync DATA TYPE: ${typeof res?.data}, isHTML: ${typeof res?.data === 'string' && res?.data?.includes('<!DOCTYPE')}`);
+
+                    // Если получили HTML вместо JSON - пробуем альтернативный эндпоинт
+                    if (typeof res?.data === 'string' && res?.data?.includes('<!DOCTYPE')) {
+                        console.error(`[Lababot] ❌ /chat-sync вернул HTML! Пробуем /api/chat/sync...`);
+
+                        // Пробуем альтернативные эндпоинты
+                        const altEndpoints = ['/api/chat/sync', '/api/chats', '/api/chat-sessions'];
+                        for (const altPath of altEndpoints) {
+                            try {
+                                const altRes = await makeApiRequest(this, 'POST', altPath, {});
+                                console.log(`[Lababot] 🔄 Попытка ${altPath}: status=${altRes?.status}, type=${typeof altRes?.data}`);
+                                if (altRes?.data && typeof altRes?.data === 'object') {
+                                    console.log(`[Lababot] ✅ Найден рабочий эндпоинт: ${altPath}`, altRes.data);
+                                }
+                            } catch (e) {
+                                console.log(`[Lababot] ❌ ${altPath} не работает:`, e.message);
+                            }
+                        }
+                        return; // Не обрабатываем HTML как данные чата
+                    }
                     const data = res.data;
                     if(data) {
                         const currentSessions = data.ChatSessions || [];
