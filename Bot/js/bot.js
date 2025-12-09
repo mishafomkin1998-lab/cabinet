@@ -1170,7 +1170,8 @@
                 method: method,
                 url: endpoint,
                 headers: { 'Content-Type': 'application/json' },
-                data: data
+                data: data,
+                withCredentials: true // Для сохранения и отправки cookies (нужно для /chat-* эндпоинтов)
             };
             if (bot && bot.token) config.headers.Authorization = `Bearer ${bot.token}`;
 
@@ -4081,6 +4082,11 @@
             const e=document.getElementById('loginError'); const s=document.getElementById('loginSpinner'); if(s) s.style.display='inline-block';
             try {
                 const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: login, Password: pass });
+
+                // DEBUG: Логируем cookies и headers после логина
+                console.log(`[Login] Headers:`, res.headers);
+                console.log(`[Login] Set-Cookie:`, res.headers['set-cookie']);
+                console.log(`[Login] Current cookies:`, document.cookie);
 
                 if(res.data.Token) {
                     const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
