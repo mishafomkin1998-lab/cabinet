@@ -736,6 +736,13 @@
             const bot = bots[minichatBotId];
             if (!bot) return;
 
+            console.log(`[MiniChat] 📥 Загрузка истории чата:`, {
+                botId: bot.id,
+                profileId: bot.displayId,
+                partnerId: minichatPartnerId,
+                hasWebView: !!bot.webview
+            });
+
             const chatHistoryEl = document.getElementById('minichat-history');
 
             try {
@@ -782,16 +789,20 @@
 
                 // Fallback на axios если WebView не работает
                 if (!data) {
+                    console.log(`[MiniChat] 📥 Загрузка через axios (fallback):`, { partnerId: minichatPartnerId });
                     const res = await makeApiRequest(bot, 'POST', '/chat-messages', { id: minichatPartnerId });
                     data = res.data;
+                    console.log(`[MiniChat] 📥 axios chat-messages result:`, { success: data?.IsSuccess, messagesCount: data?.Messages?.length });
                 }
 
                 if (!data || !data.IsSuccess) {
+                    console.log(`[MiniChat] ❌ Не удалось загрузить чат:`, { data });
                     chatHistoryEl.innerHTML = '<div class="text-center text-danger small mt-5">Ошибка загрузки чата.</div>';
                     return;
                 }
 
                 const msgs = data.Messages || [];
+                console.log(`[MiniChat] ✅ Загружено сообщений:`, msgs.length);
 
                 chatHistoryEl.innerHTML = '';
 
@@ -964,6 +975,15 @@
 
             if (!message || !bot) return;
 
+            console.log(`[MiniChat] 🚀 Начало отправки ${minichatType === 'chat' ? 'чата' : 'письма'}:`, {
+                botId: bot.id,
+                profileId: bot.displayId,
+                partnerId: minichatPartnerId,
+                type: minichatType,
+                messageLength: message.length,
+                hasWebView: !!bot.webview
+            });
+
             inputEl.value = 'Отправка...';
             inputEl.disabled = true;
 
@@ -1019,13 +1039,17 @@
 
                     // Fallback на axios если WebView не работает
                     if (!sendSuccess) {
+                        console.log(`[MiniChat] 📤 Отправка чата через axios (fallback):`, { botId: bot.displayId, partnerId: minichatPartnerId });
                         const payload = { recipientId: minichatPartnerId, body: message };
-                        await makeApiRequest(bot, 'POST', '/chat-send', payload);
+                        const response = await makeApiRequest(bot, 'POST', '/chat-send', payload);
+                        console.log(`[MiniChat] ✅ chat-send через axios:`, response.data);
                     }
                 } else {
                     // Отправка через почтовый API
+                    console.log(`[MiniChat] 📤 Проверка возможности отправки письма для partnerId:`, minichatPartnerId);
                     const checkRes = await makeApiRequest(bot, 'GET', `/api/messages/check-send/${minichatPartnerId}`);
-                    if (!checkRes.data.CheckId) throw new Error("Check send failed");
+                    console.log(`[MiniChat] 📋 CheckId получен:`, checkRes.data.CheckId);
+                    if (!checkRes.data.CheckId) throw new Error("Check send failed - нет CheckId");
 
                     const payload = {
                         CheckId: checkRes.data.CheckId,
@@ -1035,8 +1059,12 @@
                         AttachmentName: null, AttachmentHash: null, AttachmentFile: null
                     };
 
-                    await makeApiRequest(bot, 'POST', '/api/messages/send', payload);
+                    console.log(`[MiniChat] 📤 Отправка письма:`, { botId: bot.displayId, payload });
+                    const response = await makeApiRequest(bot, 'POST', '/api/messages/send', payload);
+                    console.log(`[MiniChat] ✅ Письмо отправлено:`, response.data);
                 }
+
+                console.log(`[MiniChat] ✅ Сообщение успешно отправлено!`, { type: minichatType, partnerId: minichatPartnerId });
 
                 const chatHistoryEl = document.getElementById('minichat-history');
                 const msgDiv = document.createElement('div');
@@ -1049,8 +1077,14 @@
                 inputEl.value = '';
 
             } catch (e) {
+                console.error(`[MiniChat] ❌ Ошибка отправки ${minichatType}:`, {
+                    error: e.message,
+                    response: e.response?.data,
+                    status: e.response?.status,
+                    botId: bot.displayId,
+                    partnerId: minichatPartnerId
+                });
                 alert(`Ошибка отправки ${minichatType === 'chat' ? 'чата' : 'письма'}. См. консоль.`);
-                console.error("MiniChat send error:", e);
                 inputEl.value = message;
             } finally {
                 inputEl.disabled = false;
@@ -2384,7 +2418,7 @@
                                     this.id,
                                     { partnerId: msg.User.AccountId, partnerName: msg.User.Name, messageId: msg.MessageId }
                                 );
-                                playSound('message');
+                                // playSound('message') убран - Logger.add уже воспроизводит звук для type='mail'
                             }
                         });
 
