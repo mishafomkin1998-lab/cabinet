@@ -38,9 +38,10 @@
         let activeTabId = null;
         let currentModalBotId = null;
         let editingTemplateIndex = null;
-        let editingBotId = null; 
+        let editingBotId = null;
         let currentStatsType = null;
-        
+        let isShiftPressed = false; // Глобальное отслеживание Shift для bulk-действий
+
         let minichatBotId = null;
         let minichatPartnerId = null;
         let minichatLastMessageId = 0;
@@ -1039,13 +1040,18 @@
             document.removeEventListener('mouseup', stopTabDrag);
         }
 
-        window.onload = async function() { 
-            restoreSession(); 
-            loadGlobalSettingsUI(); 
+        window.onload = async function() {
+            restoreSession();
+            loadGlobalSettingsUI();
             toggleExtendedFeatures();
             initHotkeys();
             initTooltips();
-            
+
+            // Глобальное отслеживание Shift для bulk-действий
+            document.addEventListener('keydown', (e) => { if (e.key === 'Shift') isShiftPressed = true; });
+            document.addEventListener('keyup', (e) => { if (e.key === 'Shift') isShiftPressed = false; });
+            window.addEventListener('blur', () => { isShiftPressed = false; }); // Сброс при потере фокуса
+
             document.addEventListener('click', (e) => {
                 if(!e.target.closest('.ai-container')) {
                     document.querySelectorAll('.ai-options').forEach(el => el.classList.remove('show'));
@@ -1590,9 +1596,11 @@
         function initHotkeys() {
             document.addEventListener('keydown', function(e) {
                 if(!globalSettings.hotkeys) return;
-                if(e.ctrlKey && e.key === 'Tab') { e.preventDefault(); switchTabRelative(1); }
+                // Alt+→ - следующая вкладка, Alt+← - предыдущая вкладка
+                if(e.altKey && e.key === 'ArrowRight') { e.preventDefault(); switchTabRelative(1); }
+                else if(e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); switchTabRelative(-1); }
                 else if(e.shiftKey && e.key === 'F5') { e.preventDefault(); reloginAllBots(); }
-                else if(e.key === 'F5') { e.preventDefault(); if(activeTabId && bots[activeTabId]) bots[activeTabId].doActivity(); } 
+                else if(e.key === 'F5') { e.preventDefault(); if(activeTabId && bots[activeTabId]) bots[activeTabId].doActivity(); }
             });
         }
         
@@ -2919,13 +2927,13 @@
                     </select>
                     
                     <div class="d-flex align-items-center gap-2 mb-2">
-                        <select class="form-select form-select-sm" id="speed-select-${bot.id}" style="width: 100px;" onchange="handleSpeedChange('${bot.id}', this.value, event)" title="Скорость отправки (Shift=всем)">
+                        <select class="form-select form-select-sm" id="speed-select-${bot.id}" style="width: 100px;" onchange="handleSpeedChange('${bot.id}', this.value)" title="Скорость отправки (Shift=всем)">
                             <option value="smart" selected>Smart</option>
                             <option value="15">15s</option>
                             <option value="30">30s</option>
                         </select>
                         <div class="form-check small m-0 hide-in-chat" title="Auto: Payers -> My Favorite -> Favorites -> Inbox -> Online (Shift=всем)">
-                            <input class="form-check-input" type="checkbox" id="auto-check-${bot.id}" onchange="handleAutoChange('${bot.id}', event)">
+                            <input class="form-check-input" type="checkbox" id="auto-check-${bot.id}" onchange="handleAutoChange('${bot.id}')">
                             <label class="form-check-label text-muted" for="auto-check-${bot.id}">Auto</label>
                         </div>
                         <div class="form-check small m-0 hide-in-chat" title="Отправлять только пользователям с фото">
@@ -3048,12 +3056,12 @@
         }
 
         // Обработчик Auto с поддержкой Shift
-        function handleAutoChange(botId, event) {
+        function handleAutoChange(botId) {
             const checkbox = document.getElementById(`auto-check-${botId}`);
             const isChecked = checkbox.checked;
 
-            if (event && event.shiftKey) {
-                // Применяем ко всем анкетам
+            if (isShiftPressed) {
+                // Shift зажат - применяем ко всем анкетам
                 setAutoForAll(isChecked);
             } else {
                 // Обычное поведение - только для этой анкеты
@@ -3082,9 +3090,9 @@
         }
 
         // Обработчик скорости с поддержкой Shift
-        function handleSpeedChange(botId, val, event) {
-            if (event && event.shiftKey) {
-                // Применяем ко всем анкетам
+        function handleSpeedChange(botId, val) {
+            if (isShiftPressed) {
+                // Shift зажат - применяем ко всем анкетам
                 setSpeedForAll(val);
             } else {
                 // Обычное поведение
@@ -3663,10 +3671,14 @@
                 const idx = sel ? sel.value : "";
 
                 if (idx !== "" && tpls[idx]) {
-                    tpls.splice(idx, 1);
+                    const idxNum = parseInt(idx);
+                    tpls.splice(idxNum, 1);
                     localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
                     await saveTemplatesToServer(bot.displayId, type, tpls);
-                    updateTemplateDropdown(botId);
+
+                    // Выбираем предыдущий шаблон (или последний доступный)
+                    const newIdx = tpls.length > 0 ? Math.min(idxNum, tpls.length - 1) : null;
+                    updateTemplateDropdown(botId, newIdx);
                     count++;
                 }
             }
