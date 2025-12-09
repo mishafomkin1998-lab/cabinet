@@ -1483,7 +1483,7 @@
                                             <span class="text-gray-500">→</span>
                                             <span x-text="'Мужчина ' + activity.man_id"></span>
                                         </div>
-                                        <div class="text-sm text-gray-600 mt-1" x-text="activity.message_text ? '\"' + activity.message_text + '\"' : '(текст не сохранён)'"></div>
+                                        <div class="text-sm text-gray-600 mt-1" x-text="activity.message_text || '(текст не сохранён)'"></div>
                                         <div class="text-xs text-gray-400 mt-1" x-text="formatActivityTime(activity.created_at)"></div>
                                     </div>
                                 </div>
@@ -1554,7 +1554,7 @@
                                 <div class="space-y-2 text-sm">
                                     <template x-for="activity in recentActivity.filter(a => a.used_ai).slice(0, 5)" :key="activity.id">
                                         <div class="border-l-4 border-orange-400 pl-3 py-1">
-                                            <div x-text="activity.message_text ? '\"' + activity.message_text.substring(0, 100) + '...\"' : '(ИИ генерация)'"></div>
+                                            <div x-text="activity.message_text ? activity.message_text.substring(0, 100) + '...' : '(ИИ генерация)'"></div>
                                             <div class="text-xs text-gray-500" x-text="formatActivityTime(activity.created_at)"></div>
                                         </div>
                                     </template>
