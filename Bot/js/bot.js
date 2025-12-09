@@ -2052,6 +2052,14 @@
                         const now = Date.now();
                         const NOTIFY_COOLDOWN = 30000; // 30 секунд между уведомлениями для одной сессии
 
+                        // DEBUG: Логируем все сессии для отладки
+                        if (currentSessions.length > 0) {
+                            console.log(`[Lababot] 📡 checkChatSync: ${currentSessions.length} сессий`);
+                            currentSessions.forEach(s => {
+                                console.log(`  - ${s.Name} (${s.AccountId}): IsMessage=${s.IsMessage}`);
+                            });
+                        }
+
                         // Инициализируем объект для хранения времени последнего уведомления
                         if (!this.chatNotifyTimes) this.chatNotifyTimes = {};
 
@@ -2081,7 +2089,7 @@
                                     });
 
                                     // Уведомление в логгер + звук
-                                    console.log(`[Lababot] 💬 Новое сообщение от ${partnerName} (${partnerId})`);
+                                    console.log(`[Lababot] 💬 УВЕДОМЛЕНИЕ! Новое сообщение от ${partnerName} (${partnerId})`);
                                     Logger.add(`💬 Новое сообщение в чате с <b>${partnerName}</b>`, 'chat', this.id, { partnerId, partnerName });
                                 }
                             } else if (!hasUnread && sessionId) {
