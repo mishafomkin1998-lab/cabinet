@@ -700,15 +700,24 @@ function updateTemplateDropdown(botId, forceSelectIndex = null) {
     const bot = bots[botId];
     const isChat = globalMode === 'chat';
     const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
-    
+
+    // Сохраняем текущий текст textarea перед обновлением
+    const area = document.getElementById(`msg-${botId}`);
+    const currentText = area ? area.value : '';
+
     let val = (forceSelectIndex !== null) ? forceSelectIndex : sel.value;
+
+    // Если val пустой/null, но есть шаблоны - выбираем первый автоматически
+    if ((val === null || val === "" || val === undefined) && tpls.length > 0) {
+        val = 0;
+    }
+
     sel.innerHTML='<option value="">-- Выберите --</option>';
     tpls.forEach((t,i)=> sel.innerHTML+=`<option value="${i}">${t.favorite?'❤ ':''}${t.name}</option>`);
-    
+
     const btnFav = document.getElementById(`btn-fav-${botId}`);
     if(val !== null && val !== "" && val !== undefined && tpls[val]) {
          sel.value = val;
-         const area=document.getElementById(`msg-${botId}`);
          area.disabled=false;
          area.value=tpls[val].text;
          if(isChat) bots[botId].lastTplChat = val; else bots[botId].lastTplMail = val;
@@ -722,12 +731,18 @@ function updateTemplateDropdown(botId, forceSelectIndex = null) {
 
          if(btnFav) { if(tpls[val].favorite) { btnFav.classList.add('btn-heart-active','btn-danger'); btnFav.classList.remove('btn-outline-danger'); } else { btnFav.classList.remove('btn-heart-active','btn-danger'); btnFav.classList.add('btn-outline-danger'); } }
          validateInput(area);
-    } else { 
-         sel.value=""; 
-         const area = document.getElementById(`msg-${botId}`);
-         area.disabled=true; area.value=""; 
-         if(btnFav) btnFav.classList.remove('btn-heart-active'); 
-         bots[botId].updateUI(); 
+    } else {
+         sel.value="";
+         // НЕ блокируем textarea если в ней есть текст
+         if (currentText && currentText.trim() !== '') {
+             area.disabled = false;
+             area.value = currentText;
+         } else {
+             area.disabled = true;
+             area.value = "";
+         }
+         if(btnFav) btnFav.classList.remove('btn-heart-active');
+         bots[botId].updateUI();
     }
 }
 
