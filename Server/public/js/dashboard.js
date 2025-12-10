@@ -250,6 +250,16 @@
                 // Данные загружаются с сервера
                 accounts: [],
                 bots: [],
+
+                // Модальное окно логов бота
+                showBotLogsModal: false,
+                selectedBot: null,
+                botLogs: [],
+                botLogsFilter: 'all',
+                botLogsOffset: 0,
+                botLogsLimit: 50,
+                botLogsHasMore: false,
+
                 admins: [],
                 team: [],
                 myTranslators: [], // Переводчики текущего админа
@@ -294,6 +304,8 @@
                     await this.loadAllData();
                     // Автообновление каждые 30 секунд
                     setInterval(() => this.loadDashboardStats(), 30000);
+                    // Автообновление статусов ботов каждые 15 секунд
+                    setInterval(() => this.loadBotsStatus(), 15000);
                     // ВАЖНО: Пинги активности отправляются только из бота,
                     // когда переводчик реально работает (клики, печать текста).
                     // Автоматические действия бота НЕ должны генерировать пинги.
@@ -525,56 +537,46 @@
                         const res = await fetch(`${API_BASE}/api/bots/status?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
                         const data = await res.json();
                         if (data.success) {
-                            this.botsStatus = data.summary;
+                            // ИСПРАВЛЕНО: Используем botsSummary для БОТОВ, а не summary (анкеты)
+                            this.botsStatus = data.botsSummary || { online: 0, offline: 0, total: 0 };
 
-                            // Группируем по botId чтобы получить уникальные боты
-                            // Показываем только активные боты (heartbeat за последний час)
-                            const botsMap = {};
-                            const oneHourAgo = Date.now() - 60 * 60 * 1000;
+                            // API уже возвращает правильно сгруппированные боты с полной статистикой
+                            // Просто преобразуем в нужный формат для UI
+                            this.bots = (data.bots || []).map(b => {
+                                const isActive = b.status === 'online' || b.status === 'active';
 
-                            data.bots.forEach(b => {
-                                const botId = b.botId || b.bot_id || b.profileId || b.profile_id;
-                                if (botId && botId !== 'null' && botId !== 'undefined') {
-                                    const lastHeartbeat = b.lastHeartbeat ? new Date(b.lastHeartbeat).getTime() : 0;
-                                    const isRecentlyActive = lastHeartbeat > oneHourAgo;
+                                return {
+                                    id: b.botId,
+                                    name: `Бот ${b.botId.substring(0, 8)}...`,
+                                    icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
+                                    status: isActive ? 'active' : 'inactive',
+                                    os: b.platform || 'Unknown',
+                                    ip: b.ip || '-',
+                                    version: b.version || '-',
+                                    lastHeartbeat: b.lastHeartbeat,
+                                    profilesCount: b.profilesCount || 0,
+                                    // Статистика
+                                    lettersToday: b.lettersToday || 0,
+                                    lettersHour: b.lettersHour || 0,
+                                    chatsToday: b.chatsToday || 0,
+                                    chatsHour: b.chatsHour || 0,
+                                    errorsToday: b.errorsToday || 0,
+                                    errorsHour: b.errorsHour || 0,
+                                    errorRate: b.errorRate || 0,
+                                    healthStatus: b.healthStatus || 'healthy'
+                                };
+                            });
 
-                                    // Показываем только недавно активные боты
-                                    if (!isRecentlyActive) return;
-
-                                    const isActive = b.status === 'online' || b.status === 'active' || b.status === 'idle';
-
-                                    if (!botsMap[botId]) {
-                                        botsMap[botId] = {
-                                            id: botId,
-                                            name: b.name || `Бот ${botId}`,
-                                            icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
-                                            status: isActive ? 'active' : 'inactive',
-                                            os: b.platform || 'Unknown',
-                                            ip: b.ip || '-',
-                                            version: b.version || '-',
-                                            lastHeartbeat: b.lastHeartbeat,
-                                            profilesCount: b.profilesCount || 1
-                                        };
-                                    } else {
-                                        botsMap[botId].profilesCount = (botsMap[botId].profilesCount || 0) + 1;
-                                        if (isActive) {
-                                            botsMap[botId].status = 'active';
-                                        }
+                            // Также обновляем статусы анкет (profiles)
+                            if (data.profiles) {
+                                data.profiles.forEach(p => {
+                                    const acc = this.accounts.find(a => a.id === p.profileId);
+                                    if (acc) {
+                                        acc.status = p.status || 'offline';
+                                        acc.lastOnline = p.lastHeartbeat ? new Date(p.lastHeartbeat).toLocaleString('ru-RU') : '-';
                                     }
-                                }
-                            });
-                            this.bots = Object.values(botsMap);
-
-                            // Также обновляем статусы анкет
-                            data.bots.forEach(b => {
-                                const profileId = b.profileId || b.profile_id;
-                                const acc = this.accounts.find(a => a.id === profileId);
-                                if (acc) {
-                                    const isOnline = b.status === 'online' || b.status === 'active';
-                                    acc.status = isOnline ? 'online' : (b.status === 'idle' ? 'working' : 'offline');
-                                    acc.lastOnline = b.lastHeartbeat ? new Date(b.lastHeartbeat).toLocaleString('ru-RU') : '-';
-                                }
-                            });
+                                });
+                            }
                         }
                     } catch (e) { console.error('loadBotsStatus error:', e); }
                 },
@@ -1085,7 +1087,15 @@
 
                     return filtered;
                 },
-                
+
+                // Фильтрованные логи бота
+                get filteredBotLogs() {
+                    if (this.botLogsFilter === 'all') {
+                        return this.botLogs;
+                    }
+                    return this.botLogs.filter(log => log.log_type === this.botLogsFilter);
+                },
+
                 sortAccounts(field) {
                     if (this.sortBy === field) {
                         this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
@@ -2693,6 +2703,84 @@
                 },
 
                 // ========== END MAILING CONTROL FUNCTIONS ==========
+
+                // ========== BOT MANAGEMENT FUNCTIONS ==========
+
+                // Показать логи бота
+                async showBotLogs(bot) {
+                    this.selectedBot = bot;
+                    this.botLogs = [];
+                    this.botLogsOffset = 0;
+                    this.botLogsFilter = 'all';
+                    this.showBotLogsModal = true;
+                    await this.loadBotLogs();
+                },
+
+                // Загрузить логи бота
+                async loadBotLogs() {
+                    if (!this.selectedBot) return;
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/logs?userId=${this.currentUser.id}&role=${this.currentUser.role}&botId=${this.selectedBot.id}&limit=${this.botLogsLimit}&offset=${this.botLogsOffset}`);
+                        const data = await res.json();
+
+                        if (data.success) {
+                            this.botLogs = [...this.botLogs, ...data.logs];
+                            this.botLogsHasMore = data.hasMore;
+                        }
+                    } catch (e) {
+                        console.error('loadBotLogs error:', e);
+                    }
+                },
+
+                // Загрузить больше логов
+                async loadMoreBotLogs() {
+                    this.botLogsOffset += this.botLogsLimit;
+                    await this.loadBotLogs();
+                },
+
+                // Обновить логи
+                async refreshBotLogs() {
+                    this.botLogs = [];
+                    this.botLogsOffset = 0;
+                    await this.loadBotLogs();
+                },
+
+                // Переключить статус бота (включить/выключить)
+                async toggleBotStatus(bot) {
+                    const newStatus = bot.status === 'active';
+                    const confirmMsg = newStatus
+                        ? `Вы уверены, что хотите остановить бот "${bot.name}"?\n\nВсе его анкеты будут приостановлены.`
+                        : `Вы уверены, что хотите запустить бот "${bot.name}"?`;
+
+                    if (!confirm(confirmMsg)) return;
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/${bot.id}/toggle`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                active: !newStatus,
+                                userId: this.currentUser.id
+                            })
+                        });
+
+                        const data = await res.json();
+                        if (data.success) {
+                            // Обновляем статус локально
+                            bot.status = data.status === 'online' ? 'active' : 'inactive';
+                            // Перезагружаем статусы для обновления
+                            await this.loadBotsStatus();
+                        } else {
+                            alert(data.error || 'Не удалось изменить статус бота');
+                        }
+                    } catch (e) {
+                        console.error('toggleBotStatus error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
+                // ========== END BOT MANAGEMENT FUNCTIONS ==========
 
                 logout() {
                     // Очищаем данные авторизации

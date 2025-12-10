@@ -368,6 +368,7 @@ router.get('/status', asyncHandler(async (req, res) => {
 
     // 2. Получаем уникальные боты (программы) - один бот = одна строка
     // Используем GROUP BY для гарантированной уникальности по bot_id
+    // РАСШИРЕНО: Добавлена статистика по письмам, чатам и ошибкам
     const botsQuery = `
         SELECT
             h.bot_id,
@@ -379,12 +380,31 @@ router.get('/status', asyncHandler(async (req, res) => {
             CASE
                 WHEN MAX(h.timestamp) > NOW() - INTERVAL '2 minutes' THEN 'online'
                 ELSE 'offline'
-            END as bot_status
+            END as bot_status,
+            COALESCE(stats.letters_today, 0) as letters_today,
+            COALESCE(stats.letters_hour, 0) as letters_hour,
+            COALESCE(stats.chats_today, 0) as chats_today,
+            COALESCE(stats.chats_hour, 0) as chats_hour,
+            COALESCE(stats.errors_today, 0) as errors_today,
+            COALESCE(stats.errors_hour, 0) as errors_hour
         FROM heartbeats h
+        LEFT JOIN (
+            SELECT
+                bot_id,
+                COUNT(*) FILTER (WHERE type = 'outgoing' AND status = 'success' AND timestamp >= CURRENT_DATE) as letters_today,
+                COUNT(*) FILTER (WHERE type = 'outgoing' AND status = 'success' AND timestamp >= NOW() - INTERVAL '1 hour') as letters_hour,
+                COUNT(*) FILTER (WHERE type = 'chat_msg' AND status = 'success' AND timestamp >= CURRENT_DATE) as chats_today,
+                COUNT(*) FILTER (WHERE type = 'chat_msg' AND status = 'success' AND timestamp >= NOW() - INTERVAL '1 hour') as chats_hour,
+                COUNT(*) FILTER (WHERE status = 'failed' AND timestamp >= CURRENT_DATE) as errors_today,
+                COUNT(*) FILTER (WHERE status = 'failed' AND timestamp >= NOW() - INTERVAL '1 hour') as errors_hour
+            FROM messages
+            WHERE timestamp >= CURRENT_DATE - INTERVAL '1 day'
+            GROUP BY bot_id
+        ) stats ON h.bot_id = stats.bot_id
         WHERE h.bot_id IS NOT NULL
           AND h.bot_id != ''
           AND h.timestamp > NOW() - INTERVAL '1 hour'
-        GROUP BY h.bot_id
+        GROUP BY h.bot_id, stats.letters_today, stats.letters_hour, stats.chats_today, stats.chats_hour, stats.errors_today, stats.errors_hour
         ORDER BY last_heartbeat DESC
     `;
     const botsResult = await pool.query(botsQuery);
@@ -396,6 +416,21 @@ router.get('/status', asyncHandler(async (req, res) => {
     const botStatusCounts = { online: 0, offline: 0 };
     const uniqueBots = botsResult.rows.map(row => {
         botStatusCounts[row.bot_status]++;
+
+        // Вычисляем процент ошибок для цветовой индикации
+        const totalMessages = parseInt(row.letters_today) + parseInt(row.chats_today);
+        const errorRate = totalMessages > 0 ? (parseInt(row.errors_today) / totalMessages) * 100 : 0;
+
+        // Определяем состояние здоровья бота
+        let healthStatus = 'healthy'; // green
+        if (row.bot_status === 'offline') {
+            healthStatus = 'offline'; // gray
+        } else if (errorRate > 10) {
+            healthStatus = 'critical'; // red
+        } else if (errorRate > 0) {
+            healthStatus = 'warning'; // yellow
+        }
+
         return {
             botId: row.bot_id,
             ip: row.ip || '-',
@@ -403,7 +438,16 @@ router.get('/status', asyncHandler(async (req, res) => {
             platform: row.platform || 'Unknown',
             lastHeartbeat: row.last_heartbeat,
             profilesCount: parseInt(row.profiles_count) || 0,
-            status: row.bot_status
+            status: row.bot_status,
+            // Статистика
+            lettersToday: parseInt(row.letters_today) || 0,
+            lettersHour: parseInt(row.letters_hour) || 0,
+            chatsToday: parseInt(row.chats_today) || 0,
+            chatsHour: parseInt(row.chats_hour) || 0,
+            errorsToday: parseInt(row.errors_today) || 0,
+            errorsHour: parseInt(row.errors_hour) || 0,
+            errorRate: Math.round(errorRate),
+            healthStatus: healthStatus
         };
     });
 
