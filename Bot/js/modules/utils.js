@@ -1,6 +1,34 @@
+// Генерация или получение постоянного Machine ID
+function getMachineId() {
+    let machineId = localStorage.getItem('lababot_machine_id');
+
+    if (!machineId) {
+        // Генерируем уникальный Machine ID на основе:
+        // 1. Временной метки
+        // 2. Случайного числа
+        // 3. UserAgent (для уникальности на разных устройствах)
+        const timestamp = Date.now();
+        const random = Math.floor(Math.random() * 1000000);
+        const userAgentHash = navigator.userAgent.split('').reduce((a, b) => {
+            a = ((a << 5) - a) + b.charCodeAt(0);
+            return a & a;
+        }, 0);
+
+        machineId = `machine_${timestamp}_${random}_${Math.abs(userAgentHash)}`;
+
+        // Сохраняем в localStorage
+        localStorage.setItem('lababot_machine_id', machineId);
+        console.log(`🆔 Создан новый Machine ID: ${machineId}`);
+    } else {
+        console.log(`🆔 Использую существующий Machine ID: ${machineId}`);
+    }
+
+    return machineId;
+}
+
 const forbiddenWords = [
-    "Fuck", "Shit", "Ass", "Bitch", "Damn", "Hell", "Dick", "Cunt", "Pussy", 
-    "Cock", "Tits", "Bastard", "Motherfucker", "Asshole", "Son of a bitch", 
+    "Fuck", "Shit", "Ass", "Bitch", "Damn", "Hell", "Dick", "Cunt", "Pussy",
+    "Cock", "Tits", "Bastard", "Motherfucker", "Asshole", "Son of a bitch",
     "Goddammit", "Piss", "Crap", "Fart", "Wanker"
 ];
 

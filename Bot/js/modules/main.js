@@ -979,7 +979,8 @@ async function performLogin(login, pass, displayId) {
         console.log(`[Login] Current cookies:`, document.cookie);
 
         if(res.data.Token) {
-            const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
+            // Используем постоянный Machine ID вместо временного
+            const bid = getMachineId();
             const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
             bots[bid] = bot; createInterface(bot); selectTab(bid); saveSession();
 

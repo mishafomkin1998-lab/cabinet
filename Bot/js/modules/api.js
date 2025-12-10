@@ -114,7 +114,9 @@ async function sendIncomingMessageToLababot(params) {
 // 3. Функция отправки heartbeat
 async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
     console.log(`❤️ Отправляю heartbeat для ${displayId}`);
-    
+    console.log(`🆔 BOT ID для heartbeat: ${botId}`);
+    console.log(`📍 Display ID: ${displayId}`);
+
     try {
         const response = await fetch(`${LABABOT_SERVER}/api/heartbeat`, {
             method: 'POST',
@@ -135,7 +137,8 @@ async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
         });
 
         const data = await response.json();
-        console.log(`✅ Heartbeat отправлен:`, data);
+        console.log(`✅ Heartbeat отправлен успешно!`);
+        console.log(`📦 Ответ сервера:`, data);
         return data;
     } catch (error) {
         console.error(`❌ Ошибка heartbeat:`, error);
