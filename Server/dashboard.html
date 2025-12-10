@@ -1012,56 +1012,80 @@
                             <thead>
                                 <tr class="border-b border-gray-200 text-xs text-gray-600 uppercase tracking-wide">
                                     <!-- Чекбокс для выбора всех -->
-                                    <th class="text-left py-2 px-3 w-10">
+                                    <th class="text-left py-1.5 px-2 w-10">
                                         <input type="checkbox"
                                                class="profile-checkbox"
                                                @change="toggleSelectAllProfiles($event.target.checked)"
                                                :checked="selectedProfileIds.length > 0 && selectedProfileIds.length === filteredAccounts.length"
                                                :indeterminate="selectedProfileIds.length > 0 && selectedProfileIds.length < filteredAccounts.length">
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 100px;" @click="sortAccounts('id')">
-                                        <span x-text="t('profiles.id')"></span>
-                                        <i class="fas ml-1" :class="sortBy === 'id' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                    <th class="text-left py-1.5 px-2 cursor-pointer hover:bg-gray-50 font-medium" style="width: 100px;" @click="sortAccounts('id')">
+                                        <div class="flex items-center gap-1 overflow-hidden">
+                                            <span class="truncate" x-text="t('profiles.id')"></span>
+                                            <i class="fas text-[10px] flex-shrink-0" :class="sortBy === 'id' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        </div>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 100px;" @click="sortAccounts('status')">
-                                        <span x-text="t('profiles.statusCol')"></span>
-                                        <i class="fas ml-1" :class="sortBy === 'status' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                    <th class="text-left py-1.5 px-2 cursor-pointer hover:bg-gray-50 font-medium" style="width: 100px;" @click="sortAccounts('status')">
+                                        <div class="flex items-center gap-1 overflow-hidden">
+                                            <span class="truncate" x-text="t('profiles.statusCol')"></span>
+                                            <i class="fas text-[10px] flex-shrink-0" :class="sortBy === 'status' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        </div>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('lastOnline')">
-                                        <span x-text="t('profiles.lastOnline')"></span>
-                                        <i class="fas ml-1" :class="sortBy === 'lastOnline' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                    <th class="text-left py-1.5 px-2 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('lastOnline')">
+                                        <div class="flex items-center gap-1 overflow-hidden">
+                                            <span class="truncate" x-text="t('profiles.lastOnline')"></span>
+                                            <i class="fas text-[10px] flex-shrink-0" :class="sortBy === 'lastOnline' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        </div>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 100px;" @click="sortAccounts('incoming')">
-                                        <span x-text="t('profiles.incoming')"></span>
-                                        <i class="fas ml-1" :class="sortBy === 'incoming' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                    <th class="text-left py-1.5 px-2 cursor-pointer hover:bg-gray-50 font-medium" style="width: 100px;" @click="sortAccounts('incoming')">
+                                        <div class="flex items-center gap-1 overflow-hidden">
+                                            <span class="truncate" x-text="t('profiles.incoming')"></span>
+                                            <i class="fas text-[10px] flex-shrink-0" :class="sortBy === 'incoming' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        </div>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th x-show="currentUser.role === 'director'" class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('admin')">
-                                        <span x-text="t('profiles.admin')"></span>
-                                        <i class="fas ml-1" :class="sortBy === 'admin' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                    <th x-show="currentUser.role === 'director'" class="text-left py-1.5 px-2 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('admin')">
+                                        <div class="flex items-center gap-1 overflow-hidden">
+                                            <span class="truncate" x-text="t('profiles.admin')"></span>
+                                            <i class="fas text-[10px] flex-shrink-0" :class="sortBy === 'admin' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        </div>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
                                     <!-- Колонка Переводчик для админа -->
-                                    <th x-show="currentUser.role === 'admin'" class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('translator')">
-                                        <span>Переводчик</span>
-                                        <i class="fas ml-1" :class="sortBy === 'translator' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                    <th x-show="currentUser.role === 'admin'" class="text-left py-1.5 px-2 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('translator')">
+                                        <div class="flex items-center gap-1 overflow-hidden">
+                                            <span class="truncate">Переводчик</span>
+                                            <i class="fas text-[10px] flex-shrink-0" :class="sortBy === 'translator' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        </div>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('date')">
-                                        <span x-text="t('profiles.addedDate')"></span>
-                                        <i class="fas ml-1" :class="sortBy === 'date' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                    <th class="text-left py-1.5 px-2 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('date')">
+                                        <div class="flex items-center gap-1 overflow-hidden">
+                                            <span class="truncate" x-text="t('profiles.addedDate')"></span>
+                                            <i class="fas text-[10px] flex-shrink-0" :class="sortBy === 'date' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        </div>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 font-medium" style="width: 150px;" x-text="t('profiles.commentCol')">
+                                    <th class="text-left py-1.5 px-2 font-medium" style="width: 150px;">
+                                        <div class="flex items-center overflow-hidden">
+                                            <span class="truncate" x-text="t('profiles.commentCol')"></span>
+                                        </div>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 font-medium" style="width: 100px;">Оплата
+                                    <th class="text-left py-1.5 px-2 font-medium" style="width: 100px;">
+                                        <div class="flex items-center overflow-hidden">
+                                            <span class="truncate">Оплата</span>
+                                        </div>
                                         <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
                                     </th>
-                                    <th class="text-left py-2 px-3 font-medium" x-text="t('common.actions')"></th>
+                                    <th class="text-left py-1.5 px-2 font-medium">
+                                        <div class="flex items-center overflow-hidden">
+                                            <span class="truncate" x-text="t('common.actions')"></span>
+                                        </div>
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1071,46 +1095,46 @@
                                                 'account-online': account.status === 'online' && !account.paused,
                                                 'account-offline': account.status === 'offline' && !account.paused}">
                                         <!-- Чекбокс для выбора -->
-                                        <td class="py-2 px-3">
+                                        <td class="py-1.5 px-2">
                                             <input type="checkbox"
                                                    class="profile-checkbox"
                                                    :value="account.id"
                                                    :checked="selectedProfileIds.includes(String(account.id))"
                                                    @change="toggleProfileSelection(account.id, $event.target.checked)">
                                         </td>
-                                        <td class="py-2 px-3 font-mono" x-text="account.id"></td>
-                                        <td class="py-2 px-3">
+                                        <td class="py-1.5 px-2 font-mono" x-text="account.id"></td>
+                                        <td class="py-1.5 px-2">
                                             <span class="px-2 py-0.5 rounded-full text-xs"
                                                   :class="getStatusClass(account.status)"
                                                   x-text="getStatusText(account.status)">
                                             </span>
                                         </td>
-                                        <td class="py-2 px-3 text-gray-500">
+                                        <td class="py-1.5 px-2 text-gray-500">
                                             <span x-show="account.status === 'online' || account.status === 'working'">-</span>
                                             <span x-show="!(account.status === 'online' || account.status === 'working')" x-text="account.lastOnline || '-'"></span>
                                         </td>
-                                        <td class="py-2 px-3">
+                                        <td class="py-1.5 px-2">
                                             <span class="px-2 py-0.5 rounded text-xs"
                                                   :class="account.incoming > 0 ? 'bg-white text-green-600 font-medium shadow-sm' : 'bg-gray-100 text-gray-400'"
                                                   x-text="account.incoming || 0"></span>
                                         </td>
-                                        <td x-show="currentUser.role === 'director'" class="py-2 px-3">
+                                        <td x-show="currentUser.role === 'director'" class="py-1.5 px-2">
                                             <span class="text-xs font-medium"
                                                   :class="account.admin ? getAdminColor(account.adminId, account.admin) : 'text-gray-400'"
                                                   x-text="account.admin || 'Нет админа'"></span>
                                         </td>
                                         <!-- Колонка Переводчик для админа -->
-                                        <td x-show="currentUser.role === 'admin'" class="py-2 px-3">
+                                        <td x-show="currentUser.role === 'admin'" class="py-1.5 px-2">
                                             <span class="px-2 py-0.5 rounded text-xs"
                                                   :class="account.translatorName ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'"
                                                   x-text="account.translatorName || 'Не назначен'"></span>
                                         </td>
-                                        <td class="py-2 px-3 text-gray-500" x-text="account.addedDate"></td>
-                                        <td class="py-2 px-3 max-w-xs">
+                                        <td class="py-1.5 px-2 text-gray-500" x-text="account.addedDate"></td>
+                                        <td class="py-1.5 px-2 max-w-xs">
                                             <div class="truncate text-gray-600" :title="account.comment" x-text="account.comment"></div>
                                         </td>
                                         <!-- Оплата -->
-                                        <td class="py-2 px-3">
+                                        <td class="py-1.5 px-2">
                                             <div class="flex items-center space-x-2">
                                                 <span class="text-xs font-medium" :class="getPaymentStatusClass(account)" x-text="getPaymentStatusText(account)"></span>
                                                 <!-- Кнопки оплаты (только для admin не "мой админ") -->
@@ -1133,7 +1157,7 @@
                                                 </template>
                                             </div>
                                         </td>
-                                        <td class="py-2 px-3">
+                                        <td class="py-1.5 px-2">
                                             <div class="flex items-center space-x-2">
                                                 <button @click="deleteAccount(account)"
                                                         class="p-1 rounded text-red-500 hover:text-red-700 hover:bg-red-50"
