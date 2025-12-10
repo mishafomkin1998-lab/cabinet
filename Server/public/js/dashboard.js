@@ -173,6 +173,12 @@
 
                 monitoringFunction: 'lastResponses',
 
+                // Показать все элементы в детальной активности
+                showAllResponses: false,
+                showAllLetters: false,
+                showAllTemplates: false,
+                showAllAiUsage: false,
+
                 newAccountIds: '',
                 newAccountComment: '',
 

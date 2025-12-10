@@ -469,7 +469,7 @@
                                     <i class="fas fa-download mr-1"></i>Выгрузить
                                 </button>
                             </div>
-                            <template x-for="activity in recentActivity.filter(a => (a.action_type === 'chat' || a.action_type === 'letter') && a.is_reply).slice(0, 5)" :key="activity.id">
+                            <template x-for="activity in recentActivity.filter(a => (a.action_type === 'chat' || a.action_type === 'letter') && a.is_reply).slice(0, showAllResponses ? undefined : 5)" :key="activity.id">
                                 <div class="p-3 rounded-xl border border-gray-100 bg-blue-50 hover:bg-blue-100 transition-colors">
                                     <div class="font-medium mb-2">
                                         <span class="text-blue-600">↩️ Ответ</span> | Анкета <span x-text="activity.profile_id"></span> →
@@ -487,6 +487,13 @@
                             <div x-show="recentActivity.filter(a => (a.action_type === 'chat' || a.action_type === 'letter') && a.is_reply).length === 0" class="text-center text-gray-500 py-8">
                                 Нет данных об ответах
                             </div>
+                            <!-- Кнопка Показать еще -->
+                            <div x-show="recentActivity.filter(a => (a.action_type === 'chat' || a.action_type === 'letter') && a.is_reply).length > 5" class="text-center mt-3">
+                                <button @click="showAllResponses = !showAllResponses" class="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 font-medium">
+                                    <span x-show="!showAllResponses">Показать еще (<span x-text="recentActivity.filter(a => (a.action_type === 'chat' || a.action_type === 'letter') && a.is_reply).length - 5"></span>)</span>
+                                    <span x-show="showAllResponses">Свернуть</span>
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Отправленные письма -->
@@ -497,7 +504,7 @@
                                     <i class="fas fa-download mr-1"></i>Выгрузить
                                 </button>
                             </div>
-                            <template x-for="activity in recentActivity.filter(a => a.action_type === 'letter').slice(0, 5)" :key="activity.id">
+                            <template x-for="activity in recentActivity.filter(a => a.action_type === 'letter').slice(0, showAllLetters ? undefined : 5)" :key="activity.id">
                                 <div class="flex items-start p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
                                     <i class="fas fa-envelope text-green-500 mt-1 mr-3"></i>
                                     <div class="flex-1">
@@ -514,6 +521,13 @@
                             <div x-show="recentActivity.filter(a => a.action_type === 'letter').length === 0" class="text-center text-gray-500 py-8">
                                 Нет отправленных писем за выбранный период
                             </div>
+                            <!-- Кнопка Показать еще -->
+                            <div x-show="recentActivity.filter(a => a.action_type === 'letter').length > 5" class="text-center mt-3">
+                                <button @click="showAllLetters = !showAllLetters" class="px-4 py-2 text-sm text-green-600 hover:text-green-800 font-medium">
+                                    <span x-show="!showAllLetters">Показать еще (<span x-text="recentActivity.filter(a => a.action_type === 'letter').length - 5"></span>)</span>
+                                    <span x-show="showAllLetters">Свернуть</span>
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Любимая рассылка -->
@@ -525,7 +539,7 @@
                                 </button>
                             </div>
                             <div class="space-y-3">
-                                <template x-for="template in favoriteTemplates.slice(0, 3)" :key="template.id">
+                                <template x-for="template in favoriteTemplates.slice(0, showAllTemplates ? undefined : 3)" :key="template.id">
                                     <div class="p-4 rounded-xl bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200 hover:shadow-md transition-shadow">
                                         <div class="flex items-center mb-2">
                                             <i class="fas fa-heart text-red-500 mr-2"></i>
@@ -542,6 +556,13 @@
                             <div x-show="favoriteTemplates.length === 0" class="text-center text-gray-500 py-8">
                                 <i class="fas fa-heart text-gray-300 text-4xl mb-3 block"></i>
                                 Нет избранных шаблонов. Отметьте шаблон сердечком в боте.
+                            </div>
+                            <!-- Кнопка Показать еще -->
+                            <div x-show="favoriteTemplates.length > 3" class="text-center mt-3">
+                                <button @click="showAllTemplates = !showAllTemplates" class="px-4 py-2 text-sm text-pink-600 hover:text-pink-800 font-medium">
+                                    <span x-show="!showAllTemplates">Показать еще (<span x-text="favoriteTemplates.length - 3"></span>)</span>
+                                    <span x-show="showAllTemplates">Свернуть</span>
+                                </button>
                             </div>
                         </div>
 
@@ -563,7 +584,7 @@
                             <div class="glass p-4 rounded-xl">
                                 <div class="font-medium mb-2">Последние генерации:</div>
                                 <div class="space-y-2 text-sm">
-                                    <template x-for="activity in recentActivity.filter(a => a.used_ai).slice(0, 5)" :key="activity.id">
+                                    <template x-for="activity in recentActivity.filter(a => a.used_ai).slice(0, showAllAiUsage ? undefined : 5)" :key="activity.id">
                                         <div class="border-l-4 border-orange-400 pl-3 py-2 bg-orange-50 rounded-r hover:bg-orange-100 transition-colors">
                                             <div x-text="activity.message_text ? activity.message_text.substring(0, 150) + '...' : '(ИИ генерация)'"></div>
                                             <div class="text-xs text-gray-500 mt-1" x-text="formatActivityTime(activity.created_at)"></div>
@@ -573,6 +594,13 @@
                                         Нет данных об использовании ИИ
                                     </div>
                                 </div>
+                            </div>
+                            <!-- Кнопка Показать еще -->
+                            <div x-show="recentActivity.filter(a => a.used_ai).length > 5" class="text-center mt-3">
+                                <button @click="showAllAiUsage = !showAllAiUsage" class="px-4 py-2 text-sm text-orange-600 hover:text-orange-800 font-medium">
+                                    <span x-show="!showAllAiUsage">Показать еще (<span x-text="recentActivity.filter(a => a.used_ai).length - 5"></span>)</span>
+                                    <span x-show="showAllAiUsage">Свернуть</span>
+                                </button>
                             </div>
                         </div>
                     </div>
