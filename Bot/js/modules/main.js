@@ -818,11 +818,14 @@ async function deleteTemplate(botId, event) {
     let tpls = getBotTemplates(bot.login)[type];
     const idx = document.getElementById(`tpl-select-${botId}`).value;
     if (idx !== "" && (globalSettings.skipDeleteConfirm || confirm("Удалить?"))) {
-        tpls.splice(idx, 1);
+        const idxNum = parseInt(idx);
+        tpls.splice(idxNum, 1);
         localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
         await saveTemplatesToServer(bot.displayId, type, tpls);
-        updateTemplateDropdown(botId);
-        onTemplateSelect(botId);
+
+        // Выбираем предыдущий шаблон (или последний доступный)
+        const newIdx = tpls.length > 0 ? Math.min(idxNum, tpls.length - 1) : null;
+        updateTemplateDropdown(botId, newIdx);
     }
 }
 

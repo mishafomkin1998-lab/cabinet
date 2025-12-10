@@ -12,16 +12,8 @@
     <div id="error-toast" class="error-toast"><i class="fa fa-exclamation-circle"></i> <span id="error-toast-text">Ошибка</span></div>
     <div id="tooltip-popup" class="custom-tooltip-popup"></div>
 
-    <div id="logger-window">
-        <div class="logger-resize-handle" id="logger-resize-handle" title="Тяните для изменения размера"></div>
-        <div class="logger-header" id="logger-header">
-            <span><i class="fa fa-list"></i> Лог событий</span>
-            <button class="btn btn-sm btn-link text-muted p-0" onclick="toggleLogger()"><i class="fa fa-times"></i></button>
-        </div>
-        <div class="logger-content" id="logger-content">
-            <div class="text-center text-muted small mt-5">Событий пока нет...</div>
-        </div>
-    </div>
+    <!-- Контейнер для перетаскиваемых окон ответа -->
+    <div id="response-windows-container"></div>
 
     <div id="minichat-modal" class="modal-overlay" onclick="closeModal('minichat-modal')">
         <div class="modal-card" onclick="event.stopPropagation()">
@@ -84,13 +76,26 @@
 
     <div class="tabs-container" id="tabs-bar"></div>
 
-    <div id="panels-container">
-        <div id="welcome-screen">
-            <p>Нажмите <strong class="text-success">+</strong> чтобы войти.</p>
-            <small class="text-muted" id="restore-status"></small>
+    <div id="main-content-wrapper">
+        <div id="panels-container">
+            <div id="welcome-screen">
+                <p>Нажмите <strong class="text-success">+</strong> чтобы войти.</p>
+                <small class="text-muted" id="restore-status"></small>
+            </div>
+        </div>
+
+        <!-- 5-я колонка: Logger -->
+        <div id="logger-column">
+            <div class="logger-column-header">
+                <span><i class="fa fa-list"></i> Лог событий</span>
+                <button class="btn btn-sm btn-link text-muted p-0" onclick="toggleLogger()"><i class="fa fa-times"></i></button>
+            </div>
+            <div class="logger-column-content" id="logger-content">
+                <div class="text-center text-muted small mt-5">Событий пока нет...</div>
+            </div>
         </div>
     </div>
-    
+
     <!-- === ВАЖНОЕ ДОБАВЛЕНИЕ: Контейнер для скрытых браузеров === -->
     <div id="browsers-container"></div>
 
