@@ -91,12 +91,14 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
     }
 
     // 1. Записываем heartbeat
+    console.log(`❤️ Получен heartbeat от бота: ${botId}, анкета: ${accountDisplayId}`);
     await pool.query(`
         INSERT INTO heartbeats (
             bot_id, account_display_id, status,
             ip, version, platform, timestamp
         ) VALUES ($1, $2, $3, $4, $5, $6, $7)
     `, [botId, accountDisplayId, profileStatus, ip || null, version, platform, timestamp || new Date()]);
+    console.log(`✅ Heartbeat сохранен в БД`);
 
     // 2. Автосоздание анкеты в allowed_profiles если нет
     const existsAllowed = await pool.query(
