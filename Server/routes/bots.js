@@ -368,6 +368,7 @@ router.get('/status', asyncHandler(async (req, res) => {
 
     // 2. Получаем уникальные боты (программы) - один бот = одна строка
     // Используем GROUP BY для гарантированной уникальности по bot_id
+    // ФИЛЬТР: только machine_* (постоянные Machine ID), исключаем bot_* (временные ID анкет)
     const botsQuery = `
         SELECT
             h.bot_id,
@@ -383,6 +384,7 @@ router.get('/status', asyncHandler(async (req, res) => {
         FROM heartbeats h
         WHERE h.bot_id IS NOT NULL
           AND h.bot_id != ''
+          AND h.bot_id LIKE 'machine_%'
           AND h.timestamp > NOW() - INTERVAL '1 hour'
         GROUP BY h.bot_id
         ORDER BY last_heartbeat DESC
@@ -390,8 +392,13 @@ router.get('/status', asyncHandler(async (req, res) => {
     const botsResult = await pool.query(botsQuery);
 
     // DEBUG: Логируем результат запроса ботов
-    console.log(`🤖 Bots query returned ${botsResult.rows.length} rows:`,
-        botsResult.rows.map(r => ({ botId: r.bot_id, ts: r.last_heartbeat })));
+    console.log(`🤖 Bots query returned ${botsResult.rows.length} rows`);
+    console.log('📊 First 3 bots:', botsResult.rows.slice(0, 3).map(r => ({
+        botId: r.bot_id,
+        profilesCount: r.profiles_count,
+        status: r.bot_status,
+        lastHeartbeat: r.last_heartbeat
+    })));
 
     const botStatusCounts = { online: 0, offline: 0 };
     const uniqueBots = botsResult.rows.map(row => {
@@ -406,6 +413,8 @@ router.get('/status', asyncHandler(async (req, res) => {
             status: row.bot_status
         };
     });
+
+    console.log(`🎯 botsSummary: online=${botStatusCounts.online}, offline=${botStatusCounts.offline}, total=${uniqueBots.length}`);
 
     res.json({
         success: true,
