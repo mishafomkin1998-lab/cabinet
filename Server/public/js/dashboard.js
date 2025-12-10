@@ -395,8 +395,14 @@
                     this.loading = false;
                 },
 
-                async loadDashboardStats() {
+                async loadDashboardStats(preserveOnline = false) {
                     try {
+                        // Сохраняем текущие значения онлайн если есть фильтр по датам
+                        const savedOnline = preserveOnline ? {
+                            totalProfiles: this.stats.metrics?.totalProfiles,
+                            profilesOnline: this.stats.metrics?.profilesOnline
+                        } : null;
+
                         let url = `${API_BASE}/api/dashboard?userId=${this.currentUser.id}&role=${this.currentUser.role}`;
                         if (this.statsFilter.dateFrom) {
                             url += `&dateFrom=${this.statsFilter.dateFrom}`;
@@ -408,6 +414,12 @@
                         const data = await res.json();
                         if (data.success) {
                             this.stats = data.dashboard;
+
+                            // Восстанавливаем онлайн статус если был фильтр
+                            if (preserveOnline && savedOnline) {
+                                this.stats.metrics.totalProfiles = savedOnline.totalProfiles;
+                                this.stats.metrics.profilesOnline = savedOnline.profilesOnline;
+                            }
                         }
                     } catch (e) { console.error('loadDashboardStats error:', e); }
                 },
@@ -837,8 +849,8 @@
                 },
 
                 applyDateFilter() {
-                    // Перезагружаем статистику с новым фильтром
-                    this.loadDashboardStats();
+                    // Перезагружаем статистику с новым фильтром, сохраняя онлайн статус
+                    this.loadDashboardStats(true);
                     this.loadSentLettersGrouped();
                 },
 
