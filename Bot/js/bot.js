@@ -59,6 +59,34 @@
             return `conv_${botId}_${recipientId}`;
         }
 
+        // Генерация или получение постоянного Machine ID
+        function getMachineId() {
+            let machineId = localStorage.getItem('lababot_machine_id');
+
+            if (!machineId) {
+                // Генерируем уникальный Machine ID на основе:
+                // 1. Временной метки
+                // 2. Случайного числа
+                // 3. UserAgent (для уникальности на разных устройствах)
+                const timestamp = Date.now();
+                const random = Math.floor(Math.random() * 1000000);
+                const userAgentHash = navigator.userAgent.split('').reduce((a, b) => {
+                    a = ((a << 5) - a) + b.charCodeAt(0);
+                    return a & a;
+                }, 0);
+
+                machineId = `machine_${timestamp}_${random}_${Math.abs(userAgentHash)}`;
+
+                // Сохраняем в localStorage
+                localStorage.setItem('lababot_machine_id', machineId);
+                console.log(`🆔 Создан новый Machine ID: ${machineId}`);
+            } else {
+                console.log(`🆔 Использую существующий Machine ID: ${machineId}`);
+            }
+
+            return machineId;
+        }
+
         // Конвертация миллисекунд в формат PostgreSQL INTERVAL (HH:MM:SS)
         function millisecondsToInterval(ms) {
             if (!ms || ms <= 0) return null;
@@ -176,7 +204,7 @@
         // 3. Функция отправки heartbeat
         async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
             console.log(`❤️ Отправляю heartbeat для ${displayId}`);
-            
+
             try {
                 const response = await fetch(`${LABABOT_SERVER}/api/heartbeat`, {
                     method: 'POST',
@@ -198,10 +226,41 @@
 
                 const data = await response.json();
                 console.log(`✅ Heartbeat отправлен:`, data);
+
+                // Проверяем команду перезапуска после heartbeat
+                checkRestartCommand(botId);
+
                 return data;
             } catch (error) {
                 console.error(`❌ Ошибка heartbeat:`, error);
                 return null;
+            }
+        }
+
+        // Проверка команды перезапуска
+        async function checkRestartCommand(botId) {
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/bots/${botId}/restart-status`);
+                const data = await response.json();
+
+                if (data.success && data.restartRequested) {
+                    console.log('🔄 Получена команда перезапуска!');
+
+                    // Показываем уведомление
+                    if (confirm('Получена команда перезапуска бота. Перезапустить сейчас?')) {
+                        console.log('♻️ Перезапуск бота...');
+
+                        // Сохраняем сессию перед перезапуском
+                        await saveSession();
+
+                        // Перезагружаем страницу
+                        window.location.reload();
+                    } else {
+                        console.log('⏸️ Перезапуск отложен пользователем');
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Ошибка проверки команды перезапуска:', error);
             }
         }
 
@@ -4439,7 +4498,8 @@
                 console.log(`[Login] Current cookies:`, document.cookie);
 
                 if(res.data.Token) {
-                    const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
+                    // Используем постоянный Machine ID вместо временного
+                    const bid = getMachineId();
                     const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
                     bots[bid] = bot; createInterface(bot); selectTab(bid); saveSession();
 

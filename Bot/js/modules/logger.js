@@ -43,18 +43,21 @@ function toggleStatusGroup() {
 }
 const Logger = {
     logs: [],
+    logQueue: [], // Очередь для отправки на сервер
+    sendTimer: null,
+
     add: function(text, type, botId, data = null) {
         const now = Date.now();
         const logItem = { id: now, text, type, botId, data, time: new Date() };
-        
-        this.logs.unshift(logItem); 
-        
+
+        this.logs.unshift(logItem);
+
         if (this.logs.length > 300) {
             this.logs = this.logs.slice(0, 300);
         }
 
         this.render();
-        
+
         const win = document.getElementById('logger-window');
         if(!win.classList.contains('show')) {
             document.getElementById('btn-logger-main').classList.add('blinking');
@@ -64,7 +67,62 @@ const Logger = {
         else if (type === 'chat-request') playSound('chat'); // Новый запрос на чат
         else if (type === 'mail') playSound('message');
         else if (type === 'bday') playSound('online');
-        else if (type === 'vip-online') playSound('online'); 
+        else if (type === 'vip-online') playSound('online');
+
+        // Отправляем важные логи на сервер
+        if (type === 'error' || type === 'warning' || type === 'chat-request') {
+            this.sendToServer(text, type, botId, data);
+        }
+    },
+
+    // Отправка лога на сервер
+    sendToServer: async function(message, logType, botId, details = null) {
+        try {
+            const bot = bots[botId];
+            if (!bot) return;
+
+            const logData = {
+                botId: botId,
+                profileId: bot.displayId,
+                logType: logType === 'chat-request' ? 'info' : (logType === 'error' ? 'error' : 'warning'),
+                message: message,
+                details: details ? JSON.stringify(details) : null
+            };
+
+            // Добавляем в очередь
+            this.logQueue.push(logData);
+
+            // Отправляем пакетами каждые 5 секунд
+            if (!this.sendTimer) {
+                this.sendTimer = setTimeout(() => this.flushLogs(), 5000);
+            }
+        } catch (e) {
+            console.error('[Logger] Ошибка при подготовке лога для отправки:', e);
+        }
+    },
+
+    // Отправка накопленных логов на сервер
+    flushLogs: async function() {
+        if (this.logQueue.length === 0) {
+            this.sendTimer = null;
+            return;
+        }
+
+        const logsToSend = [...this.logQueue];
+        this.logQueue = [];
+        this.sendTimer = null;
+
+        try {
+            await fetch(`${LABABOT_SERVER}/api/bots/logs`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ logs: logsToSend })
+            });
+        } catch (e) {
+            console.error('[Logger] Ошибка при отправке логов на сервер:', e);
+            // Возвращаем логи обратно в очередь при ошибке
+            this.logQueue.unshift(...logsToSend);
+        }
     },
     render: function() {
         const container = document.getElementById('logger-content');
