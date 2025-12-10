@@ -196,63 +196,75 @@ router.get('/', asyncHandler(async (req, res) => {
     console.log('   Query result:', JSON.stringify(incoming));
 
     // ========== РАСЧЁТ ВРЕМЕНИ РАБОТЫ ПО ACTIVITY PINGS ==========
-    // Получаем все пинги за период, отсортированные по времени
-    let workTimeParams = [periodFrom, periodTo];
-    let workTimeFilter = '';
-    if (role === 'translator') {
-        workTimeFilter = 'AND translator_id = $3';
-        workTimeParams.push(userId);
-    } else if (role === 'admin') {
-        workTimeFilter = 'AND admin_id = $3';
-        workTimeParams.push(userId);
-    }
+    // Получаем все пинги активности пользователя за период
+    // Пинги отправляются когда пользователь активно работает в дашборде
 
-    let workTimeMinutes = 0;
-    try {
-        const pingsResult = await pool.query(`
-            SELECT created_at FROM activity_pings
-            WHERE created_at >= $1::date
-              AND created_at < ($2::date + interval '1 day')
-              ${workTimeFilter}
-            ORDER BY created_at ASC
-        `, workTimeParams);
+    /**
+     * Функция расчета времени работы по пингам активности
+     */
+    async function calculateWorkTime(dateFrom, dateTo, userId, role) {
+        let workTimeParams = [dateFrom, dateTo];
+        let workTimeFilter = '';
 
-        // Считаем время работы: если между пингами < 2 минут - это непрерывная работа
-        const INACTIVITY_THRESHOLD = 2 * 60 * 1000; // 2 минуты в мс
-        const PING_INTERVAL = 30 * 1000; // 30 секунд - интервал пинга
-
-        let totalMs = 0;
-        const pings = pingsResult.rows;
-
-        for (let i = 0; i < pings.length; i++) {
-            if (i === 0) {
-                // Первый пинг - считаем что работал 30 сек до него
-                totalMs += PING_INTERVAL;
-            } else {
-                const prevTime = new Date(pings[i - 1].created_at).getTime();
-                const currTime = new Date(pings[i].created_at).getTime();
-                const diff = currTime - prevTime;
-
-                if (diff <= INACTIVITY_THRESHOLD) {
-                    // Непрерывная работа
-                    totalMs += diff;
-                } else {
-                    // Был перерыв, новая сессия - добавляем только интервал пинга
-                    totalMs += PING_INTERVAL;
-                }
-            }
+        if (userId && (role === 'translator' || role === 'admin')) {
+            workTimeFilter = 'AND user_id = $3';
+            workTimeParams.push(userId);
         }
 
-        workTimeMinutes = Math.round(totalMs / 60000);
-    } catch (e) {
-        // Таблица может не существовать - игнорируем
-        console.log('activity_pings query error:', e.message);
+        let workTimeMinutes = 0;
+        try {
+            const pingsResult = await pool.query(`
+                SELECT created_at FROM user_activity
+                WHERE created_at >= $1::date
+                  AND created_at < ($2::date + interval '1 day')
+                  ${workTimeFilter}
+                ORDER BY created_at ASC
+            `, workTimeParams);
+
+            const INACTIVITY_THRESHOLD = 2 * 60 * 1000; // 2 минуты в мс
+            const PING_INTERVAL = 30 * 1000; // 30 секунд - интервал пинга
+
+            let totalMs = 0;
+            const pings = pingsResult.rows;
+
+            for (let i = 0; i < pings.length; i++) {
+                if (i === 0) {
+                    totalMs += PING_INTERVAL;
+                } else {
+                    const prevTime = new Date(pings[i - 1].created_at).getTime();
+                    const currTime = new Date(pings[i].created_at).getTime();
+                    const diff = currTime - prevTime;
+
+                    if (diff <= INACTIVITY_THRESHOLD) {
+                        totalMs += diff;
+                    } else {
+                        totalMs += PING_INTERVAL;
+                    }
+                }
+            }
+
+            workTimeMinutes = Math.round(totalMs / 60000);
+        } catch (e) {
+            console.log('user_activity query error:', e.message);
+        }
+
+        return workTimeMinutes;
     }
 
-    // Форматируем время работы
+    // Время работы за выбранный период
+    const workTimeMinutes = await calculateWorkTime(periodFrom, periodTo, userId, role);
     const workTimeHours = Math.floor(workTimeMinutes / 60);
     const workTimeMins = workTimeMinutes % 60;
     const workTimeFormatted = `${workTimeHours}ч ${workTimeMins}м`;
+
+    // Время работы за текущий месяц (всегда)
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    const workTimeMonthMinutes = await calculateWorkTime(monthStart, monthEnd, userId, role);
+    const workTimeMonthHours = Math.floor(workTimeMonthMinutes / 60);
+    const workTimeMonthMins = workTimeMonthMinutes % 60;
+    const workTimeMonthFormatted = `${workTimeMonthHours}ч ${workTimeMonthMins}м`;
 
     // Преобразуем значения
     const lettersCount = parseInt(stats.letters_count) || 0;
@@ -288,7 +300,9 @@ router.get('/', asyncHandler(async (req, res) => {
                 avgResponseTime: Math.round(avgResponseSec / 60),
                 medianResponseTime: Math.round(medianResponseSec / 60),
                 workTime: workTimeFormatted,
-                workTimeMinutes: workTimeMinutes
+                workTimeMinutes: workTimeMinutes,
+                workTimeMonth: workTimeMonthFormatted,
+                workTimeMonthMinutes: workTimeMonthMinutes
             },
             // AI статистика
             ai: {
