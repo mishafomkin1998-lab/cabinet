@@ -593,7 +593,10 @@ router.get('/by-translator', asyncHandler(async (req, res) => {
 router.post('/activity-ping', asyncHandler(async (req, res) => {
     const { userId } = req.body;
 
+    console.log(`📍 Activity ping received for user ${userId}`);
+
     if (!userId) {
+        console.warn('⚠️ Activity ping: userId missing');
         return res.status(400).json({ success: false, error: 'userId required' });
     }
 
@@ -610,6 +613,7 @@ router.post('/activity-ping', asyncHandler(async (req, res) => {
         const now = Date.now();
         if (now - lastTime < 20000) {
             // Слишком частый пинг, игнорируем
+            console.log(`   ⏭️ Skipped (too frequent, ${Math.round((now - lastTime) / 1000)}s ago)`);
             return res.json({ success: true, skipped: true });
         }
     }
@@ -619,6 +623,7 @@ router.post('/activity-ping', asyncHandler(async (req, res) => {
         VALUES ($1, 'active')
     `, [userId]);
 
+    console.log(`   ✅ Activity ping saved for user ${userId}`);
     res.json({ success: true });
 }));
 

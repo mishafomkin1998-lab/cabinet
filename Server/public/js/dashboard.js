@@ -292,19 +292,32 @@
 
                 // Инициализация отслеживания активности пользователя
                 initActivityTracking() {
+                    if (!this.currentUser || !this.currentUser.id) {
+                        console.log('⚠️ Activity tracking: user not defined');
+                        return;
+                    }
+
+                    const userId = this.currentUser.id; // Сохраняем userId
                     let lastActivity = Date.now();
                     let activityPingInterval = null;
 
                     // Функция отправки пинга активности
                     const sendActivityPing = async () => {
                         try {
-                            await fetch(`${API_BASE}/api/stats/activity-ping`, {
+                            console.log(`📍 Sending activity ping for user ${userId}`);
+                            const response = await fetch(`${API_BASE}/api/stats/activity-ping`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ userId: this.currentUser.id })
+                                body: JSON.stringify({ userId: userId })
                             });
+                            const data = await response.json();
+                            if (data.success) {
+                                console.log('✅ Activity ping sent', data.skipped ? '(skipped - too frequent)' : '');
+                            } else {
+                                console.warn('⚠️ Activity ping failed:', data.error);
+                            }
                         } catch (e) {
-                            console.log('Activity ping error:', e);
+                            console.error('❌ Activity ping error:', e);
                         }
                     };
 
@@ -318,6 +331,8 @@
                         document.addEventListener(event, trackActivity, { passive: true });
                     });
 
+                    console.log('🎯 Activity tracking initialized for user', userId);
+
                     // Отправляем первый пинг сразу
                     sendActivityPing();
 
@@ -327,6 +342,8 @@
                         // Если активность была в последние 2 минуты - отправляем пинг
                         if (timeSinceActivity < 120000) {
                             sendActivityPing();
+                        } else {
+                            console.log('⏸️ User inactive, skipping ping');
                         }
                     }, 30000);
                 },

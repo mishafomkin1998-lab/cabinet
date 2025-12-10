@@ -213,6 +213,8 @@ router.get('/', asyncHandler(async (req, res) => {
 
         let workTimeMinutes = 0;
         try {
+            console.log(`📊 Calculating work time for period ${dateFrom} - ${dateTo}, userId: ${userId}, role: ${role}`);
+
             const pingsResult = await pool.query(`
                 SELECT created_at FROM user_activity
                 WHERE created_at >= $1::date
@@ -220,6 +222,8 @@ router.get('/', asyncHandler(async (req, res) => {
                   ${workTimeFilter}
                 ORDER BY created_at ASC
             `, workTimeParams);
+
+            console.log(`   Found ${pingsResult.rows.length} activity pings`);
 
             const INACTIVITY_THRESHOLD = 2 * 60 * 1000; // 2 минуты в мс
             const PING_INTERVAL = 30 * 1000; // 30 секунд - интервал пинга
@@ -244,8 +248,9 @@ router.get('/', asyncHandler(async (req, res) => {
             }
 
             workTimeMinutes = Math.round(totalMs / 60000);
+            console.log(`   Calculated work time: ${workTimeMinutes} minutes`);
         } catch (e) {
-            console.log('user_activity query error:', e.message);
+            console.error('❌ user_activity query error:', e.message);
         }
 
         return workTimeMinutes;
@@ -256,6 +261,7 @@ router.get('/', asyncHandler(async (req, res) => {
     const workTimeHours = Math.floor(workTimeMinutes / 60);
     const workTimeMins = workTimeMinutes % 60;
     const workTimeFormatted = `${workTimeHours}ч ${workTimeMins}м`;
+    console.log(`⏱️ Work time for period: ${workTimeFormatted}`);
 
     // Время работы за текущий месяц (всегда)
     const now = new Date();
@@ -265,6 +271,7 @@ router.get('/', asyncHandler(async (req, res) => {
     const workTimeMonthHours = Math.floor(workTimeMonthMinutes / 60);
     const workTimeMonthMins = workTimeMonthMinutes % 60;
     const workTimeMonthFormatted = `${workTimeMonthHours}ч ${workTimeMonthMins}м`;
+    console.log(`⏱️ Work time for month: ${workTimeMonthFormatted}`);
 
     // Преобразуем значения
     const lettersCount = parseInt(stats.letters_count) || 0;
