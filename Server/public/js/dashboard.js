@@ -363,6 +363,7 @@
                             this.loadBotsStatus(),
                             this.loadTeam(),
                             this.loadRecentActivity(),
+                            this.loadSentLettersGrouped(),
                             this.loadFavoriteTemplates(),
                             this.loadLastResponses(),
                             this.loadAiUsage(),
