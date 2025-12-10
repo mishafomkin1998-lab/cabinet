@@ -1733,6 +1733,92 @@
                     link.click();
                 },
 
+                exportLastResponses() {
+                    const responses = this.recentActivity.filter(a => (a.action_type === 'chat' || a.action_type === 'letter') && a.is_reply);
+                    if (responses.length === 0) {
+                        alert('Нет данных об ответах для экспорта');
+                        return;
+                    }
+
+                    let content = '=== ПОСЛЕДНИЕ ОТВЕТЫ ===\n';
+                    content += `Экспорт: ${new Date().toLocaleString('ru-RU')}\n`;
+                    content += `Всего ответов: ${responses.length}\n`;
+                    content += '='.repeat(50) + '\n\n';
+
+                    responses.forEach((activity, i) => {
+                        content += `--- Ответ #${i + 1} ---\n`;
+                        content += `Дата: ${new Date(activity.created_at).toLocaleString('ru-RU')}\n`;
+                        content += `Анкета: ${activity.profile_id}\n`;
+                        content += `Мужчина: ${activity.man_id}\n`;
+                        content += `Тип: ${activity.action_type === 'chat' ? 'Чат' : 'Письмо'}\n`;
+                        content += `Текст:\n${activity.message_text || '(текст не сохранён)'}\n`;
+                        content += '\n' + '-'.repeat(40) + '\n\n';
+                    });
+
+                    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `last_responses_${new Date().toISOString().slice(0,10)}.txt`;
+                    link.click();
+                },
+
+                exportSentLetters() {
+                    const letters = this.recentActivity.filter(a => a.action_type === 'letter');
+                    if (letters.length === 0) {
+                        alert('Нет отправленных писем для экспорта');
+                        return;
+                    }
+
+                    let content = '=== ОТПРАВЛЕННЫЕ ПИСЬМА ===\n';
+                    content += `Экспорт: ${new Date().toLocaleString('ru-RU')}\n`;
+                    content += `Всего писем: ${letters.length}\n`;
+                    content += '='.repeat(50) + '\n\n';
+
+                    letters.forEach((activity, i) => {
+                        content += `--- Письмо #${i + 1} ---\n`;
+                        content += `Дата: ${new Date(activity.created_at).toLocaleString('ru-RU')}\n`;
+                        content += `Анкета: ${activity.profile_id}\n`;
+                        content += `Мужчина: ${activity.man_id}\n`;
+                        content += `Текст:\n${activity.message_text || '(текст не сохранён)'}\n`;
+                        content += '\n' + '-'.repeat(40) + '\n\n';
+                    });
+
+                    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `sent_letters_${new Date().toISOString().slice(0,10)}.txt`;
+                    link.click();
+                },
+
+                exportAiUsage() {
+                    const aiActivities = this.recentActivity.filter(a => a.used_ai);
+                    if (aiActivities.length === 0) {
+                        alert('Нет данных об использовании ИИ для экспорта');
+                        return;
+                    }
+
+                    let content = '=== ИСПОЛЬЗОВАНИЕ ИИ ===\n';
+                    content += `Экспорт: ${new Date().toLocaleString('ru-RU')}\n`;
+                    content += `Всего генераций: ${aiActivities.length}\n`;
+                    content += '='.repeat(50) + '\n\n';
+
+                    aiActivities.forEach((activity, i) => {
+                        content += `--- Генерация #${i + 1} ---\n`;
+                        content += `Дата: ${new Date(activity.created_at).toLocaleString('ru-RU')}\n`;
+                        content += `Анкета: ${activity.profile_id}\n`;
+                        content += `Мужчина: ${activity.man_id}\n`;
+                        content += `Тип: ${activity.action_type === 'chat' ? 'Чат' : 'Письмо'}\n`;
+                        content += `Текст:\n${activity.message_text || '(ИИ генерация)'}\n`;
+                        content += '\n' + '-'.repeat(40) + '\n\n';
+                    });
+
+                    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `ai_usage_${new Date().toISOString().slice(0,10)}.txt`;
+                    link.click();
+                },
+
                 // === Функции истории изменений анкет ===
                 getHistoryDateRangeText() {
                     if (this.historyFilter.dateFrom && this.historyFilter.dateTo) {

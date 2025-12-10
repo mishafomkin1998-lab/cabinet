@@ -462,8 +462,14 @@
                         <h4 class="text-md font-bold mb-4" x-text="getMonitoringTitle()"></h4>
 
                         <!-- Последние ответы -->
-                        <div x-show="monitoringFunction === 'lastResponses'" x-transition class="space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin">
-                            <template x-for="activity in recentActivity.filter(a => (a.action_type === 'chat' || a.action_type === 'letter') && a.is_reply).slice(0, 10)" :key="activity.id">
+                        <div x-show="monitoringFunction === 'lastResponses'" x-transition class="space-y-3">
+                            <!-- Кнопка экспорта -->
+                            <div class="flex justify-end mb-2" x-show="recentActivity.filter(a => (a.action_type === 'chat' || a.action_type === 'letter') && a.is_reply).length > 0">
+                                <button @click="exportLastResponses()" class="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium transition-all text-xs">
+                                    <i class="fas fa-download mr-1"></i>Выгрузить
+                                </button>
+                            </div>
+                            <template x-for="activity in recentActivity.filter(a => (a.action_type === 'chat' || a.action_type === 'letter') && a.is_reply).slice(0, 5)" :key="activity.id">
                                 <div class="p-3 rounded-xl border border-gray-100 bg-blue-50 hover:bg-blue-100 transition-colors">
                                     <div class="font-medium mb-2">
                                         <span class="text-blue-600">↩️ Ответ</span> | Анкета <span x-text="activity.profile_id"></span> →
@@ -484,8 +490,14 @@
                         </div>
 
                         <!-- Отправленные письма -->
-                        <div x-show="monitoringFunction === 'sentLetters'" x-transition class="space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin">
-                            <template x-for="activity in recentActivity.filter(a => a.action_type === 'letter')" :key="activity.id">
+                        <div x-show="monitoringFunction === 'sentLetters'" x-transition class="space-y-3">
+                            <!-- Кнопка экспорта -->
+                            <div class="flex justify-end mb-2" x-show="recentActivity.filter(a => a.action_type === 'letter').length > 0">
+                                <button @click="exportSentLetters()" class="px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium transition-all text-xs">
+                                    <i class="fas fa-download mr-1"></i>Выгрузить
+                                </button>
+                            </div>
+                            <template x-for="activity in recentActivity.filter(a => a.action_type === 'letter').slice(0, 5)" :key="activity.id">
                                 <div class="flex items-start p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
                                     <i class="fas fa-envelope text-green-500 mt-1 mr-3"></i>
                                     <div class="flex-1">
@@ -512,8 +524,8 @@
                                     <i class="fas fa-download mr-1"></i>Выгрузить
                                 </button>
                             </div>
-                            <div class="max-h-[600px] overflow-y-auto scrollbar-thin space-y-3">
-                                <template x-for="template in favoriteTemplates" :key="template.id">
+                            <div class="space-y-3">
+                                <template x-for="template in favoriteTemplates.slice(0, 3)" :key="template.id">
                                     <div class="p-4 rounded-xl bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200 hover:shadow-md transition-shadow">
                                         <div class="flex items-center mb-2">
                                             <i class="fas fa-heart text-red-500 mr-2"></i>
@@ -535,6 +547,12 @@
 
                         <!-- Использование ИИ -->
                         <div x-show="monitoringFunction === 'aiUsage'" x-transition class="space-y-4">
+                            <!-- Кнопка экспорта -->
+                            <div class="flex justify-end mb-2" x-show="recentActivity.filter(a => a.used_ai).length > 0">
+                                <button @click="exportAiUsage()" class="px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium transition-all text-xs">
+                                    <i class="fas fa-download mr-1"></i>Выгрузить
+                                </button>
+                            </div>
                             <div class="glass p-4 rounded-xl">
                                 <div class="flex justify-between items-center mb-2">
                                     <div class="font-medium" x-text="t('monitoring.aiGenerations')"></div>
@@ -542,10 +560,10 @@
                                 </div>
                                 <div class="text-sm text-gray-600" x-text="t('monitoring.recentGenerations')"></div>
                             </div>
-                            <div class="glass p-4 rounded-xl max-h-[500px] overflow-y-auto scrollbar-thin">
+                            <div class="glass p-4 rounded-xl">
                                 <div class="font-medium mb-2">Последние генерации:</div>
                                 <div class="space-y-2 text-sm">
-                                    <template x-for="activity in recentActivity.filter(a => a.used_ai).slice(0, 10)" :key="activity.id">
+                                    <template x-for="activity in recentActivity.filter(a => a.used_ai).slice(0, 5)" :key="activity.id">
                                         <div class="border-l-4 border-orange-400 pl-3 py-2 bg-orange-50 rounded-r hover:bg-orange-100 transition-colors">
                                             <div x-text="activity.message_text ? activity.message_text.substring(0, 150) + '...' : '(ИИ генерация)'"></div>
                                             <div class="text-xs text-gray-500 mt-1" x-text="formatActivityTime(activity.created_at)"></div>
