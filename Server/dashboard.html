@@ -1085,7 +1085,10 @@
                                                   x-text="getStatusText(account.status)">
                                             </span>
                                         </td>
-                                        <td class="py-2 px-3 text-gray-500" x-text="(account.status === 'online' || account.status === 'working') ? '' : account.lastOnline"></td>
+                                        <td class="py-2 px-3 text-gray-500">
+                                            <span x-show="account.status === 'online' || account.status === 'working'">-</span>
+                                            <span x-show="!(account.status === 'online' || account.status === 'working')" x-text="account.lastOnline || '-'"></span>
+                                        </td>
                                         <td class="py-2 px-3">
                                             <span class="px-2 py-0.5 rounded text-xs"
                                                   :class="account.incoming > 0 ? 'bg-white text-green-600 font-medium shadow-sm' : 'bg-gray-100 text-gray-400'"

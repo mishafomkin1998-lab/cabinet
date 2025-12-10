@@ -448,6 +448,19 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/profiles?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
                         const data = await res.json();
+
+                        // DEBUG: Проверяем что приходит с сервера
+                        console.log('📊 DEBUG loadAccounts:', data.list?.length || 0, 'profiles loaded');
+                        if (data.list && data.list.length > 0) {
+                            console.log('   First profile raw data:', {
+                                id: data.list[0].profile_id,
+                                last_online: data.list[0].last_online,
+                                incoming_month: data.list[0].incoming_month,
+                                incoming_total: data.list[0].incoming_total,
+                                status: data.list[0].status
+                            });
+                        }
+
                         if (data.success) {
                             // Загружаем статус оплаты для каждой анкеты
                             const accountsWithPayment = await Promise.all(data.list.map(async p => {
@@ -491,6 +504,17 @@
                                     trialUsed: paymentStatus.trialUsed
                                 };
                             }));
+
+                            // DEBUG: Проверяем обработанные данные
+                            if (accountsWithPayment.length > 0) {
+                                console.log('   First account processed:', {
+                                    id: accountsWithPayment[0].id,
+                                    status: accountsWithPayment[0].status,
+                                    lastOnline: accountsWithPayment[0].lastOnline,
+                                    incoming: accountsWithPayment[0].incoming
+                                });
+                            }
+
                             this.accounts = accountsWithPayment;
                         }
                     } catch (e) { console.error('loadAccounts error:', e); }

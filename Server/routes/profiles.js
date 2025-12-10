@@ -75,16 +75,26 @@ router.get('/', async (req, res) => {
             ) stats ON true
             LEFT JOIN LATERAL (
                 SELECT
-                    COUNT(*) FILTER (WHERE DATE(i.created_at) >= DATE_TRUNC('month', CURRENT_DATE)) as incoming_month,
-                    COUNT(*) as incoming_total
+                    COUNT(*) FILTER (WHERE DATE(i.created_at) >= DATE_TRUNC('month', CURRENT_DATE) AND (i.type = 'letter' OR i.type IS NULL)) as incoming_month,
+                    COUNT(*) FILTER (WHERE i.type = 'letter' OR i.type IS NULL) as incoming_total
                 FROM incoming_messages i
-                WHERE i.profile_id = p.profile_id AND i.type = 'letter'
+                WHERE i.profile_id = p.profile_id
             ) incoming ON true
             ${filter}
             ORDER BY p.id DESC
         `;
 
         const result = await pool.query(query, params);
+
+        // DEBUG: Логируем первую строку для проверки
+        if (result.rows.length > 0) {
+            console.log('📊 DEBUG Profiles API - first row:');
+            console.log('   profile_id:', result.rows[0].profile_id);
+            console.log('   last_online:', result.rows[0].last_online);
+            console.log('   incoming_month:', result.rows[0].incoming_month);
+            console.log('   incoming_total:', result.rows[0].incoming_total);
+            console.log('   status:', result.rows[0].status);
+        }
 
         // Также считаем из messages для совместимости
         const msgStatsQuery = `
