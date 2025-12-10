@@ -746,4 +746,222 @@ router.get('/work-time', asyncHandler(async (req, res) => {
     res.json({ success: true, workTime });
 }));
 
+/**
+ * GET /api/stats/last-responses
+ * Возвращает последние ответы анкет на входящие письма от мужчин
+ *
+ * Логика:
+ * 1. Берем входящие сообщения (incoming_messages)
+ * 2. Для каждого ищем последующие исходящие (messages)
+ * 3. Вычисляем время реакции от последнего входящего
+ *
+ * @query {string} userId - ID пользователя
+ * @query {string} role - Роль (translator/admin/director)
+ * @query {number} limit - Количество записей (по умолчанию 5)
+ * @query {number} offset - Смещение для пагинации (по умолчанию 0)
+ * @returns {Array} responses - Массив ответов
+ */
+router.get('/last-responses', asyncHandler(async (req, res) => {
+    const { userId, role, limit = 5, offset = 0 } = req.query;
+    const limitInt = parseInt(limit) || 5;
+    const offsetInt = parseInt(offset) || 0;
+
+    // Фильтр по ролям
+    let roleFilter = '';
+    let params = [limitInt, offsetInt];
+    let paramIndex = 3;
+
+    if (role === 'translator' && userId) {
+        roleFilter = 'AND m.translator_id = $' + paramIndex;
+        params.push(userId);
+        paramIndex++;
+    } else if (role === 'admin' && userId) {
+        roleFilter = 'AND m.admin_id = $' + paramIndex;
+        params.push(userId);
+        paramIndex++;
+    }
+    // director видит все
+
+    /**
+     * Логика запроса:
+     * 1. Берем все исходящие сообщения (messages где type='outgoing' или 'chat_msg')
+     * 2. Для каждого находим последнее входящее от того же мужчины к той же анкете
+     * 3. Вычисляем разницу времени (response_time_minutes)
+     * 4. Фильтруем только те, где есть входящее (т.е. это ответы)
+     * 5. Сортируем по времени ответа (самые новые сверху)
+     */
+    const query = `
+        WITH outgoing_with_incoming AS (
+            SELECT
+                m.id,
+                m.account_id,
+                m.sender_id as man_id,
+                m.timestamp as response_timestamp,
+                m.type,
+                mc.text_content as response_text,
+                (
+                    SELECT im.created_at
+                    FROM incoming_messages im
+                    WHERE im.profile_id = m.account_id
+                        AND im.man_id = m.sender_id
+                        AND im.created_at < m.timestamp
+                    ORDER BY im.created_at DESC
+                    LIMIT 1
+                ) as last_incoming_timestamp,
+                (
+                    SELECT im.man_name
+                    FROM incoming_messages im
+                    WHERE im.profile_id = m.account_id
+                        AND im.man_id = m.sender_id
+                    ORDER BY im.created_at DESC
+                    LIMIT 1
+                ) as man_name,
+                m.admin_id,
+                m.translator_id,
+                u_admin.username as admin_name,
+                u_trans.username as translator_name
+            FROM messages m
+            LEFT JOIN message_content mc ON m.message_content_id = mc.id
+            LEFT JOIN users u_admin ON m.admin_id = u_admin.id
+            LEFT JOIN users u_trans ON m.translator_id = u_trans.id
+            WHERE (m.type = 'outgoing' OR m.type = 'chat_msg')
+                AND m.status = 'success'
+                ${roleFilter}
+        )
+        SELECT
+            id,
+            account_id as profile_id,
+            man_id,
+            man_name,
+            response_text,
+            response_timestamp,
+            last_incoming_timestamp,
+            EXTRACT(EPOCH FROM (response_timestamp - last_incoming_timestamp))::INTEGER as response_time_seconds,
+            type,
+            admin_name,
+            translator_name
+        FROM outgoing_with_incoming
+        WHERE last_incoming_timestamp IS NOT NULL
+        ORDER BY response_timestamp DESC
+        LIMIT $1 OFFSET $2
+    `;
+
+    const result = await pool.query(query, params);
+
+    const responses = result.rows.map(row => ({
+        id: row.id,
+        profileId: row.profile_id,
+        manId: row.man_id,
+        manName: row.man_name,
+        responseText: row.response_text,
+        responseTimestamp: row.response_timestamp,
+        incomingTimestamp: row.last_incoming_timestamp,
+        responseTimeSeconds: row.response_time_seconds,
+        responseTimeFormatted: formatTime(row.response_time_seconds),
+        type: row.type,
+        adminName: row.admin_name,
+        translatorName: row.translator_name
+    }));
+
+    res.json({ success: true, responses });
+}));
+
+/**
+ * GET /api/stats/ai-usage
+ * Возвращает статистику использования AI для массовых рассылок
+ *
+ * Логика:
+ * 1. Группирует сообщения с usedAi=true по text_hash
+ * 2. Считает количество получателей для каждого уникального текста
+ * 3. Фильтрует только те, где получателей >= 10
+ * 4. Возвращает с пагинацией
+ *
+ * @query {string} userId - ID пользователя
+ * @query {string} role - Роль (translator/admin/director)
+ * @query {number} limit - Количество записей (по умолчанию 5)
+ * @query {number} offset - Смещение для пагинации (по умолчанию 0)
+ * @returns {Array} aiUsage - Массив AI рассылок
+ */
+router.get('/ai-usage', asyncHandler(async (req, res) => {
+    const { userId, role, limit = 5, offset = 0 } = req.query;
+    const limitInt = parseInt(limit) || 5;
+    const offsetInt = parseInt(offset) || 0;
+
+    // Фильтр по ролям
+    let roleFilter = '';
+    let params = [limitInt, offsetInt];
+    let paramIndex = 3;
+
+    if (role === 'translator' && userId) {
+        roleFilter = 'AND amm.translator_id = $' + paramIndex;
+        params.push(userId);
+        paramIndex++;
+    } else if (role === 'admin' && userId) {
+        roleFilter = 'AND amm.admin_id = $' + paramIndex;
+        params.push(userId);
+        paramIndex++;
+    }
+
+    /**
+     * Запрос к таблице ai_mass_messages
+     * Фильтрация: recipient_count >= 10
+     * Сортировка: по времени первой отправки (самые новые сверху)
+     */
+    const query = `
+        SELECT
+            amm.id,
+            amm.text_content,
+            amm.recipient_count,
+            amm.recipient_ids,
+            amm.profile_id,
+            amm.first_sent_at,
+            amm.last_sent_at,
+            amm.generation_session_id,
+            u_admin.username as admin_name,
+            u_trans.username as translator_name
+        FROM ai_mass_messages amm
+        LEFT JOIN users u_admin ON amm.admin_id = u_admin.id
+        LEFT JOIN users u_trans ON amm.translator_id = u_trans.id
+        WHERE amm.recipient_count >= 10
+            ${roleFilter}
+        ORDER BY amm.first_sent_at DESC
+        LIMIT $1 OFFSET $2
+    `;
+
+    const result = await pool.query(query, params);
+
+    const aiUsage = result.rows.map(row => ({
+        id: row.id,
+        textContent: row.text_content,
+        recipientCount: row.recipient_count,
+        recipientIds: row.recipient_ids,
+        profileId: row.profile_id,
+        firstSentAt: row.first_sent_at,
+        lastSentAt: row.last_sent_at,
+        generationSessionId: row.generation_session_id,
+        adminName: row.admin_name,
+        translatorName: row.translator_name
+    }));
+
+    res.json({ success: true, aiUsage });
+}));
+
+/**
+ * Вспомогательная функция для форматирования времени в читаемый вид
+ */
+function formatTime(seconds) {
+    if (!seconds) return '0с';
+
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    let result = '';
+    if (hours > 0) result += `${hours}ч `;
+    if (minutes > 0) result += `${minutes}м `;
+    if (secs > 0 || result === '') result += `${secs}с`;
+
+    return result.trim();
+}
+
 module.exports = router;

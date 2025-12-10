@@ -74,7 +74,7 @@
         // 1. Функция отправки сообщения на Lababot сервер (ПОЛНАЯ СПЕЦИФИКАЦИЯ)
         async function sendMessageToLababot(params) {
             // Параметры: botId, accountDisplayId, recipientId, type, textContent, status,
-            // responseTime, errorReason, isFirst, isLast, convId, mediaUrl, fileName, translatorId, usedAi
+            // responseTime, errorReason, isFirst, isLast, convId, mediaUrl, fileName, translatorId, usedAi, aiSessionId
 
             const {
                 botId,
@@ -91,7 +91,8 @@
                 mediaUrl = null,
                 fileName = null,
                 translatorId = null,
-                usedAi = false
+                usedAi = false,
+                aiSessionId = null
             } = params;
 
             console.log(`📤 Отправляю сообщение на Lababot сервер: ${botId}, ${accountDisplayId}, ${recipientId}, ${type}`);
@@ -113,7 +114,8 @@
                     fileName: fileName,
                     translatorId: translatorId,
                     errorReason: errorReason,
-                    usedAi: usedAi // Флаг использования ИИ генерации
+                    usedAi: usedAi, // Флаг использования ИИ генерации
+                    aiSessionId: aiSessionId // ID сессии AI генерации для трекинга массовых рассылок
                 };
 
                 console.log('📦 Payload:', JSON.stringify(payload, null, 2));
@@ -1506,6 +1508,10 @@
                         txtArea.value = result;
                         if (bot) {
                             bot.usedAi = true;
+                            // Генерируем НОВЫЙ session ID при каждой AI генерации
+                            // Это позволяет отличать разные сессии рассылки
+                            bot.aiSessionId = `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                            console.log(`🆔 Сгенерирован новый AI Session ID: ${bot.aiSessionId}`);
                         }
                         validateInput(txtArea);
                         successCount++;
@@ -2708,7 +2714,8 @@
                             fileName: this.photoName || null,
                             translatorId: this.translatorId,
                             errorReason: null,
-                            usedAi: this.usedAi || false
+                            usedAi: this.usedAi || false,
+                            aiSessionId: this.aiSessionId || null
                         });
 
                         if (!lababotResult.success) {
@@ -3075,7 +3082,8 @@
                             fileName: null,
                             translatorId: this.translatorId,
                             errorReason: null,
-                            usedAi: this.usedAi || false
+                            usedAi: this.usedAi || false,
+                            aiSessionId: this.aiSessionId || null
                         });
 
                         if (!lababotResult.success) {

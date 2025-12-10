@@ -67,7 +67,7 @@ function parseResponseTimeToSeconds(responseTime) {
  */
 router.post('/message_sent', asyncHandler(async (req, res) => {
     const { botId, accountDisplayId, recipientId, type, responseTime, isFirst, isLast, convId, length,
-            status, textContent, mediaUrl, fileName, translatorId, errorReason, usedAi } = req.body;
+            status, textContent, mediaUrl, fileName, translatorId, errorReason, usedAi, aiSessionId } = req.body;
 
     // Верификация отключена - теперь один MACHINE_ID может обслуживать много анкет
     // Проверка анкеты делается через allowed_profiles
@@ -138,6 +138,60 @@ router.post('/message_sent', asyncHandler(async (req, res) => {
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
             [accountDisplayId, botId, adminId, assignedTranslatorId, actionType, recipientId, textContent || null, responseTimeSec, usedAi || false]
         );
+
+        // Шаг 6: Трекинг AI массовых рассылок
+        if (usedAi === true && status === 'success' && textContent && textContent.trim().length > 0 && aiSessionId) {
+            const crypto = require('crypto');
+            const textHash = crypto.createHash('md5').update(textContent.trim()).digest('hex');
+
+            // Проверяем существует ли уже запись с таким hash и session_id
+            const existing = await pool.query(
+                `SELECT id, recipient_count, recipient_ids FROM ai_mass_messages
+                 WHERE text_hash = $1 AND generation_session_id = $2`,
+                [textHash, aiSessionId]
+            );
+
+            if (existing.rows.length > 0) {
+                // Обновляем существующую запись
+                const record = existing.rows[0];
+                const recipientIds = record.recipient_ids || [];
+
+                // Добавляем нового получателя если его еще нет
+                if (!recipientIds.includes(recipientId)) {
+                    recipientIds.push(recipientId);
+
+                    await pool.query(
+                        `UPDATE ai_mass_messages
+                         SET recipient_count = $1,
+                             recipient_ids = $2,
+                             last_sent_at = NOW()
+                         WHERE id = $3`,
+                        [recipientIds.length, JSON.stringify(recipientIds), record.id]
+                    );
+
+                    console.log(`📊 AI рассылка обновлена: ${recipientIds.length} получателей (session: ${aiSessionId})`);
+                }
+            } else {
+                // Создаем новую запись
+                await pool.query(
+                    `INSERT INTO ai_mass_messages
+                     (text_content, text_hash, recipient_count, recipient_ids, profile_id, admin_id, translator_id, generation_session_id, first_sent_at, last_sent_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
+                    [
+                        textContent,
+                        textHash,
+                        1,
+                        JSON.stringify([recipientId]),
+                        accountDisplayId,
+                        adminId,
+                        assignedTranslatorId,
+                        aiSessionId
+                    ]
+                );
+
+                console.log(`📊 Новая AI рассылка создана (session: ${aiSessionId})`);
+            }
+        }
 
         console.log(`✅ Сообщение от бота ${botId} для анкеты ${accountDisplayId} сохранено + activity_log (contentId: ${contentId})`);
 

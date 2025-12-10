@@ -402,6 +402,31 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_activity_date ON user_activity(created_at)`);
         await fixSerialSequence('user_activity');
 
+        // 21. Таблица AI массовых рассылок (для блока "Использование ИИ")
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS ai_mass_messages (
+                id SERIAL PRIMARY KEY,
+                text_content TEXT NOT NULL,
+                text_hash VARCHAR(64) NOT NULL,
+                recipient_count INTEGER DEFAULT 0,
+                recipient_ids JSONB DEFAULT '[]',
+                profile_id VARCHAR(100),
+                admin_id INTEGER,
+                translator_id INTEGER,
+                first_sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                generation_session_id VARCHAR(100),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_mass_hash ON ai_mass_messages(text_hash)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_mass_profile ON ai_mass_messages(profile_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_mass_admin ON ai_mass_messages(admin_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_mass_translator ON ai_mass_messages(translator_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_mass_count ON ai_mass_messages(recipient_count)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_mass_first_sent ON ai_mass_messages(first_sent_at)`);
+        await fixSerialSequence('ai_mass_messages');
+
         // Очистка старых данных
         await cleanupOldData();
 
