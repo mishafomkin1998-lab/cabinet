@@ -1,235 +1,152 @@
-/**
- * utils.js - Вспомогательные функции
- * Общие утилиты, парсинг прокси, генерация ID, форматирование
- */
+const forbiddenWords = [
+    "Fuck", "Shit", "Ass", "Bitch", "Damn", "Hell", "Dick", "Cunt", "Pussy", 
+    "Cock", "Tits", "Bastard", "Motherfucker", "Asshole", "Son of a bitch", 
+    "Goddammit", "Piss", "Crap", "Fart", "Wanker"
+];
 
-// ============================================================================
-// ПАРСИНГ ПРОКСИ
-// ============================================================================
-
-/**
- * Парсинг прокси URL в формат для axios
- * @param {string} proxyUrl - URL прокси (http://user:pass@host:port)
- * @returns {Object|null} - Конфиг для axios или null
- */
-function parseProxyUrl(proxyUrl) {
-    if (!proxyUrl || proxyUrl.trim() === '') return null;
-
+function parseProxyUrl(proxyUrlString) {
+    if (!proxyUrlString) return null;
     try {
-        const url = new URL(proxyUrl);
-        return {
+        const url = new URL(proxyUrlString);
+        const proxyConfig = {
             host: url.hostname,
-            port: parseInt(url.port) || 80,
-            auth: url.username ? {
-                username: url.username,
-                password: url.password || ''
-            } : undefined,
+            port: url.port,
             protocol: url.protocol.replace(':', '')
         };
-    } catch (e) {
-        // Попробуем простой формат host:port:user:pass
-        return parseSimpleProxy(proxyUrl);
-    }
-}
-
-/**
- * Парсинг простого формата прокси (host:port:user:pass или host:port)
- * @param {string} proxyStr - Строка прокси
- * @returns {Object|null} - Конфиг для axios или null
- */
-function parseSimpleProxy(proxyStr) {
-    if (!proxyStr || proxyStr.trim() === '') return null;
-
-    const parts = proxyStr.split(':');
-    if (parts.length >= 2) {
-        const config = {
-            host: parts[0],
-            port: parseInt(parts[1]) || 80,
-            protocol: 'http'
-        };
-        if (parts.length >= 4) {
-            config.auth = {
-                username: parts[2],
-                password: parts[3]
-            };
+        if (url.username && url.password) {
+            proxyConfig.auth = { username: url.username, password: url.password };
         }
-        return config;
-    }
-    return null;
+        return proxyConfig;
+    } catch (e) { return null; }
 }
 
-/**
- * Получить прокси для бота по позиции
- * @param {number} position - Позиция анкеты (1-6)
- * @returns {Object|null} - Конфиг прокси или null
- */
-function getProxyForPosition(position) {
-    const proxyKey = `proxy${position}`;
-    const proxyStr = globalSettings[proxyKey];
-    return parseProxyUrl(proxyStr);
-}
+// Парсинг простого формата ip:port
+function parseSimpleProxy(proxyString) {
+    if (!proxyString) return null;
+    const trimmed = proxyString.trim();
+    if (!trimmed) return null;
 
-// ============================================================================
-// ГЕНЕРАЦИЯ ID
-// ============================================================================
+    const parts = trimmed.split(':');
+    if (parts.length !== 2) return null;
 
-/**
- * Генерация уникального ID диалога
- * @param {string} botId - ID бота
- * @param {string} recipientId - ID получателя
- * @returns {string} - Уникальный ID диалога
- */
-function generateConvId(botId, recipientId) {
-    return `conv_${botId}_${recipientId}`;
-}
+    const [host, portStr] = parts;
+    const port = parseInt(portStr);
 
-/**
- * Генерация уникального ID бота
- * @returns {string} - Уникальный ID
- */
-function generateBotId() {
-    return 'bot_' + Date.now() + Math.floor(Math.random() * 1000);
-}
-
-// ============================================================================
-// ФОРМАТИРОВАНИЕ
-// ============================================================================
-
-/**
- * Конвертация миллисекунд в PostgreSQL interval
- * @param {number} ms - Миллисекунды
- * @returns {string} - Строка интервала (HH:MM:SS)
- */
-function millisecondsToInterval(ms) {
-    if (!ms || ms < 0) return null;
-
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-}
-
-/**
- * Форматирование времени для отображения
- * @param {number} startTime - Время начала (timestamp)
- * @returns {string} - Отформатированное время (HH:MM:SS)
- */
-function formatElapsedTime(startTime) {
-    if (!startTime) return '';
-
-    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    const hours = Math.floor(elapsed / 3600);
-    const minutes = Math.floor((elapsed % 3600) / 60);
-    const seconds = elapsed % 60;
-
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-}
-
-/**
- * Генерация имени шаблона на основе даты
- * @param {Array} tpls - Массив существующих шаблонов
- * @returns {string} - Уникальное имя шаблона
- */
-function generateTemplateName(tpls) {
-    const now = new Date();
-    const day = String(now.getDate()).padStart(2, '0');
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const year = String(now.getFullYear()).slice(-2);
-    const baseName = `${day}.${month}.${year}`;
-
-    // Проверяем уникальность
-    if (!tpls.some(t => t.name === baseName)) {
-        return baseName;
+    // Проверка валидности
+    const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+    if (!ipRegex.test(host) || isNaN(port) || port < 1 || port > 65535) {
+        return null;
     }
 
-    // Добавляем номер если такая дата уже есть
-    let num = 2;
-    while (tpls.some(t => t.name === `${baseName} (${num})`)) {
-        num++;
-    }
-    return `${baseName} (${num})`;
-}
-
-// ============================================================================
-// ПРОВЕРКИ
-// ============================================================================
-
-/**
- * Проверка дубликата аккаунта
- * @param {string} login - Логин
- * @param {string} displayId - ID анкеты
- * @returns {boolean} - true если дубликат
- */
-function checkDuplicate(login, displayId) {
-    return !!Object.values(bots).find(b =>
-        b.login.toLowerCase() === login.toLowerCase() ||
-        b.displayId.toLowerCase() === displayId.toLowerCase()
-    );
-}
-
-/**
- * Валидация input поля (подсветка если пусто)
- * @param {HTMLElement} textarea - Элемент textarea
- */
-function validateInput(textarea) {
-    if (!textarea) return;
-
-    if (textarea.value.trim() === '') {
-        textarea.classList.add('is-invalid');
-    } else {
-        textarea.classList.remove('is-invalid');
-    }
-}
-
-// ============================================================================
-// УТИЛИТЫ ДЛЯ РАБОТЫ С ШАБЛОНАМИ
-// ============================================================================
-
-/**
- * Получить шаблоны для логина
- * @param {string} login - Логин аккаунта
- * @returns {Object} - { mail: [], chat: [] }
- */
-function getBotTemplates(login) {
-    if (!botTemplates[login]) {
-        botTemplates[login] = { mail: [], chat: [] };
-    }
-    return botTemplates[login];
-}
-
-// ============================================================================
-// ПРОЧИЕ УТИЛИТЫ
-// ============================================================================
-
-/**
- * Обновление счетчика ботов в header
- */
-function updateBotCount() {
-    const count = Object.keys(bots).length;
-    const el = document.getElementById('bot-count');
-    if (el) {
-        el.textContent = count;
-    }
-}
-
-/**
- * Debounce функция
- * @param {Function} func - Функция для debounce
- * @param {number} wait - Время ожидания в мс
- * @returns {Function} - Debounced функция
- */
-function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
+    return {
+        host: host,
+        port: port,
+        protocol: 'http'
     };
 }
 
-console.log('[Lababot] utils.js loaded');
+const LADADATE_BASE_URL = 'https://ladadate.com';
+const OPENAI_API_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
+
+// --- ОБНОВЛЕНИЕ 2: НОВАЯ ЛОГИКА Drag and Drop (Сортировка вместо плавания) ---
+let draggingTabEl = null;
+
+function startTabDrag(e, tabEl) {
+    if (e.target.closest('.tab-close')) return; // Не перетаскивать, если клик на крестик
+    
+    draggingTabEl = tabEl;
+    draggingTabEl.classList.add('dragging');
+    
+    document.addEventListener('mousemove', handleTabMove);
+    document.addEventListener('mouseup', stopTabDrag);
+}
+
+function handleTabMove(e) {
+    if (!draggingTabEl) return;
+    e.preventDefault();
+
+    const tabsContainer = document.getElementById('tabs-bar');
+    const allTabs = Array.from(tabsContainer.children);
+    
+    // Находим элемент, над которым сейчас курсор
+    const targetTab = allTabs.find(tab => {
+        if (tab === draggingTabEl) return false;
+        const rect = tab.getBoundingClientRect();
+        return (e.clientX > rect.left && e.clientX < rect.right &&
+                e.clientY > rect.top && e.clientY < rect.bottom);
+    });
+
+    if (targetTab) {
+        // Определяем индекс текущего и целевого элемента
+        const currentIndex = allTabs.indexOf(draggingTabEl);
+        const targetIndex = allTabs.indexOf(targetTab);
+
+        // Меняем местами в DOM (браузер сам анимирует сдвиг)
+        if (currentIndex < targetIndex) {
+            tabsContainer.insertBefore(draggingTabEl, targetTab.nextSibling);
+        } else {
+            tabsContainer.insertBefore(draggingTabEl, targetTab);
+        }
+    }
+}
+
+function stopTabDrag() {
+    if (draggingTabEl) {
+        draggingTabEl.classList.remove('dragging');
+        draggingTabEl = null;
+        
+        // Пересохраняем порядок ботов
+        const newOrderIds = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
+        const newBots = {};
+        newOrderIds.forEach(id => {
+            if(bots[id]) newBots[id] = bots[id];
+        });
+        bots = newBots; 
+        saveSession();
+    }
+    document.removeEventListener('mousemove', handleTabMove);
+    document.removeEventListener('mouseup', stopTabDrag);
+}
+function validateInput(textarea) {
+    let val = textarea.value;
+    let original = val;
+    let errorMsg = null;
+    for (let word of forbiddenWords) {
+        const regex = new RegExp(`\\b${word}\\b`, 'gi');
+        if (regex.test(val)) { val = val.replace(regex, ''); errorMsg = "Запрещено использовать ругательство"; }
+    }
+    if (/\d{6,}/.test(val)) { val = val.replace(/\d{6,}/g, ''); errorMsg = "Запрещено вставлять ID"; }
+    const linkRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.(com|net|org|ru|ua|io)\b)/gi;
+    if (linkRegex.test(val)) { val = val.replace(linkRegex, ''); errorMsg = "Запрещено вставлять ссылки"; }
+    if (val !== original) { textarea.value = val; if (errorMsg) showToast(errorMsg); }
+}
+
+function showToast(text) {
+    const t = document.getElementById('error-toast');
+    document.getElementById('error-toast-text').innerText = text;
+    t.classList.add('show');
+    if(t.hideTimer) clearTimeout(t.hideTimer);
+    t.hideTimer = setTimeout(() => { t.classList.remove('show'); }, 3000);
+}
+
+function initTooltips() {
+    let tooltipTimeout;
+    const popup = document.getElementById('tooltip-popup');
+    document.addEventListener('mouseover', function(e) {
+        const target = e.target.closest('[data-tip]');
+        if (!target) return;
+        const text = target.getAttribute('data-tip');
+        tooltipTimeout = setTimeout(() => {
+            popup.innerText = text;
+            const rect = target.getBoundingClientRect();
+            popup.style.top = (rect.bottom + 5) + 'px';
+            popup.style.left = (rect.left + (rect.width/2) - (popup.offsetWidth/2)) + 'px';
+            if(parseInt(popup.style.left) < 5) popup.style.left = '5px';
+            popup.classList.add('show');
+        }, 500);
+    });
+    document.addEventListener('mouseout', function(e) {
+        if (e.target.closest('[data-tip]')) { clearTimeout(tooltipTimeout); popup.classList.remove('show'); }
+    });
+    document.addEventListener('mousedown', function() { clearTimeout(tooltipTimeout); popup.classList.remove('show'); });
+}

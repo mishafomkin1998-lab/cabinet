@@ -1,455 +1,470 @@
-/**
- * api.js - API функции для работы с сервером Lababot и Ladadate
- * Все HTTP запросы к серверам проходят через этот модуль
- */
 
-// ============================================================================
-// ОСНОВНОЙ API ЗАПРОС К LADADATE
-// ============================================================================
+// Конвертация миллисекунд в формат PostgreSQL INTERVAL (HH:MM:SS)
+function millisecondsToInterval(ms) {
+    if (!ms || ms <= 0) return null;
 
-/**
- * Универсальная функция для API запросов к Ladadate
- * @param {Object|null} bot - Объект бота (или null для запросов без авторизации)
- * @param {string} method - HTTP метод (GET, POST, PUT, DELETE)
- * @param {string} path - Путь API
- * @param {Object} data - Данные для отправки
- * @returns {Promise<Object>} - Ответ от API
- */
-async function makeApiRequest(bot, method, path, data = null) {
-    const config = {
-        method: method,
-        url: LADADATE_API_BASE + path,
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        },
-        withCredentials: true
-    };
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
 
-    if (bot && bot.token) {
-        config.headers['Authorization'] = `Bearer ${bot.token}`;
-    }
-
-    if (data && (method === 'POST' || method === 'PUT')) {
-        config.data = data;
-    }
-
-    // Прокси для бота (по позиции)
-    if (bot && bot.proxyPosition) {
-        const proxy = getProxyForPosition(bot.proxyPosition);
-        if (proxy) {
-            config.proxy = proxy;
-        }
-    }
-
-    return axios(config);
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-// ============================================================================
-// API ФУНКЦИИ ДЛЯ СЕРВЕРА LABABOT (СТАТИСТИКА)
-// ============================================================================
-
-/**
- * Отправка статистики сообщения на сервер Lababot
- * @param {Object} params - Параметры сообщения
- * @returns {Promise<Object>} - Результат отправки
- */
+// 1. Функция отправки сообщения на Lababot сервер (ПОЛНАЯ СПЕЦИФИКАЦИЯ)
 async function sendMessageToLababot(params) {
+    // Параметры: botId, accountDisplayId, recipientId, type, textContent, status,
+    // responseTime, errorReason, isFirst, isLast, convId, mediaUrl, fileName, translatorId, usedAi
+
     const {
         botId,
         accountDisplayId,
         recipientId,
         type,
-        textContent,
-        status,
-        responseTime,
-        isFirst,
-        isLast,
-        convId,
-        mediaUrl,
-        fileName,
-        translatorId,
-        errorReason,
-        usedAi
+        textContent = '',
+        status = 'success',
+        responseTime = null,
+        errorReason = null,
+        isFirst = false,
+        isLast = false,
+        convId = null,
+        mediaUrl = null,
+        fileName = null,
+        translatorId = null,
+        usedAi = false
     } = params;
 
+    console.log(`📤 Отправляю сообщение на Lababot сервер: ${botId}, ${accountDisplayId}, ${recipientId}, ${type}`);
+
     try {
         const payload = {
-            profile_id: accountDisplayId,
-            man_id: recipientId,
-            type: type,
-            text_content: textContent,
-            status: status || 'success',
-            response_time: responseTime,
-            is_first: isFirst || false,
-            is_last: isLast || false,
-            conv_id: convId,
-            media_url: mediaUrl,
-            file_name: fileName,
-            translator_id: translatorId || globalSettings.translatorId,
-            error_reason: errorReason,
-            used_ai: usedAi || false
+            botId: botId,
+            accountDisplayId: accountDisplayId,
+            recipientId: String(recipientId),
+            type: type, // 'outgoing' (письмо $1.5) или 'chat_msg' (чат $0.15)
+            length: textContent.length || 0,
+            isFirst: isFirst,
+            isLast: isLast,
+            convId: convId,
+            responseTime: responseTime, // Формат PostgreSQL INTERVAL: "00:05:30"
+            status: status, // 'success', 'failed', 'pending'
+            textContent: textContent || '',
+            mediaUrl: mediaUrl,
+            fileName: fileName,
+            translatorId: translatorId,
+            errorReason: errorReason,
+            usedAi: usedAi // Флаг использования ИИ генерации
         };
 
-        const response = await fetch(`${LABABOT_SERVER}/api/activity/message_sent`, {
+        console.log('📦 Payload:', JSON.stringify(payload, null, 2));
+
+        const response = await fetch(`${LABABOT_SERVER}/api/message_sent`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify(payload)
         });
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        console.log(`✅ Ответ от Lababot сервера:`, data);
+
+        if (data.status === 'ok' || data.status === 'ignored') {
+            return { success: true, data: data };
+        } else {
+            console.warn(`⚠️ Lababot сервер вернул:`, data);
+            return { success: false, error: data.error || 'Unknown error' };
         }
-
-        const result = await response.json();
-        return { success: true, data: result };
-
     } catch (error) {
-        console.error('[Lababot API] sendMessageToLababot error:', error);
+        console.error(`❌ Ошибка отправки на Lababot сервер:`, error);
         return { success: false, error: error.message };
     }
 }
 
-/**
- * Отправка входящего сообщения на сервер Lababot
- * @param {Object} params - Параметры входящего сообщения
- * @returns {Promise<Object>} - Результат отправки
- */
+// 2. Функция отправки входящего сообщения от мужчины
 async function sendIncomingMessageToLababot(params) {
-    const { botId, profileId, manId, manName, messageId, type } = params;
+    const { botId, profileId, manId, manName, messageId, type = 'letter' } = params;
 
     try {
-        const payload = {
-            profile_id: profileId,
-            man_id: manId,
-            man_name: manName,
-            message_id: messageId,
-            type: type // 'letter' или 'chat'
-        };
-
-        const response = await fetch(`${LABABOT_SERVER}/api/activity/incoming_message`, {
+        const response = await fetch(`${LABABOT_SERVER}/api/incoming_message`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify({
+                botId: botId,
+                profileId: profileId,
+                manId: String(manId),
+                manName: manName || null,
+                messageId: String(messageId),
+                type: type,
+                timestamp: new Date().toISOString()
+            })
         });
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        if (data.isFirstFromMan) {
+            console.log(`📨 Новый уникальный мужчина: ${manName || manId} → ${profileId}`);
         }
-
-        return { success: true };
-
+        return { success: true, data: data };
     } catch (error) {
-        console.error('[Lababot API] sendIncomingMessageToLababot error:', error);
+        console.error(`❌ Ошибка отправки входящего на Lababot:`, error);
         return { success: false, error: error.message };
     }
 }
 
-/**
- * Отправка heartbeat (онлайн статус) на сервер Lababot
- * @param {string} botId - ID бота
- * @param {string} displayId - ID анкеты
- * @param {string} status - Статус ('online' или 'offline')
- * @returns {Promise<Object>} - Результат отправки
- */
-async function sendHeartbeatToLababot(botId, displayId, status) {
+// 3. Функция отправки heartbeat
+async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
+    console.log(`❤️ Отправляю heartbeat для ${displayId}`);
+    
     try {
-        const bot = bots[botId];
-        const payload = {
-            profile_id: displayId,
-            status: status,
-            bot_name: bot ? `Lababot v10 [${bot.login}]` : 'Lababot v10',
-            bot_version: '10.0'
-        };
-
-        const response = await fetch(`${LABABOT_SERVER}/api/bots/heartbeat`, {
+        const response = await fetch(`${LABABOT_SERVER}/api/heartbeat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                botId: botId,
+                accountDisplayId: displayId,
+                status: status,
+                timestamp: new Date().toISOString(),
+                ip: '127.0.0.1',
+                systemInfo: {
+                    version: '10.0',
+                    platform: navigator.platform
+                }
+            })
         });
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        return { success: true };
-
-    } catch (error) {
-        // Не логируем каждую ошибку heartbeat чтобы не засорять консоль
-        return { success: false, error: error.message };
-    }
-}
-
-/**
- * Отправка ошибки на сервер Lababot
- * @param {string} botId - ID бота
- * @param {string} displayId - ID анкеты
- * @param {string} errorType - Тип ошибки
- * @param {string} errorMessage - Сообщение об ошибке
- * @returns {Promise<Object>} - Результат отправки
- */
-async function sendErrorToLababot(botId, displayId, errorType, errorMessage) {
-    try {
-        const payload = {
-            profile_id: displayId,
-            error_type: errorType,
-            error_message: errorMessage,
-            timestamp: new Date().toISOString()
-        };
-
-        const response = await fetch(`${LABABOT_SERVER}/api/activity/error`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        return { success: response.ok };
-
-    } catch (error) {
-        console.error('[Lababot API] sendErrorToLababot error:', error);
-        return { success: false, error: error.message };
-    }
-}
-
-// ============================================================================
-// API ФУНКЦИИ ДЛЯ ПРОВЕРКИ СТАТУСА ПРОФИЛЯ
-// ============================================================================
-
-/**
- * Проверка статуса профиля на сервере
- * @param {string} profileId - ID анкеты
- * @returns {Promise<Object>} - { paused, exists, allowed }
- */
-async function checkProfileStatus(profileId) {
-    try {
-        const response = await fetch(`${LABABOT_SERVER}/api/profiles/${profileId}/status`);
-
-        if (!response.ok) {
-            if (response.status === 404) {
-                return { paused: false, exists: false, allowed: false };
-            }
-            throw new Error(`HTTP ${response.status}`);
-        }
-
         const data = await response.json();
-        return {
-            paused: data.paused || false,
-            exists: true,
-            allowed: data.allowed !== false
-        };
-
-    } catch (error) {
-        console.error('[Lababot API] checkProfileStatus error:', error);
-        // По умолчанию разрешаем работу если сервер недоступен
-        return { paused: false, exists: true, allowed: true };
-    }
-}
-
-/**
- * Проверка статуса оплаты профиля
- * @param {string} profileId - ID анкеты
- * @returns {Promise<Object>} - { isPaid, isFree, isTrial, canTrial, daysLeft }
- */
-async function checkProfilePaymentStatus(profileId) {
-    try {
-        const response = await fetch(`${LABABOT_SERVER}/api/profiles/${profileId}/payment-status`);
-
-        if (!response.ok) {
-            if (response.status === 404) {
-                return { isPaid: false, isFree: false, isTrial: false, canTrial: false, daysLeft: 0 };
-            }
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-        return {
-            isPaid: data.is_paid || false,
-            isFree: data.is_free || false,
-            isTrial: data.is_trial || false,
-            canTrial: data.can_trial || false,
-            daysLeft: data.days_left || 0
-        };
-
-    } catch (error) {
-        console.error('[Lababot API] checkProfilePaymentStatus error:', error);
-        // По умолчанию считаем оплаченным если сервер недоступен
-        return { isPaid: true, isFree: false, isTrial: false, canTrial: false, daysLeft: 30 };
-    }
-}
-
-/**
- * Проверка разрешения AI для профиля
- * @param {string} profileId - ID анкеты
- * @returns {Promise<Object>} - { enabled, reason, translatorName }
- */
-async function checkProfileAIEnabled(profileId) {
-    try {
-        const response = await fetch(`${LABABOT_SERVER}/api/profiles/${profileId}/ai-status`);
-
-        if (!response.ok) {
-            return { enabled: true, reason: null, translatorName: null };
-        }
-
-        const data = await response.json();
-        return {
-            enabled: data.ai_enabled !== false,
-            reason: data.disabled_reason || null,
-            translatorName: data.translator_name || null
-        };
-
-    } catch (error) {
-        console.error('[Lababot API] checkProfileAIEnabled error:', error);
-        return { enabled: true, reason: null, translatorName: null };
-    }
-}
-
-/**
- * Активация trial периода для профиля
- * @param {string} profileId - ID анкеты
- * @returns {Promise<Object>} - Результат активации
- */
-async function activateTrialForProfile(profileId) {
-    try {
-        const response = await fetch(`${LABABOT_SERVER}/api/profiles/${profileId}/activate-trial`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || `HTTP ${response.status}`);
-        }
-
-        return { success: true };
-
-    } catch (error) {
-        console.error('[Lababot API] activateTrialForProfile error:', error);
-        return { success: false, error: error.message };
-    }
-}
-
-// ============================================================================
-// API ФУНКЦИИ ДЛЯ РАБОТЫ С ДАННЫМИ БОТА
-// ============================================================================
-
-/**
- * Загрузка данных бота с сервера
- * @param {string} profileId - ID анкеты
- * @returns {Promise<Object|null>} - Данные бота или null
- */
-async function loadBotDataFromServer(profileId) {
-    try {
-        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${profileId}`);
-
-        if (!response.ok) {
-            if (response.status === 404) {
-                return null;
-            }
-            throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
+        console.log(`✅ Heartbeat отправлен:`, data);
         return data;
-
     } catch (error) {
-        console.error('[Lababot API] loadBotDataFromServer error:', error);
+        console.error(`❌ Ошибка heartbeat:`, error);
         return null;
     }
 }
 
-/**
- * Сохранение шаблонов на сервер
- * @param {string} profileId - ID анкеты
- * @param {string} type - Тип шаблона ('mail' или 'chat')
- * @param {Array} templates - Массив шаблонов
- * @returns {Promise<Object>} - Результат сохранения
- */
+// 3. Функция отправки ошибки
+async function sendErrorToLababot(botId, accountDisplayId, errorType, errorMessage) {
+    console.log(`⚠️ Отправляю ошибку на Lababot сервер: ${errorType}`);
+    
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/error`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                botId: botId,
+                accountDisplayId: accountDisplayId,
+                endpoint: 'bot_send_message',
+                errorType: errorType,
+                message: errorMessage.substring(0, 200) || 'Unknown error',
+                rawData: null,
+                userId: null
+            })
+        });
+
+        const data = await response.json();
+        console.log(`✅ Ошибка отправлена на сервер:`, data);
+        return data;
+    } catch (error) {
+        console.error(`❌ Ошибка отправки ошибки:`, error);
+        return null;
+    }
+}
+
+// 4. Функция отправки activity ping (трекинг активности оператора)
+async function sendActivityPingToLababot(botId, profileId) {
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/activity_ping`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                botId: botId,
+                profileId: profileId,
+                timestamp: new Date().toISOString()
+            })
+        });
+        return await response.json();
+    } catch (error) {
+        console.error(`❌ Ошибка activity ping:`, error);
+        return null;
+    }
+}
+
+// ============= СИСТЕМА ТРЕКИНГА АКТИВНОСТИ ОПЕРАТОРА =============
+const activityTracker = {
+    lastActivityTime: 0,
+    lastPingTime: 0,
+    pingInterval: 30000, // Отправлять ping каждые 30 секунд
+    inactivityTimeout: 120000, // 2 минуты без активности = не работает
+    isTracking: false,
+
+    // Регистрация активности (клик или печать)
+    recordActivity() {
+        this.lastActivityTime = Date.now();
+
+        // Если давно не отправляли ping и есть активный бот - отправляем
+        const now = Date.now();
+        if (now - this.lastPingTime >= this.pingInterval) {
+            this.sendPingForActiveBot();
+        }
+    },
+
+    // Отправить ping для активного бота
+    sendPingForActiveBot() {
+        const activeBot = this.getActiveBot();
+        if (activeBot && activeBot.displayId) {
+            this.lastPingTime = Date.now();
+            sendActivityPingToLababot(activeBot.id, activeBot.displayId);
+        }
+    },
+
+    // Получить активного бота (текущий выбранный таб)
+    getActiveBot() {
+        if (typeof selectedBotId !== 'undefined' && selectedBotId && typeof bots !== 'undefined') {
+            return bots[selectedBotId];
+        }
+        return null;
+    },
+
+    // Запуск трекинга
+    startTracking() {
+        if (this.isTracking) return;
+        this.isTracking = true;
+
+        // Слушаем клики
+        document.addEventListener('mousedown', () => this.recordActivity(), true);
+
+        // Слушаем печать
+        document.addEventListener('keydown', () => this.recordActivity(), true);
+
+        console.log('%c[Lababot] Activity tracking started', 'color: green; font-weight: bold');
+    }
+};
+
+// Запускаем трекинг активности
+activityTracker.startTracking();
+
+// ============= API ДЛЯ РАБОТЫ С ДАННЫМИ БОТА (шаблоны, blacklist, статистика) =============
+
+// Загрузка данных бота с сервера
+async function loadBotDataFromServer(profileId) {
+    try {
+        console.log(`🔄 Загрузка данных с сервера для ${profileId}...`);
+        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}`);
+        const result = await response.json();
+        console.log(`📦 Ответ сервера для ${profileId}:`, JSON.stringify(result, null, 2));
+        if (result.success) {
+            console.log(`📥 Данные бота загружены для ${profileId}:`, result.data);
+            return result.data;
+        }
+        console.warn(`⚠️ Сервер вернул success=false для ${profileId}`);
+        return null;
+    } catch (error) {
+        console.error(`❌ Ошибка загрузки данных бота:`, error);
+        return null;
+    }
+}
+
+// Сохранение шаблонов на сервер
 async function saveTemplatesToServer(profileId, type, templates) {
     try {
-        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${profileId}/templates`, {
+        const body = type === 'chat'
+            ? { templatesChat: templates }
+            : { templatesMail: templates };
+
+        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type, templates })
+            body: JSON.stringify(body)
         });
-
-        return { success: response.ok };
-
+        const result = await response.json();
+        console.log(`💾 Шаблоны ${type} сохранены для ${profileId}`);
+        return result.success;
     } catch (error) {
-        console.error('[Lababot API] saveTemplatesToServer error:', error);
-        return { success: false, error: error.message };
+        console.error(`❌ Ошибка сохранения шаблонов:`, error);
+        return false;
     }
 }
 
-/**
- * Сохранение blacklist на сервер
- * @param {string} profileId - ID анкеты
- * @param {string} type - Тип blacklist ('mail' или 'chat')
- * @param {Array} blacklist - Массив ID в blacklist
- * @returns {Promise<Object>} - Результат сохранения
- */
+// Сохранение blacklist на сервер
 async function saveBlacklistToServer(profileId, type, blacklist) {
     try {
-        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${profileId}/blacklist`, {
+        const body = type === 'chat'
+            ? { blacklistChat: blacklist }
+            : { blacklistMail: blacklist };
+
+        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type, blacklist })
+            body: JSON.stringify(body)
         });
-
-        return { success: response.ok };
-
+        const result = await response.json();
+        console.log(`📝 Blacklist ${type} сохранён для ${profileId}, ответ:`, result);
+        return result.success;
     } catch (error) {
-        console.error('[Lababot API] saveBlacklistToServer error:', error);
-        return { success: false, error: error.message };
+        console.error(`❌ Ошибка сохранения blacklist:`, error);
+        return false;
     }
 }
 
-/**
- * Сброс статистики на сервере
- * @param {string} profileId - ID анкеты
- * @param {string} type - Тип статистики ('mail' или 'chat')
- * @returns {Promise<Object>} - Результат сброса
- */
+// Увеличение счётчика статистики на сервере
+async function incrementStatsOnServer(profileId, type, field, amount = 1) {
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}/increment-stats`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, field, amount })
+        });
+        const result = await response.json();
+        return result.success;
+    } catch (error) {
+        console.error(`❌ Ошибка обновления статистики:`, error);
+        return false;
+    }
+}
+
+// Сброс статистики на сервере
 async function resetStatsOnServer(profileId, type) {
     try {
-        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${profileId}/reset-stats`, {
+        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}/reset-stats`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type })
         });
-
-        return { success: response.ok };
-
+        const result = await response.json();
+        console.log(`🔄 Статистика ${type} сброшена для ${profileId}`);
+        return result.success;
     } catch (error) {
-        console.error('[Lababot API] resetStatsOnServer error:', error);
+        console.error(`❌ Ошибка сброса статистики:`, error);
+        return false;
+    }
+}
+
+// Debounce для автосохранения (3 секунды)
+const saveDebounceTimers = {};
+function debounceSaveTemplate(profileId, type, templates, delay = 3000) {
+    const key = `${profileId}_${type}`;
+    if (saveDebounceTimers[key]) {
+        clearTimeout(saveDebounceTimers[key]);
+    }
+    saveDebounceTimers[key] = setTimeout(() => {
+        saveTemplatesToServer(profileId, type, templates);
+    }, delay);
+}
+
+// 5. Функция проверки статуса профиля (paused и allowed)
+async function checkProfileStatus(profileId) {
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/profiles/${encodeURIComponent(profileId)}/status`);
+        const data = await response.json();
+        return {
+            paused: data.paused === true,
+            exists: data.exists === true,
+            allowed: data.allowed === true,
+            reason: data.reason || null
+        };
+    } catch (error) {
+        console.error(`❌ Ошибка проверки статуса профиля:`, error);
+        // При ошибке разрешаем работу чтобы не блокировать
+        return { paused: false, exists: true, allowed: true };
+    }
+}
+
+// Обратная совместимость
+async function checkProfilePaused(profileId) {
+    const status = await checkProfileStatus(profileId);
+    return status.paused;
+}
+
+// 6. Функция проверки оплаты профиля
+async function checkProfilePaymentStatus(profileId) {
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/billing/profile-status/${encodeURIComponent(profileId)}`);
+        const data = await response.json();
+        return {
+            isPaid: data.isPaid === true,
+            isFree: data.isFree === true, // "мой админ" - бесплатно
+            isTrial: data.isTrial === true,
+            trialUsed: data.trialUsed === true,
+            canTrial: !data.trialUsed && !data.isPaid, // Можно активировать trial
+            daysLeft: data.daysLeft || 0,
+            reason: data.reason || 'unknown'
+        };
+    } catch (error) {
+        console.error(`❌ Ошибка проверки оплаты профиля:`, error);
+        // При ошибке разрешаем работу
+        return { isPaid: true, isFree: false, isTrial: false, trialUsed: false, canTrial: false, daysLeft: 999 };
+    }
+}
+
+// 7. Функция активации тестового периода
+async function activateTrialPeriod(profileId) {
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/bots/activate-trial`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profileId: profileId })
+        });
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error(`❌ Ошибка активации trial:`, error);
         return { success: false, error: error.message };
     }
 }
 
-// ============================================================================
-// API ФУНКЦИИ ДЛЯ MINICHAT
-// ============================================================================
+// 8. Функция показа диалога оплаты/trial
+function showPaymentDialog(profileId, canTrial) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
 
-/**
- * Загрузка истории MiniChat
- * @param {string} profileId - ID анкеты
- * @param {string} partnerId - ID партнера
- * @returns {Promise<Array>} - Массив сообщений
- */
-async function loadMiniChatHistory(profileId, partnerId) {
-    try {
-        const response = await fetch(`${LABABOT_SERVER}/api/chat-history/${profileId}/${partnerId}`);
+        const dialog = document.createElement('div');
+        dialog.style.cssText = 'background:white;border-radius:8px;padding:20px;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
 
-        if (!response.ok) {
-            return [];
+        let html = `
+            <h3 style="margin:0 0 15px 0;font-size:16px;">ladabot</h3>
+            <p style="margin:0 0 10px 0;">Анкета ${profileId} не оплачена.${canTrial ? '' : ' Тестовый период истёк.'}</p>
+            <p style="margin:0 0 20px 0;color:#666;font-size:14px;">Обратитесь за пополнением в телеграм к пользователю @S_Shevil</p>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+        `;
+
+        if (canTrial) {
+            html += `<button id="trialBtn" style="padding:8px 16px;background:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">Получить 2 тестовых дня</button>`;
         }
+        html += `<button id="cancelBtn" style="padding:8px 16px;background:#f0f0f0;border:1px solid #ccc;border-radius:4px;cursor:pointer;">OK</button>`;
+        html += '</div>';
 
-        const data = await response.json();
-        return data.messages || [];
+        dialog.innerHTML = html;
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
 
-    } catch (error) {
-        console.error('[Lababot API] loadMiniChatHistory error:', error);
-        return [];
-    }
+        dialog.querySelector('#cancelBtn').onclick = () => {
+            document.body.removeChild(overlay);
+            resolve({ action: 'cancel' });
+        };
+
+        if (canTrial) {
+            dialog.querySelector('#trialBtn').onclick = async () => {
+                const btn = dialog.querySelector('#trialBtn');
+                btn.disabled = true;
+                btn.textContent = 'Активация...';
+
+                const result = await activateTrialPeriod(profileId);
+                document.body.removeChild(overlay);
+
+                if (result.success) {
+                    alert('✅ Тестовый период активирован на 2 дня!');
+                    resolve({ action: 'trial_activated' });
+                } else {
+                    alert('❌ Ошибка: ' + (result.message || result.error || 'Не удалось активировать'));
+                    resolve({ action: 'error', error: result.error });
+                }
+            };
+        }
+    });
 }
 
-console.log('[Lababot] api.js loaded');
+// === КРИТИЧЕСКИ ВАЖНО: Скрипт "Анти-сон" ===

@@ -365,7 +365,16 @@
         </div>
     </div>
     
-    <!-- Оригинальный bot.js (модули в js/modules/ пока не готовы) -->
-    <script src="js/bot.js"></script>
+    <!-- Модули (разделённый bot.js) - порядок загрузки критичен! -->
+    <script src="js/modules/config.js"></script>      <!-- 1. Глобальные переменные и константы -->
+    <script src="js/modules/utils.js"></script>       <!-- 2. Утилиты, parseProxy, validateInput -->
+    <script src="js/modules/api.js"></script>         <!-- 3. API функции для Lababot сервера -->
+    <script src="js/modules/logger.js"></script>      <!-- 4. Logger, KEEP_ALIVE_SCRIPT -->
+    <script src="js/modules/minichat.js"></script>    <!-- 5. MiniChat функции -->
+    <script src="js/modules/ai.js"></script>          <!-- 6. AI функции -->
+    <script src="js/modules/settings.js"></script>    <!-- 7. Настройки -->
+    <script src="js/modules/AccountBot.js"></script>  <!-- 8. Класс AccountBot -->
+    <script src="js/modules/main.js"></script>        <!-- 9. UI функции и основная логика -->
+    <script src="js/modules/init.js"></script>        <!-- 10. Инициализация (window.onload) -->
 </body>
 </html>

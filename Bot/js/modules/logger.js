@@ -1,260 +1,172 @@
-/**
- * logger.js - Система логирования и уведомлений
- * Управление уведомлениями, логами, звуками
- */
+const KEEP_ALIVE_SCRIPT = `
+    console.log("%c[Lababot] Анти-сон активирован", "color: green; font-weight: bold");
+    Object.defineProperty(document, 'hidden', { value: false, writable: false });
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', writable: false });
 
-// ============================================================================
-// ОБЪЕКТ LOGGER
-// ============================================================================
+    setInterval(() => {
+        const x = Math.floor(Math.random() * window.innerWidth);
+        const y = Math.floor(Math.random() * window.innerHeight);
+        const moveEvent = new MouseEvent('mousemove', {
+            view: window, bubbles: true, cancelable: true, clientX: x, clientY: y
+        });
+        document.dispatchEvent(moveEvent);
+        if (Math.random() > 0.8) {
+            window.scrollBy(0, (Math.random() < 0.5 ? -10 : 10));
+        }
+    }, 10000 + Math.random() * 5000); 
 
+    setInterval(() => {
+        document.querySelectorAll('button, a').forEach(el => {
+            if(el.innerText && (el.innerText.includes('Keep me logged in') || el.innerText.includes('Online'))) {
+                el.click();
+                console.log("[Lababot] Нажата кнопка подтверждения активности");
+            }
+        });
+    }, 5000);
+`;
+
+// --- ОБНОВЛЕНИЕ 1: Функция для переключения группы кнопок ---
+function toggleStatusGroup() {
+    const container = document.getElementById('status-buttons-container');
+    const toggleBtn = document.getElementById('btn-group-toggle');
+    container.classList.toggle('show');
+    toggleBtn.classList.toggle('open');
+    // Меняем иконку для красоты (опционально, можно оставить только поворот)
+    const icon = toggleBtn.querySelector('i');
+    if (toggleBtn.classList.contains('open')) {
+        icon.classList.remove('fa-caret-right');
+        icon.classList.add('fa-caret-down');
+    } else {
+        icon.classList.remove('fa-caret-down');
+        icon.classList.add('fa-caret-right');
+    }
+}
 const Logger = {
     logs: [],
-    maxLogs: 100, // Максимум логов в памяти
-    isVisible: false,
-
-    /**
-     * Добавить запись в лог
-     * @param {string} text - Текст сообщения
-     * @param {string} type - Тип: 'chat', 'chat-request', 'mail', 'vip-online', 'bday', 'log'
-     * @param {string} botId - ID бота (опционально)
-     * @param {Object} data - Дополнительные данные (partnerId, partnerName и т.д.)
-     */
-    add: function(text, type, botId, data = {}) {
-        const entry = {
-            text,
-            type,
-            botId,
-            data,
-            time: new Date(),
-            id: Date.now() + Math.random()
-        };
-
-        // Добавляем в начало массива
-        this.logs.unshift(entry);
-
-        // Ограничиваем размер
-        if (this.logs.length > this.maxLogs) {
-            this.logs.pop();
+    add: function(text, type, botId, data = null) {
+        const now = Date.now();
+        const logItem = { id: now, text, type, botId, data, time: new Date() };
+        
+        this.logs.unshift(logItem); 
+        
+        if (this.logs.length > 300) {
+            this.logs = this.logs.slice(0, 300);
         }
 
-        // Воспроизводим звук в зависимости от типа
-        this.playNotificationSound(type);
-
-        // Обновляем UI
         this.render();
-
-        // Показываем счетчик
-        this.updateBadge();
-
-        console.log(`[Logger] ${type}: ${text}`, data);
-    },
-
-    /**
-     * Воспроизведение звука уведомления
-     * @param {string} type - Тип уведомления
-     */
-    playNotificationSound: function(type) {
-        if (!globalSettings.soundsEnabled) return;
-
-        switch(type) {
-            case 'chat':
-            case 'chat-request':
-                playSound('chat');
-                break;
-            case 'mail':
-                playSound('message');
-                break;
-            case 'vip-online':
-                playSound('online');
-                break;
-            // 'bday' и 'log' без звука
+        
+        const win = document.getElementById('logger-window');
+        if(!win.classList.contains('show')) {
+            document.getElementById('btn-logger-main').classList.add('blinking');
         }
-    },
 
-    /**
-     * Отрисовка логов в UI
-     */
+        if (type === 'chat') playSound('chat');
+        else if (type === 'chat-request') playSound('chat'); // Новый запрос на чат
+        else if (type === 'mail') playSound('message');
+        else if (type === 'bday') playSound('online');
+        else if (type === 'vip-online') playSound('online'); 
+    },
     render: function() {
         const container = document.getElementById('logger-content');
-        if (!container) return;
-
-        container.innerHTML = this.logs.map(log => {
-            const timeStr = log.time.toLocaleTimeString();
-            const botInfo = log.botId && bots[log.botId]
-                ? `<span class="log-bot">[${bots[log.botId].displayId}]</span>`
-                : '';
-
-            return `
-                <div class="log-entry log-${log.type}" data-log-id="${log.id}" onclick="Logger.onLogClick('${log.id}')">
-                    <span class="log-time">${timeStr}</span>
-                    ${botInfo}
-                    <span class="log-text">${log.text}</span>
-                </div>
-            `;
-        }).join('');
+        if(!this.logs.length) { container.innerHTML = '<div class="text-center text-muted small mt-5">Событий пока нет...</div>'; return; }
+        
+        let html = '';
+        const now = Date.now();
+        
+        this.logs.forEach(l => {
+            const isFresh = (now - l.id) < 60000; 
+            const timeStr = l.time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            const colorClass = isFresh ? 'fresh' : 'old';
+            
+            let content = ``;
+            const partnerId = l.data && l.data.partnerId ? l.data.partnerId : '???';
+            const partnerName = l.data && l.data.partnerName ? l.data.partnerName : `ID ${partnerId}`;
+            const targetBotDisplayId = bots[l.botId] ? bots[l.botId].displayId : '???';
+            
+            let linkAction = '';
+            let logClass = '';
+            
+            if (l.type === 'chat' || l.type === 'mail') {
+                 linkAction = `openMiniChat('${l.botId}', '${partnerId}', '${partnerName}', '${l.type}')`;
+                 content = `${l.type === 'chat' ? '💬' : '💌'} Новое ${l.type === 'chat' ? 'сообщение' : 'письмо'} от <b>${partnerName}</b> (ID ${partnerId})`;
+            } else if (l.type === 'chat-request') {
+                 // Новый запрос на чат с текстом сообщения
+                 logClass = 'new-chat';
+                 linkAction = `openMiniChat('${l.botId}', '${partnerId}', '${partnerName}', 'chat')`;
+                 const msgBody = l.data && l.data.messageBody ? l.data.messageBody : '';
+                 content = `🆕 Новый чат от <b>${partnerName}</b>: "${msgBody}"`;
+            } else if (l.type === 'vip-online') {
+                 logClass = 'vip';
+                 linkAction = `openMiniChat('${l.botId}', '${partnerId}', '${partnerName}', 'mail')`;
+                 content = `👑 VIP <b>${partnerName}</b> (ID ${partnerId}) теперь ONLINE!`;
+            } else if (l.type === 'bday') {
+                 linkAction = `selectTab('${l.botId}')`; 
+                 content = l.text; 
+            } else if (l.type === 'log') {
+                content = l.text;
+            }
+            
+            if(l.type !== 'log') {
+                html += `<div class="log-entry ${colorClass} ${logClass}">
+                    <span class="log-time">${timeStr} | Анкета ${targetBotDisplayId}</span><br>
+                    <span class="log-link" onclick="${linkAction}">${content}</span>
+                </div>`;
+            } else {
+                 html += `<div class="log-entry ${colorClass}">${l.text}</div>`;
+            }
+        });
+        container.innerHTML = html;
     },
-
-    /**
-     * Обработка клика по логу
-     * @param {string} logId - ID лога
-     */
-    onLogClick: function(logId) {
-        const log = this.logs.find(l => l.id == logId);
-        if (!log) return;
-
-        // Если есть данные партнера - открываем MiniChat
-        if (log.data && log.data.partnerId && log.botId) {
-            openMiniChat(log.botId, log.data.partnerId, log.data.partnerName);
-        }
-
-        // Если есть botId - переключаемся на эту вкладку
-        if (log.botId && bots[log.botId]) {
-            selectTab(log.botId);
-        }
-    },
-
-    /**
-     * Обновление badge счетчика
-     */
-    updateBadge: function() {
-        const badge = document.getElementById('logger-badge');
-        if (!badge) return;
-
-        // Считаем непрочитанные за последние 5 минут
-        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-        const unread = this.logs.filter(l =>
-            l.time.getTime() > fiveMinutesAgo &&
-            ['chat', 'chat-request', 'mail', 'vip-online'].includes(l.type)
-        ).length;
-
-        if (unread > 0) {
-            badge.textContent = unread > 99 ? '99+' : unread;
-            badge.style.display = 'flex';
-        } else {
-            badge.style.display = 'none';
-        }
-    },
-
-    /**
-     * Очистка всех логов
-     */
-    clear: function() {
-        this.logs = [];
-        this.render();
-        this.updateBadge();
-    },
-
-    /**
-     * Получить логи по типу
-     * @param {string} type - Тип лога
-     * @returns {Array} - Отфильтрованные логи
-     */
-    getByType: function(type) {
-        return this.logs.filter(l => l.type === type);
-    },
-
-    /**
-     * Получить логи по боту
-     * @param {string} botId - ID бота
-     * @returns {Array} - Отфильтрованные логи
-     */
-    getByBot: function(botId) {
-        return this.logs.filter(l => l.botId === botId);
-    }
+    cleanOld: function() { this.render(); }
 };
+setInterval(() => Logger.cleanOld(), 5000);
+const loggerWin = document.getElementById('logger-window');
+const loggerHead = document.getElementById('logger-header');
+const resizeHandle = document.getElementById('logger-resize-handle');
 
-// ============================================================================
-// ФУНКЦИИ УПРАВЛЕНИЯ LOGGER UI
-// ============================================================================
+let isDragging = false, dragOffset = {x:0, y:0};
+loggerHead.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    dragOffset.x = e.clientX - loggerWin.offsetLeft;
+    dragOffset.y = e.clientY - loggerWin.offsetTop;
+    e.preventDefault();
+});
 
-/**
- * Переключение видимости logger
- */
+let isResizing = false;
+let startW = 0, startH = 0, startX = 0, startY = 0;
+
+resizeHandle.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    startW = parseInt(document.defaultView.getComputedStyle(loggerWin).width, 10);
+    startH = parseInt(document.defaultView.getComputedStyle(loggerWin).height, 10);
+    e.stopPropagation();
+    e.preventDefault();
+});
+
+document.addEventListener('mousemove', (e) => {
+    if(isDragging) {
+        loggerWin.style.left = (e.clientX - dragOffset.x) + 'px';
+        loggerWin.style.top = (e.clientY - dragOffset.y) + 'px';
+    }
+    if(isResizing) {
+        const newWidth = startW + (startX - e.clientX);
+        const newHeight = startH + (e.clientY - startY);
+        if(newWidth > 200 && newWidth < 1200) {
+            loggerWin.style.width = newWidth + 'px';
+            loggerWin.style.left = (e.clientX - newWidth) + 'px'; 
+        }
+        if(newHeight > 200 && newHeight < 1000) {
+            loggerWin.style.height = newHeight + 'px';
+        }
+    }
+});
+document.addEventListener('mouseup', () => { isDragging = false; isResizing = false; });
+
 function toggleLogger() {
-    const container = document.getElementById('logger-container');
-    if (!container) return;
-
-    Logger.isVisible = !Logger.isVisible;
-
-    if (Logger.isVisible) {
-        container.classList.add('show');
-        Logger.render();
-    } else {
-        container.classList.remove('show');
+    loggerWin.classList.toggle('show');
+    if(loggerWin.classList.contains('show')) {
+        document.getElementById('btn-logger-main').classList.remove('blinking');
     }
 }
-
-/**
- * Переключение группы статусов в logger
- * @param {string} group - Название группы
- */
-function toggleStatusGroup(group) {
-    const content = document.getElementById(`status-${group}`);
-    const icon = document.querySelector(`[onclick="toggleStatusGroup('${group}')"] i`);
-
-    if (content) {
-        content.classList.toggle('collapsed');
-    }
-    if (icon) {
-        icon.classList.toggle('fa-chevron-down');
-        icon.classList.toggle('fa-chevron-right');
-    }
-}
-
-// ============================================================================
-// DRAG & DROP ДЛЯ LOGGER
-// ============================================================================
-
-let loggerDragOffset = { x: 0, y: 0 };
-let isLoggerDragging = false;
-
-/**
- * Начало перетаскивания logger
- * @param {MouseEvent} e - Событие мыши
- */
-function startLoggerDrag(e) {
-    const container = document.getElementById('logger-container');
-    if (!container || e.target.closest('.logger-content')) return;
-
-    isLoggerDragging = true;
-    const rect = container.getBoundingClientRect();
-    loggerDragOffset.x = e.clientX - rect.left;
-    loggerDragOffset.y = e.clientY - rect.top;
-
-    document.addEventListener('mousemove', onLoggerDrag);
-    document.addEventListener('mouseup', stopLoggerDrag);
-}
-
-/**
- * Перетаскивание logger
- * @param {MouseEvent} e - Событие мыши
- */
-function onLoggerDrag(e) {
-    if (!isLoggerDragging) return;
-
-    const container = document.getElementById('logger-container');
-    if (!container) return;
-
-    const x = e.clientX - loggerDragOffset.x;
-    const y = e.clientY - loggerDragOffset.y;
-
-    // Ограничиваем позицию в пределах окна
-    const maxX = window.innerWidth - container.offsetWidth;
-    const maxY = window.innerHeight - container.offsetHeight;
-
-    container.style.left = Math.max(0, Math.min(x, maxX)) + 'px';
-    container.style.top = Math.max(0, Math.min(y, maxY)) + 'px';
-    container.style.right = 'auto';
-    container.style.bottom = 'auto';
-}
-
-/**
- * Окончание перетаскивания logger
- */
-function stopLoggerDrag() {
-    isLoggerDragging = false;
-    document.removeEventListener('mousemove', onLoggerDrag);
-    document.removeEventListener('mouseup', stopLoggerDrag);
-}
-
-console.log('[Lababot] logger.js loaded');
