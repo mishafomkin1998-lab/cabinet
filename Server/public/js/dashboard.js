@@ -131,6 +131,14 @@
                 // Избранные шаблоны
                 favoriteTemplates: [],
 
+                // Последние ответы на входящие
+                lastResponses: [],
+                showAllResponses: false,
+
+                // Использование ИИ (массовые рассылки)
+                aiUsageData: [],
+                showAllAiUsage: false,
+
                 // Почасовая активность для графика
                 hourlyActivity: [],
 
@@ -350,6 +358,8 @@
                             this.loadTeam(),
                             this.loadRecentActivity(),
                             this.loadFavoriteTemplates(),
+                            this.loadLastResponses(),
+                            this.loadAiUsage(),
                             this.loadHourlyActivity(),
                             this.loadTranslatorStats(),
                             this.loadHistoryActions(),
@@ -619,6 +629,26 @@
                             this.favoriteTemplates = data.templates;
                         }
                     } catch (e) { console.error('loadFavoriteTemplates error:', e); }
+                },
+
+                async loadLastResponses() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/stats/last-responses?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=100`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.lastResponses = data.responses;
+                        }
+                    } catch (e) { console.error('loadLastResponses error:', e); }
+                },
+
+                async loadAiUsage() {
+                    try {
+                        const res = await fetch(`${API_BASE}/api/stats/ai-usage?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=100`);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.aiUsageData = data.aiUsage;
+                        }
+                    } catch (e) { console.error('loadAiUsage error:', e); }
                 },
 
                 async loadHourlyActivity() {
