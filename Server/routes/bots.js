@@ -1131,4 +1131,182 @@ router.delete('/logs/cleanup', asyncHandler(async (req, res) => {
     res.json({ success: true, deleted: result.rowCount });
 }));
 
+// ============= ДЕТАЛЬНАЯ СТАТИСТИКА БОТА =============
+
+/**
+ * GET /api/bots/:botId/detailed-stats
+ * Получить детальную статистику бота за выбранный период
+ *
+ * @param botId - ID бота
+ * @query period - 'day' | 'week' | 'month' (по умолчанию 'day')
+ * @returns Статистика по всем анкетам бота + список анкет с их статистикой
+ */
+router.get('/:botId/detailed-stats', asyncHandler(async (req, res) => {
+    const { botId } = req.params;
+    const { period = 'day', userId, role } = req.query;
+
+    // Определяем интервал времени
+    let intervalDays = 1;
+    if (period === 'week') intervalDays = 7;
+    else if (period === 'month') intervalDays = 30;
+
+    // 1. Получаем все анкеты этого бота
+    const profilesQuery = `
+        SELECT DISTINCT bp.profile_id
+        FROM bot_profiles bp
+        WHERE bp.bot_id = $1
+    `;
+    const profilesResult = await pool.query(profilesQuery, [botId]);
+    const profileIds = profilesResult.rows.map(r => r.profile_id);
+
+    if (profileIds.length === 0) {
+        return res.json({
+            success: true,
+            stats: {
+                totalLetters: 0,
+                totalChats: 0,
+                totalErrors: 0,
+                totalSuccess: 0,
+                profilesCount: 0
+            },
+            profiles: [],
+            period: period
+        });
+    }
+
+    // 2. Получаем суммарную статистику по всем анкетам бота
+    const statsQuery = `
+        SELECT
+            COUNT(*) FILTER (WHERE type = 'outgoing' AND status = 'success') as total_letters,
+            COUNT(*) FILTER (WHERE type = 'chat_msg' AND status = 'success') as total_chats,
+            COUNT(*) FILTER (WHERE status = 'failed') as total_errors,
+            COUNT(*) FILTER (WHERE status = 'success') as total_success
+        FROM messages
+        WHERE account_id = ANY($1)
+          AND timestamp >= CURRENT_DATE - INTERVAL '1 day' * $2
+    `;
+    const statsResult = await pool.query(statsQuery, [profileIds, intervalDays]);
+    const stats = statsResult.rows[0];
+
+    // 3. Получаем детальную статистику по каждой анкете
+    const profileStatsQuery = `
+        SELECT
+            m.account_id as profile_id,
+            COUNT(*) FILTER (WHERE m.type = 'outgoing' AND m.status = 'success') as letters,
+            COUNT(*) FILTER (WHERE m.type = 'chat_msg' AND m.status = 'success') as chats,
+            COUNT(*) FILTER (WHERE m.status = 'failed') as errors,
+            COUNT(*) FILTER (WHERE m.status = 'success') as success,
+            MAX(m.timestamp) as last_activity,
+            ap.note,
+            ap.paused,
+            ap.status as profile_status
+        FROM messages m
+        LEFT JOIN allowed_profiles ap ON m.account_id = ap.profile_id
+        WHERE m.account_id = ANY($1)
+          AND m.timestamp >= CURRENT_DATE - INTERVAL '1 day' * $2
+        GROUP BY m.account_id, ap.note, ap.paused, ap.status
+        ORDER BY success DESC
+    `;
+    const profileStatsResult = await pool.query(profileStatsQuery, [profileIds, intervalDays]);
+
+    // Форматируем данные по анкетам
+    const profiles = profileStatsResult.rows.map(row => ({
+        profileId: row.profile_id,
+        note: row.note || '',
+        status: row.profile_status || 'offline',
+        paused: row.paused || false,
+        letters: parseInt(row.letters) || 0,
+        chats: parseInt(row.chats) || 0,
+        errors: parseInt(row.errors) || 0,
+        success: parseInt(row.success) || 0,
+        lastActivity: row.last_activity
+    }));
+
+    res.json({
+        success: true,
+        stats: {
+            totalLetters: parseInt(stats.total_letters) || 0,
+            totalChats: parseInt(stats.total_chats) || 0,
+            totalErrors: parseInt(stats.total_errors) || 0,
+            totalSuccess: parseInt(stats.total_success) || 0,
+            profilesCount: profileIds.length
+        },
+        profiles: profiles,
+        period: period
+    });
+}));
+
+// ============= ПЕРЕЗАПУСК БОТА =============
+
+/**
+ * POST /api/bots/:botId/restart
+ * Отправить команду перезапуска боту
+ * Бот получит эту команду при следующем heartbeat
+ */
+router.post('/:botId/restart', asyncHandler(async (req, res) => {
+    const { botId } = req.params;
+    const { userId } = req.body;
+
+    // Проверяем права (только директор)
+    const user = await pool.query(`SELECT role FROM users WHERE id = $1`, [userId]);
+    if (user.rows.length === 0 || user.rows[0].role !== 'director') {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав' });
+    }
+
+    // Проверяем существование бота
+    const bot = await pool.query(`SELECT bot_id FROM bots WHERE bot_id = $1`, [botId]);
+    if (bot.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Бот не найден' });
+    }
+
+    // Устанавливаем флаг restart_requested
+    await pool.query(`
+        UPDATE bots
+        SET restart_requested = TRUE, restart_requested_at = NOW()
+        WHERE bot_id = $1
+    `, [botId]);
+
+    console.log(`🔄 Запрос на перезапуск бота ${botId}`);
+
+    res.json({
+        success: true,
+        message: 'Команда перезапуска отправлена. Бот перезапустится при следующем подключении.'
+    });
+}));
+
+/**
+ * GET /api/bots/:botId/restart-status
+ * Проверить, запрошен ли перезапуск (для бота)
+ */
+router.get('/:botId/restart-status', asyncHandler(async (req, res) => {
+    const { botId } = req.params;
+
+    const result = await pool.query(`
+        SELECT restart_requested, restart_requested_at
+        FROM bots
+        WHERE bot_id = $1
+    `, [botId]);
+
+    if (result.rows.length === 0) {
+        return res.json({ success: true, restartRequested: false });
+    }
+
+    const restartRequested = result.rows[0].restart_requested || false;
+
+    // Если флаг установлен, сбрасываем его (бот получил команду)
+    if (restartRequested) {
+        await pool.query(`
+            UPDATE bots
+            SET restart_requested = FALSE
+            WHERE bot_id = $1
+        `, [botId]);
+    }
+
+    res.json({
+        success: true,
+        restartRequested: restartRequested,
+        requestedAt: result.rows[0].restart_requested_at
+    });
+}));
+
 module.exports = router;

@@ -104,6 +104,13 @@
                 },
                 settingsSaving: false,
 
+                // Bot Details Modal
+                showBotDetailsModal: false,
+                selectedBot: {},
+                botDetailsData: { stats: {}, profiles: [], logs: [] },
+                botStatsPeriod: 'day', // 'day' | 'week' | 'month'
+                botDetailsTab: 'profiles', // 'profiles' | 'logs' | 'control'
+
                 // Статистика с сервера
                 stats: {
                     // Новая структура - данные за выбранный период
@@ -525,7 +532,8 @@
                         const res = await fetch(`${API_BASE}/api/bots/status?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
                         const data = await res.json();
                         if (data.success) {
-                            this.botsStatus = data.summary;
+                            // ИСПРАВЛЕНО: используем botsSummary вместо summary (анкет)
+                            this.botsStatus = data.botsSummary || { online: 0, offline: 0, total: 0 };
 
                             // Группируем по botId чтобы получить уникальные боты
                             // Показываем только активные боты (heartbeat за последний час)
@@ -2693,6 +2701,69 @@
                 },
 
                 // ========== END MAILING CONTROL FUNCTIONS ==========
+
+                // ========== BOT DETAILS MODAL FUNCTIONS ==========
+
+                // Открыть модальное окно детальной информации о боте
+                async openBotDetailsModal(bot) {
+                    this.selectedBot = bot;
+                    this.botDetailsTab = 'profiles';
+                    this.botStatsPeriod = 'day';
+                    this.showBotDetailsModal = true;
+                    await this.loadBotDetails(bot.id);
+                },
+
+                // Загрузить детальную информацию о боте
+                async loadBotDetails(botId) {
+                    try {
+                        // Загружаем статистику и список анкет
+                        const statsRes = await fetch(`${API_BASE}/api/bots/${botId}/detailed-stats?period=${this.botStatsPeriod}&userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const statsData = await statsRes.json();
+
+                        if (statsData.success) {
+                            this.botDetailsData.stats = statsData.stats;
+                            this.botDetailsData.profiles = statsData.profiles;
+                        }
+
+                        // Загружаем логи
+                        const logsRes = await fetch(`${API_BASE}/api/bots/logs?userId=${this.currentUser.id}&role=${this.currentUser.role}&botId=${botId}&limit=50`);
+                        const logsData = await logsRes.json();
+
+                        if (logsData.success) {
+                            this.botDetailsData.logs = logsData.logs;
+                        }
+                    } catch (e) {
+                        console.error('loadBotDetails error:', e);
+                    }
+                },
+
+                // Перезапустить бота
+                async restartBot(botId) {
+                    if (!confirm('Вы уверены, что хотите перезапустить бота? Бот перезапустится при следующем подключении.')) {
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/bots/${botId}/restart`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userId: this.currentUser.id })
+                        });
+
+                        const data = await res.json();
+
+                        if (data.success) {
+                            alert('✅ Команда перезапуска отправлена боту');
+                        } else {
+                            alert(`❌ Ошибка: ${data.error}`);
+                        }
+                    } catch (e) {
+                        console.error('restartBot error:', e);
+                        alert('❌ Ошибка при отправке команды перезапуска');
+                    }
+                },
+
+                // ========== END BOT DETAILS MODAL FUNCTIONS ==========
 
                 logout() {
                     // Очищаем данные авторизации
