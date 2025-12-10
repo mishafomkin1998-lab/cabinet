@@ -2293,6 +2293,7 @@
                     for (const request of chatRequests) {
                         const requestId = request.MessageId;
                         const partnerId = request.AccountId || "Unknown";
+                        const partnerIdStr = partnerId.toString();
                         const partnerName = request.Name || "Неизвестный";
                         const messageBody = request.Body || "";
                         const isRead = request.IsRead;
@@ -2316,6 +2317,18 @@
                                 messageId: requestId,
                                 type: 'chat'
                             });
+
+                            // 🔥 АВТОМАТИЧЕСКОЕ ДОБАВЛЕНИЕ В ЧС если мужчина ответил на чат-рассылку
+                            if (this.chatContactedUsers.has(partnerIdStr) && !this.chatSettings.blacklist.includes(partnerIdStr)) {
+                                this.chatSettings.blacklist.push(partnerIdStr);
+                                saveBlacklistToServer(this.login, this.chatSettings.blacklist);
+                                Logger.add(
+                                    `✅ <b>${partnerName}</b> автоматически добавлен в ЧС (ответил на чат-рассылку)`,
+                                    'log',
+                                    this.id
+                                );
+                                console.log(`[Lababot] ✅ ${partnerIdStr} добавлен в ЧС автоматически (чат)`);
+                            }
 
                             // Уведомление в логгер + звук
                             console.log(`[Lababot] 🆕 НОВЫЙ ЧАТ! От ${partnerName} (${partnerId}): "${truncatedBody}"`);
@@ -2342,6 +2355,7 @@
                         // IsMessage = true означает есть непрочитанное сообщение
                         const hasUnread = session.IsMessage === true || (session.UnreadMessageCount || 0) > 0;
                         const partnerId = session.AccountId || session.TargetUserId || session.PartnerId || "Unknown";
+                        const partnerIdStr = partnerId.toString();
                         const partnerName = session.Name || "Неизвестный";
                         const chatMinutes = session.ChatMinutes || 0;
 
@@ -2368,6 +2382,18 @@
                                     messageId: `chat_${sessionId}_${now}`,
                                     type: 'chat'
                                 });
+
+                                // 🔥 АВТОМАТИЧЕСКОЕ ДОБАВЛЕНИЕ В ЧС если мужчина ответил на чат-рассылку
+                                if (this.chatContactedUsers.has(partnerIdStr) && !this.chatSettings.blacklist.includes(partnerIdStr)) {
+                                    this.chatSettings.blacklist.push(partnerIdStr);
+                                    saveBlacklistToServer(this.login, this.chatSettings.blacklist);
+                                    Logger.add(
+                                        `✅ <b>${partnerName}</b> автоматически добавлен в ЧС (ответил в активном чате)`,
+                                        'log',
+                                        this.id
+                                    );
+                                    console.log(`[Lababot] ✅ ${partnerIdStr} добавлен в ЧС автоматически (активный чат)`);
+                                }
 
                                 // Уведомление в логгер + звук
                                 console.log(`[Lababot] 💬 УВЕДОМЛЕНИЕ! Сообщение от ${partnerName} (${partnerId}), мин: ${chatMinutes}`);
@@ -2404,12 +2430,14 @@
                 try {
                     const res = await makeApiRequest(this, 'GET', '/api/messages');
                     const msgs = res.data.Messages || [];
-                    
+
                     if (msgs.length > 0) {
                         const newestMsg = msgs[0];
                         const newMessages = msgs.filter(m => m.MessageId > this.lastMailId);
-                        
+
                         newMessages.reverse().forEach(msg => {
+                            const manId = msg.User.AccountId.toString();
+
                             // Отправляем входящее сообщение на сервер статистики
                             sendIncomingMessageToLababot({
                                 botId: this.id,
@@ -2419,6 +2447,18 @@
                                 messageId: msg.MessageId,
                                 type: 'letter'
                             });
+
+                            // 🔥 АВТОМАТИЧЕСКОЕ ДОБАВЛЕНИЕ В ЧС если мужчина ответил на рассылку
+                            if (this.mailContactedUsers.has(manId) && !this.mailSettings.blacklist.includes(manId)) {
+                                this.mailSettings.blacklist.push(manId);
+                                saveBlacklistToServer(this.login, this.mailSettings.blacklist);
+                                Logger.add(
+                                    `✅ <b>${msg.User.Name || `ID ${manId}`}</b> автоматически добавлен в ЧС (ответил на рассылку)`,
+                                    'log',
+                                    this.id
+                                );
+                                console.log(`[Lababot] ✅ ${manId} добавлен в ЧС автоматически`);
+                            }
 
                             if (!msg.IsReplied) {
                                 Logger.add(
