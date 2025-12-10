@@ -161,6 +161,14 @@ async function initDatabase() {
             END $$;
         `);
 
+        // Добавляем admin_id и translator_id для связи с пользователями
+        await pool.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS admin_id INTEGER`);
+        await pool.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS translator_id INTEGER`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_admin ON messages(admin_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_translator ON messages(translator_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_account ON messages(account_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp)`);
+
         // 7. Хранение контента сообщения
         await pool.query(`
             CREATE TABLE IF NOT EXISTS message_content (

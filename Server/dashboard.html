@@ -1720,15 +1720,14 @@
                         Оплата анкет
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <!-- ID анкет -->
+                        <!-- ID анкеты -->
                         <div>
-                            <label class="block text-sm font-medium mb-2">ID анкет</label>
-                            <textarea
+                            <label class="block text-sm font-medium mb-2">ID анкеты</label>
+                            <input type="text"
                                    class="glass w-full px-4 py-3 rounded-xl"
-                                   placeholder="Введите ID через запятую или пробел: 123456, 234567"
-                                   rows="2"
-                                   x-model="profilePayment.profileIds"></textarea>
-                            <p class="text-xs text-gray-500 mt-1">Можно ввести несколько ID</p>
+                                   placeholder="Введите ID анкеты: 123456"
+                                   x-model="profilePayment.profileId">
+                            <p class="text-xs text-gray-500 mt-1">ID профиля для оплаты</p>
                         </div>
 
                         <!-- Количество дней -->
@@ -1770,14 +1769,14 @@
                         <!-- Кнопки -->
                         <div class="flex items-end gap-2">
                             <button @click="submitProfilePayment()"
-                                    :disabled="!profilePayment.profileIds.trim() || !profilePayment.days"
+                                    :disabled="!profilePayment.profileId.trim() || !profilePayment.days"
                                     class="flex-1 glow-button px-4 py-3 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed">
                                 <i class="fas fa-credit-card mr-2"></i>Оплатить
                             </button>
                             <button @click="removeProfilePayment()"
-                                    :disabled="!profilePayment.profileIds.trim()"
+                                    :disabled="!profilePayment.profileId.trim()"
                                     class="px-4 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title="Убрать оплату с анкет">
+                                    title="Убрать оплату с анкеты">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
