@@ -412,44 +412,46 @@ router.get('/forecast', asyncHandler(async (req, res) => {
     res.json({ success: true, forecast });
 }));
 
-// Активность по часам
+// Активность по часам (только ручная работа, без автоматических рассылок)
 router.get('/hourly-activity', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
     const days = parseInt(req.query.days) || 7;
 
     const activityRoleFilter = buildRoleFilter(role, userId, { table: 'activity', prefix: 'AND', paramIndex: 2 });
-        const profileRoleFilter = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'AND', paramIndex: 2 });
         const activityFilter = activityRoleFilter.filter;
-        const msgFilter = profileRoleFilter.filter;
         const params = [days, ...activityRoleFilter.params];
 
+        /**
+         * Умный запрос: определяем ручные сообщения через пинги активности
+         *
+         * Логика:
+         * 1. Джойним activity_log с user_activity по translator_id
+         * 2. Проверяем есть ли пинг в пределах ±2 минут от времени отправки
+         * 3. Если есть пинг → переводчик был активен → это ручное сообщение
+         * 4. Если нет пинга → автоматическая рассылка → не считаем
+         *
+         * Интервал ±2 минуты выбран потому что:
+         * - Пинги отправляются каждые 30 сек при активности
+         * - 2 минуты = достаточный буфер для учета задержек
+         */
         const activityQuery = `
             SELECT
                 EXTRACT(HOUR FROM a.created_at) as hour,
-                COUNT(*) as message_count
+                COUNT(DISTINCT a.id) as message_count
             FROM activity_log a
             WHERE a.created_at >= CURRENT_DATE - INTERVAL '1 day' * $1
             ${activityFilter}
+            AND EXISTS (
+                SELECT 1 FROM user_activity ua
+                WHERE ua.user_id = a.translator_id
+                AND ua.created_at BETWEEN (a.created_at - INTERVAL '2 minutes')
+                                      AND (a.created_at + INTERVAL '2 minutes')
+            )
             GROUP BY EXTRACT(HOUR FROM a.created_at)
             ORDER BY hour
         `;
 
         let result = await pool.query(activityQuery, params);
-
-        if (result.rows.length === 0) {
-            const msgQuery = `
-                SELECT
-                    EXTRACT(HOUR FROM m.timestamp) as hour,
-                    COUNT(*) as message_count
-                FROM messages m
-                JOIN allowed_profiles p ON m.account_id = p.profile_id
-                WHERE m.timestamp >= CURRENT_DATE - INTERVAL '1 day' * $1
-                ${msgFilter}
-                GROUP BY EXTRACT(HOUR FROM m.timestamp)
-                ORDER BY hour
-            `;
-            result = await pool.query(msgQuery, params);
-        }
 
         const maxCount = Math.max(...result.rows.map(r => parseInt(r.message_count) || 0), 1);
 
