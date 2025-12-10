@@ -258,7 +258,7 @@ router.get('/', asyncHandler(async (req, res) => {
     const workTimeFormatted = `${workTimeHours}ч ${workTimeMins}м`;
 
     // Время работы за текущий месяц (всегда)
-    const now = new Date();
+    // Используем уже объявленную переменную now (строка 30)
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
     const workTimeMonthMinutes = await calculateWorkTime(monthStart, monthEnd, userId, role);
