@@ -1269,6 +1269,7 @@
             toggleExtendedFeatures();
             initHotkeys();
             initTooltips();
+            initFocusProtection(); // НОВОЕ: Защита от потери фокуса
 
             // Глобальное отслеживание Shift для bulk-действий
             document.addEventListener('keydown', (e) => { if (e.key === 'Shift') isShiftPressed = true; });
@@ -1836,7 +1837,114 @@
                 }
                 else if(e.shiftKey && e.key === 'F5') { e.preventDefault(); reloginAllBots(); }
                 else if(e.key === 'F5') { e.preventDefault(); if(activeTabId && bots[activeTabId]) bots[activeTabId].doActivity(); }
+                // НОВОЕ: Ctrl+Shift+F - "разблокировка" ввода (диагностика и восстановление фокуса)
+                else if(e.ctrlKey && e.shiftKey && e.key === 'F') {
+                    e.preventDefault();
+                    debugFocusIssue();
+                }
             }, true); // capture phase для перехвата до браузера
+        }
+
+        // НОВАЯ ФУНКЦИЯ: Защита от потери фокуса
+        function initFocusProtection() {
+            let lastActiveElement = null;
+
+            // Отслеживаем активный элемент
+            document.addEventListener('focusin', (e) => {
+                if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+                    lastActiveElement = e.target;
+                }
+            });
+
+            // Блокируем webview от получения фокуса
+            document.addEventListener('focusin', (e) => {
+                if (e.target.tagName === 'WEBVIEW') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.warn('[Focus Protection] WebView попытался получить фокус - заблокировано!');
+
+                    // Возвращаем фокус на последний активный элемент
+                    if (lastActiveElement) {
+                        setTimeout(() => {
+                            lastActiveElement.focus();
+                            console.log('[Focus Protection] Фокус возвращен на', lastActiveElement.id || lastActiveElement.className);
+                        }, 10);
+                    }
+                }
+            }, true);
+
+            // Периодическая проверка модальных окон (каждую секунду)
+            setInterval(() => {
+                const modals = document.querySelectorAll('.modal-overlay.show');
+                if (modals.length > 0) {
+                    console.warn('[Focus Protection] Обнаружены открытые модальные окна:', modals.length);
+                }
+            }, 1000);
+
+            console.log('%c[Focus Protection] Защита от потери фокуса активирована', 'color: green; font-weight: bold');
+            console.log('%cГорячая клавиша для диагностики: Ctrl+Shift+F', 'color: blue');
+        }
+
+        // НОВАЯ ФУНКЦИЯ: Диагностика проблем с фокусом
+        function debugFocusIssue() {
+            console.log('\n========== ДИАГНОСТИКА ФОКУСА ==========');
+
+            const activeEl = document.activeElement;
+            console.log('Активный элемент:', activeEl);
+            console.log('Тип:', activeEl.tagName);
+            console.log('ID:', activeEl.id || '(нет)');
+            console.log('Class:', activeEl.className || '(нет)');
+
+            // Проверяем модальные окна
+            const openModals = document.querySelectorAll('.modal-overlay.show');
+            console.log('Открытых модальных окон:', openModals.length);
+            openModals.forEach((modal, idx) => {
+                console.log(`  Модальное окно ${idx + 1}:`, modal.id);
+            });
+
+            // Проверяем webview элементы
+            const webviews = document.querySelectorAll('webview');
+            console.log('WebView элементов:', webviews.length);
+
+            // Проверяем z-index перекрытий
+            const highZIndex = Array.from(document.querySelectorAll('*'))
+                .filter(el => {
+                    const zIndex = window.getComputedStyle(el).zIndex;
+                    return zIndex !== 'auto' && parseInt(zIndex) > 1000;
+                })
+                .map(el => ({
+                    element: el.tagName + (el.id ? `#${el.id}` : '') + (el.className ? `.${el.className.split(' ')[0]}` : ''),
+                    zIndex: window.getComputedStyle(el).zIndex
+                }));
+
+            console.log('Элементы с высоким z-index:', highZIndex);
+
+            // Закрываем все модальные окна
+            openModals.forEach(modal => {
+                modal.classList.remove('show');
+                setTimeout(() => { modal.style.display = 'none'; }, 300);
+                console.log('Закрыто модальное окно:', modal.id);
+            });
+
+            // Пытаемся вернуть фокус на textarea активной вкладки
+            if (activeTabId) {
+                const textarea = document.querySelector(`#msg-${activeTabId}`);
+                if (textarea) {
+                    textarea.focus();
+                    console.log('Фокус возвращен на textarea:', textarea.id);
+
+                    // Проверяем что фокус действительно вернулся
+                    setTimeout(() => {
+                        if (document.activeElement === textarea) {
+                            console.log('%c✅ ПРОБЛЕМА РЕШЕНА! Ввод работает.', 'color: green; font-weight: bold');
+                        } else {
+                            console.error('%c❌ Фокус не вернулся. Проверьте DevTools или перезапустите приложение.', 'color: red; font-weight: bold');
+                        }
+                    }, 100);
+                }
+            }
+
+            console.log('========================================\n');
         }
         
         function switchTabRelative(step) {
@@ -2071,6 +2179,7 @@
                 webview.src = "https://ladadate.com/login";
                 webview.partition = `persist:${this.id}`;
                 webview.useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+                webview.setAttribute('tabindex', '-1'); // Блокируем получение фокуса через Tab
 
                 // Функция для отключения звука и внедрения скрипта блокировки Audio
                 const muteWebview = () => {
