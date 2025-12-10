@@ -1092,14 +1092,9 @@
                                                   x-text="account.incoming || 0"></span>
                                         </td>
                                         <td x-show="currentUser.role === 'director'" class="py-2 px-3">
-                                            <select class="glass px-2 py-1 rounded-lg text-xs"
-                                                    x-model="account.admin"
-                                                    @change="assignAccount(account)">
-                                                <option value="" x-text="t('profiles.notAssigned')"></option>
-                                                <template x-for="admin in admins" :key="admin.id">
-                                                    <option :value="admin.login" x-text="admin.name"></option>
-                                                </template>
-                                            </select>
+                                            <span class="text-xs font-medium"
+                                                  :class="account.admin ? getAdminColor(account.adminId, account.admin) : 'text-gray-400'"
+                                                  x-text="account.admin || 'Нет админа'"></span>
                                         </td>
                                         <!-- Колонка Переводчик для админа -->
                                         <td x-show="currentUser.role === 'admin'" class="py-2 px-3">

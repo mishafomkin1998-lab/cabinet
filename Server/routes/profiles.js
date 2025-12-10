@@ -75,10 +75,10 @@ router.get('/', async (req, res) => {
             ) stats ON true
             LEFT JOIN LATERAL (
                 SELECT
-                    COUNT(*) FILTER (WHERE DATE(i.created_at) = CURRENT_DATE) as incoming_today,
+                    COUNT(*) FILTER (WHERE DATE(i.created_at) >= DATE_TRUNC('month', CURRENT_DATE)) as incoming_month,
                     COUNT(*) as incoming_total
                 FROM incoming_messages i
-                WHERE i.profile_id = p.profile_id
+                WHERE i.profile_id = p.profile_id AND i.type = 'letter'
             ) incoming ON true
             ${filter}
             ORDER BY p.id DESC
@@ -116,7 +116,7 @@ router.get('/', async (req, res) => {
                 letters_today: parseInt(row.letters_today) || parseInt(msgStats.letters_today) || 0,
                 letters_total: parseInt(row.letters_total) || parseInt(msgStats.letters_total) || 0,
                 chats_today: parseInt(row.chats_today) || parseInt(msgStats.chats_today) || 0,
-                incoming_today: parseInt(row.incoming_today) || 0,
+                incoming_month: parseInt(row.incoming_month) || 0,
                 incoming_total: parseInt(row.incoming_total) || 0,
                 admin_id: row.admin_id,
                 admin_name: row.admin_name,

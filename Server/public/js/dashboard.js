@@ -472,8 +472,8 @@
                                     login: p.login || p.profile_id,
                                     password: p.password || '',
                                     status: p.status || 'offline',
-                                    lastOnline: p.last_online ? new Date(p.last_online).toLocaleString('ru-RU') : '-',
-                                    incoming: p.incoming_today || 0,
+                                    lastOnline: p.last_online ? new Date(p.last_online).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(',', '') : '-',
+                                    incoming: p.incoming_month || 0,
                                     admin: p.admin_name || '',
                                     adminId: p.admin_id || null,
                                     adminIsRestricted: p.admin_is_restricted || false,
@@ -1112,7 +1112,30 @@
                     const statuses = this.t('profiles.profileStatuses');
                     return statuses[status] || status;
                 },
-                
+
+                getAdminColor(adminId, adminName) {
+                    if (!adminId && !adminName) return 'text-gray-400';
+
+                    // Массив цветов для админов (такие же как в команде)
+                    const colors = [
+                        'text-blue-600',      // blue-indigo
+                        'text-purple-600',    // purple
+                        'text-green-600',     // green
+                        'text-orange-600',    // orange
+                        'text-pink-600',      // pink
+                        'text-indigo-600',    // indigo
+                        'text-teal-600',      // teal
+                        'text-red-600'        // red
+                    ];
+
+                    // Хэш от adminId для стабильного выбора цвета
+                    const hash = String(adminId || adminName).split('').reduce((acc, char) => {
+                        return char.charCodeAt(0) + ((acc << 5) - acc);
+                    }, 0);
+
+                    return colors[Math.abs(hash) % colors.length];
+                },
+
                 async toggleAccountAccess(account) {
                     const newPaused = !account.paused;
                     const profileId = account.profile_id || account.id;
