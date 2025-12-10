@@ -174,15 +174,24 @@ async function sendErrorToLababot(botId, accountDisplayId, errorType, errorMessa
 }
 
 // 4. Функция отправки activity ping (трекинг активности оператора)
+// ВАЖНО: Отправляет пинг только когда переводчик РЕАЛЬНО работает (клики, печать).
+// Автоматические действия бота НЕ должны вызывать эту функцию!
 async function sendActivityPingToLababot(botId, profileId) {
     try {
-        const response = await fetch(`${LABABOT_SERVER}/api/activity_ping`, {
+        // Получаем ID переводчика из настроек
+        const translatorId = globalSettings?.translatorId;
+
+        if (!translatorId) {
+            console.warn('⚠️ Переводчик не настроен в Settings. Пинг не отправлен.');
+            return null;
+        }
+
+        // Отправляем на правильный endpoint который пишет в user_activity
+        const response = await fetch(`${LABABOT_SERVER}/api/stats/activity-ping`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                botId: botId,
-                profileId: profileId,
-                timestamp: new Date().toISOString()
+                userId: translatorId
             })
         });
         return await response.json();

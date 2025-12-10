@@ -286,49 +286,9 @@
                     await this.loadAllData();
                     // Автообновление каждые 30 секунд
                     setInterval(() => this.loadDashboardStats(), 30000);
-                    // Отправка пингов активности для расчета времени работы
-                    this.initActivityTracking();
-                },
-
-                // Инициализация отслеживания активности пользователя
-                initActivityTracking() {
-                    let lastActivity = Date.now();
-                    let activityPingInterval = null;
-
-                    // Функция отправки пинга активности
-                    const sendActivityPing = async () => {
-                        try {
-                            await fetch(`${API_BASE}/api/stats/activity-ping`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ userId: this.currentUser.id })
-                            });
-                        } catch (e) {
-                            console.log('Activity ping error:', e);
-                        }
-                    };
-
-                    // Отслеживание активности (клики, движение мыши, нажатия клавиш)
-                    const trackActivity = () => {
-                        lastActivity = Date.now();
-                    };
-
-                    // Слушаем события активности
-                    ['click', 'mousemove', 'keypress', 'scroll'].forEach(event => {
-                        document.addEventListener(event, trackActivity, { passive: true });
-                    });
-
-                    // Отправляем первый пинг сразу
-                    sendActivityPing();
-
-                    // Отправляем пинги каждые 30 секунд, если пользователь был активен
-                    activityPingInterval = setInterval(() => {
-                        const timeSinceActivity = Date.now() - lastActivity;
-                        // Если активность была в последние 2 минуты - отправляем пинг
-                        if (timeSinceActivity < 120000) {
-                            sendActivityPing();
-                        }
-                    }, 30000);
+                    // ВАЖНО: Пинги активности отправляются только из бота,
+                    // когда переводчик реально работает (клики, печать текста).
+                    // Автоматические действия бота НЕ должны генерировать пинги.
                 },
 
                 // Инициализация Flatpickr календарей
