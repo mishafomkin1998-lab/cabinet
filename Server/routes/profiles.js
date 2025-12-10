@@ -47,7 +47,11 @@ router.get('/', async (req, res) => {
                 p.password,
                 p.note,
                 p.paused,
-                p.status,
+                CASE
+                    WHEN p.last_online IS NULL THEN 'offline'
+                    WHEN p.last_online > NOW() - INTERVAL '5 minutes' THEN 'online'
+                    ELSE 'offline'
+                END as status,
                 p.last_online,
                 p.added_at,
                 p.assigned_admin_id as admin_id,
