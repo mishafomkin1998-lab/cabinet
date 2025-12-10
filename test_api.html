@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Lababot API</title>
+    <style>
+        body { font-family: monospace; padding: 20px; }
+        .result { margin: 10px 0; padding: 10px; background: #f0f0f0; }
+        button { padding: 10px 20px; margin: 5px; }
+        pre { background: #fff; padding: 10px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>Проверка Lababot API</h1>
+
+    <button onclick="checkActivityLog()">Проверить activity_log</button>
+    <button onclick="checkIncomingMessages()">Проверить incoming_messages</button>
+    <button onclick="checkSentLettersGrouped()">Проверить /sent-letters-grouped</button>
+
+    <div id="output"></div>
+
+    <script>
+        const API_BASE = 'http://188.137.253.169:3000';
+        const output = document.getElementById('output');
+
+        function log(title, data) {
+            output.innerHTML = `<div class="result">
+                <h3>${title}</h3>
+                <pre>${JSON.stringify(data, null, 2)}</pre>
+            </div>` + output.innerHTML;
+        }
+
+        async function checkActivityLog() {
+            try {
+                const res = await fetch(`${API_BASE}/api/activity/recent?userId=1&role=director&limit=10`);
+                const data = await res.json();
+                log('📧 Recent Activity (последние 10):', data);
+            } catch (e) {
+                log('❌ Ошибка:', { error: e.message });
+            }
+        }
+
+        async function checkIncomingMessages() {
+            try {
+                const res = await fetch(`${API_BASE}/api/dashboard/debug-incoming?userId=1&role=director`);
+                const data = await res.json();
+                log('📨 Incoming Messages (debug):', data);
+            } catch (e) {
+                log('❌ Ошибка:', { error: e.message });
+            }
+        }
+
+        async function checkSentLettersGrouped() {
+            try {
+                const now = new Date();
+                const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+                const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+                const res = await fetch(`${API_BASE}/api/activity/sent-letters-grouped?userId=1&role=director&dateFrom=${formatDate(firstDay)}&dateTo=${formatDate(now)}&limit=10`);
+                const data = await res.json();
+                log('📮 Sent Letters Grouped (последние 10):', data);
+            } catch (e) {
+                log('❌ Ошибка:', { error: e.message });
+            }
+        }
+    </script>
+</body>
+</html>
