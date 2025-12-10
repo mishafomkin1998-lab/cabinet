@@ -840,22 +840,60 @@
                 let messages = [];
 
                 if (data.type === 'chat') {
-                    const res = await makeApiRequest(bot, 'GET', `/api/chats/${data.partnerId}/messages`);
-                    if (res.data && res.data.Messages) {
-                        messages = res.data.Messages.map(m => ({
-                            isMe: m.IsOwner,
-                            text: m.Body,
-                            time: new Date(m.Created)
-                        }));
+                    // Загружаем историю ЧАТА через WebView
+                    if (bot.webview) {
+                        try {
+                            const result = await bot.webview.executeJavaScript(`
+                                (async () => {
+                                    try {
+                                        const res = await fetch('https://ladadate.com/chat-messages', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ id: ${data.partnerId} }),
+                                            credentials: 'include'
+                                        });
+                                        const text = await res.text();
+                                        try {
+                                            return { success: true, data: JSON.parse(text) };
+                                        } catch {
+                                            return { success: false, error: 'Not JSON' };
+                                        }
+                                    } catch(e) {
+                                        return { success: false, error: e.message };
+                                    }
+                                })()
+                            `);
+
+                            if (result.success && result.data && result.data.messages) {
+                                messages = result.data.messages.map(m => ({
+                                    isMe: m.is_owner,
+                                    text: m.body,
+                                    time: new Date(m.created)
+                                }));
+                            }
+                        } catch (wvErr) {
+                            console.error('WebView error:', wvErr);
+                        }
                     }
                 } else {
-                    const res = await makeApiRequest(bot, 'GET', `/api/mail/${data.partnerId}`);
-                    if (res.data && res.data.Messages) {
-                        messages = res.data.Messages.map(m => ({
-                            isMe: m.IsOwner,
-                            text: m.Body,
-                            time: new Date(m.Created)
-                        }));
+                    // Загружаем историю ПИСЕМ
+                    const res = await makeApiRequest(bot, 'GET', `/api/messages?fromAccountId=${data.partnerId}`);
+                    const msgs = res.data.Messages || [];
+
+                    for (const msg of msgs) {
+                        try {
+                            const detailRes = await makeApiRequest(bot, 'GET', `/api/messages/${msg.MessageId}`);
+                            const detailedMsg = detailRes.data;
+                            if (detailedMsg && detailedMsg.Body) {
+                                messages.push({
+                                    isMe: detailedMsg.User.AccountId != data.partnerId,
+                                    text: detailedMsg.Body,
+                                    time: new Date(detailedMsg.DatePost)
+                                });
+                            }
+                        } catch (e) {
+                            console.error('Error loading message detail:', e);
+                        }
                     }
                 }
 
@@ -906,12 +944,34 @@
 
             try {
                 if (data.type === 'chat') {
-                    await makeApiRequest(bot, 'POST', `/api/chats/${data.partnerId}/messages`, { Body: text });
+                    // Отправка через WebView (чат)
+                    if (bot.webview) {
+                        await bot.webview.executeJavaScript(`
+                            (async () => {
+                                await fetch('https://ladadate.com/chat-send', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ id: ${data.partnerId}, body: ${JSON.stringify(text)} }),
+                                    credentials: 'include'
+                                });
+                            })()
+                        `);
+                    }
                 } else {
-                    await makeApiRequest(bot, 'POST', `/api/mail`, {
-                        RecipientId: parseInt(data.partnerId),
-                        Body: text
-                    });
+                    // Отправка письма
+                    const checkRes = await makeApiRequest(bot, 'GET', `/api/messages/check-send/${data.partnerId}`);
+                    if (!checkRes.data.CheckId) {
+                        showError('Невозможно отправить письмо этому пользователю');
+                        return;
+                    }
+
+                    const payload = {
+                        CheckId: checkRes.data.CheckId,
+                        RecipientAccountId: parseInt(data.partnerId),
+                        Body: text,
+                        PhotoId: null
+                    };
+                    await makeApiRequest(bot, 'POST', '/api/messages/send', payload);
                 }
 
                 input.value = '';
