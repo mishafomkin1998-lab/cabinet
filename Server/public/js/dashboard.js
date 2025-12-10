@@ -113,6 +113,11 @@
                     letters: 0,
                     chats: 0,
                     errors: 0,
+                    // Новые поля для X/Y отображения
+                    incomingChatsTotal: 0,
+                    incomingChatsAnswered: 0,
+                    uniqueMenLetters: 0,
+                    uniqueMenChats: 0,
                     // Метрики
                     metrics: { totalProfiles: 0, profilesOnline: 0, avgResponseTime: 0, medianResponseTime: 0 },
                     // Для обратной совместимости
