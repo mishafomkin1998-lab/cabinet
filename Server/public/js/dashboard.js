@@ -327,9 +327,6 @@
                     this.statsFilter.dateTo = formatDate(now);
                     this.statsFilter.quickRange = 'month';
 
-                    this.monitoringFilter.dateFrom = formatDate(firstDay);
-                    this.monitoringFilter.dateTo = formatDate(now);
-
                     this.accountsFilter.dateFrom = formatDate(firstDay);
                     this.accountsFilter.dateTo = formatDate(now);
 
