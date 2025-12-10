@@ -367,8 +367,8 @@ router.get('/status', asyncHandler(async (req, res) => {
     });
 
     // 2. Получаем уникальные боты (программы) - один бот = одна строка
-    // Используем GROUP BY для гарантированной уникальности по bot_id
-    // РАСШИРЕНО: Добавлена статистика по письмам, чатам и ошибкам
+    // ИСПРАВЛЕНО: Правильная группировка по bot_id (программе), а не по анкетам
+    // Суммируем статистику по ВСЕМ анкетам внутри одного бота
     const botsQuery = `
         SELECT
             h.bot_id,
@@ -381,30 +381,32 @@ router.get('/status', asyncHandler(async (req, res) => {
                 WHEN MAX(h.timestamp) > NOW() - INTERVAL '2 minutes' THEN 'online'
                 ELSE 'offline'
             END as bot_status,
-            COALESCE(stats.letters_today, 0) as letters_today,
-            COALESCE(stats.letters_hour, 0) as letters_hour,
-            COALESCE(stats.chats_today, 0) as chats_today,
-            COALESCE(stats.chats_hour, 0) as chats_hour,
-            COALESCE(stats.errors_today, 0) as errors_today,
-            COALESCE(stats.errors_hour, 0) as errors_hour
+            -- Суммируем статистику по всем анкетам этого бота
+            COALESCE(SUM(stats.letters_today), 0) as letters_today,
+            COALESCE(SUM(stats.letters_hour), 0) as letters_hour,
+            COALESCE(SUM(stats.chats_today), 0) as chats_today,
+            COALESCE(SUM(stats.chats_hour), 0) as chats_hour,
+            COALESCE(SUM(stats.errors_today), 0) as errors_today,
+            COALESCE(SUM(stats.errors_hour), 0) as errors_hour
         FROM heartbeats h
         LEFT JOIN (
             SELECT
-                bot_id,
-                COUNT(*) FILTER (WHERE type = 'outgoing' AND status = 'success' AND timestamp >= CURRENT_DATE) as letters_today,
-                COUNT(*) FILTER (WHERE type = 'outgoing' AND status = 'success' AND timestamp >= NOW() - INTERVAL '1 hour') as letters_hour,
-                COUNT(*) FILTER (WHERE type = 'chat_msg' AND status = 'success' AND timestamp >= CURRENT_DATE) as chats_today,
-                COUNT(*) FILTER (WHERE type = 'chat_msg' AND status = 'success' AND timestamp >= NOW() - INTERVAL '1 hour') as chats_hour,
-                COUNT(*) FILTER (WHERE status = 'failed' AND timestamp >= CURRENT_DATE) as errors_today,
-                COUNT(*) FILTER (WHERE status = 'failed' AND timestamp >= NOW() - INTERVAL '1 hour') as errors_hour
-            FROM messages
-            WHERE timestamp >= CURRENT_DATE - INTERVAL '1 day'
-            GROUP BY bot_id
-        ) stats ON h.bot_id = stats.bot_id
+                m.bot_id,
+                m.sender_id as profile_id,
+                COUNT(*) FILTER (WHERE m.type = 'outgoing' AND m.status = 'success' AND m.timestamp >= CURRENT_DATE) as letters_today,
+                COUNT(*) FILTER (WHERE m.type = 'outgoing' AND m.status = 'success' AND m.timestamp >= NOW() - INTERVAL '1 hour') as letters_hour,
+                COUNT(*) FILTER (WHERE m.type = 'chat_msg' AND m.status = 'success' AND m.timestamp >= CURRENT_DATE) as chats_today,
+                COUNT(*) FILTER (WHERE m.type = 'chat_msg' AND m.status = 'success' AND m.timestamp >= NOW() - INTERVAL '1 hour') as chats_hour,
+                COUNT(*) FILTER (WHERE m.status = 'failed' AND m.timestamp >= CURRENT_DATE) as errors_today,
+                COUNT(*) FILTER (WHERE m.status = 'failed' AND m.timestamp >= NOW() - INTERVAL '1 hour') as errors_hour
+            FROM messages m
+            WHERE m.timestamp >= CURRENT_DATE - INTERVAL '1 day'
+            GROUP BY m.bot_id, m.sender_id
+        ) stats ON h.bot_id = stats.bot_id AND h.account_display_id = stats.profile_id
         WHERE h.bot_id IS NOT NULL
           AND h.bot_id != ''
           AND h.timestamp > NOW() - INTERVAL '1 hour'
-        GROUP BY h.bot_id, stats.letters_today, stats.letters_hour, stats.chats_today, stats.chats_hour, stats.errors_today, stats.errors_hour
+        GROUP BY h.bot_id
         ORDER BY last_heartbeat DESC
     `;
     const botsResult = await pool.query(botsQuery);

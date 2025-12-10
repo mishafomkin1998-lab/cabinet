@@ -319,10 +319,15 @@
                     <!-- Статус ботов (программ) - только для директора -->
                     <div x-show="currentUser.role === 'director'" class="glass rounded-2xl p-6">
                         <h3 class="text-lg font-bold mb-4">Статус ботов</h3>
-                        <div class="text-3xl font-bold leading-tight mb-3" :class="botsStatus.online > 0 ? 'text-green-600' : 'text-gray-400'" x-text="botsStatus.online || 0">0</div>
-                        <div class="text-sm text-gray-500 flex gap-3 flex-wrap">
-                            <span class="text-green-600">Online: <span x-text="botsStatus.online || 0"></span></span>
-                            <span class="text-gray-500">Offline: <span x-text="botsStatus.offline || 0"></span></span>
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-600">Online</span>
+                                <span class="text-2xl font-bold text-green-600" x-text="botsStatus.online || 0">0</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-gray-600">Offline</span>
+                                <span class="text-2xl font-bold text-gray-400" x-text="botsStatus.offline || 0">0</span>
+                            </div>
                         </div>
                     </div>
 
