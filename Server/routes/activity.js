@@ -685,4 +685,81 @@ router.get('/favorite_templates', asyncHandler(async (req, res) => {
     });
 }));
 
+/**
+ * GET /api/activity/sent-letters-grouped
+ * Возвращает отправленные письма с группировкой по анкете + текст письма
+ * Показывает количество отправленных и время последней отправки
+ *
+ * @query {string} userId - ID пользователя
+ * @query {string} role - Роль (translator/admin/director)
+ * @query {string} dateFrom - Начало периода (YYYY-MM-DD)
+ * @query {string} dateTo - Конец периода (YYYY-MM-DD)
+ * @query {number} limit - Количество записей (по умолчанию 50)
+ * @returns {Array} letters - Массив сгруппированных писем
+ */
+router.get('/sent-letters-grouped', asyncHandler(async (req, res) => {
+    const { userId, role, dateFrom, dateTo, limit = 50 } = req.query;
+    const limitInt = parseInt(limit) || 50;
+
+    // Определяем период фильтрации (как в dashboard.js)
+    const now = new Date();
+    const defaultDateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const defaultDateTo = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+    const periodFrom = dateFrom || defaultDateFrom;
+    const periodTo = dateTo || defaultDateTo;
+
+    // Фильтр по ролям
+    let roleFilter = '';
+    let params = [periodFrom, periodTo, limitInt];
+    let paramIndex = 4;
+
+    if (role === 'translator' && userId) {
+        roleFilter = 'AND a.translator_id = $' + paramIndex;
+        params.splice(2, 0, userId); // Вставляем userId на позицию $3
+        paramIndex++;
+    } else if (role === 'admin' && userId) {
+        roleFilter = 'AND a.admin_id = $' + paramIndex;
+        params.splice(2, 0, userId);
+        paramIndex++;
+    }
+
+    /**
+     * Группируем по profile_id + message_text
+     * Считаем количество отправленных каждого письма
+     * Получаем время первой и последней отправки
+     * Сортируем по времени последней отправки (новые сверху)
+     */
+    const query = `
+        SELECT
+            a.profile_id,
+            a.message_text,
+            COUNT(*) as sent_count,
+            MIN(a.created_at) as first_sent_at,
+            MAX(a.created_at) as last_sent_at
+        FROM activity_log a
+        WHERE a.action_type = 'letter'
+            AND a.created_at >= $1::date
+            AND a.created_at < ($2::date + interval '1 day')
+            ${roleFilter}
+            AND a.message_text IS NOT NULL
+            AND a.message_text != ''
+        GROUP BY a.profile_id, a.message_text
+        ORDER BY MAX(a.created_at) DESC
+        LIMIT $${paramIndex}
+    `;
+
+    const result = await pool.query(query, params);
+
+    const letters = result.rows.map(row => ({
+        profileId: row.profile_id,
+        messageText: row.message_text,
+        sentCount: parseInt(row.sent_count),
+        firstSentAt: row.first_sent_at,
+        lastSentAt: row.last_sent_at
+    }));
+
+    res.json({ success: true, letters });
+}));
+
 module.exports = router;

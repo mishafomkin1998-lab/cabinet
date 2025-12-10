@@ -131,6 +131,9 @@
                 // Избранные шаблоны
                 favoriteTemplates: [],
 
+                // Отправленные письма (сгруппированные)
+                sentLettersGrouped: [],
+
                 // Последние ответы на входящие
                 lastResponses: [],
                 showAllResponses: false,
@@ -412,6 +415,7 @@
                             this.loadHourlyActivity(),
                             this.loadTranslatorStats(),
                             this.loadRecentActivity(),
+                            this.loadSentLettersGrouped(),
                             this.loadAccounts(),
                             this.loadBotsStatus()
                         ]);
@@ -634,6 +638,23 @@
                     } catch (e) { console.error('loadFavoriteTemplates error:', e); }
                 },
 
+                async loadSentLettersGrouped() {
+                    try {
+                        let url = `${API_BASE}/api/activity/sent-letters-grouped?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=50`;
+                        if (this.statsFilter.dateFrom) {
+                            url += `&dateFrom=${this.statsFilter.dateFrom}`;
+                        }
+                        if (this.statsFilter.dateTo) {
+                            url += `&dateTo=${this.statsFilter.dateTo}`;
+                        }
+                        const res = await fetch(url);
+                        const data = await res.json();
+                        if (data.success) {
+                            this.sentLettersGrouped = data.letters;
+                        }
+                    } catch (e) { console.error('loadSentLettersGrouped error:', e); }
+                },
+
                 async loadLastResponses() {
                     try {
                         const res = await fetch(`${API_BASE}/api/stats/last-responses?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=100`);
@@ -688,6 +709,18 @@
                     if (!timestamp) return '';
                     const date = new Date(timestamp);
                     return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                },
+
+                formatDateTime(timestamp) {
+                    if (!timestamp) return '';
+                    const date = new Date(timestamp);
+                    return date.toLocaleString('ru-RU', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
                 },
 
                 getActionTypeLabel(type) {
@@ -800,6 +833,7 @@
                 applyDateFilter() {
                     // Перезагружаем статистику с новым фильтром
                     this.loadDashboardStats();
+                    this.loadSentLettersGrouped();
                 },
 
                 // Calendar functions
@@ -1826,6 +1860,33 @@
                     const link = document.createElement('a');
                     link.href = URL.createObjectURL(blob);
                     link.download = `sent_letters_${new Date().toISOString().slice(0,10)}.txt`;
+                    link.click();
+                },
+
+                exportSentLettersGrouped() {
+                    if (this.sentLettersGrouped.length === 0) {
+                        alert('Нет отправленных писем для экспорта');
+                        return;
+                    }
+
+                    let content = '=== ОТПРАВЛЕННЫЕ ПИСЬМА (СГРУППИРОВАННЫЕ) ===\n';
+                    content += `Экспорт: ${new Date().toLocaleString('ru-RU')}\n`;
+                    content += `Всего уникальных писем: ${this.sentLettersGrouped.length}\n`;
+                    content += '='.repeat(50) + '\n\n';
+
+                    this.sentLettersGrouped.forEach((letter, i) => {
+                        content += `--- Письмо #${i + 1} ---\n`;
+                        content += `Анкета: ${letter.profileId}\n`;
+                        content += `Отправлено: ${letter.sentCount} раз\n`;
+                        content += `Последняя отправка: ${this.formatDateTime(letter.lastSentAt)}\n`;
+                        content += `Текст:\n${letter.messageText}\n`;
+                        content += '\n' + '-'.repeat(40) + '\n\n';
+                    });
+
+                    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `sent_letters_grouped_${new Date().toISOString().slice(0,10)}.txt`;
                     link.click();
                 },
 

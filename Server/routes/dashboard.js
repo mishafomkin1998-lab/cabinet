@@ -163,8 +163,31 @@ router.get('/', asyncHandler(async (req, res) => {
 
     const incomingQuery = `
         SELECT
+            -- Входящие письма (для обратной совместимости)
             COALESCE(COUNT(*) FILTER (WHERE i.type = 'letter'), 0) as incoming_letters,
-            COALESCE(COUNT(*) FILTER (WHERE i.type = 'chat'), 0) as incoming_chats,
+
+            -- Всего входящих чатов (Y)
+            COALESCE(COUNT(*) FILTER (WHERE i.type = 'chat'), 0) as incoming_chats_total,
+
+            -- Отвеченные входящие чаты (X) - все сообщения от мужчин, которым мы ответили
+            COALESCE(COUNT(*) FILTER (
+                WHERE i.type = 'chat'
+                AND EXISTS (
+                    SELECT 1 FROM messages m
+                    WHERE m.account_id = i.profile_id
+                    AND m.sender_id = i.man_id
+                    AND m.type = 'chat_msg'
+                    AND m.status = 'success'
+                )
+            ), 0) as incoming_chats_answered,
+
+            -- Уникальные мужчины из писем (X)
+            COUNT(DISTINCT CASE WHEN i.type = 'letter' THEN i.man_id END) as unique_men_letters,
+
+            -- Уникальные мужчины из чатов (Y)
+            COUNT(DISTINCT CASE WHEN i.type = 'chat' THEN i.man_id END) as unique_men_chats,
+
+            -- Старый формат для обратной совместимости
             COALESCE(COUNT(*) FILTER (WHERE i.is_first_from_man = true), 0) as unique_men
         FROM incoming_messages i
         WHERE i.created_at >= $1::date
@@ -277,6 +300,12 @@ router.get('/', asyncHandler(async (req, res) => {
     const incomingUniqueMen = parseInt(incoming.unique_men) || 0;
     const errorsCount = parseInt(errors.errors_count) || 0;
 
+    // Новые метрики для X/Y формата
+    const incomingChatsTotal = parseInt(incoming.incoming_chats_total) || 0;
+    const incomingChatsAnswered = parseInt(incoming.incoming_chats_answered) || 0;
+    const uniqueMenLetters = parseInt(incoming.unique_men_letters) || 0;
+    const uniqueMenChats = parseInt(incoming.unique_men_chats) || 0;
+
     // Формируем ответ с данными за выбранный период
     res.json({
         success: true,
@@ -293,6 +322,12 @@ router.get('/', asyncHandler(async (req, res) => {
             incomingChats: incomingChatsCount,
             uniqueMen: incomingUniqueMen,
             errors: errorsCount,
+
+            // Новые метрики для X/Y отображения
+            incomingChatsTotal: incomingChatsTotal,
+            incomingChatsAnswered: incomingChatsAnswered,
+            uniqueMenLetters: uniqueMenLetters,
+            uniqueMenChats: uniqueMenChats,
             // Метрики
             metrics: {
                 totalProfiles: totalProfiles,
