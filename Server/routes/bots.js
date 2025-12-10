@@ -280,6 +280,7 @@ router.post('/bot/heartbeat', asyncHandler(async (req, res) => {
 // Статус ботов и анкет
 router.get('/status', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
+    console.log(`📊 API /status вызван: userId=${userId}, role=${role}`);
 
     const { filter: profileFilter, params } = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'WHERE' });
 
@@ -371,6 +372,29 @@ router.get('/status', asyncHandler(async (req, res) => {
     // 2. Получаем уникальные боты (программы) - один бот = одна строка
     // Используем GROUP BY для гарантированной уникальности по bot_id
     // ФИЛЬТР: только machine_* (постоянные Machine ID), исключаем bot_* (временные ID анкет)
+    console.log(`🔍 Запрос уникальных ботов...`);
+
+    // DEBUG: Проверка что есть в таблице heartbeats
+    const debugHeartbeats = await pool.query(`
+        SELECT bot_id, account_display_id, timestamp,
+               NOW() as current_time,
+               NOW() - INTERVAL '1 hour' as one_hour_ago,
+               NOW() - INTERVAL '2 minutes' as two_minutes_ago
+        FROM heartbeats
+        WHERE bot_id LIKE 'machine_%'
+        ORDER BY timestamp DESC
+        LIMIT 5
+    `);
+    console.log(`🔎 DEBUG: heartbeats с machine_* (последние 5):`, debugHeartbeats.rows.map(r => ({
+        botId: r.bot_id,
+        profileId: r.account_display_id,
+        timestamp: r.timestamp,
+        age: `${Math.floor((new Date() - new Date(r.timestamp)) / 1000)}s назад`
+    })));
+    console.log(`🕐 Текущее время: ${debugHeartbeats.rows[0]?.current_time}`);
+    console.log(`🕐 1 час назад: ${debugHeartbeats.rows[0]?.one_hour_ago}`);
+    console.log(`🕐 2 минуты назад: ${debugHeartbeats.rows[0]?.two_minutes_ago}`);
+
     const botsQuery = `
         SELECT
             h.bot_id,
@@ -392,6 +416,7 @@ router.get('/status', asyncHandler(async (req, res) => {
         ORDER BY last_heartbeat DESC
     `;
     const botsResult = await pool.query(botsQuery);
+    console.log(`✅ SQL выполнен, получено строк: ${botsResult.rows.length}`);
 
     // DEBUG: Логируем результат запроса ботов
     console.log(`🤖 Bots query returned ${botsResult.rows.length} rows`);
