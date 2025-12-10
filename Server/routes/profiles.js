@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
                 COALESCE(stats.chats_today, 0) as chats_today,
                 COALESCE(stats.letters_total, 0) as letters_total,
                 COALESCE(stats.chats_total, 0) as chats_total,
-                COALESCE(incoming.incoming_today, 0) as incoming_today,
+                COALESCE(incoming.incoming_month, 0) as incoming_month,
                 COALESCE(incoming.incoming_total, 0) as incoming_total
             FROM allowed_profiles p
             LEFT JOIN users u_admin ON p.assigned_admin_id = u_admin.id
