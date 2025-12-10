@@ -749,7 +749,19 @@ router.get('/sent-letters-grouped', asyncHandler(async (req, res) => {
         LIMIT $${paramIndex}
     `;
 
+    // DEBUG: Логируем запрос
+    console.log('📊 DEBUG sent-letters-grouped:');
+    console.log('   Query params:', params);
+    console.log('   Period:', periodFrom, '-', periodTo);
+    console.log('   Role:', role, 'UserId:', userId);
+    console.log('   Role filter:', roleFilter);
+
     const result = await pool.query(query, params);
+
+    console.log('   Result count:', result.rows.length);
+    if (result.rows.length > 0) {
+        console.log('   First letter:', JSON.stringify(result.rows[0]).substring(0, 200));
+    }
 
     const letters = result.rows.map(row => ({
         profileId: row.profile_id,
