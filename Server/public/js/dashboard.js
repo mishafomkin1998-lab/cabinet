@@ -67,7 +67,6 @@
                 activeMenu: 'stats',
                 activeSubmenu: 'general',
                 showCalendar: false,
-                showMonitoringCalendar: false,
                 showAddAccountModal: false,
                 showAddAdminModal: false,
                 showAssignAccountsModal: false,
@@ -147,7 +146,6 @@
                 // Календарь
                 showStatsCalendar: false,
                 showAccountsCalendar: false,
-                showMonitoringCalendar: false,
                 calendarMonth: new Date().getMonth(),
                 calendarYear: new Date().getFullYear(),
                 calendarSelectingStart: true,
@@ -161,24 +159,11 @@
 
                     if (type === 'stats') {
                         this.showStatsCalendar = !this.showStatsCalendar;
-                        this.showMonitoringCalendar = false;
-                        this.showHistoryCalendar = false;
-                    } else if (type === 'monitoring') {
-                        this.showMonitoringCalendar = !this.showMonitoringCalendar;
-                        this.showStatsCalendar = false;
                         this.showHistoryCalendar = false;
                     } else if (type === 'history') {
                         this.showHistoryCalendar = !this.showHistoryCalendar;
                         this.showStatsCalendar = false;
-                        this.showMonitoringCalendar = false;
                     }
-                },
-
-                monitoringFilter: {
-                    admin: '',
-                    translator: '',
-                    dateFrom: '',
-                    dateTo: ''
                 },
 
                 accountsFilter: {
@@ -310,20 +295,6 @@
 
                     // Календарь статистики
                     this.statsDatePicker = flatpickr('#statsDatePicker', config);
-
-                    // Календарь мониторинга
-                    this.monitoringDatePicker = flatpickr('#monitoringDatePicker', {
-                        ...config,
-                        defaultDate: [this.monitoringFilter.dateFrom, this.monitoringFilter.dateTo],
-                        onChange: function(selectedDates) {
-                            if (selectedDates.length === 2) {
-                                const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                                self.monitoringFilter.dateFrom = formatDate(selectedDates[0]);
-                                self.monitoringFilter.dateTo = formatDate(selectedDates[1]);
-                                self.loadMonitoringData();
-                            }
-                        }
-                    });
 
                     // Календарь истории
                     this.historyDatePicker = flatpickr('#historyDatePicker', {
@@ -871,68 +842,6 @@
                 isDateInRange(date) {
                     if (!this.statsFilter.dateFrom || !this.statsFilter.dateTo) return false;
                     return date > this.statsFilter.dateFrom && date < this.statsFilter.dateTo;
-                },
-
-                // Функции календаря мониторинга
-                getMonitoringDateRangeText() {
-                    if (!this.monitoringFilter.dateFrom || !this.monitoringFilter.dateTo) {
-                        return 'Выберите период';
-                    }
-                    const from = new Date(this.monitoringFilter.dateFrom);
-                    const to = new Date(this.monitoringFilter.dateTo);
-                    const formatShort = (d) => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-
-                    if (this.monitoringFilter.dateFrom === this.monitoringFilter.dateTo) {
-                        return formatShort(from);
-                    }
-                    return `${formatShort(from)} - ${formatShort(to)}`;
-                },
-
-                selectMonitoringCalendarDate(date) {
-                    if (this.calendarSelectingStart || !this.monitoringFilter.dateFrom) {
-                        this.monitoringFilter.dateFrom = date;
-                        this.monitoringFilter.dateTo = date;
-                        this.calendarSelectingStart = false;
-                    } else {
-                        if (date < this.monitoringFilter.dateFrom) {
-                            this.monitoringFilter.dateTo = this.monitoringFilter.dateFrom;
-                            this.monitoringFilter.dateFrom = date;
-                        } else {
-                            this.monitoringFilter.dateTo = date;
-                        }
-                        this.calendarSelectingStart = true;
-                        this.showMonitoringCalendar = false;
-                    }
-                },
-
-                isMonitoringDateSelected(date) {
-                    return date === this.monitoringFilter.dateFrom || date === this.monitoringFilter.dateTo;
-                },
-
-                isMonitoringDateInRange(date) {
-                    if (!this.monitoringFilter.dateFrom || !this.monitoringFilter.dateTo) return false;
-                    return date > this.monitoringFilter.dateFrom && date < this.monitoringFilter.dateTo;
-                },
-
-                setMonitoringQuickRange(range) {
-                    const now = new Date();
-                    const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-
-                    if (range === 'today') {
-                        this.monitoringFilter.dateFrom = formatDate(now);
-                        this.monitoringFilter.dateTo = formatDate(now);
-                    } else if (range === 'week') {
-                        const weekAgo = new Date(now);
-                        weekAgo.setDate(now.getDate() - 7);
-                        this.monitoringFilter.dateFrom = formatDate(weekAgo);
-                        this.monitoringFilter.dateTo = formatDate(now);
-                    } else if (range === 'month') {
-                        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-                        this.monitoringFilter.dateFrom = formatDate(firstDay);
-                        this.monitoringFilter.dateTo = formatDate(now);
-                    }
-
-                    this.showMonitoringCalendar = false;
                 },
 
                 setMonitoringFunction(func) {

@@ -80,12 +80,6 @@
                             <span class="ml-3 font-medium" x-text="t('menu.control')"></span>
                         </div>
                     </div>
-                    <div>
-                        <div @click="setActiveMenu('monitoring')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'monitoring' ? 'active' : ''">
-                            <i class="fas fa-eye w-5 text-gray-600"></i>
-                            <span class="ml-3 font-medium" x-text="t('menu.monitoring')"></span>
-                        </div>
-                    </div>
                     <!-- Финансы (только для директора) -->
                     <div x-show="currentUser.role === 'director'">
                         <div @click="setActiveMenu('finances')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'finances' ? 'active' : ''">
@@ -425,6 +419,144 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- Детальная активность -->
+                <div class="glass rounded-2xl p-6 mt-8">
+                    <h3 class="text-lg font-bold mb-6">📊 Детальная активность</h3>
+
+                    <!-- Функции -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                        <button @click="setMonitoringFunction('lastResponses')"
+                                class="glass p-4 rounded-xl text-center hover:bg-gray-50 transition-all"
+                                :class="monitoringFunction === 'lastResponses' ? 'bg-indigo-50 border-2 border-indigo-300 shadow-md' : ''">
+                            <i class="fas fa-comments text-blue-500 text-2xl mb-2 block"></i>
+                            <div class="font-medium text-sm" x-text="t('monitoring.lastResponses')"></div>
+                        </button>
+
+                        <button @click="setMonitoringFunction('sentLetters')"
+                                class="glass p-4 rounded-xl text-center hover:bg-gray-50 transition-all"
+                                :class="monitoringFunction === 'sentLetters' ? 'bg-indigo-50 border-2 border-indigo-300 shadow-md' : ''">
+                            <i class="fas fa-paper-plane text-green-500 text-2xl mb-2 block"></i>
+                            <div class="font-medium text-sm" x-text="t('monitoring.sentLetters')"></div>
+                        </button>
+
+                        <button @click="setMonitoringFunction('favoriteMailing')"
+                                class="glass p-4 rounded-xl text-center hover:bg-gray-50 transition-all"
+                                :class="monitoringFunction === 'favoriteMailing' ? 'bg-indigo-50 border-2 border-indigo-300 shadow-md' : ''">
+                            <i class="fas fa-heart text-red-500 text-2xl mb-2 block"></i>
+                            <div class="font-medium text-sm" x-text="t('monitoring.favoriteMailing')"></div>
+                        </button>
+
+                        <button @click="setMonitoringFunction('aiUsage')"
+                                class="glass p-4 rounded-xl text-center hover:bg-gray-50 transition-all"
+                                :class="monitoringFunction === 'aiUsage' ? 'bg-indigo-50 border-2 border-indigo-300 shadow-md' : ''">
+                            <i class="fas fa-brain text-orange-500 text-2xl mb-2 block"></i>
+                            <div class="font-medium text-sm" x-text="t('monitoring.aiUsage')"></div>
+                        </button>
+                    </div>
+
+                    <!-- Контент активности -->
+                    <div class="glass rounded-2xl p-6 border border-gray-100">
+                        <h4 class="text-md font-bold mb-4" x-text="getMonitoringTitle()"></h4>
+
+                        <!-- Последние ответы -->
+                        <div x-show="monitoringFunction === 'lastResponses'" x-transition class="space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin">
+                            <template x-for="activity in recentActivity.filter(a => (a.action_type === 'chat' || a.action_type === 'letter') && a.is_reply).slice(0, 10)" :key="activity.id">
+                                <div class="p-3 rounded-xl border border-gray-100 bg-blue-50 hover:bg-blue-100 transition-colors">
+                                    <div class="font-medium mb-2">
+                                        <span class="text-blue-600">↩️ Ответ</span> | Анкета <span x-text="activity.profile_id"></span> →
+                                        Мужчина <span x-text="activity.man_id"></span>
+                                    </div>
+                                    <div class="space-y-2 text-sm">
+                                        <div class="bg-white p-2 rounded-lg">
+                                            <span class="font-medium text-blue-600">Ответ:</span>
+                                            <span x-text="activity.message_text || '(текст не сохранён)'"></span>
+                                        </div>
+                                    </div>
+                                    <div class="text-xs text-gray-400 mt-2" x-text="formatActivityTime(activity.created_at)"></div>
+                                </div>
+                            </template>
+                            <div x-show="recentActivity.filter(a => (a.action_type === 'chat' || a.action_type === 'letter') && a.is_reply).length === 0" class="text-center text-gray-500 py-8">
+                                Нет данных об ответах
+                            </div>
+                        </div>
+
+                        <!-- Отправленные письма -->
+                        <div x-show="monitoringFunction === 'sentLetters'" x-transition class="space-y-3 max-h-[600px] overflow-y-auto scrollbar-thin">
+                            <template x-for="activity in recentActivity.filter(a => a.action_type === 'letter')" :key="activity.id">
+                                <div class="flex items-start p-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-colors">
+                                    <i class="fas fa-envelope text-green-500 mt-1 mr-3"></i>
+                                    <div class="flex-1">
+                                        <div class="font-medium">
+                                            <span x-text="'Анкета ' + activity.profile_id"></span>
+                                            <span class="text-gray-500">→</span>
+                                            <span x-text="'Мужчина ' + activity.man_id"></span>
+                                        </div>
+                                        <div class="text-sm text-gray-600 mt-1" x-text="activity.message_text || '(текст не сохранён)'"></div>
+                                        <div class="text-xs text-gray-400 mt-1" x-text="formatActivityTime(activity.created_at)"></div>
+                                    </div>
+                                </div>
+                            </template>
+                            <div x-show="recentActivity.filter(a => a.action_type === 'letter').length === 0" class="text-center text-gray-500 py-8">
+                                Нет отправленных писем за выбранный период
+                            </div>
+                        </div>
+
+                        <!-- Любимая рассылка -->
+                        <div x-show="monitoringFunction === 'favoriteMailing'" x-transition class="space-y-3">
+                            <!-- Кнопка экспорта (меньше) -->
+                            <div class="flex justify-end mb-2" x-show="favoriteTemplates.length > 0">
+                                <button @click="exportFavoriteTemplates()" class="px-3 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 font-medium transition-all text-xs">
+                                    <i class="fas fa-download mr-1"></i>Выгрузить
+                                </button>
+                            </div>
+                            <div class="max-h-[600px] overflow-y-auto scrollbar-thin space-y-3">
+                                <template x-for="template in favoriteTemplates" :key="template.id">
+                                    <div class="p-4 rounded-xl bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200 hover:shadow-md transition-shadow">
+                                        <div class="flex items-center mb-2">
+                                            <i class="fas fa-heart text-red-500 mr-2"></i>
+                                            <span class="font-medium" x-text="template.templateName || 'Без названия'"></span>
+                                            <span class="ml-auto text-xs text-gray-500">
+                                                Анкета: <span x-text="template.profileLogin || template.profileId"></span>
+                                            </span>
+                                        </div>
+                                        <div class="text-sm text-gray-700 bg-white p-3 rounded-lg border border-pink-100 whitespace-pre-wrap" x-text="template.templateText || '(текст не сохранён)'"></div>
+                                        <div class="text-xs text-gray-400 mt-2" x-text="new Date(template.createdAt).toLocaleString('ru-RU')"></div>
+                                    </div>
+                                </template>
+                            </div>
+                            <div x-show="favoriteTemplates.length === 0" class="text-center text-gray-500 py-8">
+                                <i class="fas fa-heart text-gray-300 text-4xl mb-3 block"></i>
+                                Нет избранных шаблонов. Отметьте шаблон сердечком в боте.
+                            </div>
+                        </div>
+
+                        <!-- Использование ИИ -->
+                        <div x-show="monitoringFunction === 'aiUsage'" x-transition class="space-y-4">
+                            <div class="glass p-4 rounded-xl">
+                                <div class="flex justify-between items-center mb-2">
+                                    <div class="font-medium" x-text="t('monitoring.aiGenerations')"></div>
+                                    <div class="text-2xl font-bold text-orange-600" x-text="recentActivity.filter(a => a.used_ai).length"></div>
+                                </div>
+                                <div class="text-sm text-gray-600" x-text="t('monitoring.recentGenerations')"></div>
+                            </div>
+                            <div class="glass p-4 rounded-xl max-h-[500px] overflow-y-auto scrollbar-thin">
+                                <div class="font-medium mb-2">Последние генерации:</div>
+                                <div class="space-y-2 text-sm">
+                                    <template x-for="activity in recentActivity.filter(a => a.used_ai).slice(0, 10)" :key="activity.id">
+                                        <div class="border-l-4 border-orange-400 pl-3 py-2 bg-orange-50 rounded-r hover:bg-orange-100 transition-colors">
+                                            <div x-text="activity.message_text ? activity.message_text.substring(0, 150) + '...' : '(ИИ генерация)'"></div>
+                                            <div class="text-xs text-gray-500 mt-1" x-text="formatActivityTime(activity.created_at)"></div>
+                                        </div>
+                                    </template>
+                                    <div x-show="recentActivity.filter(a => a.used_ai).length === 0" class="text-center text-gray-500 py-4">
+                                        Нет данных об использовании ИИ
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1373,243 +1505,6 @@
                 </div>
             </div>
 
-            <!-- Мониторинг -->
-            <div x-show="activeMenu === 'monitoring'" x-cloak class="fade-in">
-                <!-- Фильтры для мониторинга -->
-                <div class="glass rounded-2xl p-5 mb-6">
-                    <div class="flex items-center gap-4 flex-wrap">
-                        <!-- Выбор админа (только для директора) -->
-                        <div x-show="currentUser.role === 'director'">
-                            <select class="glass px-4 py-2.5 rounded-xl" x-model="monitoringFilter.admin" @change="monitoringFilter.translator = ''">
-                                <option value="" x-text="t('filters.allAdmins')"></option>
-                                <template x-for="admin in admins" :key="admin.id">
-                                    <option :value="admin.id" x-text="admin.name"></option>
-                                </template>
-                            </select>
-                        </div>
-
-                        <!-- Выбор переводчика (для директора - при выборе админа, для админа - всегда) -->
-                        <div x-show="currentUser.role === 'admin' || monitoringFilter.admin">
-                            <select class="glass px-4 py-2.5 rounded-xl" x-model="monitoringFilter.translator">
-                                <option value="" x-text="t('filters.allTranslators')"></option>
-                                <template x-for="translator in (currentUser.role === 'admin' ? myTranslators : (admins.find(a => a.id == monitoringFilter.admin)?.translators || []))" :key="translator.id">
-                                    <option :value="translator.id" x-text="translator.name"></option>
-                                </template>
-                            </select>
-                        </div>
-
-                        <!-- Календарь выбора диапазона (Flatpickr) -->
-                        <div class="glass px-4 py-2.5 rounded-xl flex items-center">
-                            <i class="fas fa-calendar mr-2 text-gray-400"></i>
-                            <input type="text" id="monitoringDatePicker" class="bg-transparent border-none outline-none w-48 text-sm" readonly :placeholder="t('common.selectPeriod')">
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Функции мониторинга -->
-                <div class="grid grid-cols-5 gap-4 mb-6">
-                    <button @click="setMonitoringFunction('lastResponses')" 
-                            class="glass p-4 rounded-xl text-center hover:bg-gray-50"
-                            :class="monitoringFunction === 'lastResponses' ? 'bg-indigo-50 border border-indigo-200' : ''">
-                        <i class="fas fa-comments text-blue-500 text-xl mb-2 block"></i>
-                        <div class="font-medium" x-text="t('monitoring.lastResponses')"></div>
-                    </button>
-                    
-                    <button @click="setMonitoringFunction('sentLetters')" 
-                            class="glass p-4 rounded-xl text-center hover:bg-gray-50"
-                            :class="monitoringFunction === 'sentLetters' ? 'bg-indigo-50 border border-indigo-200' : ''">
-                        <i class="fas fa-paper-plane text-green-500 text-xl mb-2 block"></i>
-                        <div class="font-medium" x-text="t('monitoring.sentLetters')"></div>
-                    </button>
-                    
-                    <button @click="setMonitoringFunction('favoriteMailing')" 
-                            class="glass p-4 rounded-xl text-center hover:bg-gray-50"
-                            :class="monitoringFunction === 'favoriteMailing' ? 'bg-indigo-50 border border-indigo-200' : ''">
-                        <i class="fas fa-heart text-red-500 text-xl mb-2 block"></i>
-                        <div class="font-medium" x-text="t('monitoring.favoriteMailing')"></div>
-                    </button>
-                    
-                    <button @click="setMonitoringFunction('workTime')" 
-                            class="glass p-4 rounded-xl text-center hover:bg-gray-50"
-                            :class="monitoringFunction === 'workTime' ? 'bg-indigo-50 border border-indigo-200' : ''">
-                        <i class="fas fa-clock text-purple-500 text-xl mb-2 block"></i>
-                        <div class="font-medium" x-text="t('monitoring.workTimeBtn')"></div>
-                    </button>
-                    
-                    <button @click="setMonitoringFunction('aiUsage')" 
-                            class="glass p-4 rounded-xl text-center hover:bg-gray-50"
-                            :class="monitoringFunction === 'aiUsage' ? 'bg-indigo-50 border border-indigo-200' : ''">
-                        <i class="fas fa-brain text-orange-500 text-xl mb-2 block"></i>
-                        <div class="font-medium" x-text="t('monitoring.aiUsage')"></div>
-                    </button>
-                </div>
-                
-                <!-- Контент мониторинга -->
-                <div class="grid grid-cols-3 gap-6">
-                    <!-- Live события -->
-                    <div class="glass rounded-2xl p-6 col-span-2">
-                        <h3 class="text-lg font-bold mb-6" x-text="getMonitoringTitle()"></h3>
-                        
-                        <!-- Последние ответы (ТОЛЬКО ответы на входящие письма, не рассылка) -->
-                        <div x-show="monitoringFunction === 'lastResponses'" class="space-y-4 max-h-96 overflow-y-auto scrollbar-thin">
-                            <template x-for="activity in recentActivity.filter(a => (a.action_type === 'chat' || a.action_type === 'letter') && a.is_reply).slice(0, 10)" :key="activity.id">
-                                <div class="p-3 rounded-xl border border-gray-100 bg-blue-50">
-                                    <div class="font-medium mb-2">
-                                        <span class="text-blue-600">↩️ Ответ</span> | Анкета <span x-text="activity.profile_id"></span> →
-                                        Мужчина <span x-text="activity.man_id"></span>
-                                    </div>
-                                    <div class="space-y-2 text-sm">
-                                        <div class="bg-blue-50 p-2 rounded-lg">
-                                            <span class="font-medium text-blue-600">Ответ:</span>
-                                            <span x-text="activity.message_text || '(текст не сохранён)'"></span>
-                                        </div>
-                                    </div>
-                                    <div class="text-xs text-gray-400 mt-2" x-text="formatActivityTime(activity.created_at)"></div>
-                                </div>
-                            </template>
-                            <div x-show="recentActivity.filter(a => a.action_type === 'chat' || a.action_type === 'letter').length === 0" class="text-center text-gray-500 py-8">
-                                Нет данных об ответах
-                            </div>
-                        </div>
-                        
-                        <!-- Отправленные письма -->
-                        <div x-show="monitoringFunction === 'sentLetters'" class="space-y-4 max-h-96 overflow-y-auto scrollbar-thin">
-                            <template x-for="activity in recentActivity.filter(a => a.action_type === 'letter')" :key="activity.id">
-                                <div class="flex items-start p-3 rounded-xl border border-gray-100">
-                                    <i class="fas fa-envelope text-green-500 mt-1 mr-3"></i>
-                                    <div class="flex-1">
-                                        <div class="font-medium">
-                                            <span x-text="'Анкета ' + activity.profile_id"></span>
-                                            <span class="text-gray-500">→</span>
-                                            <span x-text="'Мужчина ' + activity.man_id"></span>
-                                        </div>
-                                        <div class="text-sm text-gray-600 mt-1" x-text="activity.message_text || '(текст не сохранён)'"></div>
-                                        <div class="text-xs text-gray-400 mt-1" x-text="formatActivityTime(activity.created_at)"></div>
-                                    </div>
-                                </div>
-                            </template>
-                            <div x-show="recentActivity.filter(a => a.action_type === 'letter').length === 0" class="text-center text-gray-500 py-8">
-                                Нет отправленных писем за выбранный период
-                            </div>
-                        </div>
-                        
-                        <!-- Любимая рассылка (избранные шаблоны с сердечком из бота) -->
-                        <div x-show="monitoringFunction === 'favoriteMailing'" class="space-y-4">
-                            <!-- Кнопка экспорта -->
-                            <div class="flex justify-end mb-2" x-show="favoriteTemplates.length > 0">
-                                <button @click="exportFavoriteTemplates()" class="px-5 py-2.5 bg-pink-500 text-white rounded-xl hover:bg-pink-600 font-medium transition-all text-sm">
-                                    <i class="fas fa-download mr-2"></i>Выгрузить все
-                                </button>
-                            </div>
-                            <div class="max-h-96 overflow-y-auto scrollbar-thin space-y-3">
-                                <template x-for="template in favoriteTemplates" :key="template.id">
-                                    <div class="p-4 rounded-xl bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-200">
-                                        <div class="flex items-center mb-2">
-                                            <i class="fas fa-heart text-red-500 mr-2"></i>
-                                            <span class="font-medium" x-text="template.templateName || 'Без названия'"></span>
-                                            <span class="ml-auto text-xs text-gray-500">
-                                                Анкета: <span x-text="template.profileLogin || template.profileId"></span>
-                                            </span>
-                                        </div>
-                                        <div class="text-sm text-gray-700 bg-white p-3 rounded-lg border border-pink-100 whitespace-pre-wrap" x-text="template.templateText || '(текст не сохранён)'"></div>
-                                        <div class="text-xs text-gray-400 mt-2" x-text="new Date(template.createdAt).toLocaleString('ru-RU')"></div>
-                                    </div>
-                                </template>
-                            </div>
-                            <div x-show="favoriteTemplates.length === 0" class="text-center text-gray-500 py-8">
-                                <i class="fas fa-heart text-gray-300 text-4xl mb-3 block"></i>
-                                Нет избранных шаблонов. Отметьте шаблон сердечком в боте.
-                            </div>
-                        </div>
-                        
-                        <!-- Время работы -->
-                        <div x-show="monitoringFunction === 'workTime'" class="space-y-4">
-                            <div class="grid grid-cols-2 gap-4">
-                                <div class="glass p-4 rounded-xl text-center">
-                                    <div class="text-2xl font-bold text-blue-600" x-text="stats.metrics.workTime || '0ч 0м'"></div>
-                                    <div class="text-sm text-gray-600" x-text="t('common.today')"></div>
-                                </div>
-                                <div class="glass p-4 rounded-xl text-center">
-                                    <div class="text-2xl font-bold text-purple-600" x-text="stats.metrics.workTimeMonth || '0ч 0м'"></div>
-                                    <div class="text-sm text-gray-600" x-text="t('stats.forMonth')"></div>
-                                </div>
-                            </div>
-                            <div class="text-sm text-gray-600">
-                                Писем: <span x-text="stats.month.letters || 0"></span> |
-                                Чатов: <span x-text="stats.month.chats || 0"></span>
-                            </div>
-                        </div>
-                        
-                        <!-- Использование ИИ -->
-                        <div x-show="monitoringFunction === 'aiUsage'" class="space-y-4">
-                            <div class="glass p-4 rounded-xl">
-                                <div class="flex justify-between items-center mb-2">
-                                    <div class="font-medium" x-text="t('monitoring.aiGenerations')"></div>
-                                    <div class="text-2xl font-bold text-orange-600" x-text="recentActivity.filter(a => a.used_ai).length"></div>
-                                </div>
-                                <div class="text-sm text-gray-600" x-text="t('monitoring.recentGenerations')"></div>
-                            </div>
-                            <div class="glass p-4 rounded-xl">
-                                <div class="font-medium mb-2">Последние генерации:</div>
-                                <div class="space-y-2 text-sm">
-                                    <template x-for="activity in recentActivity.filter(a => a.used_ai).slice(0, 5)" :key="activity.id">
-                                        <div class="border-l-4 border-orange-400 pl-3 py-1">
-                                            <div x-text="activity.message_text ? activity.message_text.substring(0, 100) + '...' : '(ИИ генерация)'"></div>
-                                            <div class="text-xs text-gray-500" x-text="formatActivityTime(activity.created_at)"></div>
-                                        </div>
-                                    </template>
-                                    <div x-show="recentActivity.filter(a => a.used_ai).length === 0" class="text-gray-500">
-                                        Нет данных об использовании ИИ
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- Переписка - реальные диалоги -->
-                    <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-4 flex items-center">
-                            <i class="fas fa-comments text-indigo-500 mr-2"></i>
-                            Последняя переписка
-                        </h3>
-                        <div class="space-y-2 max-h-80 overflow-y-auto pr-2" style="scrollbar-width: thin;">
-                            <template x-for="activity in recentActivity.filter(a => a.action_type === 'incoming' || a.action_type === 'letter' || a.action_type === 'chat').slice(0, 15)" :key="activity.id">
-                                <div class="flex items-start gap-2" :class="activity.action_type === 'incoming' ? '' : 'flex-row-reverse'">
-                                    <!-- Аватар -->
-                                    <div class="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
-                                         :class="activity.action_type === 'incoming' ? 'bg-gray-400' : 'bg-gradient-to-r from-pink-500 to-rose-500'">
-                                        <span x-text="activity.action_type === 'incoming' ? '♂' : '♀'"></span>
-                                    </div>
-                                    <!-- Сообщение -->
-                                    <div class="max-w-[75%]">
-                                        <div class="text-xs mb-1 flex items-center gap-2"
-                                             :class="activity.action_type === 'incoming' ? 'text-gray-500' : 'text-pink-600 justify-end'">
-                                            <span x-show="activity.action_type === 'incoming'" x-text="'Мужчина ' + activity.man_id"></span>
-                                            <span x-show="activity.action_type !== 'incoming'" x-text="'Анкета ' + activity.profile_id"></span>
-                                            <span class="opacity-60" x-text="formatActivityTime(activity.created_at)"></span>
-                                        </div>
-                                        <div class="p-3 rounded-2xl text-sm leading-relaxed"
-                                             :class="activity.action_type === 'incoming' ? 'bg-gray-100 text-gray-800 rounded-tl-sm' : 'bg-gradient-to-r from-pink-100 to-rose-100 text-gray-800 rounded-tr-sm'">
-                                            <span x-text="activity.message_text ? activity.message_text.substring(0, 120) + (activity.message_text.length > 120 ? '...' : '') : '(сообщение)'"></span>
-                                        </div>
-                                        <div class="flex items-center gap-2 mt-1 text-xs"
-                                             :class="activity.action_type === 'incoming' ? '' : 'justify-end'">
-                                            <span x-show="activity.action_type !== 'incoming' && activity.used_ai" class="text-purple-500">
-                                                <i class="fas fa-robot"></i> AI
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-                            <div x-show="recentActivity.filter(a => a.action_type === 'incoming' || a.action_type === 'letter' || a.action_type === 'chat').length === 0" class="text-center text-gray-500 py-8">
-                                <i class="fas fa-inbox text-4xl mb-3 opacity-30"></i>
-                                <p x-text="t('monitoring.noCorrespondence')"></p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
             <!-- Обучение -->
             <div x-show="activeMenu === 'training'" x-cloak class="fade-in">
                 <div class="glass rounded-2xl p-6">
