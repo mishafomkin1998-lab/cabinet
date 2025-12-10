@@ -4480,10 +4480,16 @@
             const area = document.getElementById(`msg-${botId}`);
             const currentText = area ? area.value : '';
 
-            let val = (forceSelectIndex !== null) ? forceSelectIndex : sel.value;
+            // Исправлено: проверяем и на null, и на undefined
+            let val = (forceSelectIndex !== null && forceSelectIndex !== undefined) ? forceSelectIndex : sel.value;
 
-            // Если val пустой/null, но есть шаблоны - выбираем первый автоматически
-            if ((val === null || val === "" || val === undefined) && tpls.length > 0) {
+            // Приводим к числу если это строка
+            if (typeof val === 'string' && val !== '') {
+                val = parseInt(val);
+            }
+
+            // Если val пустой/null/undefined или выходит за границы массива - выбираем первый шаблон
+            if ((val === null || val === "" || val === undefined || isNaN(val) || val >= tpls.length) && tpls.length > 0) {
                 val = 0;
             }
 
@@ -4491,7 +4497,7 @@
             tpls.forEach((t,i)=> sel.innerHTML+=`<option value="${i}">${t.favorite?'❤ ':''}${t.name}</option>`);
 
             const btnFav = document.getElementById(`btn-fav-${botId}`);
-            if(val !== null && val !== "" && val !== undefined && tpls[val]) {
+            if(val !== null && val !== "" && val !== undefined && !isNaN(val) && tpls[val]) {
                  sel.value = val;
                  area.disabled=false;
                  area.value=tpls[val].text;
