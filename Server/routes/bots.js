@@ -62,6 +62,10 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
     const version = systemInfo?.version || null;
     const platform = systemInfo?.platform || null;
 
+    // DEBUG: Логируем входящий heartbeat для диагностики
+    console.log(`📥 Heartbeat получен: botId=${botId}, profileId=${accountDisplayId}, status=${profileStatus}`);
+    console.log(`   botId начинается с "machine_": ${botId?.startsWith('machine_') ? 'ДА ✅' : 'НЕТ ❌'}`);
+
     // Верификация отключена - теперь один MACHINE_ID может обслуживать много анкет
     // Проверка анкеты делается через allowed_profiles
 
@@ -392,8 +396,19 @@ router.get('/status', asyncHandler(async (req, res) => {
     const botsResult = await pool.query(botsQuery);
 
     // DEBUG: Логируем результат запроса ботов
-    console.log(`🤖 Bots query returned ${botsResult.rows.length} rows:`,
-        botsResult.rows.map(r => ({ botId: r.bot_id, ts: r.last_heartbeat })));
+    console.log(`🤖 Bots query (machine_* only) returned ${botsResult.rows.length} rows:`,
+        botsResult.rows.map(r => ({ botId: r.bot_id, profiles: r.profiles_count, ts: r.last_heartbeat })));
+
+    // DEBUG: Проверяем сколько вообще уникальных bot_id за последний час (для диагностики)
+    const allBotsDebug = await pool.query(`
+        SELECT bot_id, COUNT(*) as cnt
+        FROM heartbeats
+        WHERE timestamp > NOW() - INTERVAL '1 hour'
+        GROUP BY bot_id
+        ORDER BY cnt DESC
+        LIMIT 10
+    `);
+    console.log(`🔍 Все bot_id за последний час:`, allBotsDebug.rows.map(r => `${r.bot_id} (${r.cnt})`));
 
     const botStatusCounts = { online: 0, offline: 0 };
     const uniqueBots = botsResult.rows.map(row => {
