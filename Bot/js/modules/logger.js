@@ -158,9 +158,10 @@ function openResponseWindow(botId, partnerId, partnerName, type) {
     const offsetY = 100 + (windowCount % 5) * 30;
 
     // URL для открытия на сайте
+    // Используем базовые страницы, т.к. сайт может не поддерживать прямые ссылки на конкретного пользователя
     const siteUrl = type === 'chat'
-        ? `https://ladadate.com/chat/${partnerId}`
-        : `https://ladadate.com/messages/${partnerId}`;
+        ? `https://ladadate.com/chats`
+        : `https://ladadate.com/inbox`;
 
     const win = document.createElement('div');
     win.className = 'response-window response-window-webview focused';
@@ -210,12 +211,45 @@ function openResponseWindow(botId, partnerId, partnerName, type) {
 
     webview.addEventListener('did-start-loading', () => {
         loadingEl.style.display = 'flex';
+        console.log(`[ResponseWindow] Загрузка началась: ${siteUrl}`);
     });
 
     webview.addEventListener('did-finish-load', () => {
         loadingEl.style.display = 'none';
         // Блокируем звуки на странице
         webview.setAudioMuted(true);
+
+        // Проверяем текущий URL (может быть редирект на логин)
+        const currentUrl = webview.getURL();
+        console.log(`[ResponseWindow] Загрузка завершена: ${currentUrl}`);
+
+        // Если редирект на логин - пробуем авторизоваться
+        if (currentUrl.includes('/login')) {
+            console.log(`[ResponseWindow] Обнаружен редирект на логин, пробуем авторизоваться...`);
+            const botData = bots[botId];
+            if (botData) {
+                webview.executeJavaScript(`
+                    setTimeout(() => {
+                        const emailInput = document.querySelector('input[name="login"]');
+                        const passInput = document.querySelector('input[name="password"]');
+                        const btn = document.querySelector('button[type="submit"]');
+
+                        if(emailInput && passInput) {
+                            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+
+                            nativeInputValueSetter.call(emailInput, "${botData.login}");
+                            emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+                            nativeInputValueSetter.call(passInput, "${botData.pass}");
+                            passInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+                            if(btn) setTimeout(() => btn.click(), 500);
+                        }
+                    }, 1000);
+                `).catch(e => console.error('[ResponseWindow] Ошибка авто-логина:', e));
+            }
+        }
+
         // Инжектируем блокировку Audio API
         webview.executeJavaScript(`
             if (!window.__audioMuted) {
@@ -227,9 +261,15 @@ function openResponseWindow(botId, partnerId, partnerName, type) {
     });
 
     webview.addEventListener('did-fail-load', (e) => {
+        console.error(`[ResponseWindow] Ошибка загрузки:`, e.errorCode, e.errorDescription);
         if (e.errorCode !== -3) { // -3 = операция отменена (нормально при навигации)
             loadingEl.innerHTML = `<i class="fa fa-exclamation-triangle text-warning"></i> Ошибка загрузки`;
         }
+    });
+
+    // Логируем навигацию
+    webview.addEventListener('will-navigate', (e) => {
+        console.log(`[ResponseWindow] Навигация на: ${e.url}`);
     });
 
     // Сохраняем данные окна
