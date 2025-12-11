@@ -220,9 +220,14 @@
                     password: '',
                     salary: '',
                     aiEnabled: false,
-                    adminId: ''
+                    adminId: '',
+                    isOwnTranslator: true // По умолчанию "мой переводчик"
                 },
                 editingTranslator: null,
+
+                // Выбор анкет по комментарию при создании админа
+                uniqueProfileNotes: [], // Уникальные комментарии анкет
+                selectedProfileNote: '', // Выбранный комментарий для фильтрации
 
                 showAddTranslatorModal: false,
                 selectedAdmin: null,
@@ -531,8 +536,39 @@
                             }
 
                             this.accounts = accountsWithPayment;
+
+                            // Извлекаем уникальные комментарии для фильтрации
+                            this.uniqueProfileNotes = [...new Set(
+                                accountsWithPayment
+                                    .map(a => a.comment)
+                                    .filter(c => c && c.trim().length > 0)
+                            )].sort();
                         }
                     } catch (e) { console.error('loadAccounts error:', e); }
+                },
+
+                // Получить ID анкет по выбранному комментарию
+                getProfileIdsByNote(note) {
+                    return this.accounts
+                        .filter(a => a.comment === note)
+                        .map(a => a.id);
+                },
+
+                // Выбрать анкеты по комментарию (добавить к списку в модалке админа)
+                selectProfilesByNote() {
+                    if (!this.selectedProfileNote) return;
+                    const ids = this.getProfileIdsByNote(this.selectedProfileNote);
+                    if (ids.length === 0) {
+                        alert('Нет анкет с таким комментарием');
+                        return;
+                    }
+                    // Добавляем к текущему списку
+                    const currentIds = this.newAdmin.profileIds
+                        ? this.newAdmin.profileIds.split(/[\s,]+/).filter(id => id.trim())
+                        : [];
+                    const allIds = [...new Set([...currentIds, ...ids])];
+                    this.newAdmin.profileIds = allIds.join(', ');
+                    this.selectedProfileNote = ''; // Сбрасываем выбор
                 },
 
                 async loadBotsStatus() {
@@ -690,7 +726,9 @@
                                         accounts: t.accounts || [],
                                         accountsCount: t.accounts_count || 0,
                                         salary: t.salary,
-                                        aiEnabled: t.ai_enabled || false
+                                        aiEnabled: t.ai_enabled || false,
+                                        isOwnTranslator: t.is_own_translator !== false,
+                                        balance: parseFloat(t.balance) || 0
                                     }));
                                 // Для директора: все переводчики с информацией об админе
                                 this.allTranslators = translatorsList.map(t => {
@@ -1417,7 +1455,7 @@
                         id: admin.id,
                         name: admin.name,
                         login: admin.login || '',
-                        password: admin.password || '',
+                        password: '••••••••', // Показываем звёздочки для существующего пароля
                         initials: admin.initials || '',
                         isMyAdmin: admin.isMyAdmin,
                         salary: admin.salary !== null && admin.salary !== undefined ? admin.salary : '',
@@ -1441,6 +1479,73 @@
                         }
                     } catch (e) {
                         alert('Ошибка: ' + e.message);
+                    }
+                },
+
+                // Переключение AI для пользователя (админа или переводчика)
+                async toggleAiEnabled(user) {
+                    const newValue = !user.aiEnabled;
+                    try {
+                        const res = await fetch(`${API_BASE}/api/users/${user.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ aiEnabled: newValue })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            user.aiEnabled = newValue;
+                            // Обновляем данные в списках
+                            await this.loadTeam();
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось обновить AI'));
+                        }
+                    } catch (e) {
+                        console.error('toggleAiEnabled error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
+                // Переключение "Мой админ" (is_restricted)
+                async toggleIsRestricted(admin) {
+                    const newValue = !admin.isMyAdmin;
+                    try {
+                        const res = await fetch(`${API_BASE}/api/users/${admin.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ is_restricted: newValue })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            admin.isMyAdmin = newValue;
+                            await this.loadTeam();
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось обновить'));
+                        }
+                    } catch (e) {
+                        console.error('toggleIsRestricted error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
+                // Переключение "Мой переводчик" (is_own_translator)
+                async toggleIsOwnTranslator(translator) {
+                    const newValue = !translator.isOwnTranslator;
+                    try {
+                        const res = await fetch(`${API_BASE}/api/users/${translator.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ isOwnTranslator: newValue })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            translator.isOwnTranslator = newValue;
+                            await this.loadTeam();
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось обновить'));
+                        }
+                    } catch (e) {
+                        console.error('toggleIsOwnTranslator error:', e);
+                        alert('Ошибка сети');
                     }
                 },
 
@@ -1567,8 +1672,18 @@
                 },
                 
                 async saveAdmin() {
-                    if (!this.newAdmin.name || !this.newAdmin.login || !this.newAdmin.password) {
-                        alert('Заполните все обязательные поля');
+                    // При создании нового админа пароль обязателен
+                    // При редактировании - пароль не обязателен (если звёздочки - не меняем)
+                    const isEditing = !!this.newAdmin.id;
+                    const passwordChanged = this.newAdmin.password && this.newAdmin.password !== '••••••••';
+
+                    if (!this.newAdmin.name || !this.newAdmin.login) {
+                        alert('Заполните имя и логин');
+                        return;
+                    }
+
+                    if (!isEditing && !this.newAdmin.password) {
+                        alert('Введите пароль для нового админа');
                         return;
                     }
 
@@ -1585,18 +1700,23 @@
                     try {
                         let adminId = this.newAdmin.id;
 
-                        if (this.newAdmin.id) {
+                        if (isEditing) {
                             // Редактирование существующего админа
+                            const updateData = {
+                                username: this.newAdmin.login,
+                                salary: this.newAdmin.isMyAdmin ? null : parseFloat(this.newAdmin.salary),
+                                isRestricted: this.newAdmin.isMyAdmin,
+                                aiEnabled: this.newAdmin.aiEnabled
+                            };
+                            // Пароль отправляем только если он был изменён
+                            if (passwordChanged) {
+                                updateData.password = this.newAdmin.password;
+                            }
+
                             const res = await fetch(`${API_BASE}/api/users/${this.newAdmin.id}`, {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    username: this.newAdmin.login,
-                                    password: this.newAdmin.password,
-                                    salary: this.newAdmin.isMyAdmin ? null : parseFloat(this.newAdmin.salary),
-                                    isRestricted: this.newAdmin.isMyAdmin,
-                                    aiEnabled: this.newAdmin.aiEnabled
-                                })
+                                body: JSON.stringify(updateData)
                             });
                             const data = await res.json();
                             if (!data.success) {
@@ -1686,6 +1806,7 @@
                     }
 
                     // Пароль обязателен только для нового переводчика
+                    const passwordChanged = this.newTranslator.password && this.newTranslator.password !== '••••••••';
                     if (!this.editingTranslator && !this.newTranslator.password) {
                         alert('Введите пароль для нового переводчика');
                         return;
@@ -1701,11 +1822,16 @@
                                 username: this.newTranslator.name,
                                 aiEnabled: this.newTranslator.aiEnabled
                             };
-                            if (this.newTranslator.password) {
+                            // Пароль отправляем только если он был изменён (не звёздочки)
+                            if (passwordChanged) {
                                 body.password = this.newTranslator.password;
                             }
                             if (this.newTranslator.salary) {
                                 body.salary = parseFloat(this.newTranslator.salary);
+                            }
+                            // Для переводчиков под директором - поле isOwnTranslator
+                            if (this.currentUser.role === 'director' && !this.newTranslator.adminId) {
+                                body.isOwnTranslator = this.newTranslator.isOwnTranslator;
                             }
 
                             const res = await fetch(`${API_BASE}/api/users/${this.editingTranslator.id}`, {
@@ -1729,18 +1855,24 @@
                                 ownerId = this.currentUser.id;
                             }
 
+                            const createData = {
+                                username: this.newTranslator.name,
+                                login: this.newTranslator.login,
+                                password: this.newTranslator.password,
+                                role: 'translator',
+                                ownerId: ownerId,
+                                salary: this.newTranslator.salary ? parseFloat(this.newTranslator.salary) : null,
+                                aiEnabled: this.newTranslator.aiEnabled
+                            };
+                            // Для переводчиков под директором - поле isOwnTranslator
+                            if (this.currentUser.role === 'director' && !this.newTranslator.adminId) {
+                                createData.isOwnTranslator = this.newTranslator.isOwnTranslator;
+                            }
+
                             const res = await fetch(`${API_BASE}/api/users`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    username: this.newTranslator.name,
-                                    login: this.newTranslator.login,
-                                    password: this.newTranslator.password,
-                                    role: 'translator',
-                                    ownerId: ownerId,
-                                    salary: this.newTranslator.salary ? parseFloat(this.newTranslator.salary) : null,
-                                    aiEnabled: this.newTranslator.aiEnabled
-                                })
+                                body: JSON.stringify(createData)
                             });
                             const data = await res.json();
                             if (!data.success) {
@@ -1781,10 +1913,11 @@
                         id: translator.id,
                         name: translator.name,
                         login: translator.login,
-                        password: '',
+                        password: '••••••••', // Показываем звёздочки для существующего пароля
                         salary: translator.salary || '',
                         aiEnabled: translator.aiEnabled || false,
-                        adminId: translator.adminId || ''
+                        adminId: translator.adminId || '',
+                        isOwnTranslator: translator.isOwnTranslator !== false // По умолчанию true
                     };
                     this.showAddTranslatorModal = true;
                 },

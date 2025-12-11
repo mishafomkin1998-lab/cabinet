@@ -36,6 +36,7 @@ router.get('/', async (req, res) => {
                 u.balance,
                 u.is_restricted,
                 u.ai_enabled,
+                u.is_own_translator,
                 u.created_at,
                 COALESCE(profiles.accounts_count, 0) as accounts_count,
                 COALESCE(stats.letters_today, 0) as letters_today,
@@ -92,6 +93,7 @@ router.get('/', async (req, res) => {
                 balance: parseFloat(row.balance) || 0,
                 is_restricted: row.is_restricted || false,
                 ai_enabled: row.ai_enabled || false,
+                is_own_translator: row.is_own_translator !== false, // По умолчанию true
                 accounts_count: parseInt(row.accounts_count) || 0,
                 letters_today: lettersToday,
                 chats_today: parseInt(row.chats_today) || 0,
@@ -110,15 +112,15 @@ router.get('/', async (req, res) => {
 
 // Создание пользователя
 router.post('/', async (req, res) => {
-    const { username, login, password, role, ownerId, salary, isRestricted, aiEnabled } = req.body;
+    const { username, login, password, role, ownerId, salary, isRestricted, aiEnabled, isOwnTranslator } = req.body;
     try {
         const hash = await bcrypt.hash(password, 10);
         // Если login не передан, используем username
         const userLogin = login || username;
         const result = await pool.query(
-            `INSERT INTO users (username, login, password_hash, role, owner_id, salary, is_restricted, ai_enabled)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-            [username, userLogin, hash, role, ownerId, isRestricted ? null : salary, isRestricted || false, aiEnabled || false]
+            `INSERT INTO users (username, login, password_hash, role, owner_id, salary, is_restricted, ai_enabled, is_own_translator)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+            [username, userLogin, hash, role, ownerId, isRestricted ? null : salary, isRestricted || false, aiEnabled || false, isOwnTranslator !== false]
         );
         res.json({ success: true, userId: result.rows[0].id });
     } catch (e) {
@@ -146,7 +148,7 @@ router.delete('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
     console.log(`📝 [PUT /api/users/:id] userId=${req.params.id}, body=`, req.body);
     const userId = req.params.id;
-    const { username, password, salary, aiEnabled, is_restricted } = req.body;
+    const { username, password, salary, aiEnabled, is_restricted, isOwnTranslator } = req.body;
     try {
         const updates = [];
         const params = [];
@@ -177,6 +179,11 @@ router.put('/:id', async (req, res) => {
         if (is_restricted !== undefined) {
             updates.push(`is_restricted = $${paramIndex++}`);
             params.push(is_restricted);
+        }
+
+        if (isOwnTranslator !== undefined) {
+            updates.push(`is_own_translator = $${paramIndex++}`);
+            params.push(isOwnTranslator);
         }
 
         if (updates.length === 0) {

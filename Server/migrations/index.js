@@ -531,6 +531,10 @@ async function migrateBotsTable() {
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_bot_logs_profile ON bot_logs(profile_id)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_bot_logs_type ON bot_logs(log_type)`);
     await pool.query(`CREATE INDEX IF NOT EXISTS idx_bot_logs_created ON bot_logs(created_at)`);
+
+    // 21. Поле "Мой переводчик" для переводчиков напрямую под директором
+    // is_own_translator = true означает бесплатное использование анкет (без баланса)
+    await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_own_translator BOOLEAN DEFAULT TRUE`);
 }
 
 // Исправление SERIAL последовательностей
