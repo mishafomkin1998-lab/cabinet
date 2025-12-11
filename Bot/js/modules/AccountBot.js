@@ -684,7 +684,37 @@ class AccountBot {
             const target = this.mailSettings.target;
             let users = [];
 
-            if (target === 'inbox') {
+            if (target === 'custom-ids') {
+                // Рассылка по конкретным ID из списка
+                const nextId = getNextCustomId(this.id);
+                if (nextId) {
+                    this.log(`📋 Custom ID: отправка на ID ${nextId}`);
+                    users.push({
+                        AccountId: parseInt(nextId),
+                        Name: '',
+                        City: '',
+                        Age: '',
+                        Country: ''
+                    });
+                } else {
+                    this.log(`✅ Custom IDs: все ID из списка обработаны`);
+                    if (this.mailSettings.auto) {
+                        const newTarget = getNextActiveStatus('payers');
+                        this.log(`⚠️ Переход на ${newTarget}`);
+                        this.mailSettings.target = newTarget;
+                        this.mailContactedUsers.clear();
+                        if(activeTabId === this.id) {
+                            document.getElementById(`target-select-${this.id}`).value = newTarget;
+                            toggleCustomIdsField(this.id);
+                        }
+                        return this.processMailUser(msgTemplate);
+                    } else {
+                        this.log(`⏹️ Рассылка остановлена (все Custom IDs обработаны)`);
+                        this.stopMail();
+                        return;
+                    }
+                }
+            } else if (target === 'inbox') {
                 const messagesRes = await makeApiRequest(this, 'GET', '/api/messages');
                 const unrepliedMsgs = (messagesRes.data.Messages || []).filter(m => !m.IsReplied);
 
@@ -706,6 +736,7 @@ class AccountBot {
                 users = usersRes.data.Users || [];
                 if (target === 'online') {
                     this.log(`📊 Online users: ${users.length}`);
+                    this.lastOnlineCount = users.length; // Сохраняем для глобального счётчика
                     console.log(`🔍 DEBUG Online API response:`, JSON.stringify(usersRes.data, null, 2));
                     if (users.length > 0) {
                         console.log(`🔍 DEBUG First online user:`, JSON.stringify(users[0], null, 2));
@@ -742,11 +773,8 @@ class AccountBot {
                 } else {
                     // Проверяем auto режим
                     if(this.mailSettings.auto && target !== 'online') {
-                        let newTarget = 'online';
-                        if(target === 'payers') newTarget = 'my-favorites';
-                        else if(target === 'my-favorites') newTarget = 'favorites';
-                        else if(target === 'favorites') newTarget = 'inbox';
-                        else if(target === 'inbox') newTarget = 'online';
+                        // Используем getNextActiveStatus для пропуска отключенных статусов
+                        const newTarget = getNextActiveStatus(target);
                         this.log(`⚠️ Нет пользователей (${target}). Переход на ${newTarget}`);
                         this.mailSettings.target = newTarget;
                         // Очищаем contacted при смене категории
@@ -825,6 +853,12 @@ class AccountBot {
 
                 // Добавляем в "отправленные" и убираем из очереди повторов
                 this.mailContactedUsers.add(user.AccountId.toString());
+
+                // Отмечаем Custom ID как отправленный (если это custom-ids режим)
+                if (this.mailSettings.target === 'custom-ids') {
+                    markCustomIdSent(this.id, user.AccountId.toString());
+                }
+
                 if (isRetryAttempt) {
                     this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
                 }

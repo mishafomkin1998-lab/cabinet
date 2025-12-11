@@ -72,14 +72,19 @@ function createInterface(bot) {
     col3.innerHTML = `
         <div class="panel-col">
             <div class="col-title">Настройки</div>
-            <select id="target-select-${bot.id}" class="form-select form-select-sm mb-1" onchange="updateSettings('${bot.id}')">
+            <select id="target-select-${bot.id}" class="form-select form-select-sm mb-1" onchange="updateSettings('${bot.id}'); toggleCustomIdsField('${bot.id}')">
                 <option value="online">Online</option>
                 <option value="favorites">I am a favorite of</option>
                 <option value="my-favorites">My favorite</option>
                 <option value="inbox">Inbox (Unreplied)</option>
                 <option value="payers">Payers</option>
+                <option value="custom-ids">Custom IDs</option>
             </select>
-            
+            <div id="custom-ids-field-${bot.id}" class="custom-ids-field mb-1" style="display: none;">
+                <textarea id="custom-ids-input-${bot.id}" class="form-control form-control-sm" rows="2" placeholder="ID через запятую, пробел или в столбик" onchange="saveCustomIds('${bot.id}')"></textarea>
+                <small class="text-muted">Осталось: <span id="custom-ids-remaining-${bot.id}">0</span></small>
+            </div>
+
             <div class="d-flex align-items-center gap-2 mb-2">
                 <select class="form-select form-select-sm" id="speed-select-${bot.id}" style="width: 100px;" onmousedown="shiftWasPressed=event.shiftKey" onchange="handleSpeedChange('${bot.id}', this.value)" title="Скорость отправки (Shift=всем)">
                     <option value="smart" selected>Smart</option>
@@ -159,23 +164,31 @@ function updateInterfaceForMode(botId) {
     if(isChat) {
         ws.querySelectorAll('.hide-in-chat').forEach(el => el.style.display = 'none');
         ws.querySelectorAll('.hide-in-mail').forEach(el => el.style.display = 'block');
-        
+
         Array.from(targetSelect.options).forEach(opt => {
-            if (['favorites', 'my-favorites', 'inbox'].includes(opt.value)) { opt.style.display = 'none'; }
+            // Скрываем опции недоступные в Chat режиме (включая custom-ids)
+            if (['favorites', 'my-favorites', 'inbox', 'custom-ids'].includes(opt.value)) { opt.style.display = 'none'; }
             else { opt.style.display = 'block'; }
         });
         targetSelect.value = bot.chatSettings.target;
-        
+
+        // Скрываем поле Custom IDs в Chat режиме
+        const customIdsField = document.getElementById(`custom-ids-field-${botId}`);
+        if (customIdsField) customIdsField.style.display = 'none';
+
         document.getElementById(`rot-time-${botId}`).value = bot.chatSettings.rotationHours;
         document.getElementById(`rot-cyclic-${botId}`).checked = bot.chatSettings.cyclic;
     } else {
         ws.querySelectorAll('.hide-in-chat').forEach(el => { if(el.classList.contains('photo-block')) el.style.display = 'flex'; else el.style.display = 'block'; });
         ws.querySelectorAll('.hide-in-chat.d-none').forEach(el => el.style.display = 'none');
         ws.querySelectorAll('.hide-in-mail').forEach(el => el.style.display = 'none');
-        
+
         Array.from(targetSelect.options).forEach(opt => opt.style.display = 'block');
         targetSelect.value = bot.mailSettings.target;
-        
+
+        // Показываем поле Custom IDs если выбран этот режим
+        toggleCustomIdsField(botId);
+
         document.getElementById(`auto-check-${botId}`).checked = bot.mailSettings.auto;
     }
     
@@ -1047,7 +1060,9 @@ async function saveSession() {
                 chatStartTime: b.chatSettings.rotationStartTime,
                 mailAuto: b.mailSettings.auto,
                 mailTarget: b.mailSettings.target,
-                vipList: b.vipList
+                vipList: b.vipList,
+                customIdsList: b.customIdsList || [],
+                customIdsSent: b.customIdsSent || []
             };
         }).filter(item => item !== null);
         
@@ -1091,8 +1106,14 @@ async function restoreSession() {
                 if (a.mailAuto !== undefined) bot.mailSettings.auto = a.mailAuto;
                 if (a.mailTarget) bot.mailSettings.target = a.mailTarget;
                 if (a.vipList) bot.vipList = a.vipList;
-                
+                if (a.customIdsList) bot.customIdsList = a.customIdsList;
+                if (a.customIdsSent) bot.customIdsSent = a.customIdsSent;
+
                 updateInterfaceForMode(bot.id);
+                // Показываем поле Custom IDs если выбран этот режим
+                if (a.mailTarget === 'custom-ids') {
+                    toggleCustomIdsField(bot.id);
+                }
             }
             await new Promise(r => setTimeout(r, 500));
         }

@@ -29,7 +29,9 @@ let defaultSettings = {
     translatorId: null, // ID переводчика для статистики
     aiReplyPrompt: '', // Промпт для AI ответов на письма
     // Прокси для анкет по позициям (1-10, 11-20, 21-30, 31-40, 41-50, 51-60)
-    proxy1: '', proxy2: '', proxy3: '', proxy4: '', proxy5: '', proxy6: ''
+    proxy1: '', proxy2: '', proxy3: '', proxy4: '', proxy5: '', proxy6: '',
+    // Отключенные статусы (пропускаются в авто-режиме)
+    disabledStatuses: []
 };
 
 let globalSettings = JSON.parse(localStorage.getItem('globalSettings')) || defaultSettings;
