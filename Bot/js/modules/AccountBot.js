@@ -1481,18 +1481,36 @@ class AccountBot {
 
     // Запустить цепочку автоответов для нового чата
     scheduleAutoReply(recipientId, partnerName) {
+        console.log(`[AutoReply] Проверка условий для ${partnerName} (${recipientId}):`);
+        console.log(`  - autoReplyEnabled: ${this.chatSettings.autoReplyEnabled}`);
+        console.log(`  - isChatRunning: ${this.isChatRunning}`);
+        console.log(`  - autoReplies.length: ${this.chatSettings.autoReplies.length}`);
+        console.log(`  - уже в очереди: ${!!this.autoReplyQueue[recipientId]}`);
+
         // Проверяем условия
-        if (!this.chatSettings.autoReplyEnabled) return;
-        if (!this.isChatRunning) return; // Работает только когда рассылка включена
-        if (this.chatSettings.autoReplies.length === 0) return;
-        if (this.autoReplyQueue[recipientId]) return; // Уже в очереди
+        if (!this.chatSettings.autoReplyEnabled) {
+            console.log(`[AutoReply] ❌ Автоответы выключены`);
+            return;
+        }
+        if (!this.isChatRunning) {
+            console.log(`[AutoReply] ❌ Рассылка Chat не запущена`);
+            return;
+        }
+        if (this.chatSettings.autoReplies.length === 0) {
+            console.log(`[AutoReply] ❌ Нет автоответов в списке`);
+            return;
+        }
+        if (this.autoReplyQueue[recipientId]) {
+            console.log(`[AutoReply] ❌ Уже в очереди`);
+            return;
+        }
 
         // НЕ проверяем ЧС - пользователь уже добавлен в ЧС, но автоответы должны отправиться
 
         const firstReply = this.chatSettings.autoReplies[0];
         if (!firstReply) return;
 
-        console.log(`[AutoReply] Запуск цепочки для ${partnerName} (${recipientId}), первый ответ через ${firstReply.delay} сек`);
+        console.log(`[AutoReply] ✅ Запуск цепочки для ${partnerName} (${recipientId}), первый ответ через ${firstReply.delay} сек`);
         this.log(`🤖 Автоответ: ${partnerName} через ${firstReply.delay} сек`);
 
         // Создаём запись в очереди
