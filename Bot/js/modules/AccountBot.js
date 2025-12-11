@@ -21,9 +21,23 @@ class AccountBot {
         this.chatTimeout = null;
         this.chatStats = { sent: 0, errors: 0, waiting: 0 };
         this.chatHistory = { sent: [], errors: [], waiting: [] };
-        this.chatSettings = { target: 'payers', speed: 'smart', blacklist: [], rotationHours: 3, cyclic: false, currentInviteIndex: 0, rotationStartTime: 0 };
+        this.chatSettings = {
+            target: 'payers',
+            speed: 'smart',
+            blacklist: [],
+            rotationHours: 3,
+            cyclic: false,
+            currentInviteIndex: 0,
+            rotationStartTime: 0,
+            // === Автоответы на входящие чаты ===
+            autoReplyEnabled: false,
+            autoReplies: [] // [{ text: "...", delay: 60 }, ...]
+        };
         this.chatStartTime = null; // Время начала работы Chat
-        this.chatTimerInterval = null; // Интервал обновления таймера Chat 
+        this.chatTimerInterval = null; // Интервал обновления таймера Chat
+
+        // === Очередь автоответов ===
+        this.autoReplyQueue = {}; // { recipientId: { currentIndex: 0, timerId: null, partnerName: "..." } } 
         
         this.vipList = []; 
         this.vipStatus = {}; 
@@ -132,13 +146,23 @@ class AccountBot {
         this.chatStats.sent = serverData.statsChatSent || 0;
         this.chatStats.errors = serverData.statsChatErrors || 0;
 
+        // Загружаем автоответы
+        if (serverData.autoReplies && Array.isArray(serverData.autoReplies)) {
+            this.chatSettings.autoReplies = serverData.autoReplies;
+        }
+        if (serverData.autoReplyEnabled !== undefined) {
+            this.chatSettings.autoReplyEnabled = serverData.autoReplyEnabled;
+        }
+
         console.log(`📥 Данные загружены для ${this.displayId}:`, {
             mailTemplates: botTemplates[this.login]?.mail?.length || 0,
             chatTemplates: botTemplates[this.login]?.chat?.length || 0,
             mailBlacklist: this.mailSettings.blacklist.length,
             chatBlacklist: this.chatSettings.blacklist.length,
             mailStats: this.mailStats,
-            chatStats: this.chatStats
+            chatStats: this.chatStats,
+            autoReplies: this.chatSettings.autoReplies.length,
+            autoReplyEnabled: this.chatSettings.autoReplyEnabled
         });
     }
 
@@ -454,6 +478,10 @@ class AccountBot {
                         messageId: requestId,
                         type: 'chat'
                     });
+
+                    // === ТРИГГЕР АВТООТВЕТА ===
+                    // Запускаем цепочку автоответов если включено
+                    this.scheduleAutoReply(partnerId, partnerName);
 
                     // Уведомление в логгер + звук
                     console.log(`[Lababot] 🆕 НОВЫЙ ЧАТ! От ${partnerName} (${partnerId}): "${truncatedBody}"`);
@@ -1073,6 +1101,8 @@ class AccountBot {
         this.isChatRunning = false;
         clearTimeout(this.chatTimeout);
         this.stopChatTimer();
+        // Отменяем все автоответы при остановке
+        this.cancelAllAutoReplies();
         this.log("⏹ CHAT Stopped");
         this.updateUI();
     }
@@ -1416,6 +1446,192 @@ class AccountBot {
         let res = text;
         res = res.replace(/{city}/gi, user.City || "your city").replace(/{name}/gi, user.Name || "dear").replace(/{age}/gi, user.Age || "").replace(/{country}/gi, user.Country || "your country");
         return res;
+    }
+
+    // === АВТООТВЕТЫ НА ВХОДЯЩИЕ ЧАТЫ ===
+
+    // Запустить цепочку автоответов для нового чата
+    scheduleAutoReply(recipientId, partnerName) {
+        // Проверяем условия
+        if (!this.chatSettings.autoReplyEnabled) return;
+        if (!this.isChatRunning) return; // Работает только когда рассылка включена
+        if (this.chatSettings.autoReplies.length === 0) return;
+        if (this.autoReplyQueue[recipientId]) return; // Уже в очереди
+
+        // Проверяем, не в ЧС ли этот пользователь
+        if (this.chatSettings.blacklist.includes(recipientId.toString())) {
+            console.log(`[AutoReply] ${recipientId} уже в ЧС, пропускаем`);
+            return;
+        }
+
+        const firstReply = this.chatSettings.autoReplies[0];
+        if (!firstReply) return;
+
+        console.log(`[AutoReply] Запуск цепочки для ${partnerName} (${recipientId}), первый ответ через ${firstReply.delay} сек`);
+        this.log(`🤖 Автоответ: ${partnerName} через ${firstReply.delay} сек`);
+
+        // Создаём запись в очереди
+        this.autoReplyQueue[recipientId] = {
+            currentIndex: 0,
+            partnerName: partnerName,
+            timerId: setTimeout(() => {
+                this.sendAutoReply(recipientId);
+            }, firstReply.delay * 1000)
+        };
+    }
+
+    // Отправить автоответ
+    async sendAutoReply(recipientId) {
+        const queueItem = this.autoReplyQueue[recipientId];
+        if (!queueItem) return;
+
+        const autoReplies = this.chatSettings.autoReplies;
+        const currentIndex = queueItem.currentIndex;
+
+        if (currentIndex >= autoReplies.length) {
+            // Все автоответы отправлены - добавляем в ЧС
+            this.finishAutoReplyChain(recipientId, queueItem.partnerName);
+            return;
+        }
+
+        const reply = autoReplies[currentIndex];
+        const partnerName = queueItem.partnerName;
+
+        try {
+            // Подготавливаем текст с макросами
+            const msgBody = this.replaceMacros(reply.text, {
+                Name: partnerName,
+                City: '',
+                Age: '',
+                Country: ''
+            });
+
+            // Отправляем через chat-send API
+            const payload = { recipientId: parseInt(recipientId), body: msgBody };
+            await makeApiRequest(this, 'POST', '/chat-send', payload);
+
+            // Отслеживаем статистику
+            const convData = this.trackConversation(recipientId);
+            const convId = this.getConvId(recipientId);
+
+            await sendMessageToLababot({
+                botId: this.id,
+                accountDisplayId: this.displayId,
+                recipientId: recipientId,
+                type: 'chat_msg',
+                textContent: msgBody,
+                status: 'success',
+                responseTime: convData.responseTime,
+                isFirst: convData.isFirst,
+                isLast: currentIndex === autoReplies.length - 1,
+                convId: convId,
+                mediaUrl: null,
+                fileName: null,
+                translatorId: this.translatorId,
+                errorReason: null,
+                usedAi: false
+            });
+
+            this.incrementStat('chat', 'sent');
+            this.log(`🤖 Автоответ #${currentIndex + 1} отправлен: ${partnerName}`);
+            console.log(`[AutoReply] Автоответ #${currentIndex + 1} отправлен для ${partnerName}`);
+
+            // Планируем следующий автоответ
+            const nextIndex = currentIndex + 1;
+            if (nextIndex < autoReplies.length) {
+                const nextReply = autoReplies[nextIndex];
+                queueItem.currentIndex = nextIndex;
+                queueItem.timerId = setTimeout(() => {
+                    this.sendAutoReply(recipientId);
+                }, nextReply.delay * 1000);
+
+                this.log(`🤖 Следующий автоответ через ${nextReply.delay} сек`);
+            } else {
+                // Это был последний автоответ
+                this.finishAutoReplyChain(recipientId, partnerName);
+            }
+
+        } catch (error) {
+            console.error(`[AutoReply] Ошибка отправки для ${recipientId}:`, error);
+            this.log(`🤖 Ошибка автоответа: ${partnerName}`);
+            this.incrementStat('chat', 'errors');
+
+            // При ошибке пробуем fallback через письмо
+            try {
+                const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${recipientId}`);
+                if (checkRes.data.CheckId) {
+                    const msgBody = this.replaceMacros(reply.text, { Name: partnerName, City: '', Age: '', Country: '' });
+                    const mailPayload = {
+                        CheckId: checkRes.data.CheckId,
+                        RecipientAccountId: parseInt(recipientId),
+                        Body: msgBody,
+                        ReplyForMessageId: null,
+                        AttachmentName: null,
+                        AttachmentHash: null,
+                        AttachmentFile: null
+                    };
+                    await makeApiRequest(this, 'POST', '/api/messages/send', mailPayload);
+                    this.log(`🤖 Автоответ #${currentIndex + 1} отправлен (fallback): ${partnerName}`);
+
+                    // Планируем следующий
+                    const nextIndex = currentIndex + 1;
+                    if (nextIndex < autoReplies.length) {
+                        const nextReply = autoReplies[nextIndex];
+                        queueItem.currentIndex = nextIndex;
+                        queueItem.timerId = setTimeout(() => {
+                            this.sendAutoReply(recipientId);
+                        }, nextReply.delay * 1000);
+                    } else {
+                        this.finishAutoReplyChain(recipientId, partnerName);
+                    }
+                }
+            } catch (fallbackErr) {
+                console.error(`[AutoReply] Fallback тоже не сработал:`, fallbackErr);
+                // Удаляем из очереди при критической ошибке
+                delete this.autoReplyQueue[recipientId];
+            }
+        }
+    }
+
+    // Завершить цепочку автоответов - добавить в ЧС
+    finishAutoReplyChain(recipientId, partnerName) {
+        // Удаляем из очереди
+        if (this.autoReplyQueue[recipientId]) {
+            clearTimeout(this.autoReplyQueue[recipientId].timerId);
+            delete this.autoReplyQueue[recipientId];
+        }
+
+        // Добавляем в ЧС
+        const recipientIdStr = recipientId.toString();
+        if (!this.chatSettings.blacklist.includes(recipientIdStr)) {
+            this.chatSettings.blacklist.push(recipientIdStr);
+            saveBlacklistToServer(this.displayId, 'chat', this.chatSettings.blacklist);
+            this.log(`🤖 Автоответы завершены, ${partnerName} добавлен в ЧС`);
+            console.log(`[AutoReply] Цепочка завершена для ${partnerName}, добавлен в ЧС`);
+
+            // Обновляем UI blacklist если эта вкладка активна
+            if (activeTabId === this.id) {
+                renderBlacklist(this.id);
+            }
+        }
+    }
+
+    // Отменить автоответы для пользователя
+    cancelAutoReply(recipientId) {
+        if (this.autoReplyQueue[recipientId]) {
+            clearTimeout(this.autoReplyQueue[recipientId].timerId);
+            delete this.autoReplyQueue[recipientId];
+            console.log(`[AutoReply] Цепочка отменена для ${recipientId}`);
+        }
+    }
+
+    // Отменить все автоответы
+    cancelAllAutoReplies() {
+        for (const recipientId in this.autoReplyQueue) {
+            clearTimeout(this.autoReplyQueue[recipientId].timerId);
+        }
+        this.autoReplyQueue = {};
+        console.log(`[AutoReply] Все цепочки отменены`);
     }
 
     formatElapsedTime(startTime) {

@@ -28,6 +28,24 @@ function createInterface(bot) {
                 <button class="btn btn-sm btn-danger btn-xs flex-fill" onclick="deleteTemplate('${bot.id}', event)" data-tip="Удалить (Shift=всем)"><i class="fa fa-trash"></i></button>
                 <button class="btn btn-sm btn-outline-danger btn-xs flex-fill hide-in-chat" id="btn-fav-${bot.id}" onclick="toggleTemplateFavorite('${bot.id}')" data-tip="В избранное"><i class="fa fa-heart"></i></button>
             </div>
+
+            <!-- Секция автоответов (только для Chat режима) -->
+            <div class="auto-reply-section hide-in-mail" id="auto-reply-section-${bot.id}">
+                <div class="auto-reply-header">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="auto-reply-enabled-${bot.id}" onchange="toggleAutoReply('${bot.id}')">
+                        <label class="form-check-label" for="auto-reply-enabled-${bot.id}">
+                            <i class="fa fa-robot"></i> Автоответы
+                        </label>
+                    </div>
+                </div>
+                <div class="auto-reply-list" id="auto-reply-list-${bot.id}">
+                    <!-- Автоответы будут добавляться динамически -->
+                </div>
+                <button class="btn btn-sm btn-outline-success w-100 mt-2" onclick="addAutoReply('${bot.id}')">
+                    <i class="fa fa-plus"></i> Добавить автоответ
+                </button>
+            </div>
         </div>`;
     row.appendChild(col1);
 
@@ -203,6 +221,12 @@ function updateInterfaceForMode(botId) {
 
     updateTemplateDropdown(botId, lastIdx);
     renderBlacklist(botId);
+
+    // Инициализация UI автоответов при переключении в Chat режим
+    if (isChat) {
+        initAutoRepliesUI(botId);
+    }
+
     bot.updateUI();
 }
 
@@ -1040,7 +1064,7 @@ async function performLogin(login, pass, displayId) {
     return false;
 }
 
-async function saveSession() { 
+async function saveSession() {
     try {
         // Сохраняем порядок вкладок в localStorage
         const currentTabOrder = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
@@ -1061,10 +1085,13 @@ async function saveSession() {
                 mailTarget: b.mailSettings.target,
                 vipList: b.vipList,
                 customIdsList: b.customIdsList || [],
-                customIdsSent: b.customIdsSent || []
+                customIdsSent: b.customIdsSent || [],
+                // Автоответы
+                autoReplies: b.chatSettings.autoReplies || [],
+                autoReplyEnabled: b.chatSettings.autoReplyEnabled || false
             };
         }).filter(item => item !== null);
-        
+
         localStorage.setItem('savedBots', JSON.stringify(localStorageData));
 
     } catch (error) {
@@ -1107,6 +1134,9 @@ async function restoreSession() {
                 if (a.vipList) bot.vipList = a.vipList;
                 if (a.customIdsList) bot.customIdsList = a.customIdsList;
                 if (a.customIdsSent) bot.customIdsSent = a.customIdsSent;
+                // Восстанавливаем автоответы
+                if (a.autoReplies) bot.chatSettings.autoReplies = a.autoReplies;
+                if (a.autoReplyEnabled !== undefined) bot.chatSettings.autoReplyEnabled = a.autoReplyEnabled;
 
                 updateInterfaceForMode(bot.id);
                 // Показываем поле Custom IDs если выбран этот режим
@@ -1386,7 +1416,7 @@ async function handleFullImport(input) {
         };
         
         reader.readAsText(input.files[0]);
-        
+
     } catch (error) {
         console.error('Import error:', error);
         alert('Ошибка импорта: ' + error.message);
@@ -1394,4 +1424,174 @@ async function handleFullImport(input) {
         btn.disabled = false;
         input.value = '';
     }
+}
+
+// =====================================================
+// === АВТООТВЕТЫ НА ВХОДЯЩИЕ ЧАТЫ ===
+// =====================================================
+
+// Переключить автоответы
+function toggleAutoReply(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    const checkbox = document.getElementById(`auto-reply-enabled-${botId}`);
+    bot.chatSettings.autoReplyEnabled = checkbox.checked;
+
+    saveSession();
+    saveAutoRepliesToServer(botId);
+
+    console.log(`[AutoReply] ${bot.displayId}: автоответы ${checkbox.checked ? 'включены' : 'выключены'}`);
+}
+
+// Добавить новый автоответ
+function addAutoReply(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    // Добавляем пустой автоответ с дефолтной задержкой
+    bot.chatSettings.autoReplies.push({
+        text: '',
+        delay: 60 // 60 секунд по умолчанию
+    });
+
+    renderAutoReplies(botId);
+    saveSession();
+}
+
+// Удалить автоответ
+function removeAutoReply(botId, index) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    bot.chatSettings.autoReplies.splice(index, 1);
+
+    renderAutoReplies(botId);
+    saveSession();
+    saveAutoRepliesToServer(botId);
+}
+
+// Обновить текст автоответа
+function updateAutoReplyText(botId, index, text) {
+    const bot = bots[botId];
+    if (!bot || !bot.chatSettings.autoReplies[index]) return;
+
+    bot.chatSettings.autoReplies[index].text = text;
+
+    // Debounced сохранение
+    clearTimeout(bot._autoReplyTextTimer);
+    bot._autoReplyTextTimer = setTimeout(() => {
+        saveSession();
+        saveAutoRepliesToServer(botId);
+    }, 1000);
+}
+
+// Обновить задержку автоответа
+function updateAutoReplyDelay(botId, index, delay) {
+    const bot = bots[botId];
+    if (!bot || !bot.chatSettings.autoReplies[index]) return;
+
+    const delayNum = parseInt(delay) || 60;
+    bot.chatSettings.autoReplies[index].delay = delayNum;
+
+    saveSession();
+    saveAutoRepliesToServer(botId);
+}
+
+// Отрисовать список автоответов
+function renderAutoReplies(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    const listEl = document.getElementById(`auto-reply-list-${botId}`);
+    if (!listEl) return;
+
+    const autoReplies = bot.chatSettings.autoReplies || [];
+
+    if (autoReplies.length === 0) {
+        listEl.innerHTML = '<div class="text-muted small text-center p-2">Нет автоответов</div>';
+        return;
+    }
+
+    listEl.innerHTML = autoReplies.map((reply, idx) => `
+        <div class="auto-reply-item" data-index="${idx}">
+            <div class="auto-reply-item-header">
+                <span class="auto-reply-number">#${idx + 1}</span>
+                <div class="auto-reply-delay-group">
+                    <label>Через:</label>
+                    <input type="number" class="form-control form-control-sm auto-reply-delay"
+                           value="${reply.delay}"
+                           min="5" max="3600"
+                           onchange="updateAutoReplyDelay('${botId}', ${idx}, this.value)">
+                    <span>сек</span>
+                </div>
+                <button class="btn btn-sm btn-outline-danger auto-reply-delete"
+                        onclick="removeAutoReply('${botId}', ${idx})"
+                        title="Удалить">
+                    <i class="fa fa-trash"></i>
+                </button>
+            </div>
+            <textarea class="form-control form-control-sm auto-reply-text"
+                      rows="2"
+                      placeholder="Текст автоответа..."
+                      oninput="updateAutoReplyText('${botId}', ${idx}, this.value)">${reply.text || ''}</textarea>
+        </div>
+    `).join('');
+}
+
+// Сохранить автоответы на сервер
+async function saveAutoRepliesToServer(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(bot.displayId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                autoReplies: bot.chatSettings.autoReplies,
+                autoReplyEnabled: bot.chatSettings.autoReplyEnabled
+            })
+        });
+
+        if (response.ok) {
+            console.log(`[AutoReply] Автоответы сохранены на сервер для ${bot.displayId}`);
+        }
+    } catch (error) {
+        console.error(`[AutoReply] Ошибка сохранения:`, error);
+    }
+}
+
+// Загрузить автоответы с сервера (вызывается при загрузке бота)
+function loadAutoRepliesFromServerData(bot, serverData) {
+    if (!serverData) return;
+
+    if (serverData.autoReplies && Array.isArray(serverData.autoReplies)) {
+        bot.chatSettings.autoReplies = serverData.autoReplies;
+    }
+    if (serverData.autoReplyEnabled !== undefined) {
+        bot.chatSettings.autoReplyEnabled = serverData.autoReplyEnabled;
+    }
+
+    // Обновляем UI
+    const checkbox = document.getElementById(`auto-reply-enabled-${bot.id}`);
+    if (checkbox) {
+        checkbox.checked = bot.chatSettings.autoReplyEnabled;
+    }
+    renderAutoReplies(bot.id);
+}
+
+// Инициализация UI автоответов при переключении режима
+function initAutoRepliesUI(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    // Устанавливаем чекбокс
+    const checkbox = document.getElementById(`auto-reply-enabled-${botId}`);
+    if (checkbox) {
+        checkbox.checked = bot.chatSettings.autoReplyEnabled || false;
+    }
+
+    // Отрисовываем список
+    renderAutoReplies(botId);
 }

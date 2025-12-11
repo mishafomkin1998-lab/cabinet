@@ -1439,3 +1439,156 @@
             from { opacity: 1; transform: translateX(-50%) translateY(0); }
             to { opacity: 0; transform: translateX(-50%) translateY(-20px); }
         }
+
+        /* =====================================================
+           === АВТООТВЕТЫ НА ВХОДЯЩИЕ ЧАТЫ ===
+           ===================================================== */
+        .auto-reply-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px dashed #dee2e6;
+        }
+
+        .auto-reply-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .auto-reply-header .form-check-label {
+            font-weight: 500;
+            color: #6f42c1;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .auto-reply-header .form-check-label i {
+            font-size: 14px;
+        }
+
+        .auto-reply-list {
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .auto-reply-item {
+            background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
+            border: 1px solid #d4daff;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            transition: all 0.2s ease;
+        }
+
+        .auto-reply-item:hover {
+            border-color: #a5b4fc;
+            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
+        }
+
+        .auto-reply-item-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .auto-reply-number {
+            background: #6366f1;
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+            min-width: 28px;
+            text-align: center;
+        }
+
+        .auto-reply-delay-group {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex: 1;
+        }
+
+        .auto-reply-delay-group label {
+            font-size: 11px;
+            color: #6b7280;
+            margin: 0;
+        }
+
+        .auto-reply-delay {
+            width: 70px !important;
+            padding: 3px 6px !important;
+            font-size: 12px !important;
+            text-align: center;
+        }
+
+        .auto-reply-delay-group span {
+            font-size: 11px;
+            color: #6b7280;
+        }
+
+        .auto-reply-delete {
+            padding: 3px 8px !important;
+            font-size: 11px !important;
+        }
+
+        .auto-reply-text {
+            font-size: 12px !important;
+            resize: vertical;
+            min-height: 50px;
+        }
+
+        /* Темная тема */
+        body.theme-dark .auto-reply-section {
+            border-top-color: #495057;
+        }
+
+        body.theme-dark .auto-reply-header .form-check-label {
+            color: #a78bfa;
+        }
+
+        body.theme-dark .auto-reply-item {
+            background: linear-gradient(135deg, #2d2d40 0%, #25253a 100%);
+            border-color: #4c4c6d;
+        }
+
+        body.theme-dark .auto-reply-item:hover {
+            border-color: #6366f1;
+        }
+
+        body.theme-dark .auto-reply-delay-group label,
+        body.theme-dark .auto-reply-delay-group span {
+            color: #9ca3af;
+        }
+
+        body.theme-dark .auto-reply-text {
+            background: #1f1f2e;
+            border-color: #4c4c6d;
+            color: #e5e7eb;
+        }
+
+        /* LadaDate тема */
+        body.theme-ladadate .auto-reply-section {
+            border-top-color: rgba(255,255,255,0.2);
+        }
+
+        body.theme-ladadate .auto-reply-header .form-check-label {
+            color: #f472b6;
+        }
+
+        body.theme-ladadate .auto-reply-item {
+            background: linear-gradient(135deg, rgba(244, 114, 182, 0.1) 0%, rgba(167, 139, 250, 0.1) 100%);
+            border-color: rgba(244, 114, 182, 0.3);
+        }
+
+        body.theme-ladadate .auto-reply-item:hover {
+            border-color: rgba(244, 114, 182, 0.6);
+        }
+
+        body.theme-ladadate .auto-reply-number {
+            background: linear-gradient(135deg, #f472b6, #a78bfa);
+        }
