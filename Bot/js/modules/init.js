@@ -298,54 +298,37 @@ function resetCustomIdsSent(botId) {
 // ============= МУЖЧИНЫ ОНЛАЙН (ГЛОБАЛЬНО) =============
 let globalMenOnlineInterval = null;
 
-async function updateGlobalMenOnline() {
-    const botIds = Object.keys(bots);
+// Просто читаем кэшированное значение от ботов (они обновляют его в doActivity каждую минуту)
+function updateGlobalMenOnline() {
     const el = document.getElementById('global-men-count');
+    if (!el) return;
 
+    const botIds = Object.keys(bots);
     if (botIds.length === 0) {
-        if (el) el.textContent = '0';
+        el.textContent = '0';
         return;
     }
 
-    // Берём случайную анкету с токеном
-    const randomBotId = botIds[Math.floor(Math.random() * botIds.length)];
-    const bot = bots[randomBotId];
-
-    if (!bot || !bot.token) {
-        // Используем кэшированное значение от любого бота
-        for (const bid of botIds) {
-            if (bots[bid] && bots[bid].lastOnlineCount) {
-                if (el) el.textContent = bots[bid].lastOnlineCount;
-                return;
-            }
+    // Ищем любого бота с lastOnlineCount
+    for (const bid of botIds) {
+        const bot = bots[bid];
+        if (bot && bot.lastOnlineCount !== undefined && bot.lastOnlineCount > 0) {
+            el.textContent = bot.lastOnlineCount;
+            return;
         }
-        if (el) el.textContent = '0';
-        return;
     }
 
-    try {
-        // Делаем принудительный запрос к API для получения реального числа
-        const response = await makeApiRequest(bot, 'GET', '/api/users/online');
-        if (response && response.data && response.data.Users) {
-            // API возвращает { Users: [...] }
-            const totalCount = response.data.Users.length;
-            bot.lastOnlineCount = totalCount;
-            if (el) el.textContent = totalCount;
-            console.log(`👥 Мужчин онлайн: ${totalCount} (от ${bot.displayId})`);
-        }
-    } catch (error) {
-        console.warn('Ошибка получения онлайн счётчика:', error.message);
-        // Используем кэшированное значение если есть
-        if (bot.lastOnlineCount !== undefined) {
-            if (el) el.textContent = bot.lastOnlineCount;
-        }
+    // Если ни у кого нет данных - оставляем текущее значение или 0
+    if (el.textContent === '0' || el.textContent === '...') {
+        el.textContent = '0';
     }
 }
 
 function startGlobalMenOnlineUpdater() {
-    updateGlobalMenOnline();
+    // Не запускаем сразу - подождём пока боты загрузятся и получат данные
     if (globalMenOnlineInterval) clearInterval(globalMenOnlineInterval);
-    globalMenOnlineInterval = setInterval(updateGlobalMenOnline, 600000); // Каждые 10 минут
+    // Обновляем каждые 30 секунд (читаем кэш от ботов, не делаем своих запросов)
+    globalMenOnlineInterval = setInterval(updateGlobalMenOnline, 30000);
 }
 
 async function makeApiRequest(bot, method, path, data = null, isRetry = false) {
