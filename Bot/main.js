@@ -387,7 +387,7 @@ ipcMain.handle('response-window-ai-check', async (event) => {
         // Спрашиваем у renderer есть ли API key
         const result = await mainWindow.webContents.executeJavaScript(`
             (function() {
-                return { available: !!(window.globalSettings && window.globalSettings.apiKey) };
+                return { available: !!(typeof globalSettings !== 'undefined' && globalSettings.apiKey) };
             })()
         `);
         return result;
@@ -408,7 +408,8 @@ ipcMain.handle('response-window-ai-generate', async (event, data) => {
         // Отправляем запрос в renderer для генерации через OpenAI
         const result = await mainWindow.webContents.executeJavaScript(`
             (async function() {
-                const apiKey = window.globalSettings?.apiKey;
+                // globalSettings - локальная переменная, не window.globalSettings
+                const apiKey = typeof globalSettings !== 'undefined' ? globalSettings.apiKey : null;
                 if (!apiKey) {
                     return { success: false, error: 'API ключ OpenAI не указан в настройках' };
                 }
@@ -530,7 +531,8 @@ async function generateAIForResponseWindow(win) {
 
         const aiResult = await mainWindow.webContents.executeJavaScript(`
             (async function() {
-                const apiKey = window.globalSettings?.apiKey;
+                // globalSettings - локальная переменная, не window.globalSettings
+                const apiKey = typeof globalSettings !== 'undefined' ? globalSettings.apiKey : null;
                 if (!apiKey) {
                     return { success: false, error: 'API ключ OpenAI не указан в настройках' };
                 }
