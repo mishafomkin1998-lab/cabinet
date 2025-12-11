@@ -158,10 +158,11 @@ function openResponseWindow(botId, partnerId, partnerName, type) {
     const offsetY = 100 + (windowCount % 5) * 30;
 
     // URL для открытия на сайте
-    // Используем базовые страницы, т.к. сайт может не поддерживать прямые ссылки на конкретного пользователя
+    // Чат: используем hash-навигацию /chat#partnerId
+    // Письма: открываем inbox (прямой ссылки на переписку по partnerId нет)
     const siteUrl = type === 'chat'
-        ? `https://ladadate.com/chats`
-        : `https://ladadate.com/inbox`;
+        ? `https://ladadate.com/chat#${partnerId}`
+        : `https://ladadate.com/message-inbox`;
 
     const win = document.createElement('div');
     win.className = 'response-window response-window-webview focused';
