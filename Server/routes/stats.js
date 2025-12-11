@@ -17,7 +17,7 @@
 
 const express = require('express');
 const pool = require('../config/database');
-const { asyncHandler, buildRoleFilter } = require('../utils/helpers');
+const { asyncHandler, buildRoleFilter, buildStatsFilter } = require('../utils/helpers');
 
 const router = express.Router();
 
@@ -414,12 +414,36 @@ router.get('/forecast', asyncHandler(async (req, res) => {
 
 // Активность по часам (только ручная работа, без автоматических рассылок)
 router.get('/hourly-activity', asyncHandler(async (req, res) => {
-    const { userId, role } = req.query;
+    const { userId, role, filterAdminId, filterTranslatorId, dateFrom, dateTo } = req.query;
     const days = parseInt(req.query.days) || 7;
 
-    const activityRoleFilter = buildRoleFilter(role, userId, { table: 'activity', prefix: 'AND', paramIndex: 2 });
-        const activityFilter = activityRoleFilter.filter;
-        const params = [days, ...activityRoleFilter.params];
+    // Используем buildStatsFilter для фильтрации по админу/переводчику
+    const activityStatsFilter = buildStatsFilter({
+        role,
+        userId,
+        filterAdminId,
+        filterTranslatorId,
+        table: 'activity',
+        alias: 'a',
+        prefix: 'AND',
+        paramIndex: 2
+    });
+    const activityFilter = activityStatsFilter.filter;
+    let params = [days, ...activityStatsFilter.params];
+    let nextParamIndex = activityStatsFilter.nextParamIndex;
+
+    // Добавляем фильтры по дате
+    let dateFilter = '';
+    if (dateFrom) {
+        dateFilter += ` AND a.created_at >= $${nextParamIndex}::date`;
+        params.push(dateFrom);
+        nextParamIndex++;
+    }
+    if (dateTo) {
+        dateFilter += ` AND a.created_at <= $${nextParamIndex}::date + INTERVAL '1 day'`;
+        params.push(dateTo);
+        nextParamIndex++;
+    }
 
         /**
          * Умный запрос: определяем ручные сообщения через пинги активности
@@ -441,6 +465,7 @@ router.get('/hourly-activity', asyncHandler(async (req, res) => {
             FROM activity_log a
             WHERE a.created_at >= CURRENT_DATE - INTERVAL '1 day' * $1
             ${activityFilter}
+            ${dateFilter}
             AND EXISTS (
                 SELECT 1 FROM user_activity ua
                 WHERE ua.user_id = a.translator_id
@@ -751,6 +776,7 @@ router.get('/work-time', asyncHandler(async (req, res) => {
 /**
  * GET /api/stats/last-responses
  * Возвращает последние ответы анкет на входящие письма от мужчин
+ * ВАЖНО: Показывает только письма (type='outgoing'), НЕ чаты!
  *
  * Логика:
  * 1. Берем входящие сообщения (incoming_messages)
@@ -759,34 +785,63 @@ router.get('/work-time', asyncHandler(async (req, res) => {
  *
  * @query {string} userId - ID пользователя
  * @query {string} role - Роль (translator/admin/director)
+ * @query {string} filterAdminId - ID админа для фильтрации (опционально)
+ * @query {string} filterTranslatorId - ID переводчика для фильтрации (опционально)
+ * @query {string} dateFrom - Начало периода
+ * @query {string} dateTo - Конец периода
  * @query {number} limit - Количество записей (по умолчанию 5)
  * @query {number} offset - Смещение для пагинации (по умолчанию 0)
  * @returns {Array} responses - Массив ответов
  */
 router.get('/last-responses', asyncHandler(async (req, res) => {
-    const { userId, role, limit = 5, offset = 0 } = req.query;
+    const { userId, role, filterAdminId, filterTranslatorId, dateFrom, dateTo, limit = 5, offset = 0 } = req.query;
     const limitInt = parseInt(limit) || 5;
     const offsetInt = parseInt(offset) || 0;
 
-    // Фильтр по ролям
-    let roleFilter = '';
+    // Фильтр по ролям и выбранному админу/переводчику
     let params = [limitInt, offsetInt];
     let paramIndex = 3;
 
-    if (role === 'translator' && userId) {
-        roleFilter = 'AND m.translator_id = $' + paramIndex;
+    // Используем buildStatsFilter для фильтрации
+    // Используем table='activity' с алиасом 'm' для таблицы messages
+    let roleFilter = '';
+
+    if (filterTranslatorId) {
+        roleFilter = `AND m.translator_id = $${paramIndex}`;
+        params.push(filterTranslatorId);
+        paramIndex++;
+    } else if (filterAdminId) {
+        // Фильтр по админу: админ напрямую ИЛИ переводчики этого админа
+        roleFilter = `AND (m.admin_id = $${paramIndex} OR m.translator_id IN (SELECT id FROM users WHERE owner_id = $${paramIndex}))`;
+        params.push(filterAdminId);
+        paramIndex++;
+    } else if (role === 'translator' && userId) {
+        roleFilter = `AND m.translator_id = $${paramIndex}`;
         params.push(userId);
         paramIndex++;
     } else if (role === 'admin' && userId) {
-        roleFilter = 'AND m.admin_id = $' + paramIndex;
+        roleFilter = `AND m.admin_id = $${paramIndex}`;
         params.push(userId);
         paramIndex++;
     }
     // director видит все
 
+    // Добавляем фильтры по дате
+    let dateFilter = '';
+    if (dateFrom) {
+        dateFilter += ` AND m.timestamp >= $${paramIndex}::date`;
+        params.push(dateFrom);
+        paramIndex++;
+    }
+    if (dateTo) {
+        dateFilter += ` AND m.timestamp <= $${paramIndex}::date + INTERVAL '1 day'`;
+        params.push(dateTo);
+        paramIndex++;
+    }
+
     /**
      * Логика запроса:
-     * 1. Берем все исходящие сообщения (messages где type='outgoing' или 'chat_msg')
+     * 1. Берем все исходящие письма (messages где type='outgoing') - ТОЛЬКО письма, НЕ чаты!
      * 2. Для каждого находим последнее входящее от того же мужчины к той же анкете
      * 3. Вычисляем разницу времени (response_time_minutes)
      * 4. Фильтруем только те, где есть входящее (т.е. это ответы)
@@ -826,9 +881,10 @@ router.get('/last-responses', asyncHandler(async (req, res) => {
             LEFT JOIN message_content mc ON m.message_content_id = mc.id
             LEFT JOIN users u_admin ON m.admin_id = u_admin.id
             LEFT JOIN users u_trans ON m.translator_id = u_trans.id
-            WHERE (m.type = 'outgoing' OR m.type = 'chat_msg')
+            WHERE m.type = 'outgoing'
                 AND m.status = 'success'
                 ${roleFilter}
+                ${dateFilter}
         )
         SELECT
             id,
@@ -876,37 +932,66 @@ router.get('/last-responses', asyncHandler(async (req, res) => {
  * 1. Группирует сообщения с usedAi=true по text_hash
  * 2. Считает количество получателей для каждого уникального текста
  * 3. Фильтрует только те, где получателей >= 10
- * 4. Возвращает с пагинацией
+ * 4. Показывает только если первая отправка была минимум 10 минут после генерации
+ * 5. Возвращает с пагинацией
  *
  * @query {string} userId - ID пользователя
  * @query {string} role - Роль (translator/admin/director)
+ * @query {string} filterAdminId - ID админа для фильтрации (опционально)
+ * @query {string} filterTranslatorId - ID переводчика для фильтрации (опционально)
+ * @query {string} dateFrom - Начало периода
+ * @query {string} dateTo - Конец периода
  * @query {number} limit - Количество записей (по умолчанию 5)
  * @query {number} offset - Смещение для пагинации (по умолчанию 0)
  * @returns {Array} aiUsage - Массив AI рассылок
  */
 router.get('/ai-usage', asyncHandler(async (req, res) => {
-    const { userId, role, limit = 5, offset = 0 } = req.query;
+    const { userId, role, filterAdminId, filterTranslatorId, dateFrom, dateTo, limit = 5, offset = 0 } = req.query;
     const limitInt = parseInt(limit) || 5;
     const offsetInt = parseInt(offset) || 0;
 
-    // Фильтр по ролям
+    // Фильтр по ролям и выбранному админу/переводчику
     let roleFilter = '';
     let params = [limitInt, offsetInt];
     let paramIndex = 3;
 
-    if (role === 'translator' && userId) {
-        roleFilter = 'AND amm.translator_id = $' + paramIndex;
+    if (filterTranslatorId) {
+        roleFilter = `AND amm.translator_id = $${paramIndex}`;
+        params.push(filterTranslatorId);
+        paramIndex++;
+    } else if (filterAdminId) {
+        // Фильтр по админу: админ напрямую ИЛИ переводчики этого админа
+        roleFilter = `AND (amm.admin_id = $${paramIndex} OR amm.translator_id IN (SELECT id FROM users WHERE owner_id = $${paramIndex}))`;
+        params.push(filterAdminId);
+        paramIndex++;
+    } else if (role === 'translator' && userId) {
+        roleFilter = `AND amm.translator_id = $${paramIndex}`;
         params.push(userId);
         paramIndex++;
     } else if (role === 'admin' && userId) {
-        roleFilter = 'AND amm.admin_id = $' + paramIndex;
+        roleFilter = `AND amm.admin_id = $${paramIndex}`;
         params.push(userId);
+        paramIndex++;
+    }
+    // director видит все
+
+    // Добавляем фильтры по дате
+    let dateFilter = '';
+    if (dateFrom) {
+        dateFilter += ` AND amm.first_sent_at >= $${paramIndex}::date`;
+        params.push(dateFrom);
+        paramIndex++;
+    }
+    if (dateTo) {
+        dateFilter += ` AND amm.first_sent_at <= $${paramIndex}::date + INTERVAL '1 day'`;
+        params.push(dateTo);
         paramIndex++;
     }
 
     /**
      * Запрос к таблице ai_mass_messages
      * Фильтрация: recipient_count >= 10
+     * Правило 10 минут: показываем только если разница между генерацией и первой отправкой >= 10 минут
      * Сортировка: по времени первой отправки (самые новые сверху)
      */
     const query = `
@@ -919,13 +1004,17 @@ router.get('/ai-usage', asyncHandler(async (req, res) => {
             amm.first_sent_at,
             amm.last_sent_at,
             amm.generation_session_id,
+            amm.generated_at,
             u_admin.username as admin_name,
-            u_trans.username as translator_name
+            u_trans.username as translator_name,
+            EXTRACT(EPOCH FROM (amm.first_sent_at - COALESCE(amm.generated_at, amm.first_sent_at)))::INTEGER as seconds_after_generation
         FROM ai_mass_messages amm
         LEFT JOIN users u_admin ON amm.admin_id = u_admin.id
         LEFT JOIN users u_trans ON amm.translator_id = u_trans.id
         WHERE amm.recipient_count >= 10
+            AND (amm.generated_at IS NULL OR amm.first_sent_at >= amm.generated_at + INTERVAL '10 minutes')
             ${roleFilter}
+            ${dateFilter}
         ORDER BY amm.first_sent_at DESC
         LIMIT $1 OFFSET $2
     `;
@@ -941,8 +1030,10 @@ router.get('/ai-usage', asyncHandler(async (req, res) => {
         firstSentAt: row.first_sent_at,
         lastSentAt: row.last_sent_at,
         generationSessionId: row.generation_session_id,
+        generatedAt: row.generated_at,
         adminName: row.admin_name,
-        translatorName: row.translator_name
+        translatorName: row.translator_name,
+        secondsAfterGeneration: row.seconds_after_generation
     }));
 
     res.json({ success: true, aiUsage });

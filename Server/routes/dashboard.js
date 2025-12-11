@@ -8,7 +8,7 @@
 
 const express = require('express');
 const pool = require('../config/database');
-const { asyncHandler, buildRoleFilter } = require('../utils/helpers');
+const { asyncHandler, buildRoleFilter, buildStatsFilter } = require('../utils/helpers');
 
 const router = express.Router();
 
@@ -20,10 +20,12 @@ const router = express.Router();
  * @query {string} role - Роль пользователя (translator/admin/director)
  * @query {string} dateFrom - Начало периода (YYYY-MM-DD)
  * @query {string} dateTo - Конец периода (YYYY-MM-DD)
+ * @query {string} filterAdminId - ID админа для фильтрации (опционально)
+ * @query {string} filterTranslatorId - ID переводчика для фильтрации (опционально)
  * @returns {Object} dashboard - Объект со статистикой за выбранный период
  */
 router.get('/', asyncHandler(async (req, res) => {
-    const { userId, role, dateFrom, dateTo } = req.query;
+    const { userId, role, dateFrom, dateTo, filterAdminId, filterTranslatorId } = req.query;
 
     // Определяем период фильтрации
     // Если даты не переданы - используем текущий месяц
@@ -34,12 +36,18 @@ router.get('/', asyncHandler(async (req, res) => {
     const periodFrom = dateFrom || defaultDateFrom;
     const periodTo = dateTo || defaultDateTo;
 
-    // Формируем фильтры для разных таблиц в зависимости от роли
-    const profileRoleFilter = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'WHERE' });
-    const activityRoleFilter = buildRoleFilter(role, userId, { table: 'activity', prefix: 'AND' });
-    const profileFilter = profileRoleFilter.filter;
-    const activityFilter = activityRoleFilter.filter;
-    const params = profileRoleFilter.params; // Одинаковые params для обоих фильтров
+    // Формируем фильтры с учётом выбранного админа/переводчика
+    const profileStatsFilter = buildStatsFilter({
+        role, userId, filterAdminId, filterTranslatorId,
+        table: 'profiles', prefix: 'WHERE', paramIndex: 1
+    });
+    const activityStatsFilter = buildStatsFilter({
+        role, userId, filterAdminId, filterTranslatorId,
+        table: 'activity', prefix: 'AND', paramIndex: 1
+    });
+    const profileFilter = profileStatsFilter.filter;
+    const activityFilter = activityStatsFilter.filter;
+    const params = profileStatsFilter.params;
 
     // Определяем индекс для параметров дат в зависимости от наличия userId
     const hasUserParam = params.length > 0;

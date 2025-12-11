@@ -150,6 +150,65 @@ function getMonthStart() {
     return new Date(now.getFullYear(), now.getMonth(), 1);
 }
 
+/**
+ * Строит SQL-фильтр для статистики с учётом выбранного админа/переводчика
+ * Используется когда директор или админ хотят отфильтровать данные по конкретному пользователю
+ *
+ * @param {Object} options - Опции фильтрации:
+ *   @param {string} options.role - Роль текущего пользователя
+ *   @param {string} options.userId - ID текущего пользователя
+ *   @param {string} options.filterAdminId - ID админа для фильтрации (опционально)
+ *   @param {string} options.filterTranslatorId - ID переводчика для фильтрации (опционально)
+ *   @param {string} options.table - Тип таблицы: 'profiles' или 'activity'
+ *   @param {string} options.alias - Алиас таблицы
+ *   @param {string} options.prefix - Префикс: 'WHERE', 'AND' или ''
+ *   @param {number} options.paramIndex - Номер параметра $N
+ * @returns {Object} { filter: string, params: array, nextParamIndex: number }
+ */
+function buildStatsFilter(options = {}) {
+    const {
+        role,
+        userId,
+        filterAdminId,
+        filterTranslatorId,
+        table = 'activity',
+        alias = table === 'activity' ? 'a' : 'p',
+        prefix = 'AND',
+        paramIndex = 1
+    } = options;
+
+    // Если указан конкретный переводчик - фильтруем только по нему
+    if (filterTranslatorId) {
+        const field = table === 'activity' ? 'translator_id' : 'assigned_translator_id';
+        const condition = `${alias}.${field} = $${paramIndex}`;
+        return {
+            filter: prefix ? `${prefix} ${condition}` : condition,
+            params: [filterTranslatorId],
+            nextParamIndex: paramIndex + 1
+        };
+    }
+
+    // Если указан админ - фильтруем по админу и всем его переводчикам
+    if (filterAdminId) {
+        let condition;
+        if (table === 'activity') {
+            // Для activity_log: админ напрямую ИЛИ переводчики этого админа
+            condition = `(${alias}.admin_id = $${paramIndex} OR ${alias}.translator_id IN (SELECT id FROM users WHERE owner_id = $${paramIndex}))`;
+        } else {
+            // Для allowed_profiles
+            condition = `(${alias}.assigned_admin_id = $${paramIndex} OR ${alias}.assigned_translator_id IN (SELECT id FROM users WHERE owner_id = $${paramIndex}))`;
+        }
+        return {
+            filter: prefix ? `${prefix} ${condition}` : condition,
+            params: [filterAdminId],
+            nextParamIndex: paramIndex + 1
+        };
+    }
+
+    // Иначе используем стандартную логику по роли
+    return buildRoleFilter(role, userId, { table, alias, prefix, paramIndex });
+}
+
 module.exports = {
     PRICE_LETTER,
     PRICE_CHAT,
@@ -158,5 +217,6 @@ module.exports = {
     getMonthStart,
     asyncHandler,
     errorHandler,
-    buildRoleFilter
+    buildRoleFilter,
+    buildStatsFilter
 };

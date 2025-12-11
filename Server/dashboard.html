@@ -204,7 +204,7 @@
                     <div class="flex items-center gap-4 flex-wrap">
                         <!-- Admin filter (только для директора) -->
                         <div x-show="currentUser.role === 'director'">
-                            <select class="glass px-4 py-2.5 rounded-xl" x-model="statsFilter.admin" @change="statsFilter.translator = ''">
+                            <select class="glass px-4 py-2.5 rounded-xl" x-model="statsFilter.admin" @change="statsFilter.translator = ''; applyStatsFilter()">
                                 <option value="" x-text="t('filters.allAdmins')"></option>
                                 <template x-for="admin in admins" :key="admin.id">
                                     <option :value="admin.id" x-text="admin.name"></option>
@@ -214,7 +214,7 @@
 
                         <!-- Translator filter (для директора - при выборе админа, для админа - всегда) -->
                         <div x-show="currentUser.role === 'admin' || statsFilter.admin">
-                            <select class="glass px-4 py-2.5 rounded-xl" x-model="statsFilter.translator">
+                            <select class="glass px-4 py-2.5 rounded-xl" x-model="statsFilter.translator" @change="applyStatsFilter()">
                                 <option value="" x-text="t('filters.allTranslators')"></option>
                                 <template x-for="translator in (currentUser.role === 'admin' ? myTranslators : (admins.find(a => a.id == statsFilter.admin)?.translators || []))" :key="translator.id">
                                     <option :value="translator.id" x-text="translator.name"></option>

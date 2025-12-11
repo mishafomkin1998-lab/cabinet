@@ -14,7 +14,7 @@
 
 const express = require('express');
 const pool = require('../config/database');
-const { asyncHandler, buildRoleFilter } = require('../utils/helpers');
+const { asyncHandler, buildRoleFilter, buildStatsFilter } = require('../utils/helpers');
 
 const router = express.Router();
 
@@ -694,14 +694,16 @@ router.get('/favorite_templates', asyncHandler(async (req, res) => {
  * @query {string} role - Роль (translator/admin/director)
  * @query {string} dateFrom - Начало периода (YYYY-MM-DD)
  * @query {string} dateTo - Конец периода (YYYY-MM-DD)
+ * @query {string} filterAdminId - ID админа для фильтрации
+ * @query {string} filterTranslatorId - ID переводчика для фильтрации
  * @query {number} limit - Количество записей (по умолчанию 50)
  * @returns {Array} letters - Массив сгруппированных писем
  */
 router.get('/sent-letters-grouped', asyncHandler(async (req, res) => {
-    const { userId, role, dateFrom, dateTo, limit = 50 } = req.query;
+    const { userId, role, dateFrom, dateTo, filterAdminId, filterTranslatorId, limit = 50 } = req.query;
     const limitInt = parseInt(limit) || 50;
 
-    // Определяем период фильтрации (как в dashboard.js)
+    // Определяем период фильтрации
     const now = new Date();
     const defaultDateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const defaultDateTo = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
@@ -709,20 +711,21 @@ router.get('/sent-letters-grouped', asyncHandler(async (req, res) => {
     const periodFrom = dateFrom || defaultDateFrom;
     const periodTo = dateTo || defaultDateTo;
 
-    // Фильтр по ролям
-    let roleFilter = '';
-    let params = [periodFrom, periodTo, limitInt];
-    let paramIndex = 4;
+    // Строим фильтр с учётом выбранного админа/переводчика
+    const statsFilter = buildStatsFilter({
+        role, userId, filterAdminId, filterTranslatorId,
+        table: 'activity', alias: 'a', prefix: 'AND', paramIndex: 3
+    });
 
-    if (role === 'translator' && userId) {
-        roleFilter = 'AND a.translator_id = $' + paramIndex;
-        params.splice(2, 0, userId); // Вставляем userId на позицию $3
-        paramIndex++;
-    } else if (role === 'admin' && userId) {
-        roleFilter = 'AND a.admin_id = $' + paramIndex;
-        params.splice(2, 0, userId);
-        paramIndex++;
+    // Параметры: $1 = dateFrom, $2 = dateTo, $3 = filter param (если есть), $N = limit
+    let params = [periodFrom, periodTo];
+    let limitParamIndex = 3;
+
+    if (statsFilter.params.length > 0) {
+        params.push(...statsFilter.params);
+        limitParamIndex = statsFilter.nextParamIndex;
     }
+    params.push(limitInt);
 
     /**
      * Группируем по profile_id + message_text
@@ -741,27 +744,15 @@ router.get('/sent-letters-grouped', asyncHandler(async (req, res) => {
         WHERE a.action_type = 'letter'
             AND a.created_at >= $1::date
             AND a.created_at < ($2::date + interval '1 day')
-            ${roleFilter}
+            ${statsFilter.filter}
             AND a.message_text IS NOT NULL
             AND a.message_text != ''
         GROUP BY a.profile_id, a.message_text
         ORDER BY MAX(a.created_at) DESC
-        LIMIT $${paramIndex}
+        LIMIT $${limitParamIndex}
     `;
 
-    // DEBUG: Логируем запрос
-    console.log('📊 DEBUG sent-letters-grouped:');
-    console.log('   Query params:', params);
-    console.log('   Period:', periodFrom, '-', periodTo);
-    console.log('   Role:', role, 'UserId:', userId);
-    console.log('   Role filter:', roleFilter);
-
     const result = await pool.query(query, params);
-
-    console.log('   Result count:', result.rows.length);
-    if (result.rows.length > 0) {
-        console.log('   First letter:', JSON.stringify(result.rows[0]).substring(0, 200));
-    }
 
     const letters = result.rows.map(row => ({
         profileId: row.profile_id,

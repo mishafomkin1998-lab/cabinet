@@ -415,6 +415,13 @@
                         if (this.statsFilter.dateTo) {
                             url += `&dateTo=${this.statsFilter.dateTo}`;
                         }
+                        // Фильтры по админу/переводчику
+                        if (this.statsFilter.admin) {
+                            url += `&filterAdminId=${this.statsFilter.admin}`;
+                        }
+                        if (this.statsFilter.translator) {
+                            url += `&filterTranslatorId=${this.statsFilter.translator}`;
+                        }
                         const res = await fetch(url);
                         const data = await res.json();
                         if (data.success) {
@@ -707,6 +714,13 @@
                         if (this.statsFilter.dateTo) {
                             url += `&dateTo=${this.statsFilter.dateTo}`;
                         }
+                        // Фильтры по админу/переводчику
+                        if (this.statsFilter.admin) {
+                            url += `&filterAdminId=${this.statsFilter.admin}`;
+                        }
+                        if (this.statsFilter.translator) {
+                            url += `&filterTranslatorId=${this.statsFilter.translator}`;
+                        }
                         const res = await fetch(url);
                         const data = await res.json();
                         if (data.success) {
@@ -717,7 +731,20 @@
 
                 async loadLastResponses() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/stats/last-responses?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=100`);
+                        let url = `${API_BASE}/api/stats/last-responses?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=100`;
+                        if (this.statsFilter.dateFrom) {
+                            url += `&dateFrom=${this.statsFilter.dateFrom}`;
+                        }
+                        if (this.statsFilter.dateTo) {
+                            url += `&dateTo=${this.statsFilter.dateTo}`;
+                        }
+                        if (this.statsFilter.admin) {
+                            url += `&filterAdminId=${this.statsFilter.admin}`;
+                        }
+                        if (this.statsFilter.translator) {
+                            url += `&filterTranslatorId=${this.statsFilter.translator}`;
+                        }
+                        const res = await fetch(url);
                         const data = await res.json();
                         if (data.success) {
                             this.lastResponses = data.responses;
@@ -727,7 +754,20 @@
 
                 async loadAiUsage() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/stats/ai-usage?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=100`);
+                        let url = `${API_BASE}/api/stats/ai-usage?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=100`;
+                        if (this.statsFilter.dateFrom) {
+                            url += `&dateFrom=${this.statsFilter.dateFrom}`;
+                        }
+                        if (this.statsFilter.dateTo) {
+                            url += `&dateTo=${this.statsFilter.dateTo}`;
+                        }
+                        if (this.statsFilter.admin) {
+                            url += `&filterAdminId=${this.statsFilter.admin}`;
+                        }
+                        if (this.statsFilter.translator) {
+                            url += `&filterTranslatorId=${this.statsFilter.translator}`;
+                        }
+                        const res = await fetch(url);
                         const data = await res.json();
                         if (data.success) {
                             this.aiUsageData = data.aiUsage;
@@ -737,7 +777,20 @@
 
                 async loadHourlyActivity() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/stats/hourly-activity?userId=${this.currentUser.id}&role=${this.currentUser.role}&days=7`);
+                        let url = `${API_BASE}/api/stats/hourly-activity?userId=${this.currentUser.id}&role=${this.currentUser.role}&days=7`;
+                        if (this.statsFilter.dateFrom) {
+                            url += `&dateFrom=${this.statsFilter.dateFrom}`;
+                        }
+                        if (this.statsFilter.dateTo) {
+                            url += `&dateTo=${this.statsFilter.dateTo}`;
+                        }
+                        if (this.statsFilter.admin) {
+                            url += `&filterAdminId=${this.statsFilter.admin}`;
+                        }
+                        if (this.statsFilter.translator) {
+                            url += `&filterTranslatorId=${this.statsFilter.translator}`;
+                        }
+                        const res = await fetch(url);
                         const data = await res.json();
                         if (data.success) {
                             this.hourlyActivity = data.hourlyData;
@@ -902,9 +955,17 @@
                 },
 
                 applyDateFilter() {
-                    // Перезагружаем статистику с новым фильтром, сохраняя онлайн статус
+                    // Перезагружаем ВСЕ блоки статистики с новым фильтром
+                    this.applyStatsFilter();
+                },
+
+                // Применить фильтры (вызывается при изменении админа/переводчика/дат)
+                applyStatsFilter() {
                     this.loadDashboardStats(true);
                     this.loadSentLettersGrouped();
+                    this.loadLastResponses();
+                    this.loadAiUsage();
+                    this.loadHourlyActivity();
                 },
 
                 // Calendar functions
