@@ -1563,9 +1563,20 @@ class AccountBot {
 
             if (this.webview) {
                 try {
+                    // Блокируем звук перед отправкой
+                    if (this.webview.setAudioMuted) {
+                        this.webview.setAudioMuted(true);
+                    }
+
                     console.log(`[AutoReply] Отправка через WebView chat-send...`);
                     const result = await this.webview.executeJavaScript(`
                         (async () => {
+                            // Блокируем Audio API
+                            if (!window.__audioMuted) {
+                                window.__audioMuted = true;
+                                Audio.prototype.play = function() { return Promise.resolve(); };
+                                HTMLMediaElement.prototype.play = function() { return Promise.resolve(); };
+                            }
                             try {
                                 const res = await fetch('https://ladadate.com/chat-send', {
                                     method: 'POST',
