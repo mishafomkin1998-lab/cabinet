@@ -2575,6 +2575,15 @@
                 webview.useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
                 webview.setAttribute('tabindex', '-1'); // Блокируем получение фокуса через Tab
 
+                // ВАЖНО: Отключаем звук СРАЗУ при создании (до загрузки страницы)
+                // Это предотвращает шипение/звуки при открытии бота
+                webview.addEventListener('did-attach', () => {
+                    if (webview.setAudioMuted) {
+                        webview.setAudioMuted(true);
+                        console.log(`[WebView ${this.id}] 🔇 Звук превентивно отключен при attach`);
+                    }
+                });
+
                 // Функция для отключения звука и внедрения скрипта блокировки Audio
                 const muteWebview = () => {
                     if (webview.setAudioMuted) {
