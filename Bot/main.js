@@ -160,63 +160,91 @@ ipcMain.handle('close-response-window', async (event, windowId) => {
 
 // === AI для Response Windows ===
 
-// Функция инъекции кнопки AI на сайт
-function injectAIButton(win) {
+// Функция инъекции кнопки AI на сайт (с retry)
+function injectAIButton(win, attempt = 0) {
     if (win.isDestroyed()) return;
+    if (attempt > 10) {
+        console.log('[InjectAI] Max attempts reached, giving up');
+        return;
+    }
 
     const isChat = win.windowType === 'chat';
 
     win.webContents.executeJavaScript(`
         (function() {
             // Не добавляем повторно
-            if (document.getElementById('lababot-ai-container')) return;
+            if (document.getElementById('lababot-ai-container')) {
+                return { success: true, alreadyExists: true };
+            }
 
-            // Ищем textarea для ввода сообщения
-            const selectors = ${isChat ? `[
-                'textarea.chat-textarea',
-                'textarea[placeholder*="message"]',
-                'textarea[placeholder*="Message"]',
+            // Ищем поле ввода сообщения - расширенные селекторы
+            const selectors = [
+                // Общие селекторы для input/textarea
+                'input[placeholder*="message" i]',
+                'input[placeholder*="Write" i]',
+                'textarea[placeholder*="message" i]',
+                'textarea[placeholder*="Write" i]',
+                // Специфичные для чата
+                '.chat-input input',
                 '.chat-input textarea',
-                '.message-input textarea',
+                '.message-form input',
+                '.message-form textarea',
+                // По классам
+                'input.chat-input',
+                'textarea.chat-textarea',
+                // Fallback
+                'input[type="text"]',
                 'textarea'
-            ]` : `[
-                'textarea[name="content"]',
-                'textarea.message-textarea',
-                '.compose-message textarea',
-                'textarea'
-            ]`};
+            ];
 
-            let textarea = null;
+            let inputEl = null;
             for (const sel of selectors) {
-                textarea = document.querySelector(sel);
-                if (textarea) break;
+                const el = document.querySelector(sel);
+                // Проверяем что элемент видимый и не скрытый
+                if (el && el.offsetParent !== null) {
+                    inputEl = el;
+                    console.log('[LababotAI] Found input with selector:', sel);
+                    break;
+                }
             }
 
-            if (!textarea) {
-                console.log('[LababotAI] Textarea not found, will retry...');
-                return;
+            if (!inputEl) {
+                console.log('[LababotAI] Input not found yet, attempt ${attempt}');
+                return { success: false, retry: true };
             }
+
+            // Находим контейнер для вставки (родитель поля ввода или форма)
+            let insertParent = inputEl.closest('form') || inputEl.closest('.chat-input') || inputEl.closest('.message-form') || inputEl.parentNode;
 
             // Создаём контейнер для AI кнопки
             const container = document.createElement('div');
             container.id = 'lababot-ai-container';
-            container.style.cssText = 'display:flex;gap:8px;align-items:center;margin-bottom:8px;padding:8px;background:#f0f7ff;border-radius:8px;border:1px solid #c5ddf8;';
+            container.style.cssText = 'display:flex;gap:8px;align-items:center;padding:10px;background:linear-gradient(135deg,#e8f4fd 0%,#f0e6ff 100%);border-radius:10px;border:1px solid #c5ddf8;margin:10px;position:relative;z-index:9999;';
 
             // Поле для промпта
             const promptInput = document.createElement('input');
             promptInput.type = 'text';
+            promptInput.id = 'lababot-ai-prompt';
             promptInput.placeholder = 'AI промпт (опционально)...';
-            promptInput.style.cssText = 'flex:1;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;';
+            promptInput.style.cssText = 'flex:1;padding:10px 14px;border:1px solid #ddd;border-radius:8px;font-size:14px;background:white;';
 
             // Кнопка генерации
             const aiBtn = document.createElement('button');
+            aiBtn.id = 'lababot-ai-btn';
             aiBtn.innerHTML = '✨ AI Ответ';
-            aiBtn.style.cssText = 'padding:8px 16px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold;font-size:14px;transition:transform 0.2s,box-shadow 0.2s;';
-            aiBtn.onmouseenter = () => { aiBtn.style.transform = 'scale(1.05)'; aiBtn.style.boxShadow = '0 4px 12px rgba(102,126,234,0.4)'; };
+            aiBtn.type = 'button';
+            aiBtn.style.cssText = 'padding:10px 20px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:bold;font-size:14px;transition:all 0.2s;white-space:nowrap;';
+            aiBtn.onmouseenter = () => { aiBtn.style.transform = 'scale(1.05)'; aiBtn.style.boxShadow = '0 4px 15px rgba(102,126,234,0.5)'; };
             aiBtn.onmouseleave = () => { aiBtn.style.transform = 'scale(1)'; aiBtn.style.boxShadow = 'none'; };
 
+            // Сохраняем ссылку на input для использования в обработчике
+            container.dataset.inputSelector = inputEl.tagName.toLowerCase() + (inputEl.placeholder ? '[placeholder="' + inputEl.placeholder + '"]' : '');
+
             // Обработчик клика
-            aiBtn.onclick = async () => {
+            aiBtn.onclick = async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
                 if (aiBtn.disabled) return;
 
                 const originalText = aiBtn.innerHTML;
@@ -228,51 +256,71 @@ function injectAIButton(win) {
                     // Собираем историю переписки
                     let history = '';
 
-                    ${isChat ? `
-                    // Для чата - ищем сообщения
-                    const messages = document.querySelectorAll('.chat-message, .message-item, [class*="chat-msg"], [class*="message-text"]');
-                    const msgTexts = [];
-                    messages.forEach(m => {
-                        const text = m.innerText?.trim();
-                        if (text && text.length > 2 && text.length < 500) {
-                            msgTexts.push(text);
-                        }
+                    // Ищем сообщения на странице
+                    const messageSelectors = [
+                        '.message-text',
+                        '.chat-message',
+                        '.message-content',
+                        '.msg-text',
+                        '[class*="message"]',
+                        '[class*="chat"] [class*="text"]'
+                    ];
+
+                    const allMessages = [];
+                    messageSelectors.forEach(sel => {
+                        document.querySelectorAll(sel).forEach(m => {
+                            const text = m.innerText?.trim();
+                            if (text && text.length > 1 && text.length < 1000 && !allMessages.includes(text)) {
+                                allMessages.push(text);
+                            }
+                        });
                     });
-                    history = msgTexts.slice(-10).join('\\n---\\n');
 
-                    if (!history) {
-                        const chatBody = document.querySelector('.chat-body, .messages-container, [class*="chat-content"]');
-                        if (chatBody) history = chatBody.innerText?.slice(-2000) || '';
+                    if (allMessages.length > 0) {
+                        history = allMessages.slice(-15).join('\\n---\\n');
+                    } else {
+                        // Fallback - берём текст из основной области
+                        const mainArea = document.querySelector('main, .chat-body, .messages, .content, [class*="chat"]');
+                        if (mainArea) {
+                            history = mainArea.innerText?.slice(-3000) || '';
+                        }
                     }
-                    ` : `
-                    // Для письма - ищем текст письма
-                    const letterContent = document.querySelector('.letter-content, .message-content, .mail-body, [class*="letter-text"]');
-                    if (letterContent) {
-                        history = letterContent.innerText?.slice(-2000) || '';
-                    }
-                    if (!history) {
-                        const mainContent = document.querySelector('main, .content, article');
-                        if (mainContent) history = mainContent.innerText?.slice(-2000) || '';
-                    }
-                    `}
 
-                    console.log('[LababotAI] History collected:', history.slice(0, 200));
+                    console.log('[LababotAI] History collected, length:', history.length);
 
                     // Вызываем AI через preload
+                    if (!window.lababotAI) {
+                        throw new Error('AI API не доступен');
+                    }
+
                     const result = await window.lababotAI.generate(
                         history,
                         '${isChat ? 'chat' : 'mail'}',
-                        promptInput.value.trim()
+                        document.getElementById('lababot-ai-prompt')?.value?.trim() || ''
                     );
 
                     if (result.success && result.text) {
-                        // Вставляем текст в textarea
-                        textarea.value = result.text;
-                        textarea.dispatchEvent(new Event('input', { bubbles: true }));
-                        textarea.dispatchEvent(new Event('change', { bubbles: true }));
-                        textarea.focus();
+                        // Находим текущий input (мог измениться)
+                        const currentInput = document.querySelector('input[placeholder*="message" i], input[placeholder*="Write" i], textarea[placeholder*="message" i]') || inputEl;
 
-                        promptInput.value = '';
+                        // Вставляем текст
+                        if (currentInput.tagName === 'INPUT' || currentInput.tagName === 'TEXTAREA') {
+                            // Используем нативный setter для React/Angular
+                            const nativeSetter = Object.getOwnPropertyDescriptor(
+                                currentInput.tagName === 'TEXTAREA' ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype,
+                                'value'
+                            ).set;
+                            nativeSetter.call(currentInput, result.text);
+
+                            currentInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            currentInput.dispatchEvent(new Event('change', { bubbles: true }));
+                            currentInput.focus();
+                        }
+
+                        // Очищаем промпт
+                        const promptEl = document.getElementById('lababot-ai-prompt');
+                        if (promptEl) promptEl.value = '';
+
                         console.log('[LababotAI] Text inserted successfully');
                     } else {
                         alert('Ошибка AI: ' + (result.error || 'Неизвестная ошибка'));
@@ -290,13 +338,25 @@ function injectAIButton(win) {
             container.appendChild(promptInput);
             container.appendChild(aiBtn);
 
-            // Вставляем перед textarea
-            textarea.parentNode.insertBefore(container, textarea);
+            // Вставляем в начало родительского контейнера или перед формой
+            if (insertParent.tagName === 'FORM') {
+                insertParent.parentNode.insertBefore(container, insertParent);
+            } else {
+                insertParent.insertBefore(container, insertParent.firstChild);
+            }
 
             console.log('[LababotAI] AI button injected successfully');
+            return { success: true };
         })();
-    `).catch(err => {
+    `).then(result => {
+        if (result && result.retry) {
+            // Повторяем через 500мс
+            setTimeout(() => injectAIButton(win, attempt + 1), 500);
+        }
+    }).catch(err => {
         console.log('[InjectAI] Script execution failed:', err.message);
+        // Повторяем при ошибке
+        setTimeout(() => injectAIButton(win, attempt + 1), 500);
     });
 }
 
