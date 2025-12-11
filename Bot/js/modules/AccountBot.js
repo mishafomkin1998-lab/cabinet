@@ -1557,65 +1557,125 @@ class AccountBot {
                 Country: ''
             });
 
-            console.log(`[AutoReply] Отправляю через /chat-send: recipientId=${recipientId}, body="${msgBody.substring(0, 50)}..."`);
+            // ВАЖНО: Используем WebView для отправки чата (как в MiniChat)
+            // Это нужно потому что /chat-send требует session cookies из WebView
+            let sendSuccess = false;
 
-            // Отправляем через chat-send API
-            const payload = { recipientId: parseInt(recipientId), body: msgBody };
-            await makeApiRequest(this, 'POST', '/chat-send', payload);
+            if (this.webview) {
+                try {
+                    console.log(`[AutoReply] Отправка через WebView chat-send...`);
+                    const result = await this.webview.executeJavaScript(`
+                        (async () => {
+                            try {
+                                const res = await fetch('https://ladadate.com/chat-send', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ id: ${recipientId}, body: ${JSON.stringify(msgBody)} }),
+                                    credentials: 'include'
+                                });
+                                if (!res.ok) {
+                                    return { success: false, error: 'HTTP ' + res.status, status: res.status };
+                                }
+                                const text = await res.text();
+                                console.log('[AutoReply WebView] chat-send response:', text);
+                                try {
+                                    const json = JSON.parse(text);
+                                    if (json.IsSuccess === false) {
+                                        return { success: false, error: json.Error || 'API error', data: json };
+                                    }
+                                    return { success: true, data: json };
+                                } catch {
+                                    return { success: true, data: text };
+                                }
+                            } catch (e) {
+                                return { success: false, error: e.message };
+                            }
+                        })()
+                    `);
 
-            console.log(`[AutoReply] ✅ Успешно отправлено!`);
+                    console.log(`[AutoReply] WebView chat-send result:`, result);
+                    if (result.success) {
+                        sendSuccess = true;
+                        console.log(`[AutoReply] ✅ Чат отправлен через WebView!`);
+                    } else {
+                        console.log(`[AutoReply] ❌ WebView chat-send ошибка:`, result.error);
+                    }
+                } catch (e) {
+                    console.log(`[AutoReply] ⚠️ WebView executeJavaScript error:`, e.message);
+                }
+            }
 
-            // Отслеживаем статистику
-            const convData = this.trackConversation(recipientId);
-            const convId = this.getConvId(recipientId);
+            // Если через WebView не получилось - пробуем через API (fallback)
+            if (!sendSuccess) {
+                console.log(`[AutoReply] Fallback: отправка через /chat-send API...`);
+                try {
+                    const payload = { recipientId: parseInt(recipientId), body: msgBody };
+                    await makeApiRequest(this, 'POST', '/chat-send', payload);
+                    sendSuccess = true;
+                    console.log(`[AutoReply] ✅ Чат отправлен через API fallback!`);
+                } catch (apiErr) {
+                    console.log(`[AutoReply] ❌ API fallback не сработал:`, apiErr.message);
+                }
+            }
 
-            await sendMessageToLababot({
-                botId: this.id,
-                accountDisplayId: this.displayId,
-                recipientId: recipientId,
-                type: 'chat_msg',
-                textContent: msgBody,
-                status: 'success',
-                responseTime: convData.responseTime,
-                isFirst: convData.isFirst,
-                isLast: currentIndex === autoReplies.length - 1,
-                convId: convId,
-                mediaUrl: null,
-                fileName: null,
-                translatorId: this.translatorId,
-                errorReason: null,
-                usedAi: false
-            });
+            if (sendSuccess) {
+                // Отслеживаем статистику
+                const convData = this.trackConversation(recipientId);
+                const convId = this.getConvId(recipientId);
 
-            this.incrementStat('chat', 'sent');
-            this.log(`🤖 Автоответ #${currentIndex + 1} отправлен: ${partnerName}`);
-            console.log(`[AutoReply] Автоответ #${currentIndex + 1} отправлен для ${partnerName}`);
+                await sendMessageToLababot({
+                    botId: this.id,
+                    accountDisplayId: this.displayId,
+                    recipientId: recipientId,
+                    type: 'chat_msg',
+                    textContent: msgBody,
+                    status: 'success',
+                    responseTime: convData.responseTime,
+                    isFirst: convData.isFirst,
+                    isLast: currentIndex === autoReplies.length - 1,
+                    convId: convId,
+                    mediaUrl: null,
+                    fileName: null,
+                    translatorId: this.translatorId,
+                    errorReason: null,
+                    usedAi: false
+                });
 
-            // Планируем следующий автоответ
-            const nextIndex = currentIndex + 1;
-            if (nextIndex < autoReplies.length) {
-                const nextReply = autoReplies[nextIndex];
-                queueItem.currentIndex = nextIndex;
-                queueItem.timerId = setTimeout(() => {
-                    this.sendAutoReply(recipientId);
-                }, nextReply.delay * 1000);
+                this.incrementStat('chat', 'sent');
+                this.log(`🤖 Автоответ #${currentIndex + 1} (чат) отправлен: ${partnerName}`);
+                console.log(`[AutoReply] Автоответ #${currentIndex + 1} отправлен для ${partnerName}`);
 
-                this.log(`🤖 Следующий автоответ через ${nextReply.delay} сек`);
+                // Планируем следующий автоответ
+                const nextIndex = currentIndex + 1;
+                if (nextIndex < autoReplies.length) {
+                    const nextReply = autoReplies[nextIndex];
+                    queueItem.currentIndex = nextIndex;
+                    queueItem.timerId = setTimeout(() => {
+                        this.sendAutoReply(recipientId);
+                    }, nextReply.delay * 1000);
+
+                    this.log(`🤖 Следующий автоответ через ${nextReply.delay} сек`);
+                } else {
+                    // Это был последний автоответ
+                    this.finishAutoReplyChain(recipientId, partnerName);
+                }
             } else {
-                // Это был последний автоответ
-                this.finishAutoReplyChain(recipientId, partnerName);
+                // Чат не удалось отправить - пробуем как письмо (последний fallback)
+                console.log(`[AutoReply] Последний fallback: отправка как письмо...`);
+                throw new Error('Chat send failed, trying letter fallback');
             }
 
         } catch (error) {
-            console.error(`[AutoReply] Ошибка отправки для ${recipientId}:`, error);
-            this.log(`🤖 Ошибка автоответа: ${partnerName}`);
-            this.incrementStat('chat', 'errors');
+            console.error(`[AutoReply] Ошибка отправки чата для ${recipientId}:`, error);
 
-            // При ошибке пробуем fallback через письмо
+            // Fallback: отправляем как письмо
             try {
+                const msgBody = this.replaceMacros(reply.text, { Name: partnerName, City: '', Age: '', Country: '' });
+                console.log(`[AutoReply] Получаем CheckId для письма...`);
                 const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${recipientId}`);
+
                 if (checkRes.data.CheckId) {
-                    const msgBody = this.replaceMacros(reply.text, { Name: partnerName, City: '', Age: '', Country: '' });
+                    console.log(`[AutoReply] CheckId получен: ${checkRes.data.CheckId}`);
                     const mailPayload = {
                         CheckId: checkRes.data.CheckId,
                         RecipientAccountId: parseInt(recipientId),
@@ -1626,7 +1686,31 @@ class AccountBot {
                         AttachmentFile: null
                     };
                     await makeApiRequest(this, 'POST', '/api/messages/send', mailPayload);
-                    this.log(`🤖 Автоответ #${currentIndex + 1} отправлен (fallback): ${partnerName}`);
+
+                    // Отслеживаем статистику (как письмо)
+                    const convData = this.trackConversation(recipientId);
+                    const convId = this.getConvId(recipientId);
+
+                    await sendMessageToLababot({
+                        botId: this.id,
+                        accountDisplayId: this.displayId,
+                        recipientId: recipientId,
+                        type: 'outgoing', // письмо
+                        textContent: msgBody,
+                        status: 'success',
+                        responseTime: convData.responseTime,
+                        isFirst: convData.isFirst,
+                        isLast: currentIndex === autoReplies.length - 1,
+                        convId: convId,
+                        mediaUrl: null,
+                        fileName: null,
+                        translatorId: this.translatorId,
+                        errorReason: null,
+                        usedAi: false
+                    });
+
+                    this.incrementStat('mail', 'sent');
+                    this.log(`🤖 Автоответ #${currentIndex + 1} (письмо) отправлен: ${partnerName}`);
 
                     // Планируем следующий
                     const nextIndex = currentIndex + 1;
@@ -1639,9 +1723,13 @@ class AccountBot {
                     } else {
                         this.finishAutoReplyChain(recipientId, partnerName);
                     }
+                } else {
+                    throw new Error('No CheckId for letter fallback');
                 }
             } catch (fallbackErr) {
-                console.error(`[AutoReply] Fallback тоже не сработал:`, fallbackErr);
+                console.error(`[AutoReply] Fallback письмо тоже не сработал:`, fallbackErr);
+                this.log(`🤖 Ошибка автоответа: ${partnerName}`);
+                this.incrementStat('chat', 'errors');
                 // Удаляем из очереди при критической ошибке
                 delete this.autoReplyQueue[recipientId];
             }
