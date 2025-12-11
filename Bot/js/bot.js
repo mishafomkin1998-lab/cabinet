@@ -1666,6 +1666,7 @@
             initHotkeys();
             initTooltips();
             initFocusProtection(); // НОВОЕ: Защита от потери фокуса
+            initTranscriptionContextMenu(); // Контекстное меню с переменными транскрипции
             updateDisabledStatusesUI(); // Отображаем отключенные статусы
             startGlobalMenOnlineUpdater(); // Запускаем обновление "Мужчины онлайн"
 
@@ -2559,6 +2560,134 @@
             const ta = document.getElementById(textareaId);
             ta.value = ta.value.endsWith('{') ? ta.value.slice(0, -1) + text : ta.value + text;
             document.getElementById(dropdownId).style.display='none'; ta.focus();
+        }
+
+        // === ПЕРЕМЕННЫЕ ТРАНСКРИПЦИИ (все 10 из API) ===
+        const TRANSCRIPTION_VARIABLES = [
+            { name: '{name}', desc: 'Имя', example: 'John Doe' },
+            { name: '{age}', desc: 'Возраст', example: '38' },
+            { name: '{city}', desc: 'Город', example: 'Paris' },
+            { name: '{country}', desc: 'Страна', example: 'France' },
+            { name: '{countryCode}', desc: 'Код страны', example: 'FR' },
+            { name: '{accountId}', desc: 'ID аккаунта', example: '123456' },
+            { name: '{birthday}', desc: 'День рождения', example: '1985-01-15' },
+            { name: '{ageFrom}', desc: 'Ищет от (возраст)', example: '25' },
+            { name: '{ageTo}', desc: 'Ищет до (возраст)', example: '35' },
+            { name: '{profilePhoto}', desc: 'URL фото', example: 'https://...' }
+        ];
+
+        // Текущий textarea для контекстного меню
+        let currentContextMenuTextarea = null;
+
+        // Создание контекстного меню при загрузке
+        function createTranscriptionContextMenu() {
+            // Удаляем старое меню если есть
+            const existingMenu = document.getElementById('transcription-context-menu');
+            if (existingMenu) existingMenu.remove();
+
+            // Создаём новое меню
+            const menu = document.createElement('div');
+            menu.id = 'transcription-context-menu';
+            menu.className = 'transcription-context-menu';
+
+            // Заголовок
+            const header = document.createElement('div');
+            header.className = 'transcription-context-menu-header';
+            header.textContent = 'Вставить переменную';
+            menu.appendChild(header);
+
+            // Пункты меню
+            TRANSCRIPTION_VARIABLES.forEach(v => {
+                const item = document.createElement('div');
+                item.className = 'transcription-context-menu-item';
+                item.innerHTML = `<span class="var-name">${v.name}</span><span class="var-desc">${v.desc}</span>`;
+                item.onclick = () => insertTranscriptionVar(v.name);
+                menu.appendChild(item);
+            });
+
+            document.body.appendChild(menu);
+
+            // Закрытие меню при клике вне него
+            document.addEventListener('click', (e) => {
+                if (!menu.contains(e.target)) {
+                    menu.classList.remove('show');
+                }
+            });
+
+            // Закрытие по Escape
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    menu.classList.remove('show');
+                }
+            });
+        }
+
+        // Показ контекстного меню
+        function showTranscriptionContextMenu(e, textarea) {
+            e.preventDefault();
+            currentContextMenuTextarea = textarea;
+
+            const menu = document.getElementById('transcription-context-menu');
+            if (!menu) return;
+
+            // Позиционируем меню
+            menu.style.left = e.clientX + 'px';
+            menu.style.top = e.clientY + 'px';
+
+            // Проверяем границы экрана
+            menu.classList.add('show');
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) {
+                menu.style.left = (e.clientX - rect.width) + 'px';
+            }
+            if (rect.bottom > window.innerHeight) {
+                menu.style.top = (e.clientY - rect.height) + 'px';
+            }
+        }
+
+        // Вставка переменной в textarea
+        function insertTranscriptionVar(varName) {
+            const menu = document.getElementById('transcription-context-menu');
+            if (menu) menu.classList.remove('show');
+
+            if (!currentContextMenuTextarea) return;
+
+            const textarea = currentContextMenuTextarea;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+
+            // Вставляем переменную в позицию курсора
+            textarea.value = text.substring(0, start) + varName + text.substring(end);
+
+            // Устанавливаем курсор после вставленной переменной
+            const newPos = start + varName.length;
+            textarea.setSelectionRange(newPos, newPos);
+            textarea.focus();
+
+            // Триггерим события для автосохранения
+            textarea.dispatchEvent(new Event('input', { bubbles: true }));
+
+            // Если есть botId, сохраняем шаблон
+            const botIdMatch = textarea.id.match(/msg-(.+)/);
+            if (botIdMatch && botIdMatch[1]) {
+                autoSaveTemplateText(botIdMatch[1]);
+            }
+        }
+
+        // Инициализация контекстного меню для всех textarea сообщений
+        function initTranscriptionContextMenu() {
+            createTranscriptionContextMenu();
+
+            // Добавляем обработчик на document для делегирования событий
+            document.addEventListener('contextmenu', (e) => {
+                const textarea = e.target.closest('.textarea-msg');
+                if (textarea) {
+                    showTranscriptionContextMenu(e, textarea);
+                }
+            });
+
+            console.log('✅ Контекстное меню транскрипции инициализировано');
         }
 
         class AccountBot {
@@ -4029,7 +4158,19 @@
             replaceMacros(text, user) {
                 if(!text) return "";
                 let res = text;
-                res = res.replace(/{city}/gi, user.City || "your city").replace(/{name}/gi, user.Name || "dear").replace(/{age}/gi, user.Age || "").replace(/{country}/gi, user.Country || "your country");
+
+                // Все 10 переменных транскрипции из API
+                res = res.replace(/{name}/gi, user.Name || "dear");
+                res = res.replace(/{age}/gi, user.Age || "");
+                res = res.replace(/{city}/gi, user.City || "your city");
+                res = res.replace(/{country}/gi, user.Country || "your country");
+                res = res.replace(/{countryCode}/gi, user.CountryCode || "");
+                res = res.replace(/{accountId}/gi, user.AccountId || "");
+                res = res.replace(/{birthday}/gi, user.Birthday || "");
+                res = res.replace(/{ageFrom}/gi, user.AgeFrom || "");
+                res = res.replace(/{ageTo}/gi, user.AgeTo || "");
+                res = res.replace(/{profilePhoto}/gi, user.ProfilePhoto || "");
+
                 return res;
             }
 
@@ -4134,9 +4275,16 @@
                     <div class="relative-box d-flex flex-column flex-grow-1">
                         <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." onclick="this.focus()" oninput="checkVarTrigger(this, 'vars-dropdown-${bot.id}'); bots['${bot.id}'].updateUI(); validateInput(this); autoSaveTemplateText('${bot.id}')" onblur="saveTemplateTextNow('${bot.id}')"></textarea>
                         <div id="vars-dropdown-${bot.id}" class="vars-dropdown">
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{City}', 'vars-dropdown-${bot.id}')"><b>{City}</b></div>
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{Name}', 'vars-dropdown-${bot.id}')"><b>{Name}</b></div>
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{Age}', 'vars-dropdown-${bot.id}')"><b>{Age}</b></div>
+                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{name}', 'vars-dropdown-${bot.id}')"><b>{name}</b> <span style="opacity:0.6;font-size:11px">Имя</span></div>
+                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{age}', 'vars-dropdown-${bot.id}')"><b>{age}</b> <span style="opacity:0.6;font-size:11px">Возраст</span></div>
+                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{city}', 'vars-dropdown-${bot.id}')"><b>{city}</b> <span style="opacity:0.6;font-size:11px">Город</span></div>
+                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{country}', 'vars-dropdown-${bot.id}')"><b>{country}</b> <span style="opacity:0.6;font-size:11px">Страна</span></div>
+                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{countryCode}', 'vars-dropdown-${bot.id}')"><b>{countryCode}</b> <span style="opacity:0.6;font-size:11px">Код страны</span></div>
+                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{accountId}', 'vars-dropdown-${bot.id}')"><b>{accountId}</b> <span style="opacity:0.6;font-size:11px">ID аккаунта</span></div>
+                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{birthday}', 'vars-dropdown-${bot.id}')"><b>{birthday}</b> <span style="opacity:0.6;font-size:11px">День рождения</span></div>
+                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{ageFrom}', 'vars-dropdown-${bot.id}')"><b>{ageFrom}</b> <span style="opacity:0.6;font-size:11px">Ищет от</span></div>
+                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{ageTo}', 'vars-dropdown-${bot.id}')"><b>{ageTo}</b> <span style="opacity:0.6;font-size:11px">Ищет до</span></div>
+                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{profilePhoto}', 'vars-dropdown-${bot.id}')"><b>{profilePhoto}</b> <span style="opacity:0.6;font-size:11px">URL фото</span></div>
                         </div>
                     </div>
                     <div id="active-invite-${bot.id}" class="active-invite-box hide-in-mail"></div>
