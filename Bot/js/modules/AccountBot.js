@@ -586,12 +586,15 @@ class AccountBot {
         this.keepAliveTimer = setInterval(() => { this.doActivity(); }, 60000); 
     }
     
-    async doActivity() { 
+    async doActivity() {
         if(!this.token) return;
         try {
             await makeApiRequest(this, 'POST', '/chat-sync', {});
             const res = await makeApiRequest(this, 'GET', '/api/users/online');
-            if(res.data.Users) document.getElementById(`online-${this.id}`).innerText = res.data.Users.length;
+            if(res.data.Users) {
+                // Сохраняем для глобального счётчика
+                this.lastOnlineCount = res.data.Users.length;
+            }
         } catch (e) {}
     }
 

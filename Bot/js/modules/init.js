@@ -66,6 +66,7 @@ function toggleStatusDisabled(status, event) {
 
 // Обновление визуального отображения отключенных статусов
 function updateDisabledStatusesUI() {
+    // 1. Обновляем кнопки в верхней панели
     const buttons = document.querySelectorAll('.btn-status-circle[data-status]');
     buttons.forEach(btn => {
         const status = btn.getAttribute('data-status');
@@ -74,6 +75,21 @@ function updateDisabledStatusesUI() {
         } else {
             btn.classList.remove('status-disabled');
         }
+    });
+
+    // 2. Обновляем опции в select для всех ботов
+    const selects = document.querySelectorAll('[id^="target-select-"]');
+    selects.forEach(select => {
+        Array.from(select.options).forEach(opt => {
+            const optValue = opt.value;
+            if (globalSettings.disabledStatuses && globalSettings.disabledStatuses.includes(optValue)) {
+                opt.classList.add('status-disabled-option');
+                opt.style.color = '#999';
+            } else {
+                opt.classList.remove('status-disabled-option');
+                opt.style.color = '';
+            }
+        });
     });
 }
 
@@ -95,6 +111,91 @@ function getNextActiveStatus(currentStatus) {
 }
 
 // ============= CUSTOM IDS (Рассылка по конкретным ID) =============
+
+// Открыть модалку Global Custom IDs
+function openGlobalCustomIdsModal() {
+    const input = document.getElementById('global-custom-ids-input');
+    if (input) {
+        input.value = '';
+        input.oninput = updateGlobalCustomIdsCount;
+    }
+    updateGlobalCustomIdsCount();
+    openModal('global-custom-ids-modal');
+}
+
+// Подсчёт ID в поле ввода
+function updateGlobalCustomIdsCount() {
+    const input = document.getElementById('global-custom-ids-input');
+    const countEl = document.getElementById('global-custom-ids-count');
+    if (input && countEl) {
+        const ids = parseCustomIds(input.value);
+        countEl.textContent = ids.length;
+    }
+}
+
+// Очистить поле глобальных Custom IDs
+function clearGlobalCustomIds() {
+    const input = document.getElementById('global-custom-ids-input');
+    if (input) {
+        input.value = '';
+        updateGlobalCustomIdsCount();
+    }
+}
+
+// Применить Custom IDs ко ВСЕМ анкетам
+function applyGlobalCustomIds() {
+    const input = document.getElementById('global-custom-ids-input');
+    if (!input) return;
+
+    const ids = parseCustomIds(input.value);
+    if (ids.length === 0) {
+        alert('Введите хотя бы один ID');
+        return;
+    }
+
+    const botIds = Object.keys(bots);
+    let count = 0;
+
+    for (const botId of botIds) {
+        const bot = bots[botId];
+
+        // Устанавливаем Custom IDs для бота
+        bot.customIdsList = [...ids]; // Копируем массив
+        bot.customIdsSent = []; // Сбрасываем отправленные
+
+        // Переключаем режим на custom-ids
+        if (globalMode === 'mail') {
+            bot.mailSettings.target = 'custom-ids';
+        }
+
+        // Обновляем UI
+        const targetSelect = document.getElementById(`target-select-${botId}`);
+        if (targetSelect) {
+            targetSelect.value = 'custom-ids';
+        }
+        toggleCustomIdsField(botId);
+
+        // Обновляем поле ввода и счётчик для этого бота
+        const botInput = document.getElementById(`custom-ids-input-${botId}`);
+        if (botInput) {
+            botInput.value = ids.join(', ');
+        }
+        updateCustomIdsRemaining(botId);
+
+        // Сохраняем в accountPreferences
+        if (!accountPreferences[bot.login]) accountPreferences[bot.login] = {};
+        accountPreferences[bot.login].customIds = ids;
+
+        count++;
+    }
+
+    localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
+    saveSession();
+    closeModal('global-custom-ids-modal');
+
+    showBulkNotification(`Custom IDs (${ids.length}) применены ко всем анкетам`, count);
+    console.log(`✅ Custom IDs (${ids.length}) применены к ${count} анкетам`);
+}
 
 // Показать/скрыть поле ввода Custom IDs
 function toggleCustomIdsField(botId) {
@@ -197,21 +298,40 @@ function resetCustomIdsSent(botId) {
 // ============= МУЖЧИНЫ ОНЛАЙН (ГЛОБАЛЬНО) =============
 let globalMenOnlineInterval = null;
 
-function updateGlobalMenOnline() {
+async function updateGlobalMenOnline() {
     const botIds = Object.keys(bots);
+    const el = document.getElementById('global-men-count');
+
     if (botIds.length === 0) {
-        const el = document.getElementById('global-men-count');
         if (el) el.textContent = '0';
         return;
     }
 
-    // Берём случайную анкету
+    // Берём случайную анкету с токеном
     const randomBotId = botIds[Math.floor(Math.random() * botIds.length)];
     const bot = bots[randomBotId];
 
-    if (bot && bot.lastOnlineCount !== undefined) {
-        const el = document.getElementById('global-men-count');
-        if (el) el.textContent = bot.lastOnlineCount || '0';
+    if (!bot || !bot.token) {
+        if (el) el.textContent = bot?.lastOnlineCount || '0';
+        return;
+    }
+
+    try {
+        // Делаем принудительный запрос к API для получения реального числа
+        const response = await makeApiRequest(bot, 'GET', '/api/users/online?limit=1');
+        if (response && response.data) {
+            // Получаем общее количество из ответа или длину массива
+            const totalCount = response.data.Total || response.data.length || 0;
+            bot.lastOnlineCount = totalCount;
+            if (el) el.textContent = totalCount;
+            console.log(`👥 Мужчин онлайн: ${totalCount} (от ${bot.displayId})`);
+        }
+    } catch (error) {
+        console.warn('Ошибка получения онлайн счётчика:', error.message);
+        // Используем кэшированное значение если есть
+        if (bot.lastOnlineCount !== undefined) {
+            if (el) el.textContent = bot.lastOnlineCount;
+        }
     }
 }
 

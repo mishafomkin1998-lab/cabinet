@@ -66,6 +66,7 @@
                     <button class="btn btn-circle btn-status-circle btn-my-fav-color" data-status="my-favorites" onclick="setGlobalTarget('my-favorites')" oncontextmenu="toggleStatusDisabled('my-favorites', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-heart"></i></button>
                     <button class="btn btn-circle btn-status-circle btn-inbox-color" data-status="inbox" onclick="setGlobalTarget('inbox')" oncontextmenu="toggleStatusDisabled('inbox', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-inbox"></i></button>
                     <button class="btn btn-circle btn-status-circle btn-payers-color" data-status="payers" onclick="setGlobalTarget('payers')" oncontextmenu="toggleStatusDisabled('payers', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-credit-card"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-custom-ids-color" onclick="openGlobalCustomIdsModal()" data-tip="Custom IDs: Рассылка по конкретным ID для всех анкет"><i class="fa fa-list-ol"></i></button>
                 </div>
             </div>
         </div>
@@ -181,6 +182,21 @@
             <input id="bl-modal-input" class="form-control mb-3" placeholder="ID">
             <button class="btn btn-danger w-100 mb-2" onclick="saveBlacklistID(event)" title="Shift = добавить всем анкетам">Добавить (Shift=всем)</button>
             <button class="btn btn-cancel-modal w-100" onclick="closeModal('bl-modal')">Отмена</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно: Global Custom IDs -->
+    <div id="global-custom-ids-modal" class="modal-overlay">
+        <div class="modal-card" style="width: 450px;">
+            <h5><i class="fa fa-list-ol text-primary"></i> Custom IDs для всех анкет</h5>
+            <p class="text-muted small mb-3">Введите ID мужчин для рассылки. Эти ID будут применены ко ВСЕМ анкетам (заменяют индивидуальные).</p>
+            <textarea id="global-custom-ids-input" class="form-control mb-3" rows="6" placeholder="ID через запятую, пробел или каждый в новой строке&#10;Пример: 12345, 67890, 11111"></textarea>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <small class="text-muted">Распознано ID: <b id="global-custom-ids-count">0</b></small>
+                <button class="btn btn-sm btn-outline-secondary" onclick="clearGlobalCustomIds()"><i class="fa fa-eraser"></i> Очистить</button>
+            </div>
+            <button class="btn btn-primary w-100 mb-2" onclick="applyGlobalCustomIds()"><i class="fa fa-check"></i> Применить ко всем анкетам</button>
+            <button class="btn btn-cancel-modal w-100" onclick="closeModal('global-custom-ids-modal')">Отмена</button>
         </div>
     </div>
 
