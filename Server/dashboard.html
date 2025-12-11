@@ -1322,170 +1322,6 @@
                     </button>
                 </div>
 
-                <!-- Управление анкетами -->
-                <div class="glass rounded-2xl p-6 mt-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold">
-                            <i class="fas fa-user-cog text-blue-500 mr-2"></i>Управление анкетами
-                        </h3>
-                        <div class="flex items-center space-x-2">
-                            <button @click="toggleAllProfilesMailing(true)"
-                                    class="px-3 py-1 text-sm bg-green-100 text-green-700 rounded-lg hover:bg-green-200">
-                                <i class="fas fa-play mr-1"></i>Запустить все
-                            </button>
-                            <button @click="toggleAllProfilesMailing(false)"
-                                    class="px-3 py-1 text-sm bg-red-100 text-red-700 rounded-lg hover:bg-red-200">
-                                <i class="fas fa-stop mr-1"></i>Остановить все
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Фильтры по админу и переводчику -->
-                    <div class="flex items-center space-x-4 mb-4 p-3 bg-gray-50 rounded-xl">
-                        <div class="flex items-center space-x-2">
-                            <label class="text-sm text-gray-600"><i class="fas fa-user-shield mr-1"></i>Админ:</label>
-                            <select x-model="controlFilter.adminId" @change="onAdminFilterChange()"
-                                    class="text-sm px-3 py-1.5 border rounded-lg bg-white">
-                                <option value="">Все админы</option>
-                                <template x-for="admin in team.filter(t => t.role === 'admin')" :key="admin.id">
-                                    <option :value="admin.id" x-text="admin.name || admin.username"></option>
-                                </template>
-                            </select>
-                        </div>
-                        <div class="flex items-center space-x-2" x-show="controlFilter.adminId">
-                            <label class="text-sm text-gray-600"><i class="fas fa-user mr-1"></i>Переводчик:</label>
-                            <select x-model="controlFilter.translatorId"
-                                    class="text-sm px-3 py-1.5 border rounded-lg bg-white">
-                                <option value="">Все переводчики</option>
-                                <template x-for="translator in getTranslatorsForAdmin()" :key="translator.id">
-                                    <option :value="translator.id" x-text="translator.name || translator.username"></option>
-                                </template>
-                            </select>
-                        </div>
-                        <div class="text-sm text-gray-500">
-                            <span x-text="getFilteredProfiles().length"></span> из <span x-text="profilesWithMailing.length"></span> анкет
-                        </div>
-                    </div>
-
-                    <!-- Общая статистика и автообновление -->
-                    <div class="bg-gradient-to-r from-blue-50 to-green-50 rounded-xl p-4 mb-4">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center space-x-4">
-                                <!-- Письма -->
-                                <div class="flex items-center space-x-2 bg-white/50 rounded-lg px-3 py-2">
-                                    <i class="fas fa-envelope text-blue-500"></i>
-                                    <div class="text-center">
-                                        <div class="text-xl font-bold text-blue-600" x-text="getTotalMailToday()"></div>
-                                        <div class="text-xs text-gray-500">Писем сегодня</div>
-                                    </div>
-                                    <div class="text-center border-l pl-2">
-                                        <div class="text-lg font-bold text-blue-500" x-text="getTotalMailHour()"></div>
-                                        <div class="text-xs text-gray-400">за час</div>
-                                    </div>
-                                </div>
-                                <!-- Чаты -->
-                                <div class="flex items-center space-x-2 bg-white/50 rounded-lg px-3 py-2">
-                                    <i class="fas fa-comments text-green-500"></i>
-                                    <div class="text-center">
-                                        <div class="text-xl font-bold text-green-600" x-text="getTotalChatToday()"></div>
-                                        <div class="text-xs text-gray-500">Чатов сегодня</div>
-                                    </div>
-                                    <div class="text-center border-l pl-2">
-                                        <div class="text-lg font-bold text-green-500" x-text="getTotalChatHour()"></div>
-                                        <div class="text-xs text-gray-400">за час</div>
-                                    </div>
-                                </div>
-                                <!-- Ошибки -->
-                                <div class="text-center" x-show="getTotalErrorsToday() > 0">
-                                    <div class="text-xl font-bold text-red-600" x-text="getTotalErrorsToday()"></div>
-                                    <div class="text-xs text-gray-500">Ошибок</div>
-                                </div>
-                                <!-- Онлайн -->
-                                <div class="text-center">
-                                    <div class="text-xl font-bold text-purple-600" x-text="getOnlineProfiles()"></div>
-                                    <div class="text-xs text-gray-500">Онлайн</div>
-                                </div>
-                            </div>
-                            <div class="flex items-center space-x-2">
-                                <label class="flex items-center space-x-2 text-sm text-gray-600">
-                                    <input type="checkbox" x-model="autoRefreshStats" @change="toggleAutoRefresh()" class="rounded">
-                                    <span>Авто (30 сек)</span>
-                                </label>
-                                <button @click="refreshProfileStats()"
-                                        class="p-2 bg-white rounded-lg shadow hover:shadow-md transition-shadow"
-                                        :class="{'animate-spin': refreshingStats}">
-                                    <i class="fas fa-sync-alt text-blue-500"></i>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Список анкет с управлением -->
-                    <div class="space-y-2 max-h-96 overflow-y-auto" id="profiles-list">
-                        <template x-for="profile in getFilteredProfiles()" :key="profile.profileId">
-                            <div class="p-3 bg-gray-50 rounded-lg">
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center space-x-3">
-                                        <div class="w-2 h-2 rounded-full animate-pulse"
-                                             :class="profile.status === 'online' ? 'bg-green-500' : 'bg-gray-300'"></div>
-                                        <div>
-                                            <span class="font-medium" x-text="profile.profileId"></span>
-                                            <span class="text-xs text-gray-400 ml-2" x-text="profile.note || ''"></span>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center space-x-2">
-                                        <span class="text-xs px-2 py-0.5 rounded-full"
-                                              :class="profile.mailingEnabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'"
-                                              x-text="profile.mailingEnabled ? 'Рассылка ON' : 'Рассылка OFF'"></span>
-                                        <button @click="toggleProfileMailing(profile)"
-                                                class="p-1.5 rounded-lg transition-colors"
-                                                :class="profile.mailingEnabled ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'">
-                                            <i :class="profile.mailingEnabled ? 'fas fa-pause' : 'fas fa-play'"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <!-- Статистика отправок: письма и чаты -->
-                                <div class="mt-2 flex items-center space-x-4 text-xs">
-                                    <div class="flex items-center space-x-1" title="Письма">
-                                        <i class="fas fa-envelope text-blue-500"></i>
-                                        <span class="font-bold text-blue-600" x-text="profile.mailToday || 0"></span>
-                                        <span class="text-gray-400">/</span>
-                                        <span class="text-blue-400" x-text="profile.mailHour || 0"></span>
-                                    </div>
-                                    <div class="flex items-center space-x-1" title="Чаты">
-                                        <i class="fas fa-comments text-green-500"></i>
-                                        <span class="font-bold text-green-600" x-text="profile.chatToday || 0"></span>
-                                        <span class="text-gray-400">/</span>
-                                        <span class="text-green-400" x-text="profile.chatHour || 0"></span>
-                                    </div>
-                                    <div class="flex items-center space-x-1" x-show="profile.errorsToday > 0">
-                                        <i class="fas fa-exclamation-triangle text-red-500"></i>
-                                        <span class="font-bold text-red-600" x-text="profile.errorsToday"></span>
-                                    </div>
-                                </div>
-                                <!-- Прокси -->
-                                <div class="mt-2 flex items-center space-x-2">
-                                    <span class="text-xs text-gray-500 w-12"><i class="fas fa-globe mr-1"></i>Прокси:</span>
-                                    <input type="text"
-                                           class="flex-1 text-xs px-2 py-1 border rounded-lg bg-white"
-                                           placeholder="ip:port:user:pass или ip:port"
-                                           :value="profile.proxy || ''"
-                                           @change="updateProfileProxy(profile, $event.target.value)">
-                                    <button @click="updateProfileProxy(profile, '')"
-                                            x-show="profile.proxy"
-                                            class="text-xs text-red-500 hover:text-red-700">
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        </template>
-                        <div x-show="getFilteredProfiles().length === 0" class="text-center py-4 text-gray-400">
-                            <i class="fas fa-users text-2xl mb-2"></i>
-                            <p class="text-sm">Нет анкет для управления</p>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Промт для генерации -->
                 <div class="glass rounded-2xl p-6 mt-6">
                     <h3 class="text-lg font-bold mb-4" x-text="t('control.generationPrompt')"></h3>
@@ -1499,123 +1335,143 @@
                     </button>
                 </div>
 
-                <!-- История ошибок -->
+                <!-- Логи системы (объединённый блок) -->
                 <div class="glass rounded-2xl p-6 mt-6">
                     <div class="flex items-center justify-between mb-4">
                         <h3 class="text-lg font-bold">
-                            <i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>История ошибок
+                            <i class="fas fa-stream text-indigo-500 mr-2"></i>Логи системы
                         </h3>
-                        <button @click="loadErrorLogs()" class="text-sm text-blue-600 hover:text-blue-800">
+                        <button @click="refreshAllLogs()" class="text-sm text-blue-600 hover:text-blue-800">
                             <i class="fas fa-sync-alt mr-1"></i>Обновить
                         </button>
                     </div>
 
-                    <!-- Лог ошибок в стиле чата -->
-                    <div class="bg-gray-50 rounded-xl p-4 max-h-80 overflow-y-auto" id="error-logs-container">
-                        <div x-show="errorLogs.length === 0" class="text-center py-8 text-gray-400">
-                            <i class="fas fa-check-circle text-4xl mb-3 text-green-300"></i>
-                            <p>Ошибок нет</p>
-                        </div>
-                        <div class="space-y-3">
-                            <template x-for="error in errorLogs" :key="error.id">
-                                <div class="flex items-start space-x-3 p-3 bg-white rounded-lg border-l-4"
-                                     :class="error.error_type === 'critical' ? 'border-red-500' : 'border-yellow-500'">
-                                    <div class="flex-shrink-0">
-                                        <i class="fas fa-exclamation-circle text-lg"
-                                           :class="error.error_type === 'critical' ? 'text-red-500' : 'text-yellow-500'"></i>
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex items-center justify-between">
-                                            <span class="text-sm font-medium text-gray-900" x-text="error.endpoint || 'Система'"></span>
-                                            <span class="text-xs text-gray-400" x-text="formatErrorTime(error.timestamp)"></span>
-                                        </div>
-                                        <p class="text-sm text-gray-600 mt-1" x-text="error.error_message || error.message || 'Неизвестная ошибка'"></p>
-                                        <div x-show="error.user_id" class="text-xs text-gray-400 mt-1">
-                                            <span>Профиль: </span>
-                                            <span x-text="error.user_id"></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-
-                    <!-- Кнопка загрузить больше -->
-                    <div x-show="errorLogs.length >= 20" class="mt-3 text-center">
-                        <button @click="loadMoreErrors()" class="text-sm text-gray-500 hover:text-gray-700">
-                            Загрузить ещё...
+                    <!-- Вкладки -->
+                    <div class="flex items-center space-x-1 mb-4 bg-gray-100 rounded-xl p-1">
+                        <button @click="logsActiveTab = 'all'; loadBotLogs()"
+                                class="flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                                :class="logsActiveTab === 'all' ? 'bg-white shadow text-indigo-600' : 'text-gray-600 hover:text-gray-800'">
+                            <i class="fas fa-list mr-1"></i>Все
+                            <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs"
+                                  :class="logsActiveTab === 'all' ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-200 text-gray-500'"
+                                  x-text="botLogs.length + errorLogs.length"></span>
+                        </button>
+                        <button @click="logsActiveTab = 'bots'; loadBotLogs()"
+                                class="flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                                :class="logsActiveTab === 'bots' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'">
+                            <i class="fas fa-robot mr-1"></i>Логи ботов
+                            <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs"
+                                  :class="logsActiveTab === 'bots' ? 'bg-blue-100 text-blue-600' : 'bg-gray-200 text-gray-500'"
+                                  x-text="botLogs.length"></span>
+                        </button>
+                        <button @click="logsActiveTab = 'errors'; loadErrorLogs()"
+                                class="flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                                :class="logsActiveTab === 'errors' ? 'bg-white shadow text-red-600' : 'text-gray-600 hover:text-gray-800'">
+                            <i class="fas fa-exclamation-triangle mr-1"></i>Ошибки сервера
+                            <span class="ml-1 px-1.5 py-0.5 rounded-full text-xs"
+                                  :class="logsActiveTab === 'errors' ? 'bg-red-100 text-red-600' : 'bg-gray-200 text-gray-500'"
+                                  x-text="errorLogs.length"></span>
                         </button>
                     </div>
-                </div>
 
-                <!-- Логи ботов -->
-                <div class="glass rounded-2xl p-6 mt-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h3 class="text-lg font-bold">
-                            <i class="fas fa-terminal text-blue-500 mr-2"></i>Логи ботов
-                        </h3>
-                        <div class="flex items-center space-x-3">
-                            <select x-model="botLogsFilter" @change="loadBotLogs()" class="text-sm glass px-3 py-1.5 rounded-lg">
-                                <option value="">Все типы</option>
-                                <option value="mail_start">Старт рассылки</option>
-                                <option value="mail_stop">Стоп рассылки</option>
-                                <option value="chat_start">Старт чата</option>
-                                <option value="chat_stop">Стоп чата</option>
-                                <option value="chat">Сообщения чата</option>
-                                <option value="mail">Письма</option>
-                                <option value="vip-online">VIP онлайн</option>
-                                <option value="error">Ошибки</option>
-                            </select>
-                            <button @click="loadBotLogs()" class="text-sm text-blue-600 hover:text-blue-800">
-                                <i class="fas fa-sync-alt mr-1"></i>Обновить
-                            </button>
-                        </div>
+                    <!-- Фильтр для логов ботов (показывается только на вкладках "Все" и "Логи ботов") -->
+                    <div x-show="logsActiveTab !== 'errors'" class="mb-4">
+                        <select x-model="botLogsFilter" @change="loadBotLogs()" class="text-sm glass px-3 py-1.5 rounded-lg">
+                            <option value="">Все типы логов</option>
+                            <option value="mail_start">Старт рассылки</option>
+                            <option value="mail_stop">Стоп рассылки</option>
+                            <option value="chat_start">Старт чата</option>
+                            <option value="chat_stop">Стоп чата</option>
+                            <option value="chat">Сообщения чата</option>
+                            <option value="mail">Письма</option>
+                            <option value="vip-online">VIP онлайн</option>
+                            <option value="error">Ошибки бота</option>
+                        </select>
                     </div>
 
-                    <!-- Лог ботов -->
-                    <div class="bg-gray-50 rounded-xl p-4 max-h-96 overflow-y-auto" id="bot-logs-container">
-                        <div x-show="botLogs.length === 0" class="text-center py-8 text-gray-400">
-                            <i class="fas fa-list-alt text-4xl mb-3 text-gray-300"></i>
-                            <p>Логов пока нет</p>
+                    <!-- Контейнер логов -->
+                    <div class="bg-gray-50 rounded-xl p-4 max-h-96 overflow-y-auto" id="logs-container">
+                        <!-- Пустое состояние -->
+                        <div x-show="(logsActiveTab === 'all' && botLogs.length === 0 && errorLogs.length === 0) ||
+                                     (logsActiveTab === 'bots' && botLogs.length === 0) ||
+                                     (logsActiveTab === 'errors' && errorLogs.length === 0)"
+                             class="text-center py-8 text-gray-400">
+                            <i class="fas fa-check-circle text-4xl mb-3 text-green-300"></i>
+                            <p x-text="logsActiveTab === 'errors' ? 'Ошибок нет' : 'Логов пока нет'"></p>
                         </div>
+
                         <div class="space-y-2">
-                            <template x-for="log in botLogs" :key="log.id">
-                                <div class="flex items-start space-x-3 p-2 bg-white rounded-lg border-l-4"
-                                     :class="{
-                                         'border-green-500': log.log_type.includes('start'),
-                                         'border-red-500': log.log_type.includes('stop') || log.log_type === 'error',
-                                         'border-blue-500': log.log_type === 'chat',
-                                         'border-purple-500': log.log_type === 'mail',
-                                         'border-yellow-500': log.log_type === 'vip-online',
-                                         'border-gray-300': !['start', 'stop', 'chat', 'mail', 'vip-online', 'error'].some(t => log.log_type.includes(t))
-                                     }">
-                                    <div class="flex-shrink-0">
-                                        <i class="fas text-sm"
-                                           :class="{
-                                               'fa-play text-green-500': log.log_type.includes('start'),
-                                               'fa-stop text-red-500': log.log_type.includes('stop'),
-                                               'fa-comment text-blue-500': log.log_type === 'chat',
-                                               'fa-envelope text-purple-500': log.log_type === 'mail',
-                                               'fa-crown text-yellow-500': log.log_type === 'vip-online',
-                                               'fa-exclamation text-red-500': log.log_type === 'error',
-                                               'fa-info-circle text-gray-400': !['start', 'stop', 'chat', 'mail', 'vip-online', 'error'].some(t => log.log_type.includes(t))
-                                           }"></i>
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex items-center justify-between">
-                                            <span class="text-xs font-medium text-gray-500" x-text="log.profile_id || 'Система'"></span>
-                                            <span class="text-xs text-gray-400" x-text="formatBotLogTime(log.created_at)"></span>
+                            <!-- Серверные ошибки (показываются на вкладках "Все" и "Ошибки сервера") -->
+                            <template x-if="logsActiveTab === 'all' || logsActiveTab === 'errors'">
+                                <template x-for="error in errorLogs" :key="'err-' + error.id">
+                                    <div class="flex items-start space-x-3 p-3 bg-white rounded-lg border-l-4"
+                                         :class="error.error_type === 'critical' ? 'border-red-500' : 'border-orange-400'">
+                                        <div class="flex-shrink-0">
+                                            <i class="fas fa-server text-lg"
+                                               :class="error.error_type === 'critical' ? 'text-red-500' : 'text-orange-400'"></i>
                                         </div>
-                                        <p class="text-sm text-gray-700" x-text="log.message"></p>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center justify-between">
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-600">Сервер</span>
+                                                    <span class="text-sm font-medium text-gray-900" x-text="error.endpoint || 'Система'"></span>
+                                                </div>
+                                                <span class="text-xs text-gray-400" x-text="formatErrorTime(error.timestamp)"></span>
+                                            </div>
+                                            <p class="text-sm text-gray-600 mt-1" x-text="error.error_message || error.message || 'Неизвестная ошибка'"></p>
+                                            <div x-show="error.user_id" class="text-xs text-gray-400 mt-1">
+                                                <span>Профиль: </span>
+                                                <span x-text="error.user_id"></span>
+                                            </div>
+                                        </div>
                                     </div>
-                                </div>
+                                </template>
+                            </template>
+
+                            <!-- Логи ботов (показываются на вкладках "Все" и "Логи ботов") -->
+                            <template x-if="logsActiveTab === 'all' || logsActiveTab === 'bots'">
+                                <template x-for="log in botLogs" :key="'bot-' + log.id">
+                                    <div class="flex items-start space-x-3 p-2 bg-white rounded-lg border-l-4"
+                                         :class="{
+                                             'border-green-500': log.log_type && log.log_type.includes('start'),
+                                             'border-red-500': log.log_type && (log.log_type.includes('stop') || log.log_type === 'error'),
+                                             'border-blue-500': log.log_type === 'chat',
+                                             'border-purple-500': log.log_type === 'mail',
+                                             'border-yellow-500': log.log_type === 'vip-online',
+                                             'border-gray-300': !log.log_type || !['start', 'stop', 'chat', 'mail', 'vip-online', 'error'].some(t => log.log_type.includes(t))
+                                         }">
+                                        <div class="flex-shrink-0">
+                                            <i class="fas text-sm"
+                                               :class="{
+                                                   'fa-play text-green-500': log.log_type && log.log_type.includes('start'),
+                                                   'fa-stop text-red-500': log.log_type && log.log_type.includes('stop'),
+                                                   'fa-comment text-blue-500': log.log_type === 'chat',
+                                                   'fa-envelope text-purple-500': log.log_type === 'mail',
+                                                   'fa-crown text-yellow-500': log.log_type === 'vip-online',
+                                                   'fa-exclamation text-red-500': log.log_type === 'error',
+                                                   'fa-info-circle text-gray-400': !log.log_type || !['start', 'stop', 'chat', 'mail', 'vip-online', 'error'].some(t => log.log_type.includes(t))
+                                               }"></i>
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center justify-between">
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-600">Бот</span>
+                                                    <span class="text-xs font-medium text-gray-500" x-text="log.profile_id || 'Система'"></span>
+                                                </div>
+                                                <span class="text-xs text-gray-400" x-text="formatBotLogTime(log.created_at)"></span>
+                                            </div>
+                                            <p class="text-sm text-gray-700" x-text="log.message"></p>
+                                        </div>
+                                    </div>
+                                </template>
                             </template>
                         </div>
                     </div>
 
                     <!-- Пагинация -->
-                    <div x-show="botLogsHasMore" class="mt-3 text-center">
-                        <button @click="loadMoreBotLogs()" class="text-sm text-gray-500 hover:text-gray-700">
+                    <div x-show="(logsActiveTab === 'bots' && botLogsHasMore) || (logsActiveTab === 'errors' && errorLogs.length >= 20)" class="mt-3 text-center">
+                        <button @click="logsActiveTab === 'bots' ? loadMoreBotLogs() : loadMoreErrors()"
+                                class="text-sm text-gray-500 hover:text-gray-700">
                             Загрузить ещё...
                         </button>
                     </div>

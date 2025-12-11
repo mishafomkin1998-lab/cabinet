@@ -89,8 +89,11 @@
                 refreshingStats: false, // Индикатор обновления
                 errorLogs: [], // Логи ошибок
                 botLogs: [], // Логи ботов
-                botLogsFilter: 'all', // Фильтр логов ботов
+                botLogsFilter: '', // Фильтр логов ботов
                 botLogsHasMore: false, // Есть ли ещё логи
+                logsActiveTab: 'all', // Активная вкладка логов: 'all', 'bots', 'errors'
+                botLogsOffset: 0, // Смещение для пагинации логов ботов
+                errorLogsOffset: 0, // Смещение для пагинации ошибок
                 loading: true,
                 error: null,
 
@@ -884,10 +887,11 @@
                     // Сохраняем активную вкладку в localStorage
                     localStorage.setItem('dashboard_activeMenu', menu);
 
-                    // При переключении на "Управление" загружаем статус ботов
+                    // При переключении на "Управление" загружаем статус ботов и логи
                     if (menu === 'control') {
-                        console.log('🔄 Переключение на вкладку Управление - загружаем ботов...');
+                        console.log('🔄 Переключение на вкладку Управление - загружаем ботов и логи...');
                         this.loadBotsStatus();
+                        this.refreshAllLogs();
                     }
                 },
 
@@ -1945,6 +1949,91 @@
                         console.error('activatePanicMode error:', e);
                         alert('Ошибка сети');
                     }
+                },
+
+                // === Функции логов системы ===
+                async loadBotLogs(reset = true) {
+                    if (reset) {
+                        this.botLogsOffset = 0;
+                        this.botLogs = [];
+                    }
+                    try {
+                        let url = `${API_BASE}/api/bots/logs?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=30&offset=${this.botLogsOffset}`;
+                        if (this.botLogsFilter) {
+                            url += `&logType=${this.botLogsFilter}`;
+                        }
+                        const res = await fetch(url);
+                        const data = await res.json();
+                        if (data.success) {
+                            if (reset) {
+                                this.botLogs = data.logs || [];
+                            } else {
+                                this.botLogs = [...this.botLogs, ...(data.logs || [])];
+                            }
+                            this.botLogsHasMore = data.hasMore || false;
+                        }
+                    } catch (e) {
+                        console.error('loadBotLogs error:', e);
+                    }
+                },
+
+                async loadMoreBotLogs() {
+                    this.botLogsOffset += 30;
+                    await this.loadBotLogs(false);
+                },
+
+                async loadErrorLogs(reset = true) {
+                    if (reset) {
+                        this.errorLogsOffset = 0;
+                        this.errorLogs = [];
+                    }
+                    try {
+                        const res = await fetch(`${API_BASE}/api/activity/error_logs?userId=${this.currentUser.id}&limit=30&offset=${this.errorLogsOffset}`);
+                        const data = await res.json();
+                        if (data.success) {
+                            if (reset) {
+                                this.errorLogs = data.logs || [];
+                            } else {
+                                this.errorLogs = [...this.errorLogs, ...(data.logs || [])];
+                            }
+                        }
+                    } catch (e) {
+                        console.error('loadErrorLogs error:', e);
+                    }
+                },
+
+                async loadMoreErrors() {
+                    this.errorLogsOffset += 30;
+                    await this.loadErrorLogs(false);
+                },
+
+                async refreshAllLogs() {
+                    await Promise.all([
+                        this.loadBotLogs(),
+                        this.loadErrorLogs()
+                    ]);
+                },
+
+                formatBotLogTime(timestamp) {
+                    if (!timestamp) return '';
+                    const date = new Date(timestamp);
+                    const now = new Date();
+                    const isToday = date.toDateString() === now.toDateString();
+                    if (isToday) {
+                        return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                    }
+                    return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+                },
+
+                formatErrorTime(timestamp) {
+                    if (!timestamp) return '';
+                    const date = new Date(timestamp);
+                    const now = new Date();
+                    const isToday = date.toDateString() === now.toDateString();
+                    if (isToday) {
+                        return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                    }
+                    return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
                 },
 
                 // === Функции экспорта статистики ===
