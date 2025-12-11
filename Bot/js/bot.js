@@ -29,7 +29,9 @@
             translatorId: null, // ID переводчика для статистики
             aiReplyPrompt: '', // Промпт для AI ответов на письма
             // Прокси для анкет по позициям (1-10, 11-20, 21-30, 31-40, 41-50, 51-60)
-            proxy1: '', proxy2: '', proxy3: '', proxy4: '', proxy5: '', proxy6: ''
+            proxy1: '', proxy2: '', proxy3: '', proxy4: '', proxy5: '', proxy6: '',
+            // Отключенные статусы (пропускаются в авто-режиме)
+            disabledStatuses: []
         };
         
         let globalSettings = JSON.parse(localStorage.getItem('globalSettings')) || defaultSettings;
@@ -1664,6 +1666,8 @@
             initHotkeys();
             initTooltips();
             initFocusProtection(); // НОВОЕ: Защита от потери фокуса
+            updateDisabledStatusesUI(); // Отображаем отключенные статусы
+            startGlobalMenOnlineUpdater(); // Запускаем обновление "Мужчины онлайн"
 
             // Глобальное отслеживание Shift для bulk-действий
             document.addEventListener('keydown', (e) => { if (e.key === 'Shift') isShiftPressed = true; });
@@ -1695,6 +1699,186 @@
             });
             saveSession();
             alert(`Всем анкетам установлен статус: ${targetType.toUpperCase()}`);
+        }
+
+        // ============= ОТКЛЮЧЕНИЕ СТАТУСОВ (ПКМ) =============
+        // Переключение статуса вкл/выкл по правому клику
+        function toggleStatusDisabled(status, event) {
+            event.preventDefault(); // Отменяем контекстное меню
+
+            if (!globalSettings.disabledStatuses) {
+                globalSettings.disabledStatuses = [];
+            }
+
+            const idx = globalSettings.disabledStatuses.indexOf(status);
+            if (idx === -1) {
+                // Добавляем в отключенные
+                globalSettings.disabledStatuses.push(status);
+                console.log(`🚫 Статус "${status}" отключен (пропускается в авто-режиме)`);
+            } else {
+                // Убираем из отключенных
+                globalSettings.disabledStatuses.splice(idx, 1);
+                console.log(`✅ Статус "${status}" включен`);
+            }
+
+            // Сохраняем и обновляем UI
+            localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+            updateDisabledStatusesUI();
+        }
+
+        // Обновление визуального отображения отключенных статусов
+        function updateDisabledStatusesUI() {
+            const buttons = document.querySelectorAll('.btn-status-circle[data-status]');
+            buttons.forEach(btn => {
+                const status = btn.getAttribute('data-status');
+                if (globalSettings.disabledStatuses && globalSettings.disabledStatuses.includes(status)) {
+                    btn.classList.add('status-disabled');
+                } else {
+                    btn.classList.remove('status-disabled');
+                }
+            });
+        }
+
+        // Получить следующий активный статус (пропуская отключенные)
+        function getNextActiveStatus(currentStatus) {
+            const statusOrder = ['payers', 'my-favorites', 'favorites', 'inbox', 'online'];
+            const currentIdx = statusOrder.indexOf(currentStatus);
+
+            // Ищем следующий не отключенный статус
+            for (let i = currentIdx + 1; i < statusOrder.length; i++) {
+                const nextStatus = statusOrder[i];
+                if (!globalSettings.disabledStatuses || !globalSettings.disabledStatuses.includes(nextStatus)) {
+                    return nextStatus;
+                }
+            }
+
+            // Если все следующие отключены, возвращаем online (он всегда доступен как fallback)
+            return 'online';
+        }
+
+        // ============= CUSTOM IDS (Рассылка по конкретным ID) =============
+
+        // Показать/скрыть поле ввода Custom IDs
+        function toggleCustomIdsField(botId) {
+            const select = document.getElementById(`target-select-${botId}`);
+            const field = document.getElementById(`custom-ids-field-${botId}`);
+            if (select && field) {
+                field.style.display = select.value === 'custom-ids' ? 'block' : 'none';
+                if (select.value === 'custom-ids') {
+                    // Загружаем сохранённые ID
+                    const bot = bots[botId];
+                    if (bot && bot.customIdsList) {
+                        document.getElementById(`custom-ids-input-${botId}`).value = bot.customIdsList.join(', ');
+                        updateCustomIdsRemaining(botId);
+                    }
+                }
+            }
+        }
+
+        // Сохранить Custom IDs для бота
+        function saveCustomIds(botId) {
+            const input = document.getElementById(`custom-ids-input-${botId}`);
+            if (!input) return;
+
+            const bot = bots[botId];
+            if (!bot) return;
+
+            // Парсим ID из текста (через запятую, пробел или перенос строки)
+            const ids = parseCustomIds(input.value);
+            bot.customIdsList = ids;
+            bot.customIdsSent = bot.customIdsSent || []; // ID которым уже отправили
+
+            // Сохраняем в accountPreferences
+            if (!accountPreferences[bot.login]) accountPreferences[bot.login] = {};
+            accountPreferences[bot.login].customIds = ids;
+            localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
+
+            updateCustomIdsRemaining(botId);
+            console.log(`💾 Custom IDs сохранены для ${botId}: ${ids.length} ID`);
+        }
+
+        // Парсинг ID из строки (поддержка запятых, пробелов, переносов)
+        function parseCustomIds(text) {
+            if (!text) return [];
+            // Разбиваем по запятым, пробелам и переносам строк
+            return text.split(/[\s,\n]+/)
+                .map(id => id.trim())
+                .filter(id => id && /^\d+$/.test(id)); // Только числовые ID
+        }
+
+        // Обновить счётчик оставшихся ID
+        function updateCustomIdsRemaining(botId) {
+            const bot = bots[botId];
+            if (!bot) return;
+
+            const total = (bot.customIdsList || []).length;
+            const sent = (bot.customIdsSent || []).length;
+            const remaining = total - sent;
+
+            const el = document.getElementById(`custom-ids-remaining-${botId}`);
+            if (el) el.textContent = remaining;
+        }
+
+        // Получить следующий ID из списка Custom IDs
+        function getNextCustomId(botId) {
+            const bot = bots[botId];
+            if (!bot || !bot.customIdsList) return null;
+
+            bot.customIdsSent = bot.customIdsSent || [];
+
+            // Ищем первый ID который ещё не отправлен
+            for (const id of bot.customIdsList) {
+                if (!bot.customIdsSent.includes(id)) {
+                    return id;
+                }
+            }
+            return null; // Все ID отправлены
+        }
+
+        // Отметить ID как отправленный
+        function markCustomIdSent(botId, id) {
+            const bot = bots[botId];
+            if (!bot) return;
+
+            bot.customIdsSent = bot.customIdsSent || [];
+            if (!bot.customIdsSent.includes(id)) {
+                bot.customIdsSent.push(id);
+            }
+            updateCustomIdsRemaining(botId);
+        }
+
+        // Сбросить отправленные Custom IDs (начать заново)
+        function resetCustomIdsSent(botId) {
+            const bot = bots[botId];
+            if (!bot) return;
+            bot.customIdsSent = [];
+            updateCustomIdsRemaining(botId);
+            console.log(`🔄 Custom IDs сброшены для ${botId}`);
+        }
+
+        // ============= МУЖЧИНЫ ОНЛАЙН (ГЛОБАЛЬНО) =============
+        let globalMenOnlineInterval = null;
+
+        function updateGlobalMenOnline() {
+            const botIds = Object.keys(bots);
+            if (botIds.length === 0) {
+                document.getElementById('global-men-count').textContent = '0';
+                return;
+            }
+
+            // Берём случайную анкету
+            const randomBotId = botIds[Math.floor(Math.random() * botIds.length)];
+            const bot = bots[randomBotId];
+
+            if (bot && bot.lastOnlineCount !== undefined) {
+                document.getElementById('global-men-count').textContent = bot.lastOnlineCount || '0';
+            }
+        }
+
+        function startGlobalMenOnlineUpdater() {
+            updateGlobalMenOnline();
+            if (globalMenOnlineInterval) clearInterval(globalMenOnlineInterval);
+            globalMenOnlineInterval = setInterval(updateGlobalMenOnline, 30000); // Каждые 30 сек
         }
 
         async function makeApiRequest(bot, method, path, data = null, isRetry = false) {
@@ -3113,7 +3297,40 @@
                     const target = this.mailSettings.target;
                     let users = [];
 
-                    if (target === 'inbox') {
+                    if (target === 'custom-ids') {
+                        // Рассылка по конкретным ID из списка
+                        const nextId = getNextCustomId(this.id);
+                        if (nextId) {
+                            this.log(`📋 Custom ID: отправка на ID ${nextId}`);
+                            // Создаём объект пользователя с минимальными данными
+                            // Реальные данные получим при check-send
+                            users.push({
+                                AccountId: parseInt(nextId),
+                                Name: '',
+                                City: '',
+                                Age: '',
+                                Country: ''
+                            });
+                        } else {
+                            this.log(`✅ Custom IDs: все ID из списка обработаны`);
+                            // Если включен авто-режим, переключаемся на следующий статус
+                            if (this.mailSettings.auto) {
+                                const newTarget = getNextActiveStatus('payers'); // Начинаем с начала цикла
+                                this.log(`⚠️ Переход на ${newTarget}`);
+                                this.mailSettings.target = newTarget;
+                                this.mailContactedUsers.clear();
+                                if(activeTabId === this.id) {
+                                    document.getElementById(`target-select-${this.id}`).value = newTarget;
+                                    toggleCustomIdsField(this.id);
+                                }
+                                return this.processMailUser(msgTemplate);
+                            } else {
+                                this.log(`⏹️ Рассылка остановлена (все Custom IDs обработаны)`);
+                                this.stopMail();
+                                return;
+                            }
+                        }
+                    } else if (target === 'inbox') {
                         const messagesRes = await makeApiRequest(this, 'GET', '/api/messages');
                         const unrepliedMsgs = (messagesRes.data.Messages || []).filter(m => !m.IsReplied);
 
@@ -3135,6 +3352,7 @@
                         users = usersRes.data.Users || [];
                         if (target === 'online') {
                             this.log(`📊 Online users: ${users.length}`);
+                            this.lastOnlineCount = users.length; // Сохраняем для глобального счётчика
                             console.log(`🔍 DEBUG Online API response:`, JSON.stringify(usersRes.data, null, 2));
                             if (users.length > 0) {
                                 console.log(`🔍 DEBUG First online user:`, JSON.stringify(users[0], null, 2));
@@ -3171,11 +3389,8 @@
                         } else {
                             // Проверяем auto режим
                             if(this.mailSettings.auto && target !== 'online') {
-                                let newTarget = 'online';
-                                if(target === 'payers') newTarget = 'my-favorites';
-                                else if(target === 'my-favorites') newTarget = 'favorites';
-                                else if(target === 'favorites') newTarget = 'inbox';
-                                else if(target === 'inbox') newTarget = 'online';
+                                // Используем getNextActiveStatus для пропуска отключенных статусов
+                                const newTarget = getNextActiveStatus(target);
                                 this.log(`⚠️ Нет пользователей (${target}). Переход на ${newTarget}`);
                                 this.mailSettings.target = newTarget;
                                 // Очищаем contacted при смене категории
@@ -3255,6 +3470,12 @@
 
                         // Добавляем в "отправленные" и убираем из очереди повторов
                         this.mailContactedUsers.add(user.AccountId.toString());
+
+                        // Отмечаем Custom ID как отправленный (если это custom-ids режим)
+                        if (this.mailSettings.target === 'custom-ids') {
+                            markCustomIdSent(this.id, user.AccountId.toString());
+                        }
+
                         if (isRetryAttempt) {
                             this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
                         }
@@ -3935,14 +4156,19 @@
             col3.innerHTML = `
                 <div class="panel-col">
                     <div class="col-title">Настройки</div>
-                    <select id="target-select-${bot.id}" class="form-select form-select-sm mb-1" onchange="updateSettings('${bot.id}')">
+                    <select id="target-select-${bot.id}" class="form-select form-select-sm mb-1" onchange="updateSettings('${bot.id}'); toggleCustomIdsField('${bot.id}')">
                         <option value="online">Online</option>
                         <option value="favorites">I am a favorite of</option>
                         <option value="my-favorites">My favorite</option>
                         <option value="inbox">Inbox (Unreplied)</option>
                         <option value="payers">Payers</option>
+                        <option value="custom-ids">Custom IDs</option>
                     </select>
-                    
+                    <div id="custom-ids-field-${bot.id}" class="custom-ids-field mb-1" style="display: none;">
+                        <textarea id="custom-ids-input-${bot.id}" class="form-control form-control-sm" rows="2" placeholder="ID через запятую, пробел или в столбик" onchange="saveCustomIds('${bot.id}')"></textarea>
+                        <small class="text-muted">Осталось: <span id="custom-ids-remaining-${bot.id}">0</span></small>
+                    </div>
+
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <select class="form-select form-select-sm" id="speed-select-${bot.id}" style="width: 100px;" onmousedown="shiftWasPressed=event.shiftKey" onchange="handleSpeedChange('${bot.id}', this.value)" title="Скорость отправки (Shift=всем)">
                             <option value="smart" selected>Smart</option>
@@ -4022,23 +4248,31 @@
             if(isChat) {
                 ws.querySelectorAll('.hide-in-chat').forEach(el => el.style.display = 'none');
                 ws.querySelectorAll('.hide-in-mail').forEach(el => el.style.display = 'block');
-                
+
                 Array.from(targetSelect.options).forEach(opt => {
-                    if (['favorites', 'my-favorites', 'inbox'].includes(opt.value)) { opt.style.display = 'none'; }
+                    // Скрываем опции недоступные в Chat режиме (включая custom-ids)
+                    if (['favorites', 'my-favorites', 'inbox', 'custom-ids'].includes(opt.value)) { opt.style.display = 'none'; }
                     else { opt.style.display = 'block'; }
                 });
                 targetSelect.value = bot.chatSettings.target;
-                
+
+                // Скрываем поле Custom IDs в Chat режиме
+                const customIdsField = document.getElementById(`custom-ids-field-${botId}`);
+                if (customIdsField) customIdsField.style.display = 'none';
+
                 document.getElementById(`rot-time-${botId}`).value = bot.chatSettings.rotationHours;
                 document.getElementById(`rot-cyclic-${botId}`).checked = bot.chatSettings.cyclic;
             } else {
                 ws.querySelectorAll('.hide-in-chat').forEach(el => { if(el.classList.contains('photo-block')) el.style.display = 'flex'; else el.style.display = 'block'; });
                 ws.querySelectorAll('.hide-in-chat.d-none').forEach(el => el.style.display = 'none');
                 ws.querySelectorAll('.hide-in-mail').forEach(el => el.style.display = 'none');
-                
+
                 Array.from(targetSelect.options).forEach(opt => opt.style.display = 'block');
                 targetSelect.value = bot.mailSettings.target;
-                
+
+                // Показываем поле Custom IDs если выбран этот режим
+                toggleCustomIdsField(botId);
+
                 document.getElementById(`auto-check-${botId}`).checked = bot.mailSettings.auto;
             }
             
@@ -4910,7 +5144,9 @@
                         chatStartTime: b.chatSettings.rotationStartTime,
                         mailAuto: b.mailSettings.auto,
                         mailTarget: b.mailSettings.target,
-                        vipList: b.vipList
+                        vipList: b.vipList,
+                        customIdsList: b.customIdsList || [],
+                        customIdsSent: b.customIdsSent || []
                     };
                 }).filter(item => item !== null);
                 
@@ -4954,8 +5190,14 @@
                         if (a.mailAuto !== undefined) bot.mailSettings.auto = a.mailAuto;
                         if (a.mailTarget) bot.mailSettings.target = a.mailTarget;
                         if (a.vipList) bot.vipList = a.vipList;
-                        
+                        if (a.customIdsList) bot.customIdsList = a.customIdsList;
+                        if (a.customIdsSent) bot.customIdsSent = a.customIdsSent;
+
                         updateInterfaceForMode(bot.id);
+                        // Показываем поле Custom IDs если выбран этот режим
+                        if (a.mailTarget === 'custom-ids') {
+                            toggleCustomIdsField(bot.id);
+                        }
                     }
                     await new Promise(r => setTimeout(r, 500));
                 }

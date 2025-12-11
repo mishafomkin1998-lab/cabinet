@@ -878,7 +878,7 @@
         }
         
         .status-buttons-container.show {
-            max-width: 300px; /* Достаточно места для 5 кнопок */
+            max-width: 450px; /* Достаточно места для badge + 5 кнопок */
             opacity: 1;
             pointer-events: auto;
         }
@@ -929,6 +929,53 @@
         .btn-status-circle.btn-payers-color { color: #6f42c1; border-color: #d6bdf7; }
         .btn-status-circle.btn-payers-color:hover { background: #e9d5ff; }
 
+        /* Отключенные статусы (серые, пропускаются в авто-режиме) */
+        .btn-status-circle.status-disabled {
+            opacity: 0.4 !important;
+            filter: grayscale(100%) !important;
+            position: relative;
+        }
+        .btn-status-circle.status-disabled::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 80%; height: 2px;
+            background: #666;
+            transform: translate(-50%, -50%) rotate(-45deg);
+        }
+
+        /* Badge "Мужчины онлайн" в панели статусов */
+        .men-online-badge {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            color: #1565c0;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid #90caf9;
+            white-space: nowrap;
+        }
+        .men-online-badge i { font-size: 14px; }
+
+        /* Custom IDs поле ввода */
+        .custom-ids-field {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 8px;
+        }
+        .custom-ids-field textarea {
+            font-size: 12px;
+            resize: none;
+        }
+        .custom-ids-field small {
+            font-size: 10px;
+            display: block;
+            margin-top: 4px;
+        }
 
         /* TABS */
         .tabs-container { 

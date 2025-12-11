@@ -60,11 +60,12 @@
                     <i class="fa fa-caret-right"></i>
                 </button>
                 <div class="status-buttons-container" id="status-buttons-container">
-                    <button class="btn btn-circle btn-status-circle btn-online-color" onclick="setGlobalTarget('online')" data-tip="Установить всем: Online (Online)"><i class="fa fa-globe"></i></button>
-                    <button class="btn btn-circle btn-status-circle btn-fav-of-color" onclick="setGlobalTarget('favorites')" data-tip="Установить всем: I am favorite of (favorites)"><i class="fa fa-star"></i></button>
-                    <button class="btn btn-circle btn-status-circle btn-my-fav-color" onclick="setGlobalTarget('my-favorites')" data-tip="Установить всем: My favorite (my-favorites)"><i class="fa fa-heart"></i></button>
-                    <button class="btn btn-circle btn-status-circle btn-inbox-color" onclick="setGlobalTarget('inbox')" data-tip="Установить всем: Inbox (inbox)"><i class="fa fa-inbox"></i></button>
-                    <button class="btn btn-circle btn-status-circle btn-payers-color" onclick="setGlobalTarget('payers')" data-tip="Установить всем: Payers (payers)"><i class="fa fa-credit-card"></i></button>
+                    <span id="global-men-online" class="men-online-badge" data-tip="Мужчин онлайн (от случайной анкеты)"><i class="fa fa-male"></i> <span id="global-men-count">0</span></span>
+                    <button class="btn btn-circle btn-status-circle btn-online-color" data-status="online" onclick="setGlobalTarget('online')" oncontextmenu="toggleStatusDisabled('online', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-globe"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-fav-of-color" data-status="favorites" onclick="setGlobalTarget('favorites')" oncontextmenu="toggleStatusDisabled('favorites', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-star"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-my-fav-color" data-status="my-favorites" onclick="setGlobalTarget('my-favorites')" oncontextmenu="toggleStatusDisabled('my-favorites', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-heart"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-inbox-color" data-status="inbox" onclick="setGlobalTarget('inbox')" oncontextmenu="toggleStatusDisabled('inbox', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-inbox"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-payers-color" data-status="payers" onclick="setGlobalTarget('payers')" oncontextmenu="toggleStatusDisabled('payers', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-credit-card"></i></button>
                 </div>
             </div>
         </div>
