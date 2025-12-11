@@ -147,6 +147,32 @@ ipcMain.handle('open-response-window', async (event, data) => {
             }
         `);
 
+        // Инжектируем CSS для улучшения поля ввода
+        await win.webContents.insertCSS(`
+            /* Увеличиваем поле ввода сообщения */
+            input[placeholder*="message" i],
+            input[placeholder*="Write" i],
+            textarea[placeholder*="message" i] {
+                min-height: 60px !important;
+                height: auto !important;
+                font-size: 16px !important;
+                padding: 12px 15px !important;
+                line-height: 1.4 !important;
+            }
+
+            /* Делаем textarea если это input */
+            .chat-input, .message-input, form[class*="chat"], form[class*="message"] {
+                flex-direction: column !important;
+            }
+
+            /* Увеличиваем область ввода */
+            textarea, input[type="text"][placeholder*="message" i] {
+                resize: vertical !important;
+                min-height: 80px !important;
+                max-height: 200px !important;
+            }
+        `);
+
         // Инжектируем кнопку AI после загрузки страницы
         win.webContents.on('did-finish-load', () => {
             injectAIButton(win);
