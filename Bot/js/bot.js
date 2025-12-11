@@ -2627,7 +2627,12 @@
             e.preventDefault();
             currentContextMenuTextarea = textarea;
 
-            const menu = document.getElementById('transcription-context-menu');
+            // Если меню ещё не создано - создаём
+            let menu = document.getElementById('transcription-context-menu');
+            if (!menu) {
+                createTranscriptionContextMenu();
+                menu = document.getElementById('transcription-context-menu');
+            }
             if (!menu) return;
 
             // Позиционируем меню
@@ -4273,7 +4278,7 @@
                     </div>
                     </div>
                     <div class="relative-box d-flex flex-column flex-grow-1">
-                        <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." onclick="this.focus()" oninput="checkVarTrigger(this, 'vars-dropdown-${bot.id}'); bots['${bot.id}'].updateUI(); validateInput(this); autoSaveTemplateText('${bot.id}')" onblur="saveTemplateTextNow('${bot.id}')"></textarea>
+                        <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." onclick="this.focus()" oninput="checkVarTrigger(this, 'vars-dropdown-${bot.id}'); bots['${bot.id}'].updateUI(); validateInput(this); autoSaveTemplateText('${bot.id}')" onblur="saveTemplateTextNow('${bot.id}')" oncontextmenu="showTranscriptionContextMenu(event, this)"></textarea>
                         <div id="vars-dropdown-${bot.id}" class="vars-dropdown">
                             <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{name}', 'vars-dropdown-${bot.id}')"><b>{name}</b> <span style="opacity:0.6;font-size:11px">Имя</span></div>
                             <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{age}', 'vars-dropdown-${bot.id}')"><b>{age}</b> <span style="opacity:0.6;font-size:11px">Возраст</span></div>
