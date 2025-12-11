@@ -42,12 +42,61 @@ function toggleStatusGroup() {
 }
 
 // === LOGGER - 5-я колонка ===
+
+// Трекинг для предотвращения дублирования
+const loggerTracking = {
+    // VIP: partnerId -> timestamp последнего уведомления (cooldown 1 час)
+    vipNotified: {},
+    // Все уведомления: уникальный ключ -> true (чтобы не дублировать)
+    notified: new Set(),
+    // Таймеры звуковых напоминаний для писем: logId -> [timerId1, timerId2]
+    mailSoundTimers: {},
+    // Связь логов с окнами: windowId -> logId (для удаления при закрытии)
+    windowToLog: {}
+};
+
+const VIP_COOLDOWN_MS = 60 * 60 * 1000; // 1 час
+const VIP_FADE_MS = 3 * 60 * 1000; // 3 минуты до затухания
+
 const Logger = {
     logs: [],
     add: function(text, type, botId, data = null) {
         const now = Date.now();
-        const logItem = { id: now, text, type, botId, data, time: new Date() };
+        const partnerId = data?.partnerId || '???';
 
+        // Уникальный ключ для дедупликации
+        const uniqueKey = `${type}-${botId}-${partnerId}-${data?.messageBody || ''}`;
+
+        // === Дедупликация: каждое уведомление только 1 раз ===
+        if (type !== 'log' && loggerTracking.notified.has(uniqueKey)) {
+            console.log(`[Logger] Дубликат пропущен: ${uniqueKey}`);
+            return;
+        }
+
+        // === VIP: cooldown 1 час на мужчину ===
+        if (type === 'vip-online') {
+            const vipKey = `${botId}-${partnerId}`;
+            const lastNotified = loggerTracking.vipNotified[vipKey] || 0;
+            if (now - lastNotified < VIP_COOLDOWN_MS) {
+                console.log(`[Logger] VIP ${partnerId} в cooldown, пропускаем`);
+                return;
+            }
+            loggerTracking.vipNotified[vipKey] = now;
+        }
+
+        // === Игнорируем тип 'chat' (дубликат chat-request) ===
+        if (type === 'chat') {
+            console.log(`[Logger] Тип 'chat' игнорируется`);
+            return;
+        }
+
+        // Отмечаем как уведомлённое
+        loggerTracking.notified.add(uniqueKey);
+
+        // Очищаем старые записи из notified (старше 1 часа)
+        setTimeout(() => loggerTracking.notified.delete(uniqueKey), VIP_COOLDOWN_MS);
+
+        const logItem = { id: now, text, type, botId, data, time: new Date(), uniqueKey };
         this.logs.unshift(logItem);
 
         if (this.logs.length > 300) {
@@ -61,12 +110,80 @@ const Logger = {
             document.getElementById('btn-logger-main').classList.add('blinking');
         }
 
-        if (type === 'chat') playSound('chat');
-        else if (type === 'chat-request') playSound('chat');
-        else if (type === 'mail') playSound('message');
-        else if (type === 'bday') playSound('online');
-        else if (type === 'vip-online') playSound('online');
+        // === Звуки ===
+        if (type === 'chat-request') {
+            playSound('chat');
+        } else if (type === 'mail') {
+            playSound('message');
+            // Дополнительные звуки через 1 и 2 минуты
+            const timer1 = setTimeout(() => {
+                if (this.logs.find(l => l.id === logItem.id)) {
+                    playSound('message');
+                }
+            }, 60000);
+            const timer2 = setTimeout(() => {
+                if (this.logs.find(l => l.id === logItem.id)) {
+                    playSound('message');
+                }
+            }, 120000);
+            loggerTracking.mailSoundTimers[logItem.id] = [timer1, timer2];
+
+            // Electron уведомление для писем
+            this.showElectronNotification(data, type, botId);
+        } else if (type === 'vip-online') {
+            playSound('online');
+        } else if (type === 'bday') {
+            playSound('online');
+        }
     },
+
+    // Electron уведомление
+    showElectronNotification: function(data, type, botId) {
+        if (!data) return;
+        const partnerId = data.partnerId || '???';
+        const partnerName = data.partnerName || `ID ${partnerId}`;
+        const messageBody = data.messageBody || '';
+        const avatarUrl = data.avatarUrl || null;
+
+        const title = '💌 Входящее письмо';
+        const body = `От ${partnerId} ${partnerName}${messageBody ? ': "' + messageBody.slice(0, 50) + '"' : ''}`;
+
+        const notification = new Notification(title, {
+            body: body,
+            icon: avatarUrl || undefined,
+            silent: true // Звук уже играет через playSound
+        });
+
+        notification.onclick = () => {
+            openResponseWindow(botId, partnerId, partnerName, 'mail');
+        };
+    },
+
+    // Удаление лога по ID
+    removeLog: function(logId) {
+        const index = this.logs.findIndex(l => l.id === logId);
+        if (index !== -1) {
+            const log = this.logs[index];
+            // Отменяем таймеры звуков если есть
+            if (loggerTracking.mailSoundTimers[logId]) {
+                loggerTracking.mailSoundTimers[logId].forEach(t => clearTimeout(t));
+                delete loggerTracking.mailSoundTimers[logId];
+            }
+            this.logs.splice(index, 1);
+            this.render();
+            console.log(`[Logger] Удалён лог ${logId}`);
+        }
+    },
+
+    // Удаление лога по windowId
+    removeLogByWindowId: function(windowId) {
+        const logId = loggerTracking.windowToLog[windowId];
+        if (logId) {
+            this.removeLog(logId);
+            delete loggerTracking.windowToLog[windowId];
+        }
+    },
+
     render: function() {
         const container = document.getElementById('logger-content');
         if(!this.logs.length) {
@@ -90,20 +207,27 @@ const Logger = {
             let linkAction = '';
             let logClass = '';
 
-            if (l.type === 'chat' || l.type === 'mail') {
-                // Открываем окно ответа вместо MiniChat
-                linkAction = `openResponseWindow('${l.botId}', '${partnerId}', '${partnerName}', '${l.type}')`;
-                content = `${l.type === 'chat' ? '💬' : '💌'} Новое ${l.type === 'chat' ? 'сообщение' : 'письмо'} от <b>${partnerName}</b> (ID ${partnerId})`;
-            } else if (l.type === 'chat-request') {
-                logClass = 'new-chat';
-                linkAction = `openResponseWindow('${l.botId}', '${partnerId}', '${partnerName}', 'chat')`;
+            // Для VIP - проверяем затухание (серый через 3 минуты)
+            let vipFaded = false;
+            if (l.type === 'vip-online' && (now - l.id) > VIP_FADE_MS) {
+                vipFaded = true;
+            }
+
+            if (l.type === 'mail') {
+                logClass = 'mail-log';
+                linkAction = `openResponseWindowAndTrack('${l.botId}', '${partnerId}', '${partnerName}', 'mail', ${l.id})`;
                 const msgBody = l.data && l.data.messageBody ? l.data.messageBody : '';
-                content = `🆕 Новый чат от <b>${partnerName}</b>: "${msgBody}"`;
+                const msgPreview = msgBody ? ` "${msgBody.slice(0, 30)}${msgBody.length > 30 ? '...' : ''}"` : '';
+                content = `💌 Входящее письмо от ${partnerId} <b>${partnerName}</b>${msgPreview}`;
+            } else if (l.type === 'chat-request') {
+                logClass = 'chat-request-log';
+                linkAction = `openResponseWindowAndTrack('${l.botId}', '${partnerId}', '${partnerName}', 'chat', ${l.id})`;
+                const msgBody = l.data && l.data.messageBody ? l.data.messageBody : '';
+                content = `🆕 Новый чат от ${partnerId} <b>${partnerName}</b> "${msgBody}"`;
             } else if (l.type === 'vip-online') {
-                logClass = 'vip';
-                // VIP клик открывает ПИСЬМО (mail), а не чат
-                linkAction = `openResponseWindow('${l.botId}', '${partnerId}', '${partnerName}', 'mail')`;
-                content = `👑 VIP <b>${partnerName}</b> (ID ${partnerId}) теперь ONLINE!`;
+                logClass = vipFaded ? 'vip-faded' : 'vip';
+                linkAction = `openResponseWindowAndTrack('${l.botId}', '${partnerId}', '${partnerName}', 'mail', ${l.id})`;
+                content = `👑 VIP ${partnerId} <b>${partnerName}</b> теперь ONLINE!`;
             } else if (l.type === 'bday') {
                 linkAction = `selectTab('${l.botId}')`;
                 content = l.text;
@@ -112,7 +236,7 @@ const Logger = {
             }
 
             if(l.type !== 'log') {
-                html += `<div class="log-entry ${colorClass} ${logClass}">
+                html += `<div class="log-entry ${colorClass} ${logClass}" data-log-id="${l.id}">
                     <span class="log-time">${timeStr} | Анкета ${targetBotDisplayId}</span><br>
                     <span class="log-link" onclick="${linkAction}">${content}</span>
                 </div>`;
@@ -201,5 +325,18 @@ async function closeResponseWindow(windowId) {
 // Слушаем событие закрытия окна от main process
 ipcRenderer.on('response-window-closed', (event, windowId) => {
     openedResponseWindows.delete(windowId);
-    console.log(`[ResponseWindow] Окно ${windowId} закрыто`);
+    // Удаляем связанный лог при закрытии окна
+    Logger.removeLogByWindowId(windowId);
+    console.log(`[ResponseWindow] Окно ${windowId} закрыто, лог удалён`);
 });
+
+// Открытие окна с трекингом для удаления лога при закрытии
+async function openResponseWindowAndTrack(botId, partnerId, partnerName, type, logId) {
+    const windowId = `rw-${botId}-${partnerId}-${type}`;
+
+    // Связываем окно с логом
+    loggerTracking.windowToLog[windowId] = logId;
+
+    // Открываем окно
+    await openResponseWindow(botId, partnerId, partnerName, type);
+}

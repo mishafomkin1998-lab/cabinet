@@ -575,6 +575,22 @@
             border-color: #254a35;
         }
 
+        body.theme-dark .log-entry.mail-log {
+            background: #152a1a;
+            border-color: #1d4a2a;
+        }
+
+        body.theme-dark .log-entry.chat-request-log {
+            background: #251a2a;
+            border-color: #3a254a;
+        }
+
+        body.theme-dark .log-entry.vip-faded {
+            background: #1a1a1a;
+            border-color: #2a2a2a;
+            opacity: 0.5;
+        }
+
         body.theme-dark .active-invite-box {
             background: #152515;
             border-color: #254525;
@@ -1201,7 +1217,10 @@
         .log-entry.fresh { color: #198754; font-weight: 600; }
         .log-entry.old { color: #777; font-weight: 400; }
         .log-entry.vip { background: #fff3cd; border-radius: 4px; border: 1px solid #ffecb5; margin-bottom: 4px; }
+        .log-entry.vip-faded { background: #e9ecef; border-radius: 4px; border: 1px solid #dee2e6; margin-bottom: 4px; color: #6c757d !important; opacity: 0.6; }
         .log-entry.new-chat { background: #d1e7dd; border-radius: 4px; border: 1px solid #badbcc; margin-bottom: 4px; }
+        .log-entry.mail-log { background: #d4edda; border-radius: 4px; border: 1px solid #a3cfbb; margin-bottom: 4px; }
+        .log-entry.chat-request-log { background: #e2d9f3; border-radius: 4px; border: 1px solid #c5b3e6; margin-bottom: 4px; }
         .log-time { opacity: 0.7; font-size: 11px; margin-right: 5px; }
         .log-link { text-decoration: underline; cursor: pointer; color: inherit; }
         .log-link:hover { color: var(--mode-color); }
