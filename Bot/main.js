@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session } = require('electron');
+const { app, BrowserWindow, ipcMain, session, Menu } = require('electron');
 const path = require('path');
 
 let mainWindow = null;
@@ -79,6 +79,23 @@ ipcMain.handle('open-response-window', async (event, data) => {
 
     // Блокируем звук
     win.webContents.setAudioMuted(true);
+
+    // Контекстное меню с AI
+    win.webContents.on('context-menu', (e, params) => {
+        const contextMenu = Menu.buildFromTemplate([
+            {
+                label: '✨ AI Ответ',
+                click: () => generateAIForResponseWindow(win)
+            },
+            { type: 'separator' },
+            { label: 'Вырезать', role: 'cut' },
+            { label: 'Копировать', role: 'copy' },
+            { label: 'Вставить', role: 'paste' },
+            { type: 'separator' },
+            { label: 'Выделить всё', role: 'selectAll' }
+        ]);
+        contextMenu.popup();
+    });
 
     // Обработка закрытия
     win.on('closed', () => {
@@ -444,3 +461,196 @@ ipcMain.handle('response-window-ai-generate', async (event, data) => {
         return { success: false, error: err.message };
     }
 });
+
+// Функция генерации AI ответа для Response Window (вызывается из контекстного меню)
+async function generateAIForResponseWindow(win) {
+    if (win.isDestroyed()) return;
+
+    const isChat = win.windowType === 'chat';
+
+    try {
+        // Показываем индикатор загрузки
+        await win.webContents.executeJavaScript(`
+            (function() {
+                // Создаём overlay с индикатором
+                if (!document.getElementById('lababot-ai-loading')) {
+                    const overlay = document.createElement('div');
+                    overlay.id = 'lababot-ai-loading';
+                    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;z-index:99999;';
+                    overlay.innerHTML = '<div style="background:white;padding:20px 40px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:16px;display:flex;align-items:center;gap:12px;"><span style="font-size:24px;">⏳</span> Генерирую AI ответ...</div>';
+                    document.body.appendChild(overlay);
+                }
+            })()
+        `);
+
+        // Собираем историю переписки
+        const historyResult = await win.webContents.executeJavaScript(`
+            (function() {
+                let history = '';
+
+                // Ищем сообщения на странице
+                const messageSelectors = [
+                    '.message-text',
+                    '.chat-message',
+                    '.message-content',
+                    '.msg-text',
+                    '[class*="message"]'
+                ];
+
+                const allMessages = [];
+                messageSelectors.forEach(sel => {
+                    document.querySelectorAll(sel).forEach(m => {
+                        const text = m.innerText?.trim();
+                        if (text && text.length > 1 && text.length < 1000 && !allMessages.includes(text)) {
+                            allMessages.push(text);
+                        }
+                    });
+                });
+
+                if (allMessages.length > 0) {
+                    history = allMessages.slice(-15).join('\\n---\\n');
+                } else {
+                    // Fallback - берём текст из основной области
+                    const mainArea = document.querySelector('main, .chat-body, .messages, .content, [class*="chat"]');
+                    if (mainArea) {
+                        history = mainArea.innerText?.slice(-3000) || '';
+                    }
+                }
+
+                return history;
+            })()
+        `);
+
+        console.log('[AI Context Menu] History length:', historyResult?.length || 0);
+
+        // Генерируем ответ через main window
+        if (!mainWindow || mainWindow.isDestroyed()) {
+            throw new Error('Main window not available');
+        }
+
+        const aiResult = await mainWindow.webContents.executeJavaScript(`
+            (async function() {
+                const apiKey = window.globalSettings?.apiKey;
+                if (!apiKey) {
+                    return { success: false, error: 'API ключ OpenAI не указан в настройках' };
+                }
+
+                const isChat = ${isChat};
+                const history = ${JSON.stringify(historyResult || '')};
+
+                const systemPrompt = isChat
+                    ? 'Ты помощник оператора на сайте знакомств. Пиши короткие ответы (1-2 предложения) в чат от лица девушки, естественно и игриво. Отвечай на последнее сообщение мужчины. Пиши ТОЛЬКО текст ответа, без пояснений и кавычек.'
+                    : 'Ты помощник оператора на сайте знакомств. Пиши ответы (2-4 предложения) на письма от лица девушки, тепло и романтично. Отвечай на последнее сообщение мужчины. Пиши ТОЛЬКО текст ответа, без пояснений и кавычек.';
+
+                try {
+                    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+                        model: 'gpt-4o-mini',
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: 'Контекст переписки:\\n' + history + '\\n\\nНапиши ответ:' }
+                        ],
+                        max_tokens: 300,
+                        temperature: 0.8
+                    }, {
+                        headers: {
+                            'Authorization': 'Bearer ' + apiKey,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.data.choices && response.data.choices[0]) {
+                        return {
+                            success: true,
+                            text: response.data.choices[0].message.content.trim()
+                        };
+                    } else {
+                        return { success: false, error: 'Пустой ответ от AI' };
+                    }
+                } catch (err) {
+                    console.error('[AI] Error:', err);
+                    return {
+                        success: false,
+                        error: err.response?.data?.error?.message || err.message
+                    };
+                }
+            })()
+        `);
+
+        // Убираем индикатор загрузки
+        await win.webContents.executeJavaScript(`
+            (function() {
+                const overlay = document.getElementById('lababot-ai-loading');
+                if (overlay) overlay.remove();
+            })()
+        `);
+
+        if (aiResult.success && aiResult.text) {
+            // Вставляем текст в поле ввода
+            await win.webContents.executeJavaScript(`
+                (function() {
+                    const text = ${JSON.stringify(aiResult.text)};
+
+                    // Ищем поле ввода
+                    const selectors = [
+                        'input[placeholder*="message" i]',
+                        'input[placeholder*="Write" i]',
+                        'textarea[placeholder*="message" i]',
+                        'textarea',
+                        'input[type="text"]'
+                    ];
+
+                    let inputEl = null;
+                    for (const sel of selectors) {
+                        const el = document.querySelector(sel);
+                        if (el && el.offsetParent !== null) {
+                            inputEl = el;
+                            break;
+                        }
+                    }
+
+                    if (inputEl) {
+                        // Используем нативный setter для React
+                        const proto = inputEl.tagName === 'TEXTAREA'
+                            ? window.HTMLTextAreaElement.prototype
+                            : window.HTMLInputElement.prototype;
+                        const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+                        nativeSetter.call(inputEl, text);
+
+                        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+                        inputEl.focus();
+
+                        console.log('[LababotAI] Text inserted via context menu');
+                        return { success: true };
+                    } else {
+                        // Копируем в буфер если не нашли поле
+                        navigator.clipboard.writeText(text);
+                        alert('Текст скопирован в буфер обмена (поле ввода не найдено):\\n\\n' + text);
+                        return { success: false, copied: true };
+                    }
+                })()
+            `);
+
+            console.log('[AI Context Menu] Text inserted successfully');
+        } else {
+            // Показываем ошибку
+            await win.webContents.executeJavaScript(`
+                alert('Ошибка AI: ${(aiResult.error || 'Неизвестная ошибка').replace(/'/g, "\\'")}');
+            `);
+        }
+
+    } catch (err) {
+        console.error('[AI Context Menu] Error:', err);
+
+        // Убираем индикатор и показываем ошибку
+        try {
+            await win.webContents.executeJavaScript(`
+                (function() {
+                    const overlay = document.getElementById('lababot-ai-loading');
+                    if (overlay) overlay.remove();
+                    alert('Ошибка: ${err.message.replace(/'/g, "\\'")}');
+                })()
+            `);
+        } catch (e) {}
+    }
+}
