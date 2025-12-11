@@ -367,7 +367,8 @@ router.get('/status', asyncHandler(async (req, res) => {
     });
 
     // 2. Получаем уникальные боты (программы) - один бот = одна строка
-    // Используем GROUP BY для гарантированной уникальности по bot_id
+    // ВАЖНО: Показываем только настоящие программы-боты (machineId начинается с "machine_")
+    // Старые записи с "bot_" (уникальные для каждой анкеты) игнорируем
     const botsQuery = `
         SELECT
             h.bot_id,
@@ -383,6 +384,7 @@ router.get('/status', asyncHandler(async (req, res) => {
         FROM heartbeats h
         WHERE h.bot_id IS NOT NULL
           AND h.bot_id != ''
+          AND h.bot_id LIKE 'machine_%'
           AND h.timestamp > NOW() - INTERVAL '1 hour'
         GROUP BY h.bot_id
         ORDER BY last_heartbeat DESC
