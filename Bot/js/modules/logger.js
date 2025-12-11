@@ -157,37 +157,46 @@ function openResponseWindow(botId, partnerId, partnerName, type) {
     const offsetX = 100 + (windowCount % 5) * 30;
     const offsetY = 100 + (windowCount % 5) * 30;
 
+    // URL для открытия на сайте
+    const siteUrl = type === 'chat'
+        ? `https://ladadate.com/chat/${partnerId}`
+        : `https://ladadate.com/messages/${partnerId}`;
+
     const win = document.createElement('div');
-    win.className = 'response-window focused';
+    win.className = 'response-window response-window-webview focused';
     win.id = windowId;
     win.style.left = offsetX + 'px';
     win.style.top = offsetY + 'px';
     win.style.zIndex = ++responseWindowZIndex;
+    win.style.width = '500px';
+    win.style.height = '600px';
 
     win.innerHTML = `
         <div class="response-window-header" onmousedown="startDragResponseWindow(event, '${windowId}')">
             <div class="window-info">
                 <span class="window-title">${typeLabel} с ${partnerName}</span>
-                <span class="window-subtitle">Анкета: ${bot ? bot.displayId : '???'} | ID партнёра: ${partnerId}</span>
+                <span class="window-subtitle">Анкета: ${bot ? bot.displayId : '???'} | ID: ${partnerId}</span>
             </div>
-            <button class="btn-close-window" onclick="closeResponseWindow('${windowId}')"><i class="fa fa-times"></i></button>
+            <div class="window-controls">
+                <button class="btn-reload-window" onclick="reloadResponseWindowWebview('${windowId}')" title="Обновить"><i class="fa fa-refresh"></i></button>
+                <button class="btn-close-window" onclick="closeResponseWindow('${windowId}')"><i class="fa fa-times"></i></button>
+            </div>
         </div>
-        <div class="response-window-body">
-            <div class="response-window-history" id="history-${windowId}">
-                <div class="text-center text-muted small">Загрузка истории...</div>
-            </div>
-            <div class="response-window-ai">
-                <div class="d-flex">
-                    <i class="fa fa-robot text-primary"></i>
-                    <input class="form-control form-control-sm" id="ai-prompt-${windowId}" placeholder="Как ответить? (игриво, романтично...)">
-                    <button class="btn btn-primary btn-sm" onclick="generateResponseWindowAI('${windowId}')">
-                        <i class="fa fa-magic"></i> AI
-                    </button>
-                </div>
-            </div>
-            <div class="response-window-input">
-                <textarea class="form-control" id="input-${windowId}" rows="2" placeholder="Сообщение..."></textarea>
-                <button class="btn btn-primary" onclick="sendResponseWindowMessage('${windowId}')"><i class="fa fa-paper-plane"></i></button>
+        <div class="response-window-ai-panel">
+            <input class="form-control form-control-sm" id="ai-prompt-${windowId}" placeholder="AI промпт (игриво, романтично...)">
+            <button class="btn btn-primary btn-sm" onclick="generateResponseWindowAI('${windowId}')" title="Сгенерировать ответ">
+                <i class="fa fa-magic"></i> AI
+            </button>
+        </div>
+        <div class="response-window-webview-container">
+            <webview id="webview-${windowId}"
+                     src="${siteUrl}"
+                     partition="persist:${botId}"
+                     class="response-webview"
+                     allowpopups>
+            </webview>
+            <div class="webview-loading" id="loading-${windowId}">
+                <i class="fa fa-spinner fa-spin"></i> Загрузка сайта...
             </div>
         </div>
         <div class="response-window-resize" onmousedown="startResizeResponseWindow(event, '${windowId}')"></div>
@@ -195,24 +204,58 @@ function openResponseWindow(botId, partnerId, partnerName, type) {
 
     container.appendChild(win);
 
+    // Настраиваем WebView
+    const webview = document.getElementById(`webview-${windowId}`);
+    const loadingEl = document.getElementById(`loading-${windowId}`);
+
+    webview.addEventListener('did-start-loading', () => {
+        loadingEl.style.display = 'flex';
+    });
+
+    webview.addEventListener('did-finish-load', () => {
+        loadingEl.style.display = 'none';
+        // Блокируем звуки на странице
+        webview.setAudioMuted(true);
+        // Инжектируем блокировку Audio API
+        webview.executeJavaScript(`
+            if (!window.__audioMuted) {
+                window.__audioMuted = true;
+                Audio.prototype.play = function() { return Promise.resolve(); };
+                HTMLMediaElement.prototype.play = function() { return Promise.resolve(); };
+            }
+        `).catch(() => {});
+    });
+
+    webview.addEventListener('did-fail-load', (e) => {
+        if (e.errorCode !== -3) { // -3 = операция отменена (нормально при навигации)
+            loadingEl.innerHTML = `<i class="fa fa-exclamation-triangle text-warning"></i> Ошибка загрузки`;
+        }
+    });
+
     // Сохраняем данные окна
     responseWindows[windowId] = {
         botId,
         partnerId,
         partnerName,
         type,
-        element: win
+        element: win,
+        webview: webview
     };
 
     // Убираем фокус с других окон
     document.querySelectorAll('.response-window').forEach(w => w.classList.remove('focused'));
     win.classList.add('focused');
 
-    // Загружаем историю
-    loadResponseWindowHistory(windowId);
-
     // Фокус на клик
     win.addEventListener('mousedown', () => focusResponseWindow(windowId));
+}
+
+// Перезагрузить WebView в окне
+function reloadResponseWindowWebview(windowId) {
+    const data = responseWindows[windowId];
+    if (data && data.webview) {
+        data.webview.reload();
+    }
 }
 
 function closeResponseWindow(windowId) {
@@ -290,175 +333,14 @@ document.addEventListener('mouseup', () => {
     resizeState.active = false;
 });
 
-// === RESPONSE WINDOW - LOAD HISTORY ===
-async function loadResponseWindowHistory(windowId) {
-    const data = responseWindows[windowId];
-    if (!data) return;
-
-    const historyContainer = document.getElementById(`history-${windowId}`);
-    const bot = bots[data.botId];
-    if (!bot) {
-        historyContainer.innerHTML = '<div class="text-danger">Бот не найден</div>';
-        return;
-    }
-
-    try {
-        let messages = [];
-
-        if (data.type === 'chat') {
-            // Загружаем историю ЧАТА через WebView
-            if (bot.webview) {
-                try {
-                    const result = await bot.webview.executeJavaScript(`
-                        (async () => {
-                            try {
-                                const res = await fetch('https://ladadate.com/chat-messages', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ id: ${data.partnerId} }),
-                                    credentials: 'include'
-                                });
-                                const text = await res.text();
-                                try {
-                                    return { success: true, data: JSON.parse(text) };
-                                } catch {
-                                    return { success: false, error: 'Not JSON' };
-                                }
-                            } catch(e) {
-                                return { success: false, error: e.message };
-                            }
-                        })()
-                    `);
-
-                    if (result.success && result.data && result.data.messages) {
-                        messages = result.data.messages.map(m => ({
-                            isMe: m.is_owner,
-                            text: m.body,
-                            time: new Date(m.created)
-                        }));
-                    }
-                } catch (wvErr) {
-                    console.error('WebView error:', wvErr);
-                }
-            }
-        } else {
-            // Загружаем историю ПИСЕМ
-            const res = await makeApiRequest(bot, 'GET', `/api/messages?fromAccountId=${data.partnerId}`);
-            const msgs = res.data.Messages || [];
-
-            for (const msg of msgs) {
-                try {
-                    const detailRes = await makeApiRequest(bot, 'GET', `/api/messages/${msg.MessageId}`);
-                    const detailedMsg = detailRes.data;
-                    if (detailedMsg && detailedMsg.Body) {
-                        messages.push({
-                            isMe: detailedMsg.User.AccountId != data.partnerId,
-                            text: detailedMsg.Body,
-                            time: new Date(detailedMsg.DatePost)
-                        });
-                    }
-                } catch (e) {
-                    console.error('Error loading message detail:', e);
-                }
-            }
-        }
-
-        if (messages.length === 0) {
-            historyContainer.innerHTML = '<div class="text-muted text-center">Нет сообщений</div>';
-            return;
-        }
-
-        // Сортируем от старых к новым
-        messages.sort((a, b) => a.time - b.time);
-
-        let html = '';
-        messages.forEach(m => {
-            const timeStr = m.time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-            const dateStr = m.time.toLocaleDateString();
-            const cls = m.isMe ? 'text-end' : 'text-start';
-            const bg = m.isMe ? 'background: #d1e7dd; border-radius: 10px 10px 0 10px;' : 'background: #e9ecef; border-radius: 10px 10px 10px 0;';
-            html += `<div class="${cls} mb-2">
-                <div style="${bg} padding: 8px 12px; display: inline-block; max-width: 80%;">
-                    <div style="font-size: 11px; color: #666; margin-bottom: 2px;">${dateStr} ${timeStr}</div>
-                    <div>${m.text}</div>
-                </div>
-            </div>`;
-        });
-
-        historyContainer.innerHTML = html;
-        historyContainer.scrollTop = historyContainer.scrollHeight;
-
-    } catch (err) {
-        console.error('Error loading history:', err);
-        historyContainer.innerHTML = '<div class="text-danger">Ошибка загрузки истории</div>';
-    }
-}
-
-// === RESPONSE WINDOW - SEND MESSAGE ===
-async function sendResponseWindowMessage(windowId) {
-    const data = responseWindows[windowId];
-    if (!data) return;
-
-    const input = document.getElementById(`input-${windowId}`);
-    const text = input.value.trim();
-    if (!text) return;
-
-    const bot = bots[data.botId];
-    if (!bot) {
-        showError('Бот не найден');
-        return;
-    }
-
-    try {
-        if (data.type === 'chat') {
-            // Отправка через WebView (чат)
-            if (bot.webview) {
-                await bot.webview.executeJavaScript(`
-                    (async () => {
-                        await fetch('https://ladadate.com/chat-send', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ id: ${data.partnerId}, body: ${JSON.stringify(text)} }),
-                            credentials: 'include'
-                        });
-                    })()
-                `);
-            }
-        } else {
-            // Отправка письма
-            const checkRes = await makeApiRequest(bot, 'GET', `/api/messages/check-send/${data.partnerId}`);
-            if (!checkRes.data.CheckId) {
-                showError('Невозможно отправить письмо этому пользователю');
-                return;
-            }
-
-            const payload = {
-                CheckId: checkRes.data.CheckId,
-                RecipientAccountId: parseInt(data.partnerId),
-                Body: text,
-                PhotoId: null
-            };
-            await makeApiRequest(bot, 'POST', '/api/messages/send', payload);
-        }
-
-        input.value = '';
-        // Перезагружаем историю
-        await loadResponseWindowHistory(windowId);
-
-    } catch (err) {
-        console.error('Error sending message:', err);
-        showError('Ошибка отправки сообщения');
-    }
-}
-
 // === RESPONSE WINDOW - AI GENERATE ===
 async function generateResponseWindowAI(windowId) {
     const data = responseWindows[windowId];
-    if (!data) return;
+    if (!data || !data.webview) return;
 
     const promptInput = document.getElementById(`ai-prompt-${windowId}`);
-    const msgInput = document.getElementById(`input-${windowId}`);
     const prompt = promptInput.value.trim();
+    const aiBtn = promptInput.nextElementSibling;
 
     if (!globalSettings.apiKey) {
         showError('API ключ OpenAI не указан в настройках');
@@ -468,15 +350,46 @@ async function generateResponseWindowAI(windowId) {
     const bot = bots[data.botId];
     if (!bot) return;
 
-    // Получаем последние сообщения для контекста
-    const historyContainer = document.getElementById(`history-${windowId}`);
-    const historyText = historyContainer.innerText.slice(-1500);
+    const originalBtnHtml = aiBtn.innerHTML;
+    aiBtn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+    aiBtn.disabled = true;
+    promptInput.disabled = true;
 
     try {
-        msgInput.disabled = true;
-        msgInput.placeholder = 'AI генерирует ответ...';
+        // Получаем историю переписки из WebView
+        const historyResult = await data.webview.executeJavaScript(`
+            (function() {
+                // Пробуем разные селекторы для получения сообщений
+                let messages = [];
 
-        const systemPrompt = `Ты помощник оператора на сайте знакомств. Пиши ответы от лица девушки, ${prompt || 'естественно и романтично'}. Отвечай на последнее сообщение мужчины, учитывая контекст переписки. Пиши ТОЛЬКО текст ответа, без пояснений.`;
+                // Для чата
+                const chatMessages = document.querySelectorAll('.chat-message, .message-item, [class*="message"]');
+                chatMessages.forEach(msg => {
+                    const text = msg.innerText || msg.textContent;
+                    if (text && text.length > 2 && text.length < 1000) {
+                        messages.push(text.trim());
+                    }
+                });
+
+                // Если не нашли - берём весь контент области сообщений
+                if (messages.length === 0) {
+                    const chatArea = document.querySelector('.chat-body, .messages-list, .conversation, [class*="chat"], [class*="message"]');
+                    if (chatArea) {
+                        messages.push(chatArea.innerText.slice(-2000));
+                    }
+                }
+
+                return messages.slice(-10).join('\\n---\\n');
+            })()
+        `);
+
+        const historyText = historyResult || 'Нет истории';
+        console.log('[AI] История из WebView:', historyText.slice(0, 200));
+
+        const isChat = data.type === 'chat';
+        const systemPrompt = isChat
+            ? `Ты помощник оператора на сайте знакомств. Пиши короткие ответы (1-2 предложения) в чат от лица девушки, ${prompt || 'естественно и игриво'}. Отвечай на последнее сообщение мужчины. Пиши ТОЛЬКО текст ответа, без пояснений и кавычек.`
+            : `Ты помощник оператора на сайте знакомств. Пиши ответы (2-4 предложения) на письма от лица девушки, ${prompt || 'тепло и романтично'}. Отвечай на последнее сообщение мужчины. Пиши ТОЛЬКО текст ответа, без пояснений и кавычек.`;
 
         const response = await axios.post('https://api.openai.com/v1/chat/completions', {
             model: 'gpt-4o-mini',
@@ -484,7 +397,8 @@ async function generateResponseWindowAI(windowId) {
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: `Контекст переписки:\n${historyText}\n\nНапиши ответ:` }
             ],
-            max_tokens: 300
+            max_tokens: 300,
+            temperature: 0.8
         }, {
             headers: {
                 'Authorization': `Bearer ${globalSettings.apiKey}`,
@@ -493,15 +407,62 @@ async function generateResponseWindowAI(windowId) {
         });
 
         if (response.data.choices && response.data.choices[0]) {
-            msgInput.value = response.data.choices[0].message.content.trim();
+            const generatedText = response.data.choices[0].message.content.trim();
+            console.log('[AI] Сгенерировано:', generatedText);
+
+            // Вставляем текст в поле ввода на сайте
+            const insertResult = await data.webview.executeJavaScript(`
+                (function() {
+                    const text = ${JSON.stringify(generatedText)};
+
+                    // Пробуем разные селекторы для поля ввода
+                    const selectors = [
+                        'textarea[name="message"]',
+                        'textarea.message-input',
+                        'textarea[placeholder*="message"]',
+                        'textarea[placeholder*="Message"]',
+                        'textarea',
+                        'input[type="text"][name="message"]',
+                        '[contenteditable="true"]'
+                    ];
+
+                    for (const selector of selectors) {
+                        const input = document.querySelector(selector);
+                        if (input) {
+                            if (input.tagName === 'TEXTAREA' || input.tagName === 'INPUT') {
+                                input.value = text;
+                                input.dispatchEvent(new Event('input', { bubbles: true }));
+                                input.dispatchEvent(new Event('change', { bubbles: true }));
+                                input.focus();
+                            } else {
+                                // contenteditable
+                                input.innerText = text;
+                                input.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                            return { success: true, selector };
+                        }
+                    }
+                    return { success: false, error: 'Поле ввода не найдено' };
+                })()
+            `);
+
+            if (insertResult.success) {
+                console.log('[AI] Текст вставлен в:', insertResult.selector);
+                promptInput.value = '';
+            } else {
+                console.warn('[AI] Не удалось вставить:', insertResult.error);
+                showError('Не удалось вставить текст. Скопируйте: ' + generatedText.slice(0, 50) + '...');
+                // Копируем в буфер обмена как fallback
+                navigator.clipboard.writeText(generatedText).catch(() => {});
+            }
         }
 
     } catch (err) {
         console.error('AI Error:', err);
-        showError('Ошибка AI генерации');
+        showError('Ошибка AI генерации: ' + (err.response?.data?.error?.message || err.message));
     } finally {
-        msgInput.disabled = false;
-        msgInput.placeholder = 'Сообщение...';
-        msgInput.focus();
+        aiBtn.innerHTML = originalBtnHtml;
+        aiBtn.disabled = false;
+        promptInput.disabled = false;
     }
 }
