@@ -1525,20 +1525,28 @@ class AccountBot {
 
     // Отправить автоответ
     async sendAutoReply(recipientId) {
+        console.log(`[AutoReply] 🚀 sendAutoReply вызван для ${recipientId}`);
+
         const queueItem = this.autoReplyQueue[recipientId];
-        if (!queueItem) return;
+        if (!queueItem) {
+            console.log(`[AutoReply] ❌ Нет записи в очереди для ${recipientId}`);
+            return;
+        }
 
         const autoReplies = this.chatSettings.autoReplies;
         const currentIndex = queueItem.currentIndex;
+        console.log(`[AutoReply] Отправка автоответа #${currentIndex + 1} для ${queueItem.partnerName}`);
 
         if (currentIndex >= autoReplies.length) {
-            // Все автоответы отправлены - добавляем в ЧС
+            // Все автоответы отправлены
             this.finishAutoReplyChain(recipientId, queueItem.partnerName);
             return;
         }
 
         const reply = autoReplies[currentIndex];
         const partnerName = queueItem.partnerName;
+
+        console.log(`[AutoReply] Текст: "${reply.text.substring(0, 50)}..."`);
 
         try {
             // Подготавливаем текст с макросами
@@ -1549,9 +1557,13 @@ class AccountBot {
                 Country: ''
             });
 
+            console.log(`[AutoReply] Отправляю через /chat-send: recipientId=${recipientId}, body="${msgBody.substring(0, 50)}..."`);
+
             // Отправляем через chat-send API
             const payload = { recipientId: parseInt(recipientId), body: msgBody };
             await makeApiRequest(this, 'POST', '/chat-send', payload);
+
+            console.log(`[AutoReply] ✅ Успешно отправлено!`);
 
             // Отслеживаем статистику
             const convData = this.trackConversation(recipientId);
