@@ -469,6 +469,19 @@ class AccountBot {
                         ? messageBody.substring(0, 50) + '...'
                         : messageBody;
 
+                    // === СРАЗУ ДОБАВЛЯЕМ В ЧС ЧАТА ===
+                    const partnerIdStr = partnerId.toString();
+                    if (!this.chatSettings.blacklist.includes(partnerIdStr)) {
+                        this.chatSettings.blacklist.push(partnerIdStr);
+                        saveBlacklistToServer(this.displayId, 'chat', this.chatSettings.blacklist);
+                        console.log(`[Lababot] ✅ ${partnerName} (${partnerId}) добавлен в ЧС чата`);
+
+                        // Обновляем UI blacklist если эта вкладка активна и режим Chat
+                        if (activeTabId === this.id && globalMode === 'chat') {
+                            renderBlacklist(this.id);
+                        }
+                    }
+
                     // Отправляем на сервер статистики
                     sendIncomingMessageToLababot({
                         botId: this.id,
@@ -576,22 +589,38 @@ class AccountBot {
                 const newMessages = msgs.filter(m => m.MessageId > this.lastMailId);
                 
                 newMessages.reverse().forEach(msg => {
+                    const partnerId = msg.User.AccountId;
+                    const partnerName = msg.User.Name || `ID ${partnerId}`;
+
+                    // === СРАЗУ ДОБАВЛЯЕМ В ЧС ПИСЕМ ===
+                    const partnerIdStr = partnerId.toString();
+                    if (!this.mailSettings.blacklist.includes(partnerIdStr)) {
+                        this.mailSettings.blacklist.push(partnerIdStr);
+                        saveBlacklistToServer(this.displayId, 'mail', this.mailSettings.blacklist);
+                        console.log(`[Lababot] ✅ ${partnerName} (${partnerId}) добавлен в ЧС писем`);
+
+                        // Обновляем UI blacklist если эта вкладка активна и режим Mail
+                        if (activeTabId === this.id && globalMode === 'mail') {
+                            renderBlacklist(this.id);
+                        }
+                    }
+
                     // Отправляем входящее сообщение на сервер статистики
                     sendIncomingMessageToLababot({
                         botId: this.id,
                         profileId: this.displayId,
-                        manId: msg.User.AccountId,
-                        manName: msg.User.Name,
+                        manId: partnerId,
+                        manName: partnerName,
                         messageId: msg.MessageId,
                         type: 'letter'
                     });
 
                     if (!msg.IsReplied) {
                         Logger.add(
-                            `💌 Входящее письмо от <b>${msg.User.Name || `ID ${msg.User.AccountId}`}</b> (Ждет ответа)`,
+                            `💌 Входящее письмо от <b>${partnerName}</b> (Ждет ответа)`,
                             'mail',
                             this.id,
-                            { partnerId: msg.User.AccountId, partnerName: msg.User.Name, messageId: msg.MessageId }
+                            { partnerId: partnerId, partnerName: partnerName, messageId: msg.MessageId }
                         );
                         // playSound('message') убран - Logger.add уже воспроизводит звук для type='mail'
                     }
@@ -1458,11 +1487,7 @@ class AccountBot {
         if (this.chatSettings.autoReplies.length === 0) return;
         if (this.autoReplyQueue[recipientId]) return; // Уже в очереди
 
-        // Проверяем, не в ЧС ли этот пользователь
-        if (this.chatSettings.blacklist.includes(recipientId.toString())) {
-            console.log(`[AutoReply] ${recipientId} уже в ЧС, пропускаем`);
-            return;
-        }
+        // НЕ проверяем ЧС - пользователь уже добавлен в ЧС, но автоответы должны отправиться
 
         const firstReply = this.chatSettings.autoReplies[0];
         if (!firstReply) return;
@@ -1593,7 +1618,7 @@ class AccountBot {
         }
     }
 
-    // Завершить цепочку автоответов - добавить в ЧС
+    // Завершить цепочку автоответов
     finishAutoReplyChain(recipientId, partnerName) {
         // Удаляем из очереди
         if (this.autoReplyQueue[recipientId]) {
@@ -1601,19 +1626,9 @@ class AccountBot {
             delete this.autoReplyQueue[recipientId];
         }
 
-        // Добавляем в ЧС
-        const recipientIdStr = recipientId.toString();
-        if (!this.chatSettings.blacklist.includes(recipientIdStr)) {
-            this.chatSettings.blacklist.push(recipientIdStr);
-            saveBlacklistToServer(this.displayId, 'chat', this.chatSettings.blacklist);
-            this.log(`🤖 Автоответы завершены, ${partnerName} добавлен в ЧС`);
-            console.log(`[AutoReply] Цепочка завершена для ${partnerName}, добавлен в ЧС`);
-
-            // Обновляем UI blacklist если эта вкладка активна
-            if (activeTabId === this.id) {
-                renderBlacklist(this.id);
-            }
-        }
+        // В ЧС уже добавлен при получении сообщения, просто логируем завершение
+        this.log(`🤖 Автоответы завершены для ${partnerName}`);
+        console.log(`[AutoReply] Цепочка завершена для ${partnerName}`);
     }
 
     // Отменить автоответы для пользователя
