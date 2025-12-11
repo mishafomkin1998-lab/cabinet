@@ -1,0 +1,62 @@
+let axios;
+try { axios = require('axios'); } catch(e) { axios = window.axios; }
+
+const audioFiles = {
+    online: new Audio('Sound/Online.mp3'),
+    message: new Audio('Sound/Message.mp3'),
+    chat: new Audio('Sound/Chat.mp3')
+};
+Object.values(audioFiles).forEach(a => a.load());
+
+function playSound(type) {
+    if(!globalSettings.soundsEnabled) return;
+    try {
+        if(type === 'online') audioFiles.online.play().catch(()=>{});
+        else if(type === 'message') audioFiles.message.play().catch(()=>{});
+        else if (type === 'chat') audioFiles.chat.play().catch(()=>{});
+    } catch(e) { console.warn("Audio play error", e); }
+}
+
+let bots = {};
+let botTemplates = JSON.parse(localStorage.getItem('botTemplates')) || {};
+let accountPreferences = JSON.parse(localStorage.getItem('accountPreferences')) || {};
+
+let defaultSettings = {
+    lang: 'ru', theme: 'light', proxy: '', proxyURL: '', proxyAI: '',
+    hotkeys: true, myPrompt: '', apiKey: '',
+    soundsEnabled: true, confirmTabClose: true, extendedFeatures: true,
+    skipDeleteConfirm: false, // Не спрашивать об удалении шаблона
+    translatorId: null, // ID переводчика для статистики
+    aiReplyPrompt: '', // Промпт для AI ответов на письма
+    // Прокси для анкет по позициям (1-10, 11-20, 21-30, 31-40, 41-50, 51-60)
+    proxy1: '', proxy2: '', proxy3: '', proxy4: '', proxy5: '', proxy6: '',
+    // Отключенные статусы (пропускаются в авто-режиме)
+    disabledStatuses: []
+};
+
+let globalSettings = JSON.parse(localStorage.getItem('globalSettings')) || defaultSettings;
+globalSettings = { ...defaultSettings, ...globalSettings };
+
+let globalMode = 'mail';
+let activeTabId = null;
+let currentModalBotId = null;
+let editingTemplateIndex = null;
+let editingBotId = null;
+let currentStatsType = null;
+let isShiftPressed = false; // Глобальное отслеживание Shift для bulk-действий
+let shiftWasPressed = false; // Сохраняет состояние Shift при mousedown (для select/checkbox)
+
+let minichatBotId = null;
+let minichatPartnerId = null;
+let minichatLastMessageId = 0;
+let minichatType = 'mail'; // 'mail' или 'chat'
+
+// ============= API ДЛЯ ОТПРАВКИ ДАННЫХ НА LABABOT SERVER =============
+const LABABOT_SERVER = 'http://188.137.253.169:3000';
+
+// Вспомогательные функции для работы с данными
+
+// Генерация уникального conversation ID для диалога
+function generateConvId(botId, recipientId) {
+    return `conv_${botId}_${recipientId}`;
+}
