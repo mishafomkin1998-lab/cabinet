@@ -157,17 +157,32 @@ router.get('/', asyncHandler(async (req, res) => {
 
     /**
      * Запрос 6: Входящие сообщения от мужчин за выбранный период
+     * Используем buildStatsFilter для фильтрации по админу/переводчику
      */
-    let incomingWhereClause = '';
     let incomingParams = [periodFrom, periodTo];
+    let incomingFilter = '';
+    let incomingParamIndex = 3;
 
-    if (role === 'translator' && userId) {
-        incomingWhereClause = `AND i.translator_id = $3`;
+    // Строим фильтр с учётом выбранного админа/переводчика
+    if (filterTranslatorId) {
+        incomingFilter = `AND i.translator_id = $${incomingParamIndex}`;
+        incomingParams.push(filterTranslatorId);
+        incomingParamIndex++;
+    } else if (filterAdminId) {
+        // Фильтр по админу: админ напрямую ИЛИ переводчики этого админа
+        incomingFilter = `AND (i.admin_id = $${incomingParamIndex} OR i.translator_id IN (SELECT id FROM users WHERE owner_id = $${incomingParamIndex}))`;
+        incomingParams.push(filterAdminId);
+        incomingParamIndex++;
+    } else if (role === 'translator' && userId) {
+        incomingFilter = `AND i.translator_id = $${incomingParamIndex}`;
         incomingParams.push(userId);
+        incomingParamIndex++;
     } else if (role === 'admin' && userId) {
-        incomingWhereClause = `AND i.admin_id = $3`;
+        incomingFilter = `AND i.admin_id = $${incomingParamIndex}`;
         incomingParams.push(userId);
+        incomingParamIndex++;
     }
+    // director видит все
 
     const incomingQuery = `
         SELECT
@@ -200,7 +215,7 @@ router.get('/', asyncHandler(async (req, res) => {
         FROM incoming_messages i
         WHERE i.created_at >= $1::date
           AND i.created_at < ($2::date + interval '1 day')
-          ${incomingWhereClause}
+          ${incomingFilter}
     `;
 
     // DEBUG: Логируем запрос входящих
@@ -232,15 +247,30 @@ router.get('/', asyncHandler(async (req, res) => {
 
     /**
      * Функция расчета времени работы по пингам активности
+     * Поддерживает фильтрацию по админу/переводчику
      */
-    async function calculateWorkTime(dateFrom, dateTo, userId, role) {
+    async function calculateWorkTime(dateFrom, dateTo, options = {}) {
+        const { userId, role, filterAdminId, filterTranslatorId } = options;
         let workTimeParams = [dateFrom, dateTo];
         let workTimeFilter = '';
+        let paramIndex = 3;
 
-        if (userId && (role === 'translator' || role === 'admin')) {
-            workTimeFilter = 'AND user_id = $3';
+        // Строим фильтр с учётом выбранного админа/переводчика
+        if (filterTranslatorId) {
+            workTimeFilter = `AND user_id = $${paramIndex}`;
+            workTimeParams.push(filterTranslatorId);
+            paramIndex++;
+        } else if (filterAdminId) {
+            // Фильтр по админу: админ сам ИЛИ переводчики этого админа
+            workTimeFilter = `AND (user_id = $${paramIndex} OR user_id IN (SELECT id FROM users WHERE owner_id = $${paramIndex}))`;
+            workTimeParams.push(filterAdminId);
+            paramIndex++;
+        } else if (userId && (role === 'translator' || role === 'admin')) {
+            workTimeFilter = `AND user_id = $${paramIndex}`;
             workTimeParams.push(userId);
+            paramIndex++;
         }
+        // director без фильтра видит всех
 
         let workTimeMinutes = 0;
         try {
@@ -283,7 +313,7 @@ router.get('/', asyncHandler(async (req, res) => {
     }
 
     // Время работы за выбранный период
-    const workTimeMinutes = await calculateWorkTime(periodFrom, periodTo, userId, role);
+    const workTimeMinutes = await calculateWorkTime(periodFrom, periodTo, { userId, role, filterAdminId, filterTranslatorId });
     const workTimeHours = Math.floor(workTimeMinutes / 60);
     const workTimeMins = workTimeMinutes % 60;
     const workTimeFormatted = `${workTimeHours}ч ${workTimeMins}м`;
@@ -292,7 +322,7 @@ router.get('/', asyncHandler(async (req, res) => {
     // Используем уже объявленную переменную now (строка 30)
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-    const workTimeMonthMinutes = await calculateWorkTime(monthStart, monthEnd, userId, role);
+    const workTimeMonthMinutes = await calculateWorkTime(monthStart, monthEnd, { userId, role, filterAdminId, filterTranslatorId });
     const workTimeMonthHours = Math.floor(workTimeMonthMinutes / 60);
     const workTimeMonthMins = workTimeMonthMinutes % 60;
     const workTimeMonthFormatted = `${workTimeMonthHours}ч ${workTimeMonthMins}м`;
