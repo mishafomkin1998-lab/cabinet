@@ -312,16 +312,23 @@ async function updateGlobalMenOnline() {
     const bot = bots[randomBotId];
 
     if (!bot || !bot.token) {
-        if (el) el.textContent = bot?.lastOnlineCount || '0';
+        // Используем кэшированное значение от любого бота
+        for (const bid of botIds) {
+            if (bots[bid] && bots[bid].lastOnlineCount) {
+                if (el) el.textContent = bots[bid].lastOnlineCount;
+                return;
+            }
+        }
+        if (el) el.textContent = '0';
         return;
     }
 
     try {
         // Делаем принудительный запрос к API для получения реального числа
-        const response = await makeApiRequest(bot, 'GET', '/api/users/online?limit=1');
-        if (response && response.data) {
-            // Получаем общее количество из ответа или длину массива
-            const totalCount = response.data.Total || response.data.length || 0;
+        const response = await makeApiRequest(bot, 'GET', '/api/users/online');
+        if (response && response.data && response.data.Users) {
+            // API возвращает { Users: [...] }
+            const totalCount = response.data.Users.length;
             bot.lastOnlineCount = totalCount;
             if (el) el.textContent = totalCount;
             console.log(`👥 Мужчин онлайн: ${totalCount} (от ${bot.displayId})`);
@@ -338,7 +345,7 @@ async function updateGlobalMenOnline() {
 function startGlobalMenOnlineUpdater() {
     updateGlobalMenOnline();
     if (globalMenOnlineInterval) clearInterval(globalMenOnlineInterval);
-    globalMenOnlineInterval = setInterval(updateGlobalMenOnline, 30000); // Каждые 30 сек
+    globalMenOnlineInterval = setInterval(updateGlobalMenOnline, 600000); // Каждые 10 минут
 }
 
 async function makeApiRequest(bot, method, path, data = null, isRetry = false) {
