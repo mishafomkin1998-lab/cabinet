@@ -547,38 +547,23 @@
                             this.botsStatus = data.botsSummary || { online: 0, offline: 0, total: 0 };
 
                             // data.bots - это уже уникальные программы-боты с сервера
-                            // Фильтруем только активные за последний час
-                            const oneHourAgo = Date.now() - 60 * 60 * 1000;
-
+                            // Сервер уже фильтрует ботов за последний час, повторная фильтрация не нужна
                             const rawBots = data.bots || [];
-                            console.log('🔍 Фильтрация ботов:');
-                            console.log('   До фильтрации:', rawBots.length);
+                            console.log('🤖 Получено ботов с сервера:', rawBots.length);
 
-                            this.bots = rawBots
-                                .filter(b => {
-                                    const lastHeartbeat = b.lastHeartbeat ? new Date(b.lastHeartbeat).getTime() : 0;
-                                    const passesFilter = lastHeartbeat > oneHourAgo;
-                                    if (!passesFilter) {
-                                        console.log(`   ❌ Бот ${b.botId || b.bot_id} отфильтрован: lastHeartbeat=${b.lastHeartbeat}`);
-                                    }
-                                    return passesFilter;
-                                })
-                                .map(b => ({
-                                    id: b.botId || b.bot_id,
-                                    name: b.name || this.formatBotName(b.botId || b.bot_id),
-                                    icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
-                                    status: b.status === 'online' ? 'active' : 'inactive',
-                                    os: b.platform || 'Unknown',
-                                    ip: b.ip || '-',
-                                    version: b.version || '-',
-                                    lastHeartbeat: b.lastHeartbeat,
-                                    profilesCount: b.profilesCount || 0  // Количество анкет в этом боте
-                                }));
+                            this.bots = rawBots.map(b => ({
+                                id: b.botId || b.bot_id,
+                                name: b.name || this.formatBotName(b.botId || b.bot_id),
+                                icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
+                                status: b.status === 'online' ? 'active' : 'inactive',
+                                os: b.platform || 'Unknown',
+                                ip: b.ip || '-',
+                                version: b.version || '-',
+                                lastHeartbeat: b.lastHeartbeat,
+                                profilesCount: b.profilesCount || 0  // Количество анкет в этом боте
+                            }));
 
-                            console.log('   После фильтрации:', this.bots.length);
-                            if (this.bots.length > 0) {
-                                console.log('✅ Боты для отображения:', this.bots);
-                            }
+                            console.log('✅ Боты для отображения:', this.bots.length, this.bots);
 
                             // Обновляем статусы анкет из data.profiles (не из data.bots!)
                             if (data.profiles) {
