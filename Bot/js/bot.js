@@ -35,6 +35,21 @@
         let globalSettings = JSON.parse(localStorage.getItem('globalSettings')) || defaultSettings;
         globalSettings = { ...defaultSettings, ...globalSettings };
 
+        // ============= MACHINE ID (уникальный ID программы-бота) =============
+        // Генерируется один раз при первом запуске и сохраняется в localStorage
+        function getMachineId() {
+            let machineId = localStorage.getItem('machineId');
+            if (!machineId) {
+                // Генерируем уникальный ID для этой установки программы
+                machineId = 'machine_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
+                localStorage.setItem('machineId', machineId);
+                console.log(`🆔 Сгенерирован новый machineId: ${machineId}`);
+            }
+            return machineId;
+        }
+        const MACHINE_ID = getMachineId();
+        console.log(`🤖 Программа запущена с machineId: ${MACHINE_ID}`);
+
         let globalMode = 'mail';
         let activeTabId = null;
         let currentModalBotId = null;
@@ -72,12 +87,13 @@
         }
 
         // 1. Функция отправки сообщения на Lababot сервер (ПОЛНАЯ СПЕЦИФИКАЦИЯ)
+        // ВАЖНО: botId теперь это MACHINE_ID (ID программы), accountDisplayId - ID анкеты
         async function sendMessageToLababot(params) {
-            // Параметры: botId, accountDisplayId, recipientId, type, textContent, status,
+            // Параметры: botId (игнорируется, используется MACHINE_ID), accountDisplayId, recipientId, type, textContent, status,
             // responseTime, errorReason, isFirst, isLast, convId, mediaUrl, fileName, translatorId, usedAi, aiSessionId
 
             const {
-                botId,
+                botId,  // Оставляем для совместимости, но используем MACHINE_ID
                 accountDisplayId,
                 recipientId,
                 type,
@@ -95,11 +111,11 @@
                 aiSessionId = null
             } = params;
 
-            console.log(`📤 Отправляю сообщение на Lababot сервер: ${botId}, ${accountDisplayId}, ${recipientId}, ${type}`);
+            console.log(`📤 Отправляю сообщение на Lababot сервер: программа=${MACHINE_ID}, анкета=${accountDisplayId}, получатель=${recipientId}, тип=${type}`);
 
             try {
                 const payload = {
-                    botId: botId,
+                    botId: MACHINE_ID,  // ID программы-бота (один на всю программу)
                     accountDisplayId: accountDisplayId,
                     recipientId: String(recipientId),
                     type: type, // 'outgoing' (письмо $1.5) или 'chat_msg' (чат $0.15)
@@ -144,6 +160,7 @@
         }
 
         // 2. Функция отправки входящего сообщения от мужчины
+        // ВАЖНО: botId теперь это MACHINE_ID (ID программы)
         async function sendIncomingMessageToLababot(params) {
             const { botId, profileId, manId, manName, messageId, type = 'letter' } = params;
 
@@ -152,7 +169,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        botId: botId,
+                        botId: MACHINE_ID,  // ID программы-бота
                         profileId: profileId,
                         manId: String(manId),
                         manName: manName || null,
@@ -174,9 +191,10 @@
         }
 
         // 3. Функция отправки heartbeat
+        // ВАЖНО: botId теперь это MACHINE_ID (ID программы), а не ID анкеты!
         async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
-            console.log(`❤️ Отправляю heartbeat для ${displayId}`);
-            
+            console.log(`❤️ Отправляю heartbeat для анкеты ${displayId} (программа: ${MACHINE_ID})`);
+
             try {
                 const response = await fetch(`${LABABOT_SERVER}/api/heartbeat`, {
                     method: 'POST',
@@ -184,8 +202,8 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        botId: botId,
-                        accountDisplayId: displayId,
+                        botId: MACHINE_ID,  // ID программы-бота (один на всю программу)
+                        accountDisplayId: displayId,  // ID анкеты
                         status: status,
                         timestamp: new Date().toISOString(),
                         ip: '127.0.0.1',
@@ -206,9 +224,10 @@
         }
 
         // 3. Функция отправки ошибки
+        // ВАЖНО: botId теперь это MACHINE_ID (ID программы)
         async function sendErrorToLababot(botId, accountDisplayId, errorType, errorMessage) {
             console.log(`⚠️ Отправляю ошибку на Lababot сервер: ${errorType}`);
-            
+
             try {
                 const response = await fetch(`${LABABOT_SERVER}/api/error`, {
                     method: 'POST',
@@ -216,7 +235,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        botId: botId,
+                        botId: MACHINE_ID,  // ID программы-бота
                         accountDisplayId: accountDisplayId,
                         endpoint: 'bot_send_message',
                         errorType: errorType,

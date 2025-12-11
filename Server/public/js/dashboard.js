@@ -127,8 +127,8 @@
                     month: { letters: 0, chats: 0, uniqueMen: 0, incomingLetters: 0, incomingChats: 0 }
                 },
 
-                // Статус ботов
-                botsStatus: { online: 0, idle: 0, offline: 0, never_connected: 0 },
+                // Статус ботов (программ, не анкет!)
+                botsStatus: { online: 0, offline: 0, total: 0 },
 
                 // Последняя активность
                 recentActivity: [],
@@ -537,58 +537,54 @@
                         const res = await fetch(`${API_BASE}/api/bots/status?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
                         const data = await res.json();
                         if (data.success) {
-                            this.botsStatus = data.summary;
+                            // ВАЖНО: используем botsSummary для статистики ПРОГРАММ-ботов, не анкет!
+                            this.botsStatus = data.botsSummary || { online: 0, offline: 0, total: 0 };
 
-                            // Группируем по botId чтобы получить уникальные боты
-                            // Показываем только активные боты (heartbeat за последний час)
-                            const botsMap = {};
+                            // data.bots - это уже уникальные программы-боты с сервера
+                            // Фильтруем только активные за последний час
                             const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
-                            data.bots.forEach(b => {
-                                const botId = b.botId || b.bot_id || b.profileId || b.profile_id;
-                                if (botId && botId !== 'null' && botId !== 'undefined') {
+                            this.bots = (data.bots || [])
+                                .filter(b => {
                                     const lastHeartbeat = b.lastHeartbeat ? new Date(b.lastHeartbeat).getTime() : 0;
-                                    const isRecentlyActive = lastHeartbeat > oneHourAgo;
+                                    return lastHeartbeat > oneHourAgo;
+                                })
+                                .map(b => ({
+                                    id: b.botId || b.bot_id,
+                                    name: b.name || this.formatBotName(b.botId || b.bot_id),
+                                    icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
+                                    status: b.status === 'online' ? 'active' : 'inactive',
+                                    os: b.platform || 'Unknown',
+                                    ip: b.ip || '-',
+                                    version: b.version || '-',
+                                    lastHeartbeat: b.lastHeartbeat,
+                                    profilesCount: b.profilesCount || 0  // Количество анкет в этом боте
+                                }));
 
-                                    // Показываем только недавно активные боты
-                                    if (!isRecentlyActive) return;
-
-                                    const isActive = b.status === 'online' || b.status === 'active' || b.status === 'idle';
-
-                                    if (!botsMap[botId]) {
-                                        botsMap[botId] = {
-                                            id: botId,
-                                            name: b.name || `Бот ${botId}`,
-                                            icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
-                                            status: isActive ? 'active' : 'inactive',
-                                            os: b.platform || 'Unknown',
-                                            ip: b.ip || '-',
-                                            version: b.version || '-',
-                                            lastHeartbeat: b.lastHeartbeat,
-                                            profilesCount: b.profilesCount || 1
-                                        };
-                                    } else {
-                                        botsMap[botId].profilesCount = (botsMap[botId].profilesCount || 0) + 1;
-                                        if (isActive) {
-                                            botsMap[botId].status = 'active';
-                                        }
+                            // Обновляем статусы анкет из data.profiles (не из data.bots!)
+                            if (data.profiles) {
+                                data.profiles.forEach(p => {
+                                    const profileId = p.profileId || p.profile_id;
+                                    const acc = this.accounts.find(a => a.id === profileId);
+                                    if (acc) {
+                                        acc.status = p.status || 'offline';
+                                        acc.lastOnline = p.lastHeartbeat ? new Date(p.lastHeartbeat).toLocaleString('ru-RU') : '-';
                                     }
-                                }
-                            });
-                            this.bots = Object.values(botsMap);
-
-                            // Также обновляем статусы анкет
-                            data.bots.forEach(b => {
-                                const profileId = b.profileId || b.profile_id;
-                                const acc = this.accounts.find(a => a.id === profileId);
-                                if (acc) {
-                                    const isOnline = b.status === 'online' || b.status === 'active';
-                                    acc.status = isOnline ? 'online' : (b.status === 'idle' ? 'working' : 'offline');
-                                    acc.lastOnline = b.lastHeartbeat ? new Date(b.lastHeartbeat).toLocaleString('ru-RU') : '-';
-                                }
-                            });
+                                });
+                            }
                         }
                     } catch (e) { console.error('loadBotsStatus error:', e); }
+                },
+
+                // Форматирование имени бота из machineId
+                formatBotName(machineId) {
+                    if (!machineId) return 'Неизвестный бот';
+                    // machine_1234567890123_abc123def -> "Бот abc123"
+                    const parts = machineId.split('_');
+                    if (parts.length >= 3) {
+                        return `Бот ${parts[2].substring(0, 6)}`;
+                    }
+                    return `Бот ${machineId.substring(0, 10)}`;
                 },
 
                 async loadTeam() {
