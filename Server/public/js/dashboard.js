@@ -855,6 +855,11 @@
                     this.activeSubmenu = 'general';
                     // Сохраняем активную вкладку в localStorage
                     localStorage.setItem('dashboard_activeMenu', menu);
+
+                    // При переключении на "Управление" загружаем статус ботов
+                    if (menu === 'control') {
+                        this.loadBotsStatus();
+                    }
                 },
 
                 setActiveSubmenu(submenu) {
