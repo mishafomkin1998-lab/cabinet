@@ -57,14 +57,27 @@ async function checkProfilePaymentStatus(profileId) {
 
 // Heartbeat (legacy)
 router.post('/heartbeat', asyncHandler(async (req, res) => {
-    const { botId, accountDisplayId, status, timestamp, ip, systemInfo } = req.body;
+    const {
+        botId, accountDisplayId, status, timestamp, ip,
+        // Новые расширенные поля
+        version, platform, uptime, memoryUsage,
+        profilesTotal, profilesRunning, profilesStopped, profilesList,
+        sessionStats, globalMode,
+        // Для обратной совместимости со старым форматом
+        systemInfo
+    } = req.body;
+
     const profileStatus = status || 'online';
-    const version = systemInfo?.version || null;
-    const platform = systemInfo?.platform || null;
+    // Поддержка старого и нового формата
+    const botVersion = version || systemInfo?.version || null;
+    const botPlatform = platform || systemInfo?.platform || null;
 
     // DEBUG: Логируем входящий heartbeat для диагностики
     console.log(`📥 Heartbeat получен: botId=${botId}, profileId=${accountDisplayId}, status=${profileStatus}`);
     console.log(`   botId начинается с "machine_": ${botId?.startsWith('machine_') ? 'ДА ✅' : 'НЕТ ❌'}`);
+    if (profilesTotal !== undefined) {
+        console.log(`   📊 Расширенные данные: анкет=${profilesTotal}, работают=${profilesRunning}, uptime=${uptime}s`);
+    }
 
     // Верификация отключена - теперь один MACHINE_ID может обслуживать много анкет
     // Проверка анкеты делается через allowed_profiles
@@ -136,15 +149,28 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
     );
 
     // 4. Обновляем/создаём запись бота в bots для dashboard + верификация ID
+    // Собираем расширенные данные в JSON
+    const extendedData = {
+        uptime: uptime || null,
+        memoryUsage: memoryUsage || null,
+        profilesTotal: profilesTotal || 0,
+        profilesRunning: profilesRunning || 0,
+        profilesStopped: profilesStopped || 0,
+        profilesList: profilesList || [],
+        sessionStats: sessionStats || null,
+        globalMode: globalMode || 'mail',
+        lastUpdate: new Date().toISOString()
+    };
+
     const existsBot = await pool.query(
         `SELECT verified_profile_id FROM bots WHERE bot_id = $1`, [botId]
     );
     if (existsBot.rows.length === 0) {
-        // Новый бот - сохраняем verified_profile_id
+        // Новый бот - сохраняем verified_profile_id и расширенные данные
         await pool.query(
-            `INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat, verified_profile_id, profile_verified_at)
-             VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW())`,
-            [botId, platform, ip || null, version, profileStatus, accountDisplayId]
+            `INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat, verified_profile_id, profile_verified_at, extended_data)
+             VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW(), $7)`,
+            [botId, botPlatform, ip || null, botVersion, profileStatus, accountDisplayId, JSON.stringify(extendedData)]
         );
         console.log(`🔐 Бот ${botId} верифицирован с анкетой ${accountDisplayId}`);
     } else {
@@ -153,16 +179,16 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
             // Если verified_profile_id ещё не установлен - устанавливаем
             await pool.query(
                 `UPDATE bots SET platform = COALESCE($1, platform), ip = COALESCE($2, ip), version = COALESCE($3, version),
-                 status = $4, last_heartbeat = NOW(), verified_profile_id = $5, profile_verified_at = NOW()
-                 WHERE bot_id = $6`,
-                [platform, ip || null, version, profileStatus, accountDisplayId, botId]
+                 status = $4, last_heartbeat = NOW(), verified_profile_id = $5, profile_verified_at = NOW(), extended_data = $6
+                 WHERE bot_id = $7`,
+                [botPlatform, ip || null, botVersion, profileStatus, accountDisplayId, JSON.stringify(extendedData), botId]
             );
             console.log(`🔐 Бот ${botId} верифицирован с анкетой ${accountDisplayId}`);
         } else {
             await pool.query(
                 `UPDATE bots SET platform = COALESCE($1, platform), ip = COALESCE($2, ip), version = COALESCE($3, version),
-                 status = $4, last_heartbeat = NOW() WHERE bot_id = $5`,
-                [platform, ip || null, version, profileStatus, botId]
+                 status = $4, last_heartbeat = NOW(), extended_data = $5 WHERE bot_id = $6`,
+                [botPlatform, ip || null, botVersion, profileStatus, JSON.stringify(extendedData), botId]
             );
         }
     }
@@ -370,57 +396,63 @@ router.get('/status', asyncHandler(async (req, res) => {
         };
     });
 
-    // 2. Получаем уникальные боты (программы) - один бот = одна строка
+    // 2. Получаем уникальные боты (программы) с расширенными данными
     // ВАЖНО: Показываем только настоящие программы-боты (machineId начинается с "machine_")
-    // Старые записи с "bot_" (уникальные для каждой анкеты) игнорируем
+    // Используем таблицу bots для получения extended_data
     const botsQuery = `
         SELECT
-            h.bot_id,
-            MAX(h.ip) as ip,
-            MAX(h.version) as version,
-            MAX(h.platform) as platform,
-            MAX(h.timestamp) as last_heartbeat,
-            COUNT(DISTINCT h.account_display_id) as profiles_count,
+            b.bot_id,
+            b.ip,
+            b.version,
+            b.platform,
+            b.last_heartbeat,
+            b.status,
+            b.extended_data,
             CASE
-                WHEN MAX(h.timestamp) > NOW() - INTERVAL '2 minutes' THEN 'online'
+                WHEN b.last_heartbeat > NOW() - INTERVAL '2 minutes' THEN 'online'
                 ELSE 'offline'
             END as bot_status
-        FROM heartbeats h
-        WHERE h.bot_id IS NOT NULL
-          AND h.bot_id != ''
-          AND h.bot_id LIKE 'machine_%'
-          AND h.timestamp > NOW() - INTERVAL '1 hour'
-        GROUP BY h.bot_id
-        ORDER BY last_heartbeat DESC
+        FROM bots b
+        WHERE b.bot_id IS NOT NULL
+          AND b.bot_id != ''
+          AND b.bot_id LIKE 'machine_%'
+          AND b.last_heartbeat > NOW() - INTERVAL '1 hour'
+        ORDER BY b.last_heartbeat DESC
     `;
     const botsResult = await pool.query(botsQuery);
 
     // DEBUG: Логируем результат запроса ботов
-    console.log(`🤖 Bots query (machine_* only) returned ${botsResult.rows.length} rows:`,
-        botsResult.rows.map(r => ({ botId: r.bot_id, profiles: r.profiles_count, ts: r.last_heartbeat })));
-
-    // DEBUG: Проверяем сколько вообще уникальных bot_id за последний час (для диагностики)
-    const allBotsDebug = await pool.query(`
-        SELECT bot_id, COUNT(*) as cnt
-        FROM heartbeats
-        WHERE timestamp > NOW() - INTERVAL '1 hour'
-        GROUP BY bot_id
-        ORDER BY cnt DESC
-        LIMIT 10
-    `);
-    console.log(`🔍 Все bot_id за последний час:`, allBotsDebug.rows.map(r => `${r.bot_id} (${r.cnt})`));
+    console.log(`🤖 Bots query (machine_* only) returned ${botsResult.rows.length} rows`);
 
     const botStatusCounts = { online: 0, offline: 0 };
     const uniqueBots = botsResult.rows.map(row => {
         botStatusCounts[row.bot_status]++;
+
+        // Парсим extended_data если есть
+        let extData = {};
+        if (row.extended_data) {
+            try {
+                extData = typeof row.extended_data === 'string'
+                    ? JSON.parse(row.extended_data)
+                    : row.extended_data;
+            } catch (e) { extData = {}; }
+        }
+
         return {
             botId: row.bot_id,
             ip: row.ip || '-',
             version: row.version || '-',
             platform: row.platform || 'Unknown',
             lastHeartbeat: row.last_heartbeat,
-            profilesCount: parseInt(row.profiles_count) || 0,
-            status: row.bot_status
+            status: row.bot_status,
+            // Расширенные данные
+            profilesCount: extData.profilesTotal || 0,
+            profilesRunning: extData.profilesRunning || 0,
+            profilesStopped: extData.profilesStopped || 0,
+            uptime: extData.uptime || 0,
+            memoryUsage: extData.memoryUsage || null,
+            globalMode: extData.globalMode || 'mail',
+            sessionStats: extData.sessionStats || null
         };
     });
 

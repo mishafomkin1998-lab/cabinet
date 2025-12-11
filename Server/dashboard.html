@@ -1212,8 +1212,41 @@
                                         </div>
                                     </div>
                                     
+                                    <!-- Статистика сессии -->
+                                    <div class="grid grid-cols-3 gap-3 mb-3">
+                                        <div class="bg-blue-50 rounded-lg p-2 text-center">
+                                            <div class="text-lg font-bold text-blue-600" x-text="bot.sessionStats?.mailSent || 0"></div>
+                                            <div class="text-xs text-blue-500">Письма</div>
+                                        </div>
+                                        <div class="bg-purple-50 rounded-lg p-2 text-center">
+                                            <div class="text-lg font-bold text-purple-600" x-text="bot.sessionStats?.chatSent || 0"></div>
+                                            <div class="text-xs text-purple-500">Чаты</div>
+                                        </div>
+                                        <div class="bg-red-50 rounded-lg p-2 text-center">
+                                            <div class="text-lg font-bold text-red-600" x-text="bot.sessionStats?.errors || 0"></div>
+                                            <div class="text-xs text-red-500">Ошибки</div>
+                                        </div>
+                                    </div>
+
                                     <!-- Детальная информация -->
                                     <div class="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                                        <div>
+                                            <span class="font-medium">Анкет:</span>
+                                            <span x-text="bot.profilesCount"></span>
+                                            <span class="text-green-600" x-show="bot.profilesRunning > 0" x-text="'(' + bot.profilesRunning + ' работают)'"></span>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium">Режим:</span>
+                                            <span x-text="formatMode(bot.globalMode)"></span>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium">Uptime:</span>
+                                            <span x-text="formatUptime(bot.uptime)"></span>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium">Память:</span>
+                                            <span x-text="bot.memoryUsage ? bot.memoryUsage + ' MB' : '-'"></span>
+                                        </div>
                                         <div>
                                             <span class="font-medium">IP:</span>
                                             <span x-text="bot.ip"></span>
@@ -1222,14 +1255,11 @@
                                             <span class="font-medium">Версия:</span>
                                             <span x-text="bot.version"></span>
                                         </div>
-                                        <div>
-                                            <span class="font-medium">Анкет:</span>
-                                            <span x-text="bot.profilesCount"></span>
-                                        </div>
-                                        <div>
-                                            <span class="font-medium">Последний отклик:</span>
-                                            <span x-text="bot.lastHeartbeat ? new Date(bot.lastHeartbeat).toLocaleString('ru-RU') : '-'"></span>
-                                        </div>
+                                    </div>
+
+                                    <!-- Последний отклик -->
+                                    <div class="mt-2 text-xs text-gray-400">
+                                        Последний отклик: <span x-text="bot.lastHeartbeat ? new Date(bot.lastHeartbeat).toLocaleString('ru-RU') : '-'"></span>
                                     </div>
 
                                     <!-- Если бот неактивен - возможность изменить название -->

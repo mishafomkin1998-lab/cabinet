@@ -509,6 +509,8 @@ async function migrateBotsTable() {
     await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'offline'`);
     await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS last_heartbeat TIMESTAMP`);
     await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`);
+    // Расширенные данные бота (uptime, memory, profilesCount, sessionStats и т.д.)
+    await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS extended_data JSONB`);
 
     try {
         await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS bots_bot_id_unique ON bots(bot_id) WHERE bot_id IS NOT NULL`);

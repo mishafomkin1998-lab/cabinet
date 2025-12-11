@@ -14,6 +14,80 @@ function getMachineId() {
 const MACHINE_ID = getMachineId();
 console.log(`🤖 Программа запущена с machineId: ${MACHINE_ID}`);
 
+// ============= СТАТИСТИКА СЕССИИ =============
+// Отслеживает статистику с момента запуска программы
+const sessionStats = {
+    startedAt: new Date().toISOString(),
+    mailSent: 0,
+    chatSent: 0,
+    errors: 0,
+
+    // Методы для обновления статистики
+    addMailSent() { this.mailSent++; },
+    addChatSent() { this.chatSent++; },
+    addError() { this.errors++; },
+
+    // Получить uptime в секундах
+    getUptime() {
+        return Math.floor((Date.now() - new Date(this.startedAt).getTime()) / 1000);
+    },
+
+    // Получить статистику для отправки
+    getStats() {
+        return {
+            startedAt: this.startedAt,
+            mailSent: this.mailSent,
+            chatSent: this.chatSent,
+            errors: this.errors,
+            uptime: this.getUptime()
+        };
+    }
+};
+
+// Функция сбора информации о всех ботах (анкетах)
+function collectBotsInfo() {
+    // bots - глобальная переменная из config.js
+    if (typeof bots === 'undefined' || !bots) {
+        return { total: 0, running: 0, stopped: 0, list: [] };
+    }
+
+    const botsList = Object.values(bots);
+    const list = [];
+    let running = 0;
+    let stopped = 0;
+
+    for (const bot of botsList) {
+        const isRunning = bot.mailRunning || bot.chatRunning || false;
+        if (isRunning) running++;
+        else stopped++;
+
+        list.push({
+            profileId: bot.displayId,
+            status: isRunning ? 'running' : 'stopped',
+            mode: bot.mailRunning ? 'mail' : (bot.chatRunning ? 'chat' : 'idle')
+        });
+    }
+
+    return {
+        total: botsList.length,
+        running: running,
+        stopped: stopped,
+        list: list
+    };
+}
+
+// Получить использование памяти (если доступно)
+function getMemoryUsage() {
+    if (typeof process !== 'undefined' && process.memoryUsage) {
+        const mem = process.memoryUsage();
+        return Math.round(mem.heapUsed / 1024 / 1024); // MB
+    }
+    if (performance && performance.memory) {
+        return Math.round(performance.memory.usedJSHeapSize / 1024 / 1024); // MB
+    }
+    return null;
+}
+
 // Конвертация миллисекунд в формат PostgreSQL INTERVAL (HH:MM:SS)
 function millisecondsToInterval(ms) {
     if (!ms || ms <= 0) return null;
@@ -86,6 +160,16 @@ async function sendMessageToLababot(params) {
         console.log(`✅ Ответ от Lababot сервера:`, data);
 
         if (data.status === 'ok' || data.status === 'ignored') {
+            // Обновляем статистику сессии
+            if (status === 'success') {
+                if (type === 'outgoing') {
+                    sessionStats.addMailSent();
+                } else if (type === 'chat_msg') {
+                    sessionStats.addChatSent();
+                }
+            } else if (status === 'failed') {
+                sessionStats.addError();
+            }
             return { success: true, data: data };
         } else {
             console.warn(`⚠️ Lababot сервер вернул:`, data);
@@ -93,6 +177,7 @@ async function sendMessageToLababot(params) {
         }
     } catch (error) {
         console.error(`❌ Ошибка отправки на Lababot сервер:`, error);
+        sessionStats.addError();
         return { success: false, error: error.message };
     }
 }
@@ -128,28 +213,56 @@ async function sendIncomingMessageToLababot(params) {
     }
 }
 
-// 3. Функция отправки heartbeat
+// 3. Функция отправки heartbeat с расширенной статистикой
 // ВАЖНО: botId теперь это MACHINE_ID (ID программы), а не ID анкеты!
 async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
     console.log(`❤️ Отправляю heartbeat для анкеты ${displayId} (программа: ${MACHINE_ID})`);
 
     try {
+        // Собираем информацию о всех анкетах
+        const botsInfo = collectBotsInfo();
+        const stats = sessionStats.getStats();
+        const memoryMB = getMemoryUsage();
+
+        // Определяем текущий глобальный режим
+        const currentMode = (typeof globalMode !== 'undefined') ? globalMode : 'mail';
+
+        const payload = {
+            botId: MACHINE_ID,  // ID программы-бота (один на всю программу)
+            accountDisplayId: displayId,  // ID анкеты (для совместимости)
+            status: status,
+            timestamp: new Date().toISOString(),
+
+            // Расширенная информация о программе
+            version: '10.0',
+            platform: navigator.platform || 'Unknown',
+            uptime: stats.uptime,  // Секунды с запуска
+            memoryUsage: memoryMB,  // MB
+
+            // Информация об анкетах
+            profilesTotal: botsInfo.total,
+            profilesRunning: botsInfo.running,
+            profilesStopped: botsInfo.stopped,
+            profilesList: botsInfo.list,  // Список всех анкет с их статусами
+
+            // Статистика за сессию
+            sessionStats: {
+                startedAt: stats.startedAt,
+                mailSent: stats.mailSent,
+                chatSent: stats.chatSent,
+                errors: stats.errors
+            },
+
+            // Текущий режим работы
+            globalMode: currentMode
+        };
+
         const response = await fetch(`${LABABOT_SERVER}/api/heartbeat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                botId: MACHINE_ID,  // ID программы-бота (один на всю программу)
-                accountDisplayId: displayId,  // ID анкеты
-                status: status,
-                timestamp: new Date().toISOString(),
-                ip: '127.0.0.1',
-                systemInfo: {
-                    version: '10.0',
-                    platform: navigator.platform
-                }
-            })
+            body: JSON.stringify(payload)
         });
 
         const data = await response.json();

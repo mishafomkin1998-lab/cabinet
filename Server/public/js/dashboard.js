@@ -560,7 +560,14 @@
                                 ip: b.ip || '-',
                                 version: b.version || '-',
                                 lastHeartbeat: b.lastHeartbeat,
-                                profilesCount: b.profilesCount || 0  // Количество анкет в этом боте
+                                // Расширенные данные
+                                profilesCount: b.profilesCount || 0,
+                                profilesRunning: b.profilesRunning || 0,
+                                profilesStopped: b.profilesStopped || 0,
+                                uptime: b.uptime || 0,
+                                memoryUsage: b.memoryUsage || null,
+                                globalMode: b.globalMode || 'mail',
+                                sessionStats: b.sessionStats || { mailSent: 0, chatSent: 0, errors: 0 }
                             }));
 
                             console.log('✅ Боты для отображения:', this.bots.length, this.bots);
@@ -589,6 +596,22 @@
                         return `Бот ${parts[2].substring(0, 6)}`;
                     }
                     return `Бот ${machineId.substring(0, 10)}`;
+                },
+
+                // Форматирование uptime из секунд в читаемый формат
+                formatUptime(seconds) {
+                    if (!seconds || seconds <= 0) return '-';
+                    const hours = Math.floor(seconds / 3600);
+                    const minutes = Math.floor((seconds % 3600) / 60);
+                    if (hours > 0) {
+                        return `${hours}ч ${minutes}м`;
+                    }
+                    return `${minutes}м`;
+                },
+
+                // Форматирование режима работы
+                formatMode(mode) {
+                    return mode === 'mail' ? 'Письма' : (mode === 'chat' ? 'Чаты' : mode);
                 },
 
                 async loadTeam() {
