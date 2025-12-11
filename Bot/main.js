@@ -13,6 +13,20 @@ app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 // =======================================================
 
+// Переменные транскрипции для контекстного меню
+const TRANSCRIPTION_VARS = [
+    { var: '{name}', label: '{name} - Имя' },
+    { var: '{age}', label: '{age} - Возраст' },
+    { var: '{city}', label: '{city} - Город' },
+    { var: '{country}', label: '{country} - Страна' },
+    { var: '{countryCode}', label: '{countryCode} - Код страны' },
+    { var: '{accountId}', label: '{accountId} - ID аккаунта' },
+    { var: '{birthday}', label: '{birthday} - День рождения' },
+    { var: '{ageFrom}', label: '{ageFrom} - Ищет от (возраст)' },
+    { var: '{ageTo}', label: '{ageTo} - Ищет до (возраст)' },
+    { var: '{profilePhoto}', label: '{profilePhoto} - URL фото' }
+];
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1400,
@@ -29,6 +43,54 @@ function createWindow() {
 
     mainWindow.setMenuBarVisibility(false);
     mainWindow.loadFile('index.html');
+
+    // Контекстное меню для главного окна с переменными транскрипции
+    mainWindow.webContents.on('context-menu', (e, params) => {
+        // Проверяем, что клик был в textarea (editable field)
+        if (params.isEditable) {
+            const transcriptionSubmenu = TRANSCRIPTION_VARS.map(item => ({
+                label: item.label,
+                click: () => {
+                    // Вставляем переменную в текущее поле
+                    mainWindow.webContents.executeJavaScript(`
+                        (function() {
+                            const el = document.activeElement;
+                            if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')) {
+                                const start = el.selectionStart;
+                                const end = el.selectionEnd;
+                                const text = el.value;
+                                el.value = text.substring(0, start) + '${item.var}' + text.substring(end);
+                                el.selectionStart = el.selectionEnd = start + '${item.var}'.length;
+                                el.focus();
+                                el.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                        })()
+                    `);
+                }
+            }));
+
+            const contextMenu = Menu.buildFromTemplate([
+                {
+                    label: '📝 Вставить переменную',
+                    submenu: transcriptionSubmenu
+                },
+                { type: 'separator' },
+                { label: 'Вырезать', role: 'cut' },
+                { label: 'Копировать', role: 'copy' },
+                { label: 'Вставить', role: 'paste' },
+                { type: 'separator' },
+                { label: 'Выделить всё', role: 'selectAll' }
+            ]);
+            contextMenu.popup();
+        } else {
+            // Обычное контекстное меню для не-editable элементов
+            const contextMenu = Menu.buildFromTemplate([
+                { label: 'Копировать', role: 'copy' },
+                { label: 'Выделить всё', role: 'selectAll' }
+            ]);
+            contextMenu.popup();
+        }
+    });
 
     require('events').EventEmitter.defaultMaxListeners = 100;
 }
