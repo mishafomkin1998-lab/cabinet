@@ -2080,9 +2080,9 @@
             <div class="space-y-4">
                 <!-- Выбор админа (только для директора) -->
                 <div x-show="currentUser.role === 'director'">
-                    <label class="block text-sm font-medium mb-2">Админ</label>
+                    <label class="block text-sm font-medium mb-2">Назначить админу (опционально)</label>
                     <select class="glass w-full px-4 py-3 rounded-xl" x-model="newTranslator.adminId">
-                        <option value="">-- Выберите админа --</option>
+                        <option value="">Напрямую под директором</option>
                         <template x-for="admin in admins" :key="admin.id">
                             <option :value="admin.id" x-text="admin.name"></option>
                         </template>

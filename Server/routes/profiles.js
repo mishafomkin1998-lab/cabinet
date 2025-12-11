@@ -232,11 +232,23 @@ router.post('/assign', async (req, res) => {
 
 // Массовое назначение анкет админу (по profile_id)
 router.post('/assign-admin', async (req, res) => {
-    const { profileIds, adminId, userId } = req.body;
+    const { profileIds, adminId, adminName, userId, userName } = req.body;
     try {
         const placeholders = profileIds.map((_, i) => `$${i + 2}`).join(',');
         const query = `UPDATE allowed_profiles SET assigned_admin_id = $1 WHERE profile_id IN (${placeholders})`;
         await pool.query(query, [adminId, ...profileIds]);
+
+        // Логируем назначение для каждой анкеты
+        for (const profileId of profileIds) {
+            await logProfileAction(
+                profileId,
+                adminId ? 'assign_admin' : 'unassign_admin',
+                userId,
+                userName || `User #${userId}`,
+                adminId ? `Назначен админ: ${adminName || adminId}` : 'Снято назначение админа'
+            );
+        }
+
         res.json({ success: true });
     } catch (e) {
         console.error('assign-admin error:', e);
@@ -246,11 +258,23 @@ router.post('/assign-admin', async (req, res) => {
 
 // Массовое назначение анкет переводчику (по profile_id)
 router.post('/assign-translator', async (req, res) => {
-    const { profileIds, translatorId, userId } = req.body;
+    const { profileIds, translatorId, translatorName, userId, userName } = req.body;
     try {
         const placeholders = profileIds.map((_, i) => `$${i + 2}`).join(',');
         const query = `UPDATE allowed_profiles SET assigned_translator_id = $1 WHERE profile_id IN (${placeholders})`;
         await pool.query(query, [translatorId, ...profileIds]);
+
+        // Логируем назначение для каждой анкеты
+        for (const profileId of profileIds) {
+            await logProfileAction(
+                profileId,
+                translatorId ? 'assign_translator' : 'unassign_translator',
+                userId,
+                userName || `User #${userId}`,
+                translatorId ? `Назначен переводчик: ${translatorName || translatorId}` : 'Снято назначение переводчика'
+            );
+        }
+
         res.json({ success: true });
     } catch (e) {
         console.error('assign-translator error:', e);

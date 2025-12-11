@@ -287,6 +287,11 @@
                 // Инициализация - загрузка данных с сервера
                 async init() {
                     console.log('Dashboard init, user:', this.currentUser);
+                    // Восстанавливаем активную вкладку из localStorage
+                    const savedMenu = localStorage.getItem('dashboard_activeMenu');
+                    if (savedMenu) {
+                        this.activeMenu = savedMenu;
+                    }
                     // Устанавливаем период по умолчанию - текущий месяц
                     this.setDefaultDateRange();
                     // Инициализация Flatpickr
@@ -641,6 +646,19 @@
                                     }))
                                 }));
                                 this.myTranslators = [];
+                                // Для директора: переводчики напрямую под ним (owner_id = директора)
+                                this.directTranslators = translatorsList
+                                    .filter(t => t.owner_id === this.currentUser.id)
+                                    .map(t => ({
+                                        id: t.id,
+                                        name: t.username,
+                                        login: t.login || t.username,
+                                        conversion: t.conversion || 0,
+                                        accounts: t.accounts || [],
+                                        accountsCount: t.accounts_count || 0,
+                                        salary: t.salary,
+                                        aiEnabled: t.ai_enabled || false
+                                    }));
                                 // Для директора: все переводчики с информацией об админе
                                 this.allTranslators = translatorsList.map(t => {
                                     const admin = adminsList.find(a => a.id === t.owner_id);
@@ -786,10 +804,21 @@
                 setActiveMenu(menu) {
                     this.activeMenu = menu;
                     this.activeSubmenu = 'general';
+                    // Сохраняем активную вкладку в localStorage
+                    localStorage.setItem('dashboard_activeMenu', menu);
                 },
-                
+
                 setActiveSubmenu(submenu) {
                     this.activeSubmenu = submenu;
+                },
+
+                // Раскрытие/скрытие списка переводчиков админа
+                toggleAdminExpanded(adminId) {
+                    if (this.expandedAdminId === adminId) {
+                        this.expandedAdminId = null;
+                    } else {
+                        this.expandedAdminId = adminId;
+                    }
                 },
                 
                 getPageTitle() {
@@ -1416,13 +1445,17 @@
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                                profileIds: this.selectedTranslatorProfileIds
+                                profileIds: this.selectedTranslatorProfileIds,
+                                translatorName: this.selectedTranslatorForProfiles.name,
+                                userId: this.currentUser.id,
+                                userName: this.currentUser.username
                             })
                         });
                         const data = await res.json();
                         if (data.success) {
                             this.showTranslatorProfilesModal = false;
                             await this.loadTeam();
+                            await this.loadProfileHistory();
                             alert(`Анкеты назначены переводчику ${this.selectedTranslatorForProfiles.name}`);
                         } else {
                             alert('Ошибка: ' + (data.error || 'Не удалось назначить анкеты'));
@@ -1563,11 +1596,8 @@
                         return;
                     }
 
-                    // Для директора требуем выбор админа (только при создании)
-                    if (!this.editingTranslator && this.currentUser.role === 'director' && !this.newTranslator.adminId) {
-                        alert('Выберите админа для переводчика');
-                        return;
-                    }
+                    // Для директора: adminId может быть пустым (переводчик напрямую под директором)
+                    // или указывать на конкретного админа
 
                     try {
                         if (this.editingTranslator) {
@@ -1595,9 +1625,14 @@
                             }
                         } else {
                             // Создание нового переводчика
-                            const ownerId = this.currentUser.role === 'director'
-                                ? this.newTranslator.adminId
-                                : this.currentUser.id;
+                            // Для директора: если adminId пустой - создаём под директором,
+                            // иначе под выбранным админом
+                            let ownerId;
+                            if (this.currentUser.role === 'director') {
+                                ownerId = this.newTranslator.adminId || this.currentUser.id;
+                            } else {
+                                ownerId = this.currentUser.id;
+                            }
 
                             const res = await fetch(`${API_BASE}/api/users`, {
                                 method: 'POST',
@@ -2087,8 +2122,14 @@
 
                 getProfileActionClass(actionType) {
                     const classes = {
+                        'add': 'bg-green-100 text-green-800',
                         'added': 'bg-green-100 text-green-800',
+                        'delete': 'bg-red-100 text-red-800',
                         'removed': 'bg-red-100 text-red-800',
+                        'assign_admin': 'bg-blue-100 text-blue-800',
+                        'unassign_admin': 'bg-yellow-100 text-yellow-800',
+                        'assign_translator': 'bg-indigo-100 text-indigo-800',
+                        'unassign_translator': 'bg-orange-100 text-orange-800',
                         'assigned': 'bg-blue-100 text-blue-800',
                         'unassigned': 'bg-yellow-100 text-yellow-800',
                         'paused': 'bg-gray-100 text-gray-800',
@@ -2221,6 +2262,10 @@
                 async assignSelectedToAdmin(adminId) {
                     if (this.selectedProfileIds.length === 0) return;
 
+                    // Найти имя админа для логирования
+                    const admin = this.admins.find(a => a.id === adminId);
+                    const adminName = admin ? admin.name : null;
+
                     try {
                         const res = await fetch(`${API_BASE}/api/profiles/assign-admin`, {
                             method: 'POST',
@@ -2228,13 +2273,16 @@
                             body: JSON.stringify({
                                 profileIds: this.selectedProfileIds,
                                 adminId: adminId,
-                                userId: this.currentUser.id
+                                adminName: adminName,
+                                userId: this.currentUser.id,
+                                userName: this.currentUser.username
                             })
                         });
                         const data = await res.json();
                         if (data.success) {
                             this.selectedProfileIds = [];
                             await this.loadAccounts();
+                            await this.loadProfileHistory();
                             alert(adminId ? `Анкеты назначены админу` : 'Назначение снято');
                         } else {
                             alert('Ошибка: ' + (data.error || 'Не удалось назначить'));
@@ -2249,6 +2297,11 @@
                 async assignSelectedToTranslator(translatorId) {
                     if (this.selectedProfileIds.length === 0) return;
 
+                    // Найти имя переводчика для логирования
+                    const translator = this.myTranslators.find(t => t.id === translatorId) ||
+                                        this.allTranslators?.find(t => t.id === translatorId);
+                    const translatorName = translator ? translator.name : null;
+
                     try {
                         const res = await fetch(`${API_BASE}/api/profiles/assign-translator`, {
                             method: 'POST',
@@ -2256,7 +2309,9 @@
                             body: JSON.stringify({
                                 profileIds: this.selectedProfileIds,
                                 translatorId: translatorId,
-                                userId: this.currentUser.id
+                                translatorName: translatorName,
+                                userId: this.currentUser.id,
+                                userName: this.currentUser.username
                             })
                         });
                         const data = await res.json();
@@ -2264,6 +2319,7 @@
                             this.selectedProfileIds = [];
                             await this.loadAccounts();
                             await this.loadTeam();
+                            await this.loadProfileHistory();
                             alert(translatorId ? `Анкеты назначены переводчику` : 'Назначение снято');
                         } else {
                             alert('Ошибка: ' + (data.error || 'Не удалось назначить'));

@@ -281,16 +281,33 @@ router.get('/translator/:id/profiles', async (req, res) => {
 // Обновление списка анкет переводчика
 router.put('/translator/:id/profiles', async (req, res) => {
     const translatorId = req.params.id;
-    const { profileIds } = req.body;
+    const { profileIds, translatorName, userId, userName } = req.body;
 
     try {
         await pool.query('BEGIN');
+
+        // Получаем текущие анкеты переводчика для логирования
+        const currentProfiles = await pool.query(
+            `SELECT profile_id FROM allowed_profiles WHERE assigned_translator_id = $1`,
+            [translatorId]
+        );
+        const currentProfileIds = currentProfiles.rows.map(r => r.profile_id);
 
         // Убираем все текущие назначения этого переводчика
         await pool.query(
             `UPDATE allowed_profiles SET assigned_translator_id = NULL WHERE assigned_translator_id = $1`,
             [translatorId]
         );
+
+        // Логируем снятие назначения для анкет, которые были убраны
+        const removedProfiles = currentProfileIds.filter(id => !profileIds?.includes(id));
+        for (const profileId of removedProfiles) {
+            await pool.query(
+                `INSERT INTO profile_actions (profile_id, action_type, performed_by_id, performed_by_name, details)
+                 VALUES ($1, $2, $3, $4, $5)`,
+                [profileId, 'unassign_translator', userId, userName || `User #${userId}`, `Снято назначение переводчика: ${translatorName || translatorId}`]
+            );
+        }
 
         // Назначаем новые анкеты (если есть)
         if (profileIds && profileIds.length > 0) {
@@ -313,6 +330,15 @@ router.put('/translator/:id/profiles', async (req, res) => {
                         `INSERT INTO allowed_profiles (profile_id, assigned_translator_id, note)
                          VALUES ($1, $2, 'Добавлено при назначении переводчику')`,
                         [profileId, translatorId]
+                    );
+                }
+
+                // Логируем назначение, если анкета не была ранее назначена этому переводчику
+                if (!currentProfileIds.includes(profileId)) {
+                    await pool.query(
+                        `INSERT INTO profile_actions (profile_id, action_type, performed_by_id, performed_by_name, details)
+                         VALUES ($1, $2, $3, $4, $5)`,
+                        [profileId, 'assign_translator', userId, userName || `User #${userId}`, `Назначен переводчик: ${translatorName || translatorId}`]
                     );
                 }
             }
