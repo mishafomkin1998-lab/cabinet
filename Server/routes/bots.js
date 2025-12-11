@@ -58,7 +58,7 @@ async function checkProfilePaymentStatus(profileId) {
 // Heartbeat (legacy)
 router.post('/heartbeat', asyncHandler(async (req, res) => {
     const {
-        botId, accountDisplayId, status, timestamp, ip,
+        botId, accountDisplayId, status, timestamp,
         // Новые расширенные поля
         version, platform, uptime, memoryUsage,
         profilesTotal, profilesRunning, profilesStopped, profilesList,
@@ -72,8 +72,14 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
     const botVersion = version || systemInfo?.version || null;
     const botPlatform = platform || systemInfo?.platform || null;
 
+    // Получаем реальный IP клиента (не из body, а из запроса)
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+                  || req.socket?.remoteAddress
+                  || req.ip
+                  || 'unknown';
+
     // DEBUG: Логируем входящий heartbeat для диагностики
-    console.log(`📥 Heartbeat получен: botId=${botId}, profileId=${accountDisplayId}, status=${profileStatus}`);
+    console.log(`📥 Heartbeat получен: botId=${botId}, profileId=${accountDisplayId}, status=${profileStatus}, IP=${clientIp}`);
     console.log(`   botId начинается с "machine_": ${botId?.startsWith('machine_') ? 'ДА ✅' : 'НЕТ ❌'}`);
     if (profilesTotal !== undefined) {
         console.log(`   📊 Расширенные данные: анкет=${profilesTotal}, работают=${profilesRunning}, uptime=${uptime}s`);
@@ -113,7 +119,7 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
             bot_id, account_display_id, status,
             ip, version, platform, timestamp
         ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-    `, [botId, accountDisplayId, profileStatus, ip || null, version, platform, timestamp || new Date()]);
+    `, [botId, accountDisplayId, profileStatus, clientIp, botVersion, botPlatform, timestamp || new Date()]);
 
     // 2. Автосоздание анкеты в allowed_profiles если нет
     const existsAllowed = await pool.query(
@@ -170,7 +176,7 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
         await pool.query(
             `INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat, verified_profile_id, profile_verified_at, extended_data)
              VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW(), $7)`,
-            [botId, botPlatform, ip || null, botVersion, profileStatus, accountDisplayId, JSON.stringify(extendedData)]
+            [botId, botPlatform, clientIp, botVersion, profileStatus, accountDisplayId, JSON.stringify(extendedData)]
         );
         console.log(`🔐 Бот ${botId} верифицирован с анкетой ${accountDisplayId}`);
     } else {
@@ -181,14 +187,14 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
                 `UPDATE bots SET platform = COALESCE($1, platform), ip = COALESCE($2, ip), version = COALESCE($3, version),
                  status = $4, last_heartbeat = NOW(), verified_profile_id = $5, profile_verified_at = NOW(), extended_data = $6
                  WHERE bot_id = $7`,
-                [botPlatform, ip || null, botVersion, profileStatus, accountDisplayId, JSON.stringify(extendedData), botId]
+                [botPlatform, clientIp, botVersion, profileStatus, accountDisplayId, JSON.stringify(extendedData), botId]
             );
             console.log(`🔐 Бот ${botId} верифицирован с анкетой ${accountDisplayId}`);
         } else {
             await pool.query(
                 `UPDATE bots SET platform = COALESCE($1, platform), ip = COALESCE($2, ip), version = COALESCE($3, version),
                  status = $4, last_heartbeat = NOW(), extended_data = $5 WHERE bot_id = $6`,
-                [botPlatform, ip || null, botVersion, profileStatus, JSON.stringify(extendedData), botId]
+                [botPlatform, clientIp, botVersion, profileStatus, JSON.stringify(extendedData), botId]
             );
         }
     }

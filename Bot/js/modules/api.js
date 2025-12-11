@@ -1,3 +1,44 @@
+// ============= ИНФОРМАЦИЯ О ПРОГРАММЕ =============
+// Получаем версию из package.json (доступно благодаря nodeIntegration)
+let APP_VERSION = '1.0.0';
+let APP_PLATFORM = 'Unknown';
+let APP_ARCH = '';
+
+try {
+    // Получаем версию из package.json
+    const packageJson = require('../package.json');
+    APP_VERSION = packageJson.version || '1.0.0';
+} catch (e) {
+    console.warn('⚠️ Не удалось загрузить версию из package.json:', e.message);
+}
+
+// Получаем информацию о платформе и архитектуре
+try {
+    if (typeof process !== 'undefined') {
+        // process.platform: 'win32', 'darwin', 'linux'
+        // process.arch: 'x64', 'ia32', 'arm', 'arm64'
+        const platformNames = {
+            'win32': 'Windows',
+            'darwin': 'macOS',
+            'linux': 'Linux'
+        };
+        const archNames = {
+            'x64': '64-bit',
+            'ia32': '32-bit',
+            'arm': 'ARM',
+            'arm64': 'ARM64'
+        };
+        APP_PLATFORM = platformNames[process.platform] || process.platform;
+        APP_ARCH = archNames[process.arch] || process.arch;
+    } else {
+        // Fallback для браузера
+        APP_PLATFORM = navigator.platform || 'Unknown';
+    }
+} catch (e) {
+    APP_PLATFORM = navigator.platform || 'Unknown';
+}
+
+console.log(`📦 Версия приложения: ${APP_VERSION}, Платформа: ${APP_PLATFORM} ${APP_ARCH}`);
 
 // ============= MACHINE ID (уникальный ID программы-бота) =============
 // Генерируется один раз при первом запуске и сохраняется в localStorage
@@ -234,8 +275,8 @@ async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
             timestamp: new Date().toISOString(),
 
             // Расширенная информация о программе
-            version: '10.0',
-            platform: navigator.platform || 'Unknown',
+            version: APP_VERSION,
+            platform: APP_PLATFORM + (APP_ARCH ? ' ' + APP_ARCH : ''),
             uptime: stats.uptime,  // Секунды с запуска
             memoryUsage: memoryMB,  // MB
 
