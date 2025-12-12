@@ -74,7 +74,7 @@ function setGlobalTarget(targetType) {
         }
     });
     saveSession();
-    alert(`Всем анкетам установлен статус: ${targetType.toUpperCase()}`);
+    showToast(`Всем установлен: ${targetType.toUpperCase()}`);
 }
 
 // ============= ОТКЛЮЧЕНИЕ СТАТУСОВ (ПКМ) =============
@@ -187,7 +187,7 @@ function applyGlobalCustomIds() {
 
     const ids = parseCustomIds(input.value);
     if (ids.length === 0) {
-        alert('Введите хотя бы один ID');
+        showToast('Введите хотя бы один ID');
         return;
     }
 

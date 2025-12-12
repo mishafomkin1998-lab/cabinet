@@ -46,12 +46,12 @@ async function handleAIAction(botId, action, event) {
                 : aiStatus.reason === 'no_translator'
                 ? 'Анкете не назначен переводчик'
                 : 'AI недоступен для этой анкеты';
-            alert(`⚠️ ${reason}`);
+            showToast(`⚠️ ${reason}`);
             return;
         }
     }
 
-    if(!globalSettings.apiKey) return alert("Пожалуйста, введите OpenAI API Key в настройках!");
+    if(!globalSettings.apiKey) { showToast("Введите OpenAI API Key в настройках!"); return; }
 
     const txtArea = document.getElementById(`msg-${botId}`);
     const currentText = txtArea.value;
@@ -60,10 +60,10 @@ async function handleAIAction(botId, action, event) {
     let systemRole = "You are a helpful dating assistant. Write engaging, short, and natural texts for dating sites.";
 
     if(action === 'myprompt') {
-        if(!globalSettings.myPrompt) return alert("Заполните 'My Prompt' в настройках!");
+        if(!globalSettings.myPrompt) { showToast("Заполните 'My Prompt' в настройках!"); return; }
         prompt = `${globalSettings.myPrompt}. \n\nOriginal text: "${currentText}"`;
     } else if (action === 'improve') {
-        if(!currentText) return alert("Напишите хоть что-то, чтобы я мог улучшить!");
+        if(!currentText) { showToast("Напишите что-то, чтобы улучшить!"); return; }
         prompt = `Rewrite the following text to be more engaging, grammatically correct, and flirtatious. Keep it natural. Text: "${currentText}"`;
     } else if (action === 'generate') {
         prompt = "Write a creative and engaging opening message for a dating site to start a conversation with a man. Keep it short and intriguing.";
@@ -98,7 +98,7 @@ async function handleAIAction(botId, action, event) {
         }
     } catch (e) {
         console.error(e);
-        alert("Ошибка AI. Проверьте ключ или прокси.");
+        showToast("Ошибка AI. Проверьте ключ или прокси.");
     } finally {
         btn.innerHTML = originalHtml;
     }
@@ -106,7 +106,7 @@ async function handleAIAction(botId, action, event) {
 
 // Генерация AI текста для ВСЕХ анкет (параллельно, разные тексты)
 async function generateAIForAll(action) {
-    if(!globalSettings.apiKey) return alert("Пожалуйста, введите OpenAI API Key в настройках!");
+    if(!globalSettings.apiKey) { showToast("Введите OpenAI API Key в настройках!"); return; }
 
     const botIds = Object.keys(bots);
     if (botIds.length === 0) return;
