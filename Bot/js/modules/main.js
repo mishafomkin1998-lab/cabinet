@@ -29,6 +29,11 @@ function createInterface(bot) {
                 <button class="btn btn-sm btn-outline-danger btn-xs flex-fill hide-in-chat" id="btn-fav-${bot.id}" onclick="toggleTemplateFavorite('${bot.id}')" data-tip="В избранное"><i class="fa fa-heart"></i></button>
             </div>
 
+            <!-- Кнопка SHARE MY CAM -->
+            <button class="btn btn-share-cam w-100 mb-2" id="btn-share-cam-${bot.id}" onclick="openVideoChatWindow('${bot.id}')">
+                <i class="fa fa-video-camera"></i> SHARE MY CAM
+            </button>
+
             <!-- Секция автоответов (только для Chat режима) -->
             <div class="auto-reply-section hide-in-mail" id="auto-reply-section-${bot.id}">
                 <div class="auto-reply-header">
