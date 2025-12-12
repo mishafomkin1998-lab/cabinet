@@ -1600,3 +1600,205 @@ function initAutoRepliesUI(botId) {
     // Отрисовываем список
     renderAutoReplies(botId);
 }
+
+// === ВИДЕОЧАТ (SHARE MY CAM) ===
+
+// Хранение открытых окон видеочата и сохранённых камер
+const videoChatWindows = new Map();
+let savedCameras = JSON.parse(localStorage.getItem('savedCameras')) || {};
+
+// Открыть видеочат - показать модальное окно выбора камеры
+async function openVideoChatWindow(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    // Проверяем, есть ли сохранённая камера для этой анкеты
+    const savedCamera = savedCameras[bot.displayId];
+    if (savedCamera) {
+        // Сразу открываем с сохранённой камерой
+        launchVideoChatWindow(botId, savedCamera);
+        return;
+    }
+
+    // Показываем модальное окно выбора камеры
+    document.getElementById('camera-select-bot-id').value = botId;
+    document.getElementById('camera-remember-choice').checked = false;
+
+    // Загружаем список камер
+    await loadAvailableCameras();
+
+    openModal('camera-select-modal');
+}
+
+// Загрузить список доступных камер
+async function loadAvailableCameras() {
+    const select = document.getElementById('camera-select-list');
+    select.innerHTML = '<option value="">Загрузка...</option>';
+
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+        if (videoDevices.length === 0) {
+            select.innerHTML = '<option value="">Камеры не найдены</option>';
+            return;
+        }
+
+        select.innerHTML = '';
+        videoDevices.forEach((device, index) => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.textContent = device.label || `Камера ${index + 1}`;
+            select.appendChild(option);
+        });
+
+    } catch (error) {
+        console.error('Ошибка получения списка камер:', error);
+        select.innerHTML = '<option value="">Ошибка доступа к камерам</option>';
+    }
+}
+
+// Подтвердить выбор камеры и открыть видеочат
+function confirmCameraSelection() {
+    const botId = document.getElementById('camera-select-bot-id').value;
+    const cameraId = document.getElementById('camera-select-list').value;
+    const remember = document.getElementById('camera-remember-choice').checked;
+
+    if (!cameraId) {
+        alert('Выберите камеру');
+        return;
+    }
+
+    const bot = bots[botId];
+    if (!bot) return;
+
+    // Запоминаем выбор если нужно
+    if (remember) {
+        savedCameras[bot.displayId] = cameraId;
+        localStorage.setItem('savedCameras', JSON.stringify(savedCameras));
+    }
+
+    closeModal('camera-select-modal');
+    launchVideoChatWindow(botId, cameraId);
+}
+
+// Запустить окно видеочата
+async function launchVideoChatWindow(botId, cameraId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    // Проверяем, есть ли уже открытое окно
+    if (videoChatWindows.has(botId)) {
+        // Фокусируем существующее окно
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.invoke('focus-video-chat-window', { botId });
+        return;
+    }
+
+    try {
+        const { ipcRenderer } = require('electron');
+
+        // Открываем окно видеочата
+        const result = await ipcRenderer.invoke('open-video-chat-window', {
+            botId: botId,
+            displayId: bot.displayId,
+            login: bot.login,
+            pass: bot.pass,
+            cameraId: cameraId
+        });
+
+        if (result.success) {
+            videoChatWindows.set(botId, true);
+
+            // Меняем стиль кнопки на "активный"
+            const btn = document.getElementById(`btn-share-cam-${botId}`);
+            if (btn) btn.classList.add('cam-active');
+
+            console.log(`✅ Видеочат открыт для ${bot.displayId}`);
+        }
+    } catch (error) {
+        console.error('Ошибка открытия видеочата:', error);
+        alert('Ошибка открытия видеочата: ' + error.message);
+    }
+}
+
+// Обработчик закрытия окна видеочата (вызывается из main process)
+if (typeof require !== 'undefined') {
+    const { ipcRenderer } = require('electron');
+
+    ipcRenderer.on('video-chat-window-closed', (event, botId) => {
+        videoChatWindows.delete(botId);
+
+        // Убираем стиль "активный" с кнопки
+        const btn = document.getElementById(`btn-share-cam-${botId}`);
+        if (btn) btn.classList.remove('cam-active');
+
+        console.log(`📹 Видеочат закрыт для ${botId}`);
+    });
+
+    // Обработчик уведомления о камере мужчины
+    ipcRenderer.on('video-chat-man-camera', (event, data) => {
+        const { botId, manName, manId, type } = data;
+        const bot = bots[botId];
+        if (!bot) return;
+
+        let message = '';
+        if (type === 'camera_on') {
+            message = `${manName} (${manId}) включил камеру`;
+        } else if (type === 'watching') {
+            message = `${manName} (${manId}) смотрит вашу камеру`;
+        }
+
+        if (message) {
+            // Звук
+            playSound('chat');
+
+            // Toast уведомление
+            showCameraToast(message, bot.displayId);
+
+            // Мигание вкладки
+            flashTab(botId);
+        }
+    });
+}
+
+// Показать toast уведомление о камере
+function showCameraToast(message, displayId) {
+    // Удаляем старый toast если есть
+    const existingToast = document.querySelector('.camera-toast');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'camera-toast';
+    toast.innerHTML = `
+        <i class="fa fa-video-camera"></i>
+        <span><b>[${displayId}]</b> ${message}</span>
+    `;
+    document.body.appendChild(toast);
+
+    // Показываем
+    setTimeout(() => toast.classList.add('show'), 10);
+
+    // Убираем через 5 секунд
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
+}
+
+// Мигание вкладки
+function flashTab(botId) {
+    const tab = document.getElementById(`tab-${botId}`);
+    if (!tab) return;
+
+    let flashes = 0;
+    const maxFlashes = 6;
+    const interval = setInterval(() => {
+        tab.style.backgroundColor = flashes % 2 === 0 ? '#dc3545' : '';
+        flashes++;
+        if (flashes >= maxFlashes) {
+            clearInterval(interval);
+            tab.style.backgroundColor = '';
+        }
+    }, 300);
+}
