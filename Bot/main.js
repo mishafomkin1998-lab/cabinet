@@ -137,15 +137,50 @@ ipcMain.handle('set-session-proxy', async (event, { botId, proxyString }) => {
             return { success: true, proxy: null };
         }
 
-        // Формат: ip:port или http://ip:port
-        let proxyUrl = proxyString.trim();
-        if (!proxyUrl.includes('://')) {
-            proxyUrl = 'http://' + proxyUrl;
+        // Парсим прокси (поддержка форматов: ip:port, domain:port, domain:port:user:pass)
+        const trimmed = proxyString.trim();
+        const parts = trimmed.split(':');
+
+        let proxyUrl;
+        let username = null;
+        let password = null;
+
+        if (parts.length === 2) {
+            // Формат: ip:port или domain:port
+            const [host, port] = parts;
+            proxyUrl = `http://${host}:${port}`;
+        } else if (parts.length === 4) {
+            // Формат: domain:port:user:pass
+            const [host, port, user, pass] = parts;
+            proxyUrl = `http://${host}:${port}`;
+            username = user;
+            password = pass;
+        } else if (trimmed.includes('://')) {
+            // Формат: http://domain:port (уже с протоколом)
+            proxyUrl = trimmed;
+        } else {
+            console.error(`[Proxy] ${botId}: неверный формат прокси: ${proxyString}`);
+            return { success: false, error: 'Неверный формат прокси' };
         }
 
         // Устанавливаем прокси для сессии
         await ses.setProxy({ proxyRules: proxyUrl });
-        console.log(`[Proxy] ${botId}: установлен прокси ${proxyUrl}`);
+        console.log(`[Proxy] ${botId}: установлен прокси ${proxyUrl}${username ? ` (auth: ${username})` : ''}`);
+
+        // Если есть логин/пароль - настраиваем обработчик аутентификации
+        if (username && password) {
+            // Убираем предыдущие обработчики для этой сессии
+            ses.removeAllListeners('login');
+
+            // Добавляем обработчик аутентификации
+            ses.on('login', (loginEvent, webContents, request, authInfo, callback) => {
+                console.log(`[Proxy Auth] ${botId}: запрошена аутентификация для ${authInfo.host}`);
+                loginEvent.preventDefault();
+                callback(username, password);
+            });
+
+            console.log(`[Proxy] ${botId}: настроена аутентификация для прокси`);
+        }
 
         return { success: true, proxy: proxyUrl };
     } catch (error) {
