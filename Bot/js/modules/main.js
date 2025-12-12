@@ -1046,7 +1046,12 @@ async function performLogin(login, pass, displayId) {
         if(res.data.Token) {
             const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
             const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
-            bots[bid] = bot; createInterface(bot); selectTab(bid); saveSession();
+            bots[bid] = bot; // СНАЧАЛА добавляем в объект bots
+
+            // ТЕПЕРЬ устанавливаем прокси (после добавления в bots чтобы getAccountNumber работал)
+            await setWebviewProxy(bid);
+
+            createInterface(bot); selectTab(bid); saveSession();
 
             // Загружаем данные с сервера (шаблоны, blacklist, статистику)
             const serverData = await loadBotDataFromServer(displayId);

@@ -3161,8 +3161,7 @@
 
             // === ВАЖНОЕ ДОБАВЛЕНИЕ: Метод для создания скрытого WebView ===
             async createWebview() {
-                // Устанавливаем прокси для сессии ПЕРЕД созданием webview
-                await setWebviewProxy(this.id);
+                // ПРОКСИ УСТАНАВЛИВАЕТСЯ СНАРУЖИ после добавления в bots (чтобы getAccountNumber работал)
 
                 const webview = document.createElement('webview');
                 webview.id = `webview-${this.id}`;
@@ -5589,7 +5588,12 @@
                 if(res.data.Token) {
                     const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
                     const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
-                    bots[bid] = bot; createInterface(bot); selectTab(bid); saveSession();
+                    bots[bid] = bot; // СНАЧАЛА добавляем в объект bots
+
+                    // ТЕПЕРЬ устанавливаем прокси (после добавления в bots чтобы getAccountNumber работал)
+                    await setWebviewProxy(bid);
+
+                    createInterface(bot); selectTab(bid); saveSession();
 
                     // Загружаем данные с сервера (шаблоны, blacklist, статистику)
                     const serverData = await loadBotDataFromServer(displayId);

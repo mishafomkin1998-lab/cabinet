@@ -216,8 +216,7 @@ class AccountBot {
 
     // === ВАЖНОЕ ДОБАВЛЕНИЕ: Метод для создания скрытого WebView ===
     async createWebview() {
-        // Устанавливаем прокси для сессии ПЕРЕД созданием webview
-        await setWebviewProxy(this.id);
+        // ПРОКСИ УСТАНАВЛИВАЕТСЯ СНАРУЖИ после добавления в bots (чтобы getAccountNumber работал)
 
         const webview = document.createElement('webview');
         webview.id = `webview-${this.id}`;
