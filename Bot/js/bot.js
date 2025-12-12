@@ -2698,42 +2698,83 @@
 
         // НОВАЯ ФУНКЦИЯ: Защита от потери фокуса
         function initFocusProtection() {
-            let lastActiveElement = null;
+            let lastActiveInput = null;
 
-            // Отслеживаем активный элемент
+            // Функция для блокировки фокуса на кнопках
+            function disableButtonFocus(button) {
+                if (!button.hasAttribute('id') || button.id === '') {
+                    button.setAttribute('tabindex', '-1');
+                    // Запрещаем фокус через click тоже
+                    button.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                    }, { passive: false });
+                }
+            }
+
+            // Применяем ко всем существующим кнопкам
+            document.querySelectorAll('button').forEach(disableButtonFocus);
+
+            // MutationObserver для отслеживания новых кнопок (динамически создаваемых)
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === 1) { // Element node
+                            // Если это кнопка
+                            if (node.tagName === 'BUTTON') {
+                                disableButtonFocus(node);
+                                console.log('[Focus Protection] Найдена новая кнопка без ID, заблокирована:', node.className || 'без класса');
+                            }
+                            // Если это контейнер с кнопками
+                            if (node.querySelectorAll) {
+                                node.querySelectorAll('button').forEach(disableButtonFocus);
+                            }
+                        }
+                    });
+                });
+            });
+
+            // Наблюдаем за изменениями в body
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+
+            // Отслеживаем последний активный input/textarea
             document.addEventListener('focusin', (e) => {
                 if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
-                    lastActiveElement = e.target;
+                    lastActiveInput = e.target;
+                    console.log('[Focus] Активный input:', e.target.id || e.target.className);
                 }
             });
 
-            // Блокируем webview от получения фокуса
+            // Блокируем кнопки и webview от получения фокуса
             document.addEventListener('focusin', (e) => {
-                if (e.target.tagName === 'WEBVIEW') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.warn('[Focus Protection] WebView попытался получить фокус - заблокировано!');
+                // Если фокус ушёл на кнопку, webview или другой не-input элемент
+                if (e.target.tagName === 'BUTTON' || e.target.tagName === 'WEBVIEW') {
+                    console.warn('[Focus Protection] ⚠️ ФОКУС УКРАДЕН элементом:', {
+                        tag: e.target.tagName,
+                        id: e.target.id || 'БЕЗ ID',
+                        className: e.target.className || 'без класса',
+                        text: e.target.innerText?.substring(0, 20) || ''
+                    });
 
-                    // Возвращаем фокус на последний активный элемент
-                    if (lastActiveElement) {
+                    // Возвращаем фокус на последний активный input
+                    if (lastActiveInput && document.body.contains(lastActiveInput)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        // Небольшая задержка чтобы не конфликтовать с кликом
                         setTimeout(() => {
-                            lastActiveElement.focus();
-                            console.log('[Focus Protection] Фокус возвращен на', lastActiveElement.id || lastActiveElement.className);
+                            lastActiveInput.focus();
+                            console.log('[Focus Protection] ✅ Фокус возвращён на:', lastActiveInput.id || lastActiveInput.className);
                         }, 10);
+                    } else {
+                        console.error('[Focus Protection] ❌ Нет lastActiveInput для возврата фокуса!');
                     }
                 }
             }, true);
 
-            // Периодическая проверка модальных окон (каждую секунду)
-            setInterval(() => {
-                const modals = document.querySelectorAll('.modal-overlay.show');
-                if (modals.length > 0) {
-                    console.warn('[Focus Protection] Обнаружены открытые модальные окна:', modals.length);
-                }
-            }, 1000);
-
-            console.log('%c[Focus Protection] Защита от потери фокуса активирована', 'color: green; font-weight: bold');
-            console.log('%cГорячая клавиша для диагностики: Ctrl+Shift+F', 'color: blue');
+            console.log('%c[Focus Protection] Защита от потери фокуса активирована + MutationObserver', 'color: green; font-weight: bold');
         }
 
         // НОВАЯ ФУНКЦИЯ: Диагностика проблем с фокусом

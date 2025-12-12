@@ -31,17 +31,64 @@ window.onload = async function() {
 function initFocusProtection() {
     let lastActiveInput = null;
 
+    // Функция для блокировки фокуса на кнопках
+    function disableButtonFocus(button) {
+        if (!button.hasAttribute('id') || button.id === '') {
+            button.setAttribute('tabindex', '-1');
+            // Запрещаем фокус через click тоже
+            button.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+            }, { passive: false });
+        }
+    }
+
+    // Применяем ко всем существующим кнопкам
+    document.querySelectorAll('button').forEach(disableButtonFocus);
+
+    // MutationObserver для отслеживания новых кнопок (динамически создаваемых)
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.addedNodes.forEach((node) => {
+                if (node.nodeType === 1) { // Element node
+                    // Если это кнопка
+                    if (node.tagName === 'BUTTON') {
+                        disableButtonFocus(node);
+                        console.log('[Focus Protection] Найдена новая кнопка без ID, заблокирована:', node.className || 'без класса');
+                    }
+                    // Если это контейнер с кнопками
+                    if (node.querySelectorAll) {
+                        node.querySelectorAll('button').forEach(disableButtonFocus);
+                    }
+                }
+            });
+        });
+    });
+
+    // Наблюдаем за изменениями в body
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
     // Отслеживаем последний активный input/textarea
     document.addEventListener('focusin', (e) => {
         if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
             lastActiveInput = e.target;
+            console.log('[Focus] Активный input:', e.target.id || e.target.className);
         }
     });
 
-    // Блокируем кнопки от получения фокуса (они забирают фокус с textarea)
+    // Блокируем кнопки и webview от получения фокуса
     document.addEventListener('focusin', (e) => {
         // Если фокус ушёл на кнопку, webview или другой не-input элемент
         if (e.target.tagName === 'BUTTON' || e.target.tagName === 'WEBVIEW') {
+            console.warn('[Focus Protection] ⚠️ ФОКУС УКРАДЕН элементом:', {
+                tag: e.target.tagName,
+                id: e.target.id || 'БЕЗ ID',
+                className: e.target.className || 'без класса',
+                text: e.target.innerText?.substring(0, 20) || ''
+            });
+
             // Возвращаем фокус на последний активный input
             if (lastActiveInput && document.body.contains(lastActiveInput)) {
                 e.preventDefault();
@@ -50,18 +97,15 @@ function initFocusProtection() {
                 // Небольшая задержка чтобы не конфликтовать с кликом
                 setTimeout(() => {
                     lastActiveInput.focus();
-                    console.log('[Focus Protection] Фокус возвращён на:', lastActiveInput.id || lastActiveInput.className);
+                    console.log('[Focus Protection] ✅ Фокус возвращён на:', lastActiveInput.id || lastActiveInput.className);
                 }, 10);
+            } else {
+                console.error('[Focus Protection] ❌ Нет lastActiveInput для возврата фокуса!');
             }
         }
     }, true);
 
-    // Добавляем tabindex="-1" всем кнопкам без ID чтобы они не получали фокус через Tab
-    document.querySelectorAll('button:not([id])').forEach(btn => {
-        btn.setAttribute('tabindex', '-1');
-    });
-
-    console.log('%c[Focus Protection] Защита от потери фокуса активирована', 'color: green; font-weight: bold');
+    console.log('%c[Focus Protection] Защита от потери фокуса активирована + MutationObserver', 'color: green; font-weight: bold');
 }
 
 function setGlobalTarget(targetType) {
