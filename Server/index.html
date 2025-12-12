@@ -409,16 +409,7 @@
                 });
             });
 
-            // Имитация скачивания
-            const downloadBtns = document.querySelectorAll('a[href="#"]');
-            downloadBtns.forEach(btn => {
-                if (btn.textContent.includes('Скачать')) {
-                    btn.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        alert('Скачивание началось! В реальном проекте здесь будет загрузка файла.');
-                    });
-                }
-            });
+            // Скачивание файлов теперь работает через прямые ссылки
         });
     </script>
 </body>
