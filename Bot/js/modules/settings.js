@@ -442,72 +442,113 @@ async function selectPromptTemplate(promptType) {
     }
 }
 
-// Добавить новый шаблон (сохраняется локально, опционально на сервер)
-async function addPromptTemplate(promptType) {
-    const name = prompt('Введите название шаблона:');
-    if (!name || !name.trim()) return;
+// Текущий тип промпта для добавления (используется модальным окном)
+let pendingPromptType = null;
 
-    const textarea = document.getElementById(promptTypeToTextarea[promptType]);
+// Добавить новый шаблон - открывает модальное окно
+function addPromptTemplate(promptType) {
+    console.log('[addPromptTemplate] Вызвана функция, promptType:', promptType);
+
+    const textareaId = promptTypeToTextarea[promptType];
+    const textarea = document.getElementById(textareaId);
+
+    if (!textarea) {
+        alert('Ошибка: не найден элемент textarea');
+        return;
+    }
+
     const text = textarea.value.trim();
-
     if (!text) {
         alert('Сначала введите текст промпта в поле ниже');
         return;
     }
 
-    // Генерируем локальный ID
-    const localId = 'local_' + Date.now();
+    // Сохраняем тип и открываем модалку
+    pendingPromptType = promptType;
+    document.getElementById('prompt-name-input').value = '';
+    openModal('prompt-name-modal');
 
-    // Добавляем в локальный список
-    promptTemplates[promptType] = promptTemplates[promptType] || [];
-    // Деактивируем остальные локально
-    promptTemplates[promptType].forEach(t => t.isActive = false);
+    // Фокус на поле ввода
+    setTimeout(() => {
+        document.getElementById('prompt-name-input').focus();
+    }, 100);
+}
 
-    const newTemplate = {
-        id: localId,
-        name: name.trim(),
-        text: text,
-        isActive: true
-    };
-    promptTemplates[promptType].push(newTemplate);
-
-    // Сохраняем в localStorage
-    savePromptTemplatesToStorage();
-
-    // Обновляем dropdown
-    updatePromptDropdown(promptType);
-
-    // Сохраняем активный ID
-    globalSettings.activePromptTemplates = globalSettings.activePromptTemplates || {};
-    globalSettings.activePromptTemplates[promptType] = localId;
-    localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
-
-    console.log('[PromptTemplates] Шаблон сохранён локально:', newTemplate);
-
-    // Если есть translatorId - пробуем сохранить на сервер
-    if (globalSettings.translatorId) {
-        try {
-            const response = await axios.post(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}`, {
-                promptType,
-                name: name.trim(),
-                text,
-                isActive: true
-            });
-            if (response.data.success) {
-                // Обновляем ID на серверный
-                newTemplate.id = response.data.data.id;
-                globalSettings.activePromptTemplates[promptType] = response.data.data.id;
-                savePromptTemplatesToStorage();
-                localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
-                updatePromptDropdown(promptType);
-                console.log('[PromptTemplates] Синхронизировано с сервером');
-            }
-        } catch (error) {
-            console.log('[PromptTemplates] Сервер недоступен, сохранено только локально');
-        }
+// Подтверждение добавления шаблона (вызывается из модалки)
+async function confirmAddPromptTemplate() {
+    const name = document.getElementById('prompt-name-input').value.trim();
+    if (!name) {
+        alert('Введите название шаблона');
+        return;
     }
 
-    alert('Шаблон сохранён!');
+    const promptType = pendingPromptType;
+    if (!promptType) return;
+
+    closeModal('prompt-name-modal');
+
+    try {
+        const textareaId = promptTypeToTextarea[promptType];
+        const textarea = document.getElementById(textareaId);
+        const text = textarea.value.trim();
+
+        // Генерируем локальный ID
+        const localId = 'local_' + Date.now();
+
+        // Добавляем в локальный список
+        promptTemplates[promptType] = promptTemplates[promptType] || [];
+        // Деактивируем остальные локально
+        promptTemplates[promptType].forEach(t => t.isActive = false);
+
+        const newTemplate = {
+            id: localId,
+            name: name,
+            text: text,
+            isActive: true
+        };
+        promptTemplates[promptType].push(newTemplate);
+
+        // Сохраняем в localStorage
+        savePromptTemplatesToStorage();
+
+        // Обновляем dropdown
+        updatePromptDropdown(promptType);
+
+        // Сохраняем активный ID
+        globalSettings.activePromptTemplates = globalSettings.activePromptTemplates || {};
+        globalSettings.activePromptTemplates[promptType] = localId;
+        localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+
+        console.log('[PromptTemplates] Шаблон сохранён локально:', newTemplate);
+
+        // Если есть translatorId - пробуем сохранить на сервер
+        if (globalSettings.translatorId) {
+            try {
+                const response = await axios.post(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}`, {
+                    promptType,
+                    name: name,
+                    text,
+                    isActive: true
+                });
+                if (response.data.success) {
+                    // Обновляем ID на серверный
+                    newTemplate.id = response.data.data.id;
+                    globalSettings.activePromptTemplates[promptType] = response.data.data.id;
+                    savePromptTemplatesToStorage();
+                    localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+                    updatePromptDropdown(promptType);
+                    console.log('[PromptTemplates] Синхронизировано с сервером');
+                }
+            } catch (error) {
+                console.log('[PromptTemplates] Сервер недоступен, сохранено только локально');
+            }
+        }
+
+        alert('Шаблон сохранён!');
+    } catch (err) {
+        console.error('[confirmAddPromptTemplate] Ошибка:', err);
+        alert('Ошибка при добавлении шаблона: ' + err.message);
+    }
 }
 
 // Удалить шаблон (локально, опционально с сервера)
