@@ -404,8 +404,8 @@ const activityTracker = {
 
     // Получить активного бота (текущий выбранный таб)
     getActiveBot() {
-        if (typeof selectedBotId !== 'undefined' && selectedBotId && typeof bots !== 'undefined') {
-            return bots[selectedBotId];
+        if (typeof activeTabId !== 'undefined' && activeTabId && typeof bots !== 'undefined') {
+            return bots[activeTabId];
         }
         return null;
     },

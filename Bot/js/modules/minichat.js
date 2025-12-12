@@ -193,7 +193,7 @@ async function generateMiniChatAIReply() {
 
     // Проверяем наличие API ключа
     if (!globalSettings.apiKey) {
-        alert('Добавьте OpenAI API Key в настройках (вкладка AI функции)');
+        showToast('Добавьте OpenAI API Key в настройках');
         return;
     }
 
@@ -214,7 +214,7 @@ async function generateMiniChatAIReply() {
                 : aiStatus.reason === 'no_translator'
                 ? 'Анкете не назначен переводчик'
                 : 'AI недоступен для этой анкеты';
-            alert(`⚠️ ${reason}`);
+            showToast(`⚠️ ${reason}`);
             return;
         }
     }
@@ -224,7 +224,7 @@ async function generateMiniChatAIReply() {
     const myMessages = chatHistoryEl.querySelectorAll('.chat-msg.me .msg-bubble');
 
     if (partnerMessages.length === 0) {
-        alert('Нет входящих сообщений для ответа');
+        showToast('Нет входящих сообщений для ответа');
         btn.innerHTML = originalBtnHtml;
         btn.disabled = false;
         return;
@@ -309,7 +309,7 @@ async function generateMiniChatAIReply() {
     } catch (error) {
         console.error('AI Reply generation error:', error);
         const errorMsg = error.response?.data?.error?.message || error.message || 'Неизвестная ошибка';
-        alert(`Ошибка генерации: ${errorMsg}`);
+        showToast(`Ошибка генерации: ${errorMsg}`);
     } finally {
         btn.innerHTML = originalBtnHtml;
         btn.disabled = false;
@@ -434,7 +434,7 @@ async function sendMiniChatMessage() {
             botId: bot.displayId,
             partnerId: minichatPartnerId
         });
-        alert(`Ошибка отправки ${minichatType === 'chat' ? 'чата' : 'письма'}. См. консоль.`);
+        showToast(`Ошибка отправки ${minichatType === 'chat' ? 'чата' : 'письма'}`);
         inputEl.value = message;
     } finally {
         inputEl.disabled = false;

@@ -2764,7 +2764,7 @@
                 this.chatTimeout = null;
                 this.chatStats = { sent: 0, errors: 0, waiting: 0 };
                 this.chatHistory = { sent: [], errors: [], waiting: [] };
-                this.chatSettings = { target: 'payers', speed: 'smart', blacklist: [], rotationHours: 3, cyclic: false, currentInviteIndex: 0, rotationStartTime: 0 };
+                this.chatSettings = { target: 'online', speed: 'smart', blacklist: [], rotationHours: 3, cyclic: false, currentInviteIndex: 0, rotationStartTime: 0 };
                 this.chatStartTime = null; // Время начала работы Chat
                 this.chatTimerInterval = null; // Интервал обновления таймера Chat 
                 

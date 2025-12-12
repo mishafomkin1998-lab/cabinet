@@ -22,7 +22,7 @@ class AccountBot {
         this.chatStats = { sent: 0, errors: 0, waiting: 0 };
         this.chatHistory = { sent: [], errors: [], waiting: [] };
         this.chatSettings = {
-            target: 'payers',
+            target: 'online',
             speed: 'smart',
             blacklist: [],
             rotationHours: 3,

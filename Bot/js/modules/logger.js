@@ -304,11 +304,11 @@ async function openResponseWindow(botId, partnerId, partnerName, type) {
             console.log(`[ResponseWindow] Окно успешно открыто`);
         } else {
             console.error(`[ResponseWindow] Ошибка открытия окна:`, result.error);
-            showError('Ошибка открытия окна: ' + result.error);
+            showToast('Ошибка открытия окна: ' + result.error);
         }
     } catch (err) {
         console.error(`[ResponseWindow] IPC ошибка:`, err);
-        showError('Ошибка открытия окна');
+        showToast('Ошибка открытия окна');
     }
 }
 
