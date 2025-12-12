@@ -162,14 +162,11 @@ ipcMain.handle('set-session-proxy', async (event, { botId, proxyString }) => {
             // Формат: domain:port:user:pass
             const [host, port, user, pass] = parts;
 
-            // URL-encode пароля для специальных символов (например +)
-            const encodedPass = encodeURIComponent(pass);
-
-            // ВАЖНО: Встраиваем credentials В URL для более надежной работы
-            proxyUrl = `http://${user}:${encodedPass}@${host}:${port}`;
+            // НЕ встраиваем credentials в URL - Electron не поддерживает
+            proxyUrl = `http://${host}:${port}`;
             username = user;
             password = pass;
-            console.log(`[Proxy MAIN] Формат: domain:port:user:pass → ${proxyUrl}`);
+            console.log(`[Proxy MAIN] Формат: domain:port:user:pass → ${proxyUrl} (auth: ${username})`);
         } else if (trimmed.includes('://')) {
             // Формат: http://domain:port (уже с протоколом)
             proxyUrl = trimmed;
@@ -179,25 +176,26 @@ ipcMain.handle('set-session-proxy', async (event, { botId, proxyString }) => {
             return { success: false, error: 'Неверный формат прокси' };
         }
 
-        // Устанавливаем прокси для сессии
-        console.log(`[Proxy MAIN] Вызов ses.setProxy({ proxyRules: "${proxyUrl}" })...`);
-        await ses.setProxy({ proxyRules: proxyUrl });
-        console.log(`[Proxy MAIN] ✅ Прокси успешно установлен для ${botId}: ${proxyUrl}`);
-
-        // Если есть логин/пароль - настраиваем обработчик аутентификации
+        // ВАЖНО: Настраиваем обработчик аутентификации ДО установки прокси
         if (username && password) {
             // Убираем предыдущие обработчики для этой сессии
             ses.removeAllListeners('login');
 
-            // Добавляем обработчик аутентификации
+            // Добавляем обработчик аутентификации ПЕРЕД setProxy
             ses.on('login', (loginEvent, webContents, request, authInfo, callback) => {
-                console.log(`[Proxy Auth] ${botId}: запрошена аутентификация для ${authInfo.host}`);
+                console.log(`[Proxy Auth] ${botId}: запрошена аутентификация для ${authInfo.host}:${authInfo.port}`);
+                console.log(`[Proxy Auth] ${botId}: отправляю credentials: ${username} / ${password.substring(0, 3)}***`);
                 loginEvent.preventDefault();
                 callback(username, password);
             });
 
-            console.log(`[Proxy MAIN] ✅ Настроена аутентификация для прокси (user: ${username})`);
+            console.log(`[Proxy MAIN] ✅ Настроена аутентификация ДО установки прокси (user: ${username})`);
         }
+
+        // Устанавливаем прокси для сессии
+        console.log(`[Proxy MAIN] Вызов ses.setProxy({ proxyRules: "${proxyUrl}" })...`);
+        await ses.setProxy({ proxyRules: proxyUrl });
+        console.log(`[Proxy MAIN] ✅ Прокси успешно установлен для ${botId}: ${proxyUrl}`);
 
         return { success: true, proxy: proxyUrl };
     } catch (error) {
@@ -251,14 +249,11 @@ ipcMain.handle('set-default-session-proxy', async (event, { proxyString }) => {
         } else if (parts.length === 4) {
             const [host, port, user, pass] = parts;
 
-            // URL-encode пароля для специальных символов (например +)
-            const encodedPass = encodeURIComponent(pass);
-
-            // ВАЖНО: Встраиваем credentials В URL для более надежной работы
-            proxyUrl = `http://${user}:${encodedPass}@${host}:${port}`;
+            // НЕ встраиваем credentials в URL - Electron не поддерживает
+            proxyUrl = `http://${host}:${port}`;
             username = user;
             password = pass;
-            console.log(`[Proxy Default MAIN] Формат: domain:port:user:pass → ${proxyUrl}`);
+            console.log(`[Proxy Default MAIN] Формат: domain:port:user:pass → ${proxyUrl} (auth: ${username})`);
         } else if (trimmed.includes('://')) {
             proxyUrl = trimmed;
             console.log(`[Proxy Default MAIN] Формат: полный URL → ${proxyUrl}`);
@@ -267,19 +262,21 @@ ipcMain.handle('set-default-session-proxy', async (event, { proxyString }) => {
             return { success: false, error: 'Неверный формат прокси' };
         }
 
-        console.log(`[Proxy Default MAIN] Вызов ses.setProxy({ proxyRules: "${proxyUrl}" })...`);
-        await ses.setProxy({ proxyRules: proxyUrl });
-        console.log(`[Proxy Default MAIN] ✅ Прокси успешно установлен: ${proxyUrl}`);
-
+        // ВАЖНО: Настраиваем обработчик аутентификации ДО установки прокси
         if (username && password) {
             ses.removeAllListeners('login');
             ses.on('login', (loginEvent, webContents, request, authInfo, callback) => {
-                console.log(`[Proxy Default Auth] Запрошена аутентификация для ${authInfo.host}`);
+                console.log(`[Proxy Default Auth] Запрошена аутентификация для ${authInfo.host}:${authInfo.port}`);
+                console.log(`[Proxy Default Auth] Отправляю credentials: ${username} / ${password.substring(0, 3)}***`);
                 loginEvent.preventDefault();
                 callback(username, password);
             });
-            console.log(`[Proxy Default MAIN] ✅ Настроена аутентификация (user: ${username})`);
+            console.log(`[Proxy Default MAIN] ✅ Настроена аутентификация ДО установки прокси (user: ${username})`);
         }
+
+        console.log(`[Proxy Default MAIN] Вызов ses.setProxy({ proxyRules: "${proxyUrl}" })...`);
+        await ses.setProxy({ proxyRules: proxyUrl });
+        console.log(`[Proxy Default MAIN] ✅ Прокси успешно установлен: ${proxyUrl}`);
 
         return { success: true, proxy: proxyUrl };
     } catch (error) {
