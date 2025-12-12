@@ -4259,8 +4259,8 @@
                         <button class="btn btn-sm btn-outline-danger btn-xs flex-fill hide-in-chat" id="btn-fav-${bot.id}" onclick="toggleTemplateFavorite('${bot.id}')" data-tip="В избранное"><i class="fa fa-heart"></i></button>
                     </div>
 
-                    <!-- Кнопка SHARE MY CAM -->
-                    <button class="btn btn-share-cam w-100 mb-2" id="btn-share-cam-${bot.id}" onclick="openVideoChatWindow('${bot.id}')">
+                    <!-- Кнопка SHARE MY CAM (только в режиме Chat) -->
+                    <button class="btn btn-share-cam w-100 mb-2 hide-in-mail" id="btn-share-cam-${bot.id}" onclick="openVideoChatWindow('${bot.id}')">
                         <i class="fa fa-video-camera"></i> SHARE MY CAM
                     </button>
 
