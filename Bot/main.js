@@ -127,19 +127,27 @@ ipcMain.handle('get-app-version', () => {
 
 // IPC: Установить прокси для сессии бота
 ipcMain.handle('set-session-proxy', async (event, { botId, proxyString }) => {
+    console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.log(`[Proxy MAIN] IPC set-session-proxy получен`);
+    console.log(`[Proxy MAIN] botId: "${botId}"`);
+    console.log(`[Proxy MAIN] proxyString: "${proxyString}"`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+
     try {
         const ses = session.fromPartition(`persist:${botId}`);
+        console.log(`[Proxy MAIN] Создан session для partition: persist:${botId}`);
 
         if (!proxyString || proxyString.trim() === '') {
             // Убираем прокси - прямое соединение
             await ses.setProxy({ proxyRules: '' });
-            console.log(`[Proxy] ${botId}: прокси отключен (прямое соединение)`);
+            console.log(`[Proxy MAIN] ${botId}: прокси отключен (прямое соединение)`);
             return { success: true, proxy: null };
         }
 
         // Парсим прокси (поддержка форматов: ip:port, domain:port, domain:port:user:pass)
         const trimmed = proxyString.trim();
         const parts = trimmed.split(':');
+        console.log(`[Proxy MAIN] Парсинг прокси, parts:`, parts);
 
         let proxyUrl;
         let username = null;
@@ -149,23 +157,27 @@ ipcMain.handle('set-session-proxy', async (event, { botId, proxyString }) => {
             // Формат: ip:port или domain:port
             const [host, port] = parts;
             proxyUrl = `http://${host}:${port}`;
+            console.log(`[Proxy MAIN] Формат: ip:port / domain:port → ${proxyUrl}`);
         } else if (parts.length === 4) {
             // Формат: domain:port:user:pass
             const [host, port, user, pass] = parts;
             proxyUrl = `http://${host}:${port}`;
             username = user;
             password = pass;
+            console.log(`[Proxy MAIN] Формат: domain:port:user:pass → ${proxyUrl} (auth: ${username})`);
         } else if (trimmed.includes('://')) {
             // Формат: http://domain:port (уже с протоколом)
             proxyUrl = trimmed;
+            console.log(`[Proxy MAIN] Формат: полный URL → ${proxyUrl}`);
         } else {
-            console.error(`[Proxy] ${botId}: неверный формат прокси: ${proxyString}`);
+            console.error(`[Proxy MAIN] ${botId}: НЕВЕРНЫЙ ФОРМАТ ПРОКСИ: ${proxyString}`);
             return { success: false, error: 'Неверный формат прокси' };
         }
 
         // Устанавливаем прокси для сессии
+        console.log(`[Proxy MAIN] Вызов ses.setProxy({ proxyRules: "${proxyUrl}" })...`);
         await ses.setProxy({ proxyRules: proxyUrl });
-        console.log(`[Proxy] ${botId}: установлен прокси ${proxyUrl}${username ? ` (auth: ${username})` : ''}`);
+        console.log(`[Proxy MAIN] ✅ Прокси успешно установлен для ${botId}: ${proxyUrl}`);
 
         // Если есть логин/пароль - настраиваем обработчик аутентификации
         if (username && password) {
@@ -179,12 +191,13 @@ ipcMain.handle('set-session-proxy', async (event, { botId, proxyString }) => {
                 callback(username, password);
             });
 
-            console.log(`[Proxy] ${botId}: настроена аутентификация для прокси`);
+            console.log(`[Proxy MAIN] ✅ Настроена аутентификация для прокси (user: ${username})`);
         }
 
         return { success: true, proxy: proxyUrl };
     } catch (error) {
-        console.error(`[Proxy] ${botId}: ошибка установки прокси:`, error.message);
+        console.error(`[Proxy MAIN] ❌ ОШИБКА установки прокси для ${botId}:`, error.message);
+        console.error(`[Proxy MAIN] Stack trace:`, error.stack);
         return { success: false, error: error.message };
     }
 });
@@ -202,18 +215,25 @@ ipcMain.handle('get-session-proxy', async (event, { botId }) => {
 
 // IPC: Установить прокси для default session (для axios запросов из renderer)
 ipcMain.handle('set-default-session-proxy', async (event, { proxyString }) => {
+    console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.log(`[Proxy Default MAIN] IPC set-default-session-proxy получен`);
+    console.log(`[Proxy Default MAIN] proxyString: "${proxyString}"`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+
     try {
         const ses = session.defaultSession;
+        console.log(`[Proxy Default MAIN] Используем defaultSession`);
 
         if (!proxyString || proxyString.trim() === '') {
             await ses.setProxy({ proxyRules: '' });
-            console.log('[Proxy Default] Прокси отключен');
+            console.log('[Proxy Default MAIN] Прокси отключен');
             return { success: true, proxy: null };
         }
 
         // Парсим прокси (как в set-session-proxy)
         const trimmed = proxyString.trim();
         const parts = trimmed.split(':');
+        console.log(`[Proxy Default MAIN] Парсинг прокси, parts:`, parts);
 
         let proxyUrl;
         let username = null;
@@ -222,20 +242,24 @@ ipcMain.handle('set-default-session-proxy', async (event, { proxyString }) => {
         if (parts.length === 2) {
             const [host, port] = parts;
             proxyUrl = `http://${host}:${port}`;
+            console.log(`[Proxy Default MAIN] Формат: ip:port / domain:port → ${proxyUrl}`);
         } else if (parts.length === 4) {
             const [host, port, user, pass] = parts;
             proxyUrl = `http://${host}:${port}`;
             username = user;
             password = pass;
+            console.log(`[Proxy Default MAIN] Формат: domain:port:user:pass → ${proxyUrl} (auth: ${username})`);
         } else if (trimmed.includes('://')) {
             proxyUrl = trimmed;
+            console.log(`[Proxy Default MAIN] Формат: полный URL → ${proxyUrl}`);
         } else {
-            console.error('[Proxy Default] Неверный формат прокси:', proxyString);
+            console.error('[Proxy Default MAIN] НЕВЕРНЫЙ ФОРМАТ ПРОКСИ:', proxyString);
             return { success: false, error: 'Неверный формат прокси' };
         }
 
+        console.log(`[Proxy Default MAIN] Вызов ses.setProxy({ proxyRules: "${proxyUrl}" })...`);
         await ses.setProxy({ proxyRules: proxyUrl });
-        console.log(`[Proxy Default] Установлен прокси ${proxyUrl}${username ? ` (auth: ${username})` : ''}`);
+        console.log(`[Proxy Default MAIN] ✅ Прокси успешно установлен: ${proxyUrl}`);
 
         if (username && password) {
             ses.removeAllListeners('login');
@@ -244,12 +268,13 @@ ipcMain.handle('set-default-session-proxy', async (event, { proxyString }) => {
                 loginEvent.preventDefault();
                 callback(username, password);
             });
-            console.log('[Proxy Default] Настроена аутентификация');
+            console.log(`[Proxy Default MAIN] ✅ Настроена аутентификация (user: ${username})`);
         }
 
         return { success: true, proxy: proxyUrl };
     } catch (error) {
-        console.error('[Proxy Default] Ошибка:', error.message);
+        console.error('[Proxy Default MAIN] ❌ ОШИБКА:', error.message);
+        console.error('[Proxy Default MAIN] Stack trace:', error.stack);
         return { success: false, error: error.message };
     }
 });
