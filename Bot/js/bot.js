@@ -4278,19 +4278,7 @@
                     </div>
                     </div>
                     <div class="relative-box d-flex flex-column flex-grow-1">
-                        <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." onclick="this.focus()" oninput="checkVarTrigger(this, 'vars-dropdown-${bot.id}'); bots['${bot.id}'].updateUI(); validateInput(this); autoSaveTemplateText('${bot.id}')" onblur="saveTemplateTextNow('${bot.id}')" oncontextmenu="showTranscriptionContextMenu(event, this)"></textarea>
-                        <div id="vars-dropdown-${bot.id}" class="vars-dropdown">
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{name}', 'vars-dropdown-${bot.id}')"><b>{name}</b> <span style="opacity:0.6;font-size:11px">Имя</span></div>
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{age}', 'vars-dropdown-${bot.id}')"><b>{age}</b> <span style="opacity:0.6;font-size:11px">Возраст</span></div>
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{city}', 'vars-dropdown-${bot.id}')"><b>{city}</b> <span style="opacity:0.6;font-size:11px">Город</span></div>
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{country}', 'vars-dropdown-${bot.id}')"><b>{country}</b> <span style="opacity:0.6;font-size:11px">Страна</span></div>
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{countryCode}', 'vars-dropdown-${bot.id}')"><b>{countryCode}</b> <span style="opacity:0.6;font-size:11px">Код страны</span></div>
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{accountId}', 'vars-dropdown-${bot.id}')"><b>{accountId}</b> <span style="opacity:0.6;font-size:11px">ID аккаунта</span></div>
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{birthday}', 'vars-dropdown-${bot.id}')"><b>{birthday}</b> <span style="opacity:0.6;font-size:11px">День рождения</span></div>
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{ageFrom}', 'vars-dropdown-${bot.id}')"><b>{ageFrom}</b> <span style="opacity:0.6;font-size:11px">Ищет от</span></div>
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{ageTo}', 'vars-dropdown-${bot.id}')"><b>{ageTo}</b> <span style="opacity:0.6;font-size:11px">Ищет до</span></div>
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{profilePhoto}', 'vars-dropdown-${bot.id}')"><b>{profilePhoto}</b> <span style="opacity:0.6;font-size:11px">URL фото</span></div>
-                        </div>
+                        <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." onclick="this.focus()" oninput="bots['${bot.id}'].updateUI(); validateInput(this); autoSaveTemplateText('${bot.id}')" onblur="saveTemplateTextNow('${bot.id}')"></textarea>
                     </div>
                     <div id="active-invite-${bot.id}" class="active-invite-box hide-in-mail"></div>
                     <div class="photo-block hide-in-chat">

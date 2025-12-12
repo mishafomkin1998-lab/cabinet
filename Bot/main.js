@@ -48,7 +48,7 @@ function createWindow() {
     mainWindow.webContents.on('context-menu', (e, params) => {
         // Проверяем, что клик был в textarea (editable field)
         if (params.isEditable) {
-            const transcriptionSubmenu = TRANSCRIPTION_VARS.map(item => ({
+            const transcriptionItems = TRANSCRIPTION_VARS.map(item => ({
                 label: item.label,
                 click: () => {
                     // Вставляем переменную в текущее поле
@@ -70,10 +70,7 @@ function createWindow() {
             }));
 
             const contextMenu = Menu.buildFromTemplate([
-                {
-                    label: '📝 Вставить переменную',
-                    submenu: transcriptionSubmenu
-                },
+                ...transcriptionItems,
                 { type: 'separator' },
                 { label: 'Вырезать', role: 'cut' },
                 { label: 'Копировать', role: 'copy' },
