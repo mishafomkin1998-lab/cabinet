@@ -313,6 +313,50 @@ async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
         // После heartbeat проверяем статус управления (panic mode)
         checkControlStatus();
 
+        // Обрабатываем команды для конкретной анкеты
+        if (data.commands && typeof bots !== 'undefined') {
+            // Проверяем статус бот-машины (botEnabled) - влияет на ВСЕ анкеты
+            const wasBotEnabled = controlStatus.botEnabled !== false;
+            controlStatus.botEnabled = data.commands.botEnabled !== false;
+
+            // Если бот-машина была отключена - останавливаем ВСЕ рассылки
+            if (wasBotEnabled && !controlStatus.botEnabled) {
+                console.log(`🔴 Бот-машина отключена администратором! Останавливаю все рассылки...`);
+                stopAllMailingOnBotDisabled();
+            } else if (!wasBotEnabled && controlStatus.botEnabled) {
+                console.log(`🟢 Бот-машина включена администратором`);
+                showToast('Бот включен - можно запускать рассылки', 'success');
+            }
+
+            // Ищем бота по displayId для обновления mailingEnabled (per-profile)
+            for (const botId in bots) {
+                const bot = bots[botId];
+                if (bot && bot.displayId === displayId) {
+                    // Обновляем статус mailingEnabled для этой анкеты
+                    const wasEnabled = bot.mailingEnabled !== false; // По умолчанию true
+                    bot.mailingEnabled = data.commands.mailingEnabled !== false;
+
+                    // Если рассылка была отключена с сервера - останавливаем
+                    if (wasEnabled && !bot.mailingEnabled) {
+                        console.log(`⛔ Рассылка для ${displayId} отключена с сервера`);
+                        if (bot.isMailRunning) {
+                            bot.stopMail();
+                            console.log(`⛔ Mail остановлен для ${displayId}`);
+                        }
+                        if (bot.isChatRunning) {
+                            bot.stopChat();
+                            console.log(`⛔ Chat остановлен для ${displayId}`);
+                        }
+                        showToast(`Анкета ${displayId}: рассылка отключена администратором`, 'warning');
+                    } else if (!wasEnabled && bot.mailingEnabled) {
+                        console.log(`✅ Рассылка для ${displayId} включена с сервера`);
+                        showToast(`Анкета ${displayId}: рассылка разрешена`, 'success');
+                    }
+                    break;
+                }
+            }
+        }
+
         return data;
     } catch (error) {
         console.error(`❌ Ошибка heartbeat:`, error);
@@ -320,7 +364,7 @@ async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
     }
 }
 
-// 4. Функция проверки статуса управления (panic mode, mailing enabled)
+// 4. Функция проверки статуса управления (panic mode, stopSpam)
 async function checkControlStatus() {
     try {
         const response = await fetch(`${LABABOT_SERVER}/api/bots/control/panic-status`);
@@ -328,15 +372,27 @@ async function checkControlStatus() {
 
         if (data.success) {
             const wasPanic = controlStatus.panicMode;
+            const wasStopSpam = controlStatus.stopSpam;
+
             controlStatus.panicMode = data.panicMode === true;
+            controlStatus.stopSpam = data.stopSpam === true;
             controlStatus.lastCheck = new Date();
 
-            // Если включился panic mode - остановить все рассылки
+            // Если включился panic mode - остановить все рассылки (критичный)
             if (!wasPanic && controlStatus.panicMode) {
                 console.log('🚨 PANIC MODE АКТИВИРОВАН! Останавливаю все рассылки...');
                 stopAllMailingOnPanic();
             } else if (wasPanic && !controlStatus.panicMode) {
                 console.log('✅ Panic Mode отключен');
+            }
+
+            // Если включился stopSpam - остановить все рассылки (мягкий, можно перезапустить)
+            if (!wasStopSpam && controlStatus.stopSpam) {
+                console.log('⛔ STOP SPAM АКТИВИРОВАН! Останавливаю все рассылки...');
+                stopAllMailingOnStopSpam();
+            } else if (wasStopSpam && !controlStatus.stopSpam) {
+                console.log('✅ Stop Spam отключен - можно запускать рассылки');
+                showToast('Stop Spam отключен - можно запускать рассылки', 'success');
             }
         }
 
@@ -347,22 +403,58 @@ async function checkControlStatus() {
     }
 }
 
-// Функция остановки всех рассылок при panic mode
+// Функция остановки всех рассылок при panic mode (критичный - блокирует запуск)
 function stopAllMailingOnPanic() {
     for (const botId in bots) {
         const bot = bots[botId];
         if (bot) {
-            if (bot.mailRunning) {
+            if (bot.isMailRunning) {
                 bot.stopMail();
                 console.log(`⛔ Остановлена Mail рассылка для ${bot.displayId}`);
             }
-            if (bot.chatRunning) {
+            if (bot.isChatRunning) {
                 bot.stopChat();
                 console.log(`⛔ Остановлена Chat рассылка для ${bot.displayId}`);
             }
         }
     }
     showToast('🚨 Panic Mode: все рассылки остановлены!', 'error');
+}
+
+// Функция остановки всех рассылок при stopSpam (мягкий - можно перезапустить)
+function stopAllMailingOnStopSpam() {
+    for (const botId in bots) {
+        const bot = bots[botId];
+        if (bot) {
+            if (bot.isMailRunning) {
+                bot.stopMail();
+                console.log(`⛔ Остановлена Mail рассылка для ${bot.displayId}`);
+            }
+            if (bot.isChatRunning) {
+                bot.stopChat();
+                console.log(`⛔ Остановлена Chat рассылка для ${bot.displayId}`);
+            }
+        }
+    }
+    showToast('⛔ Stop Spam: все рассылки остановлены администратором', 'warning');
+}
+
+// Функция остановки всех рассылок при отключении бот-машины (блокирует запуск)
+function stopAllMailingOnBotDisabled() {
+    for (const botId in bots) {
+        const bot = bots[botId];
+        if (bot) {
+            if (bot.isMailRunning) {
+                bot.stopMail();
+                console.log(`🔴 Mail остановлен для ${bot.displayId} (бот отключен)`);
+            }
+            if (bot.isChatRunning) {
+                bot.stopChat();
+                console.log(`🔴 Chat остановлен для ${bot.displayId} (бот отключен)`);
+            }
+        }
+    }
+    showToast('🔴 Бот отключен администратором! Все рассылки остановлены.', 'error');
 }
 
 // 5. Функция отправки ошибки

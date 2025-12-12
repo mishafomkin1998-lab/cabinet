@@ -215,11 +215,20 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
     const isPaused = profileSettings.rows[0]?.paused || false;
     const proxy = profileSettings.rows[0]?.proxy || null;
 
+    // Получаем статус бота (машины) - если offline, то бот выключен
+    const botStatusResult = await pool.query(
+        `SELECT status FROM bots WHERE bot_id = $1`,
+        [botId]
+    );
+    const botStatus = botStatusResult.rows[0]?.status || 'online';
+    const botEnabled = botStatus !== 'offline' && botStatus !== 'disabled';
+
     res.json({
         status: 'ok',
         commands: {
             mailingEnabled: !isPaused,  // true = рассылка включена, false = на паузе
-            proxy: proxy  // прокси для этой анкеты (null = без прокси)
+            proxy: proxy,  // прокси для этой анкеты (null = без прокси)
+            botEnabled: botEnabled  // true = бот включен, false = бот выключен админом
         }
     });
 }));
@@ -695,11 +704,6 @@ router.post('/activate-trial', asyncHandler(async (req, res) => {
     });
 }));
 
-// Обновление всех ботов
-router.post('/refresh-all', asyncHandler(async (req, res) => {
-    res.json({ success: true, message: 'Refresh signal sent' });
-}));
-
 // Включение/выключение бота
 router.post('/:botId/toggle', asyncHandler(async (req, res) => {
     const { botId } = req.params;
@@ -1046,23 +1050,25 @@ router.post('/control/panic', asyncHandler(async (req, res) => {
     }
 }));
 
-// Проверка статуса panic mode (для бота)
+// Проверка статуса управления (для бота) - panic mode и stopSpam
 router.get('/control/panic-status', asyncHandler(async (req, res) => {
-    // Проверяем, есть ли активный panic mode у любого пользователя
     try {
+        // Проверяем panic mode и stopSpam у любого пользователя
         const result = await pool.query(`
-            SELECT settings->>'panicMode' as panic
+            SELECT
+                COALESCE(bool_or((settings->>'panicMode')::boolean), false) as panic_mode,
+                COALESCE(bool_or((settings->>'stopSpam')::boolean), false) as stop_spam
             FROM user_settings
-            WHERE (settings->>'panicMode')::boolean = true
-            LIMIT 1
         `);
 
+        const row = result.rows[0] || {};
         res.json({
             success: true,
-            panicMode: result.rows.length > 0
+            panicMode: row.panic_mode === true,
+            stopSpam: row.stop_spam === true
         });
     } catch (e) {
-        res.json({ success: true, panicMode: false });
+        res.json({ success: true, panicMode: false, stopSpam: false });
     }
 }));
 

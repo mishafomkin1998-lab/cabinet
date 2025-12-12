@@ -1990,23 +1990,6 @@
                     }
                 },
 
-                async updateAllBots() {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/refresh-all`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' }
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            // Обновляем список ботов
-                            await this.loadBotsStatus();
-                            alert(this.t('messages.botsUpdated'));
-                        }
-                    } catch (e) {
-                        console.error('Ошибка:', e);
-                    }
-                },
-
                 async syncPromptWithBots() {
                     try {
                         const res = await fetch(`${API_BASE}/api/bots/sync-prompt`, {
