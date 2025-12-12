@@ -100,6 +100,14 @@
 
         let globalMode = 'mail';
         let activeTabId = null;
+
+        // Статус управления с сервера (panic mode, разрешение рассылки)
+        let controlStatus = {
+            panicMode: false,
+            mailingEnabled: true,
+            lastCheck: null
+        };
+
         let currentModalBotId = null;
         let editingTemplateIndex = null;
         let editingBotId = null;
@@ -265,6 +273,10 @@
 
                 const data = await response.json();
                 console.log(`✅ Heartbeat отправлен:`, data);
+
+                // После heartbeat проверяем статус управления (panic mode)
+                checkControlStatus();
+
                 return data;
             } catch (error) {
                 console.error(`❌ Ошибка heartbeat:`, error);
@@ -272,7 +284,52 @@
             }
         }
 
-        // 3. Функция отправки ошибки
+        // 3.1 Функция проверки статуса управления (panic mode)
+        async function checkControlStatus() {
+            try {
+                const response = await fetch(`${LABABOT_SERVER}/api/bots/control/panic-status`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const wasPanic = controlStatus.panicMode;
+                    controlStatus.panicMode = data.panicMode === true;
+                    controlStatus.lastCheck = new Date();
+
+                    // Если включился panic mode - остановить все рассылки
+                    if (!wasPanic && controlStatus.panicMode) {
+                        console.log('🚨 PANIC MODE АКТИВИРОВАН! Останавливаю все рассылки...');
+                        stopAllMailingOnPanic();
+                    } else if (wasPanic && !controlStatus.panicMode) {
+                        console.log('✅ Panic Mode отключен');
+                    }
+                }
+
+                return controlStatus;
+            } catch (error) {
+                console.error('❌ Ошибка проверки статуса управления:', error);
+                return controlStatus;
+            }
+        }
+
+        // 3.2 Функция остановки всех рассылок при panic mode
+        function stopAllMailingOnPanic() {
+            for (const botId in bots) {
+                const bot = bots[botId];
+                if (bot) {
+                    if (bot.mailRunning) {
+                        bot.stopMail();
+                        console.log(`⛔ Остановлена Mail рассылка для ${bot.displayId}`);
+                    }
+                    if (bot.chatRunning) {
+                        bot.stopChat();
+                        console.log(`⛔ Остановлена Chat рассылка для ${bot.displayId}`);
+                    }
+                }
+            }
+            showToast('🚨 Panic Mode: все рассылки остановлены!', 'error');
+        }
+
+        // 4. Функция отправки ошибки
         // ВАЖНО: botId теперь это MACHINE_ID (ID программы)
         async function sendErrorToLababot(botId, accountDisplayId, errorType, errorMessage) {
             console.log(`⚠️ Отправляю ошибку на Lababot сервер: ${errorType}`);
@@ -3437,6 +3494,13 @@
             async startMail(text) {
                 if(!this.token) return;
 
+                // Проверяем panic mode с сервера
+                if (controlStatus.panicMode) {
+                    this.log(`🚨 Запуск заблокирован - активен Panic Mode`);
+                    showToast('🚨 Panic Mode активен! Рассылка заблокирована.', 'error');
+                    return;
+                }
+
                 // Проверяем статус профиля на сервере
                 const profileStatus = await checkProfileStatus(this.displayId);
 
@@ -3864,6 +3928,13 @@
 
             async startChat(fullText) {
                 if(!this.token) return;
+
+                // Проверяем panic mode с сервера
+                if (controlStatus.panicMode) {
+                    this.log(`🚨 Запуск заблокирован - активен Panic Mode`);
+                    showToast('🚨 Panic Mode активен! Рассылка заблокирована.', 'error');
+                    return;
+                }
 
                 // Проверяем статус профиля на сервере
                 const profileStatus = await checkProfileStatus(this.displayId);

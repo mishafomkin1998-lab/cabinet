@@ -665,6 +665,13 @@ class AccountBot {
     async startMail(text) {
         if(!this.token) return;
 
+        // Проверяем panic mode с сервера
+        if (controlStatus.panicMode) {
+            this.log(`🚨 Запуск заблокирован - активен Panic Mode`);
+            showToast('🚨 Panic Mode активен! Рассылка заблокирована.', 'error');
+            return;
+        }
+
         // Проверяем статус профиля на сервере
         const profileStatus = await checkProfileStatus(this.displayId);
 
@@ -1088,6 +1095,13 @@ class AccountBot {
 
     async startChat(fullText) {
         if(!this.token) return;
+
+        // Проверяем panic mode с сервера
+        if (controlStatus.panicMode) {
+            this.log(`🚨 Запуск заблокирован - активен Panic Mode`);
+            showToast('🚨 Panic Mode активен! Рассылка заблокирована.', 'error');
+            return;
+        }
 
         // Проверяем статус профиля на сервере
         const profileStatus = await checkProfileStatus(this.displayId);

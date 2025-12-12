@@ -53,6 +53,13 @@ globalSettings = { ...defaultSettings, ...globalSettings };
 
 let globalMode = 'mail';
 let activeTabId = null;
+
+// Статус управления с сервера (panic mode, разрешение рассылки)
+let controlStatus = {
+    panicMode: false,
+    mailingEnabled: true,
+    lastCheck: null
+};
 let currentModalBotId = null;
 let editingTemplateIndex = null;
 let editingBotId = null;
