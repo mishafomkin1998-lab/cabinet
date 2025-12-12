@@ -2070,11 +2070,12 @@
                     Переводчик будет оплачивать использование анкет со своего баланса. Вы сможете пополнять его баланс во вкладке "Финансы".
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium mb-2">Ставка</label>
+                <!-- Поле Сумма - только для директора, когда галочка "Мой переводчик" снята -->
+                <div x-show="currentUser.role === 'director' && !newTranslator.adminId && !newTranslator.isOwnTranslator">
+                    <label class="block text-sm font-medium mb-2">Сумма</label>
                     <input type="number"
                            class="glass w-full px-4 py-3 rounded-xl"
-                           placeholder="Введите ставку"
+                           placeholder="Введите сумму"
                            x-model="newTranslator.salary">
                 </div>
 

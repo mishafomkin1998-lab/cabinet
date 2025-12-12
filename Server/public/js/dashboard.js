@@ -1832,12 +1832,15 @@
                             if (passwordChanged) {
                                 body.password = this.newTranslator.password;
                             }
-                            if (this.newTranslator.salary) {
-                                body.salary = parseFloat(this.newTranslator.salary);
-                            }
-                            // Для переводчиков под директором - поле isOwnTranslator
+                            // Для переводчиков под директором - поле isOwnTranslator и salary
                             if (this.currentUser.role === 'director' && !this.newTranslator.adminId) {
                                 body.isOwnTranslator = this.newTranslator.isOwnTranslator;
+                                // Salary только если НЕ свой переводчик
+                                if (!this.newTranslator.isOwnTranslator && this.newTranslator.salary) {
+                                    body.salary = parseFloat(this.newTranslator.salary);
+                                } else if (this.newTranslator.isOwnTranslator) {
+                                    body.salary = null; // Сбрасываем salary для своего переводчика
+                                }
                             }
 
                             const res = await fetch(`${API_BASE}/api/users/${this.editingTranslator.id}`, {
@@ -1867,12 +1870,15 @@
                                 password: this.newTranslator.password,
                                 role: 'translator',
                                 ownerId: ownerId,
-                                salary: this.newTranslator.salary ? parseFloat(this.newTranslator.salary) : null,
                                 aiEnabled: this.newTranslator.aiEnabled
                             };
-                            // Для переводчиков под директором - поле isOwnTranslator
+                            // Для переводчиков под директором - поле isOwnTranslator и salary
                             if (this.currentUser.role === 'director' && !this.newTranslator.adminId) {
                                 createData.isOwnTranslator = this.newTranslator.isOwnTranslator;
+                                // Salary только если НЕ свой переводчик
+                                if (!this.newTranslator.isOwnTranslator && this.newTranslator.salary) {
+                                    createData.salary = parseFloat(this.newTranslator.salary);
+                                }
                             }
 
                             const res = await fetch(`${API_BASE}/api/users`, {
