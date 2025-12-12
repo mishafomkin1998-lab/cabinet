@@ -101,12 +101,29 @@ async function setWebviewProxy(botId) {
     const proxyString = getProxyForAccountNumber(accountNumber);
 
     try {
+        // 1. Устанавливаем прокси для webview сессии бота
         const result = await ipcRenderer.invoke('set-session-proxy', { botId, proxyString });
         if (result.success) {
             console.log(`[Proxy] Бот ${botId} (анкета #${accountNumber}): ${proxyString || 'без прокси'}`);
         } else {
             console.error(`[Proxy] Ошибка для ${botId}:`, result.error);
         }
+
+        // 2. Устанавливаем прокси для default session (для axios запросов)
+        // Используем прокси первой анкеты для всех axios запросов
+        if (accountNumber === 1 && proxyString) {
+            try {
+                const defaultResult = await ipcRenderer.invoke('set-default-session-proxy', { proxyString });
+                if (defaultResult.success) {
+                    console.log(`[Proxy Default] Установлен глобальный прокси: ${proxyString}`);
+                } else {
+                    console.error(`[Proxy Default] Ошибка:`, defaultResult.error);
+                }
+            } catch (e) {
+                console.error('[Proxy Default] IPC ошибка:', e);
+            }
+        }
+
         return result;
     } catch (err) {
         console.error(`[Proxy] IPC ошибка для ${botId}:`, err);

@@ -200,6 +200,60 @@ ipcMain.handle('get-session-proxy', async (event, { botId }) => {
     }
 });
 
+// IPC: Установить прокси для default session (для axios запросов из renderer)
+ipcMain.handle('set-default-session-proxy', async (event, { proxyString }) => {
+    try {
+        const ses = session.defaultSession;
+
+        if (!proxyString || proxyString.trim() === '') {
+            await ses.setProxy({ proxyRules: '' });
+            console.log('[Proxy Default] Прокси отключен');
+            return { success: true, proxy: null };
+        }
+
+        // Парсим прокси (как в set-session-proxy)
+        const trimmed = proxyString.trim();
+        const parts = trimmed.split(':');
+
+        let proxyUrl;
+        let username = null;
+        let password = null;
+
+        if (parts.length === 2) {
+            const [host, port] = parts;
+            proxyUrl = `http://${host}:${port}`;
+        } else if (parts.length === 4) {
+            const [host, port, user, pass] = parts;
+            proxyUrl = `http://${host}:${port}`;
+            username = user;
+            password = pass;
+        } else if (trimmed.includes('://')) {
+            proxyUrl = trimmed;
+        } else {
+            console.error('[Proxy Default] Неверный формат прокси:', proxyString);
+            return { success: false, error: 'Неверный формат прокси' };
+        }
+
+        await ses.setProxy({ proxyRules: proxyUrl });
+        console.log(`[Proxy Default] Установлен прокси ${proxyUrl}${username ? ` (auth: ${username})` : ''}`);
+
+        if (username && password) {
+            ses.removeAllListeners('login');
+            ses.on('login', (loginEvent, webContents, request, authInfo, callback) => {
+                console.log(`[Proxy Default Auth] Запрошена аутентификация для ${authInfo.host}`);
+                loginEvent.preventDefault();
+                callback(username, password);
+            });
+            console.log('[Proxy Default] Настроена аутентификация');
+        }
+
+        return { success: true, proxy: proxyUrl };
+    } catch (error) {
+        console.error('[Proxy Default] Ошибка:', error.message);
+        return { success: false, error: error.message };
+    }
+});
+
 // =====================================================
 
 // === КРИТИЧЕСКИ ВАЖНО: Флаги для поддержания ОНЛАЙНА ===
