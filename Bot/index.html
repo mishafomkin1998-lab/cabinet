@@ -160,13 +160,8 @@
                 </div>
             </div>
 
-            <div class="mb-3 relative-box">
-                <textarea id="tpl-modal-text" class="form-control" rows="5" placeholder="Текст..." oninput="checkVarTrigger(this, 'tpl-vars-dropdown'); validateInput(this)"></textarea>
-                <div id="tpl-vars-dropdown" class="vars-dropdown">
-                    <div class="vars-item" onclick="applyVar('tpl-modal-text', '{City}', 'tpl-vars-dropdown')"><b>{City}</b> - Город</div>
-                    <div class="vars-item" onclick="applyVar('tpl-modal-text', '{Name}', 'tpl-vars-dropdown')"><b>{Name}</b> - Имя</div>
-                    <div class="vars-item" onclick="applyVar('tpl-modal-text', '{Age}', 'tpl-vars-dropdown')"><b>{Age}</b> - Возраст</div>
-                </div>
+            <div class="mb-3">
+                <textarea id="tpl-modal-text" class="form-control" rows="5" placeholder="Текст..." oninput="validateInput(this)"></textarea>
             </div>
             <div class="alert alert-info small p-1 hide-in-mail" style="display:none;" id="chat-hint">
                 В чате разделяйте инвайты через <b>__</b> (два подчеркивания) между абзацами.
