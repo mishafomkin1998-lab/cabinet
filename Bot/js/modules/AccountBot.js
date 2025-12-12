@@ -492,7 +492,8 @@ class AccountBot {
                         manId: partnerId,
                         manName: partnerName,
                         messageId: requestId,
-                        type: 'chat'
+                        type: 'chat',
+                        messageText: truncatedBody
                     });
 
                     // === ТРИГГЕР АВТООТВЕТА ===
@@ -609,13 +610,16 @@ class AccountBot {
                     }
 
                     // Отправляем входящее сообщение на сервер статистики
+                    // Текст берём из msg.Text, msg.Body или msg.Preview если есть
+                    const mailText = msg.Text || msg.Body || msg.Preview || null;
                     sendIncomingMessageToLababot({
                         botId: this.id,
                         profileId: this.displayId,
                         manId: partnerId,
                         manName: partnerName,
                         messageId: msg.MessageId,
-                        type: 'letter'
+                        type: 'letter',
+                        messageText: mailText
                     });
 
                     if (!msg.IsReplied) {

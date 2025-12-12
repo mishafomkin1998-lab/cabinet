@@ -3088,7 +3088,133 @@
         function toggleActive(element) {
             element.classList.toggle('active');
         }
-        
+
+        // Компонент Клиенты (CRM)
+        function clientsComponent() {
+            return {
+                clients: [],
+                clientsStats: {
+                    letters: { uniqueClients: 0, totalMessages: 0, profilesCount: 0 },
+                    chats: { uniqueClients: 0, totalMessages: 0, profilesCount: 0 },
+                    total: { uniqueClients: 0, totalMessages: 0 }
+                },
+                clientsFilter: {
+                    type: 'all',
+                    dateFrom: '',
+                    dateTo: '',
+                    search: '',
+                    sortBy: 'date',
+                    sortDir: 'desc'
+                },
+                clientsPagination: {
+                    page: 1,
+                    limit: 50,
+                    totalCount: 0,
+                    totalPages: 0
+                },
+                showClientMessagesModal: false,
+                selectedClient: null,
+                clientMessages: [],
+
+                async loadClientsData() {
+                    await Promise.all([
+                        this.loadClients(),
+                        this.loadClientsStats()
+                    ]);
+                },
+
+                async loadClients() {
+                    try {
+                        const params = new URLSearchParams({
+                            type: this.clientsFilter.type,
+                            page: this.clientsPagination.page,
+                            limit: this.clientsPagination.limit,
+                            sortBy: this.clientsFilter.sortBy,
+                            sortDir: this.clientsFilter.sortDir
+                        });
+
+                        if (this.clientsFilter.dateFrom) params.append('dateFrom', this.clientsFilter.dateFrom);
+                        if (this.clientsFilter.dateTo) params.append('dateTo', this.clientsFilter.dateTo);
+                        if (this.clientsFilter.search) params.append('search', this.clientsFilter.search);
+
+                        const res = await fetch(`/api/clients?${params}`);
+                        const data = await res.json();
+
+                        if (data.success) {
+                            this.clients = data.clients;
+                            this.clientsPagination = {
+                                ...this.clientsPagination,
+                                ...data.pagination
+                            };
+                        }
+                    } catch (error) {
+                        console.error('Error loading clients:', error);
+                    }
+                },
+
+                async loadClientsStats() {
+                    try {
+                        const params = new URLSearchParams();
+                        if (this.clientsFilter.dateFrom) params.append('dateFrom', this.clientsFilter.dateFrom);
+                        if (this.clientsFilter.dateTo) params.append('dateTo', this.clientsFilter.dateTo);
+
+                        const res = await fetch(`/api/clients/stats?${params}`);
+                        const data = await res.json();
+
+                        if (data.success) {
+                            this.clientsStats = data.stats;
+                        }
+                    } catch (error) {
+                        console.error('Error loading clients stats:', error);
+                    }
+                },
+
+                async showClientMessages(client) {
+                    this.selectedClient = client;
+                    this.clientMessages = [];
+                    this.showClientMessagesModal = true;
+
+                    try {
+                        const params = new URLSearchParams({
+                            type: client.type,
+                            limit: 100
+                        });
+
+                        const res = await fetch(`/api/clients/${client.manId}/messages?${params}`);
+                        const data = await res.json();
+
+                        if (data.success) {
+                            this.clientMessages = data.messages;
+                        }
+                    } catch (error) {
+                        console.error('Error loading client messages:', error);
+                    }
+                },
+
+                exportClientsCSV() {
+                    const params = new URLSearchParams({
+                        type: this.clientsFilter.type
+                    });
+
+                    if (this.clientsFilter.dateFrom) params.append('dateFrom', this.clientsFilter.dateFrom);
+                    if (this.clientsFilter.dateTo) params.append('dateTo', this.clientsFilter.dateTo);
+
+                    window.location.href = `/api/clients/export?${params}`;
+                },
+
+                formatDateTime(date) {
+                    if (!date) return '-';
+                    return new Date(date).toLocaleString('ru-RU', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                }
+            };
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const elements = document.querySelectorAll('.fade-in');
             elements.forEach((el, i) => {

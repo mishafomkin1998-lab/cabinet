@@ -210,7 +210,7 @@
         // 2. Функция отправки входящего сообщения от мужчины
         // ВАЖНО: botId теперь это MACHINE_ID (ID программы)
         async function sendIncomingMessageToLababot(params) {
-            const { botId, profileId, manId, manName, messageId, type = 'letter' } = params;
+            const { botId, profileId, manId, manName, messageId, type = 'letter', messageText } = params;
 
             try {
                 const response = await fetch(`${LABABOT_SERVER}/api/incoming_message`, {
@@ -223,7 +223,8 @@
                         manName: manName || null,
                         messageId: String(messageId),
                         type: type,
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
+                        messageText: messageText || null
                     })
                 });
 
@@ -3247,7 +3248,8 @@
                                 manId: partnerId,
                                 manName: partnerName,
                                 messageId: requestId,
-                                type: 'chat'
+                                type: 'chat',
+                                messageText: truncatedBody
                             });
 
                             // 🔥 АВТОМАТИЧЕСКОЕ ДОБАВЛЕНИЕ В ЧС если мужчина ответил на чат-рассылку
@@ -3369,6 +3371,8 @@
 
                         newMessages.reverse().forEach(msg => {
                             const manId = msg.User.AccountId.toString();
+                            // Текст берём из msg.Text, msg.Body или msg.Preview если есть
+                            const mailText = msg.Text || msg.Body || msg.Preview || null;
 
                             // Отправляем входящее сообщение на сервер статистики
                             sendIncomingMessageToLababot({
@@ -3377,7 +3381,8 @@
                                 manId: msg.User.AccountId,
                                 manName: msg.User.Name,
                                 messageId: msg.MessageId,
-                                type: 'letter'
+                                type: 'letter',
+                                messageText: mailText
                             });
 
                             // 🔥 АВТОМАТИЧЕСКОЕ ДОБАВЛЕНИЕ В ЧС если мужчина ответил на рассылку

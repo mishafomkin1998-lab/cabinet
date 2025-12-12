@@ -484,7 +484,7 @@ router.get('/history', asyncHandler(async (req, res) => {
  * @body {string} timestamp - Время получения
  */
 router.post('/incoming_message', asyncHandler(async (req, res) => {
-    const { botId, profileId, manId, manName, messageId, type, timestamp } = req.body;
+    const { botId, profileId, manId, manName, messageId, type, timestamp, messageText } = req.body;
 
     if (!profileId || !manId) {
         return res.status(400).json({ success: false, error: 'profileId и manId обязательны' });
@@ -518,8 +518,8 @@ router.post('/incoming_message', asyncHandler(async (req, res) => {
     // Записываем входящее сообщение
     await pool.query(
         `INSERT INTO incoming_messages
-         (profile_id, bot_id, man_id, man_name, platform_message_id, type, is_first_from_man, admin_id, translator_id, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+         (profile_id, bot_id, man_id, man_name, platform_message_id, type, is_first_from_man, admin_id, translator_id, created_at, message_text)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
             profileId,
             botId || null,
@@ -530,7 +530,8 @@ router.post('/incoming_message', asyncHandler(async (req, res) => {
             isFirstFromMan,
             profile.assigned_admin_id || null,
             profile.assigned_translator_id || null,
-            timestamp ? new Date(timestamp) : new Date()
+            timestamp ? new Date(timestamp) : new Date(),
+            messageText || null
         ]
     );
 
@@ -763,6 +764,358 @@ router.get('/sent-letters-grouped', asyncHandler(async (req, res) => {
     }));
 
     res.json({ success: true, letters });
+}));
+
+/**
+ * GET /api/clients
+ * Получить уникальных клиентов (мужчин) из входящих сообщений
+ * Клиенты группируются по man_id и type - один мужчина может быть клиентом и в письмах, и в чатах отдельно
+ *
+ * @query {string} type - Тип: 'letter', 'chat' или 'all' (по умолчанию 'all')
+ * @query {string} dateFrom - Начало периода (YYYY-MM-DD)
+ * @query {string} dateTo - Конец периода (YYYY-MM-DD)
+ * @query {string} profileId - Фильтр по ID анкеты
+ * @query {string} search - Поиск по имени или ID мужчины
+ * @query {number} page - Страница (по умолчанию 1)
+ * @query {number} limit - Количество на странице (по умолчанию 50)
+ * @query {string} sortBy - Поле сортировки: 'date', 'name', 'messages' (по умолчанию 'date')
+ * @query {string} sortDir - Направление: 'asc' или 'desc' (по умолчанию 'desc')
+ */
+router.get('/clients', asyncHandler(async (req, res) => {
+    const {
+        type = 'all',
+        dateFrom,
+        dateTo,
+        profileId,
+        search,
+        page = 1,
+        limit = 50,
+        sortBy = 'date',
+        sortDir = 'desc'
+    } = req.query;
+
+    const pageInt = Math.max(1, parseInt(page) || 1);
+    const limitInt = Math.min(100, Math.max(1, parseInt(limit) || 50));
+    const offset = (pageInt - 1) * limitInt;
+
+    // Строим условия фильтрации
+    let conditions = [];
+    let params = [];
+    let paramIndex = 1;
+
+    // Фильтр по типу
+    if (type && type !== 'all') {
+        conditions.push(`im.type = $${paramIndex}`);
+        params.push(type);
+        paramIndex++;
+    }
+
+    // Фильтр по дате
+    if (dateFrom) {
+        conditions.push(`im.created_at >= $${paramIndex}::date`);
+        params.push(dateFrom);
+        paramIndex++;
+    }
+    if (dateTo) {
+        conditions.push(`im.created_at < ($${paramIndex}::date + interval '1 day')`);
+        params.push(dateTo);
+        paramIndex++;
+    }
+
+    // Фильтр по анкете
+    if (profileId) {
+        conditions.push(`im.profile_id = $${paramIndex}`);
+        params.push(profileId);
+        paramIndex++;
+    }
+
+    // Поиск по имени или ID
+    if (search) {
+        conditions.push(`(im.man_name ILIKE $${paramIndex} OR im.man_id ILIKE $${paramIndex})`);
+        params.push(`%${search}%`);
+        paramIndex++;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    // Сортировка
+    const sortFields = {
+        'date': 'last_message_at',
+        'name': 'man_name',
+        'messages': 'messages_count'
+    };
+    const sortField = sortFields[sortBy] || 'last_message_at';
+    const sortDirection = sortDir === 'asc' ? 'ASC' : 'DESC';
+
+    // Подзапрос для уникальных клиентов с агрегацией
+    const query = `
+        WITH client_data AS (
+            SELECT
+                im.man_id,
+                im.type,
+                MAX(im.man_name) as man_name,
+                ARRAY_AGG(DISTINCT im.profile_id) as profile_ids,
+                COUNT(*) as messages_count,
+                MIN(im.created_at) as first_message_at,
+                MAX(im.created_at) as last_message_at,
+                (SELECT message_text FROM incoming_messages WHERE man_id = im.man_id AND type = im.type ORDER BY created_at DESC LIMIT 1) as last_message_text
+            FROM incoming_messages im
+            ${whereClause}
+            GROUP BY im.man_id, im.type
+        )
+        SELECT
+            cd.*,
+            (SELECT COUNT(*) FROM client_data) as total_count
+        FROM client_data cd
+        ORDER BY cd.${sortField} ${sortDirection} NULLS LAST
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+
+    params.push(limitInt, offset);
+
+    const result = await pool.query(query, params);
+
+    const totalCount = result.rows.length > 0 ? parseInt(result.rows[0].total_count) : 0;
+    const totalPages = Math.ceil(totalCount / limitInt);
+
+    const clients = result.rows.map(row => ({
+        manId: row.man_id,
+        manName: row.man_name || `ID ${row.man_id}`,
+        type: row.type,
+        profileIds: row.profile_ids || [],
+        messagesCount: parseInt(row.messages_count),
+        firstMessageAt: row.first_message_at,
+        lastMessageAt: row.last_message_at,
+        lastMessageText: row.last_message_text
+    }));
+
+    res.json({
+        success: true,
+        clients,
+        pagination: {
+            page: pageInt,
+            limit: limitInt,
+            totalCount,
+            totalPages
+        }
+    });
+}));
+
+/**
+ * GET /api/clients/stats
+ * Статистика по клиентам
+ */
+router.get('/clients/stats', asyncHandler(async (req, res) => {
+    const { dateFrom, dateTo } = req.query;
+
+    let dateCondition = '';
+    let params = [];
+
+    if (dateFrom && dateTo) {
+        dateCondition = 'WHERE created_at >= $1::date AND created_at < ($2::date + interval \'1 day\')';
+        params = [dateFrom, dateTo];
+    } else if (dateFrom) {
+        dateCondition = 'WHERE created_at >= $1::date';
+        params = [dateFrom];
+    } else if (dateTo) {
+        dateCondition = 'WHERE created_at < ($1::date + interval \'1 day\')';
+        params = [dateTo];
+    }
+
+    // Общая статистика
+    const statsQuery = `
+        SELECT
+            type,
+            COUNT(DISTINCT man_id) as unique_clients,
+            COUNT(*) as total_messages,
+            COUNT(DISTINCT profile_id) as profiles_count
+        FROM incoming_messages
+        ${dateCondition}
+        GROUP BY type
+    `;
+
+    const statsResult = await pool.query(statsQuery, params);
+
+    // Статистика по письмам
+    const letterStats = statsResult.rows.find(r => r.type === 'letter') || {
+        unique_clients: 0,
+        total_messages: 0,
+        profiles_count: 0
+    };
+
+    // Статистика по чатам
+    const chatStats = statsResult.rows.find(r => r.type === 'chat') || {
+        unique_clients: 0,
+        total_messages: 0,
+        profiles_count: 0
+    };
+
+    res.json({
+        success: true,
+        stats: {
+            letters: {
+                uniqueClients: parseInt(letterStats.unique_clients) || 0,
+                totalMessages: parseInt(letterStats.total_messages) || 0,
+                profilesCount: parseInt(letterStats.profiles_count) || 0
+            },
+            chats: {
+                uniqueClients: parseInt(chatStats.unique_clients) || 0,
+                totalMessages: parseInt(chatStats.total_messages) || 0,
+                profilesCount: parseInt(chatStats.profiles_count) || 0
+            },
+            total: {
+                uniqueClients: (parseInt(letterStats.unique_clients) || 0) + (parseInt(chatStats.unique_clients) || 0),
+                totalMessages: (parseInt(letterStats.total_messages) || 0) + (parseInt(chatStats.total_messages) || 0)
+            }
+        }
+    });
+}));
+
+/**
+ * GET /api/clients/export
+ * Экспорт клиентов в CSV
+ */
+router.get('/clients/export', asyncHandler(async (req, res) => {
+    const { type = 'all', dateFrom, dateTo, profileId } = req.query;
+
+    // Строим условия фильтрации
+    let conditions = [];
+    let params = [];
+    let paramIndex = 1;
+
+    if (type && type !== 'all') {
+        conditions.push(`im.type = $${paramIndex}`);
+        params.push(type);
+        paramIndex++;
+    }
+
+    if (dateFrom) {
+        conditions.push(`im.created_at >= $${paramIndex}::date`);
+        params.push(dateFrom);
+        paramIndex++;
+    }
+    if (dateTo) {
+        conditions.push(`im.created_at < ($${paramIndex}::date + interval '1 day')`);
+        params.push(dateTo);
+        paramIndex++;
+    }
+
+    if (profileId) {
+        conditions.push(`im.profile_id = $${paramIndex}`);
+        params.push(profileId);
+        paramIndex++;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const query = `
+        SELECT
+            im.man_id,
+            MAX(im.man_name) as man_name,
+            im.type,
+            STRING_AGG(DISTINCT im.profile_id, ', ') as profile_ids,
+            COUNT(*) as messages_count,
+            MIN(im.created_at) as first_message_at,
+            MAX(im.created_at) as last_message_at
+        FROM incoming_messages im
+        ${whereClause}
+        GROUP BY im.man_id, im.type
+        ORDER BY MAX(im.created_at) DESC
+    `;
+
+    const result = await pool.query(query, params);
+
+    // Формируем CSV
+    const headers = ['ID мужчины', 'Имя', 'Тип', 'Анкеты', 'Кол-во сообщений', 'Первое сообщение', 'Последнее сообщение'];
+    const rows = result.rows.map(row => [
+        row.man_id,
+        (row.man_name || '').replace(/"/g, '""'),
+        row.type === 'letter' ? 'Письмо' : 'Чат',
+        row.profile_ids,
+        row.messages_count,
+        row.first_message_at ? new Date(row.first_message_at).toLocaleString('ru-RU') : '',
+        row.last_message_at ? new Date(row.last_message_at).toLocaleString('ru-RU') : ''
+    ]);
+
+    // BOM для корректного отображения кириллицы в Excel
+    const BOM = '\uFEFF';
+    const csv = BOM + [
+        headers.join(';'),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
+    ].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="clients_${type}_${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csv);
+}));
+
+/**
+ * GET /api/clients/:manId/messages
+ * Получить все сообщения от конкретного клиента
+ */
+router.get('/clients/:manId/messages', asyncHandler(async (req, res) => {
+    const { manId } = req.params;
+    const { type, profileId, page = 1, limit = 50 } = req.query;
+
+    const pageInt = Math.max(1, parseInt(page) || 1);
+    const limitInt = Math.min(100, Math.max(1, parseInt(limit) || 50));
+    const offset = (pageInt - 1) * limitInt;
+
+    let conditions = ['man_id = $1'];
+    let params = [manId];
+    let paramIndex = 2;
+
+    if (type) {
+        conditions.push(`type = $${paramIndex}`);
+        params.push(type);
+        paramIndex++;
+    }
+
+    if (profileId) {
+        conditions.push(`profile_id = $${paramIndex}`);
+        params.push(profileId);
+        paramIndex++;
+    }
+
+    const whereClause = conditions.join(' AND ');
+
+    // Получаем сообщения
+    const query = `
+        SELECT
+            id, profile_id, man_id, man_name, type, message_text, created_at
+        FROM incoming_messages
+        WHERE ${whereClause}
+        ORDER BY created_at DESC
+        LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+    params.push(limitInt, offset);
+
+    const result = await pool.query(query, params);
+
+    // Получаем общее количество
+    const countQuery = `SELECT COUNT(*) as total FROM incoming_messages WHERE ${whereClause}`;
+    const countResult = await pool.query(countQuery, params.slice(0, -2));
+    const totalCount = parseInt(countResult.rows[0].total);
+    const totalPages = Math.ceil(totalCount / limitInt);
+
+    res.json({
+        success: true,
+        messages: result.rows.map(row => ({
+            id: row.id,
+            profileId: row.profile_id,
+            manId: row.man_id,
+            manName: row.man_name,
+            type: row.type,
+            messageText: row.message_text,
+            createdAt: row.created_at
+        })),
+        pagination: {
+            page: pageInt,
+            limit: limitInt,
+            totalCount,
+            totalPages
+        }
+    });
 }));
 
 module.exports = router;

@@ -226,7 +226,7 @@ async function sendMessageToLababot(params) {
 // 2. Функция отправки входящего сообщения от мужчины
 // ВАЖНО: botId теперь это MACHINE_ID (ID программы)
 async function sendIncomingMessageToLababot(params) {
-    const { botId, profileId, manId, manName, messageId, type = 'letter' } = params;
+    const { botId, profileId, manId, manName, messageId, type = 'letter', messageText } = params;
 
     try {
         const response = await fetch(`${LABABOT_SERVER}/api/incoming_message`, {
@@ -239,7 +239,8 @@ async function sendIncomingMessageToLababot(params) {
                 manName: manName || null,
                 messageId: String(messageId),
                 type: type,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                messageText: messageText || null
             })
         });
 

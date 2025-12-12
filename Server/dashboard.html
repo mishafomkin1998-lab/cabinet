@@ -87,6 +87,13 @@
                             <span class="ml-3 font-medium">Финансы</span>
                         </div>
                     </div>
+                    <!-- Клиенты (только для директора) -->
+                    <div x-show="currentUser.role === 'director'">
+                        <div @click="setActiveMenu('clients')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'clients' ? 'active' : ''">
+                            <i class="fas fa-address-book w-5 text-gray-600"></i>
+                            <span class="ml-3 font-medium">Клиенты</span>
+                        </div>
+                    </div>
                     <div>
                         <div @click="setActiveMenu('history')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'history' ? 'active' : ''">
                             <i class="fas fa-history w-5 text-gray-600"></i>
@@ -1826,6 +1833,189 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Клиенты (только для директора) -->
+            <div x-show="activeMenu === 'clients' && currentUser.role === 'director'" x-cloak class="fade-in"
+                 x-data="clientsComponent()"
+                 x-init="loadClientsData()">
+
+                <!-- Статистика -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-blue-600" x-text="clientsStats.letters.uniqueClients"></div>
+                        <div class="text-sm text-gray-500 mt-1">Клиентов (Письма)</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-purple-600" x-text="clientsStats.chats.uniqueClients"></div>
+                        <div class="text-sm text-gray-500 mt-1">Клиентов (Чаты)</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-green-600" x-text="clientsStats.letters.totalMessages"></div>
+                        <div class="text-sm text-gray-500 mt-1">Всего писем</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-orange-600" x-text="clientsStats.chats.totalMessages"></div>
+                        <div class="text-sm text-gray-500 mt-1">Всего чатов</div>
+                    </div>
+                </div>
+
+                <!-- Фильтры -->
+                <div class="glass rounded-2xl p-6 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+                        <!-- Тип -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Тип</label>
+                            <select class="glass w-full px-4 py-3 rounded-xl" x-model="clientsFilter.type" @change="loadClients()">
+                                <option value="all">Все</option>
+                                <option value="letter">Письма</option>
+                                <option value="chat">Чаты</option>
+                            </select>
+                        </div>
+
+                        <!-- Дата с -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Дата с</label>
+                            <input type="date" class="glass w-full px-4 py-3 rounded-xl" x-model="clientsFilter.dateFrom" @change="loadClients()">
+                        </div>
+
+                        <!-- Дата по -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Дата по</label>
+                            <input type="date" class="glass w-full px-4 py-3 rounded-xl" x-model="clientsFilter.dateTo" @change="loadClients()">
+                        </div>
+
+                        <!-- Поиск -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Поиск</label>
+                            <input type="text" class="glass w-full px-4 py-3 rounded-xl" placeholder="Имя или ID" x-model="clientsFilter.search" @input.debounce.500ms="loadClients()">
+                        </div>
+
+                        <!-- Сортировка -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Сортировка</label>
+                            <select class="glass w-full px-4 py-3 rounded-xl" x-model="clientsFilter.sortBy" @change="loadClients()">
+                                <option value="date">По дате</option>
+                                <option value="name">По имени</option>
+                                <option value="messages">По сообщениям</option>
+                            </select>
+                        </div>
+
+                        <!-- Кнопки -->
+                        <div class="flex items-end gap-2">
+                            <button @click="exportClientsCSV()" class="flex-1 px-4 py-3 rounded-xl bg-green-500 hover:bg-green-600 text-white font-medium transition-all">
+                                <i class="fas fa-file-csv mr-1"></i> CSV
+                            </button>
+                            <button @click="loadClientsData()" class="px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 font-medium transition-all">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Таблица клиентов -->
+                <div class="glass rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold">
+                            <i class="fas fa-address-book text-gray-500 mr-2"></i>
+                            База клиентов
+                            <span class="text-sm font-normal text-gray-500">(<span x-text="clientsPagination.totalCount"></span> всего)</span>
+                        </h3>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-100">
+                                    <th class="text-left py-3 px-4">ID</th>
+                                    <th class="text-left py-3 px-4">Имя</th>
+                                    <th class="text-left py-3 px-4">Тип</th>
+                                    <th class="text-left py-3 px-4">Анкеты</th>
+                                    <th class="text-left py-3 px-4">Сообщений</th>
+                                    <th class="text-left py-3 px-4">Последнее</th>
+                                    <th class="text-left py-3 px-4">Текст</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="client in clients" :key="client.manId + '_' + client.type">
+                                    <tr class="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" @click="showClientMessages(client)">
+                                        <td class="py-3 px-4 font-mono text-sm" x-text="client.manId"></td>
+                                        <td class="py-3 px-4 font-medium" x-text="client.manName"></td>
+                                        <td class="py-3 px-4">
+                                            <span x-show="client.type === 'letter'" class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs font-medium">
+                                                <i class="fas fa-envelope mr-1"></i>Письмо
+                                            </span>
+                                            <span x-show="client.type === 'chat'" class="px-2 py-1 bg-purple-100 text-purple-600 rounded text-xs font-medium">
+                                                <i class="fas fa-comments mr-1"></i>Чат
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4 text-sm" x-text="client.profileIds.slice(0, 3).join(', ') + (client.profileIds.length > 3 ? '...' : '')"></td>
+                                        <td class="py-3 px-4">
+                                            <span class="px-2 py-1 bg-gray-100 rounded font-medium" x-text="client.messagesCount"></span>
+                                        </td>
+                                        <td class="py-3 px-4 text-sm text-gray-500" x-text="formatDateTime(client.lastMessageAt)"></td>
+                                        <td class="py-3 px-4 text-sm text-gray-600 max-w-xs truncate" x-text="client.lastMessageText || '-'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="clients.length === 0">
+                                    <td colspan="7" class="py-8 px-4 text-center text-gray-500">
+                                        <i class="fas fa-address-book text-3xl mb-2 opacity-30"></i>
+                                        <p>Клиенты не найдены</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Пагинация -->
+                    <div class="flex items-center justify-between mt-6 pt-4 border-t border-gray-100" x-show="clientsPagination.totalPages > 1">
+                        <div class="text-sm text-gray-500">
+                            Страница <span x-text="clientsPagination.page"></span> из <span x-text="clientsPagination.totalPages"></span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button @click="clientsPagination.page--; loadClients()"
+                                    :disabled="clientsPagination.page <= 1"
+                                    class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button @click="clientsPagination.page++; loadClients()"
+                                    :disabled="clientsPagination.page >= clientsPagination.totalPages"
+                                    class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Модалка с сообщениями клиента -->
+                <div x-show="showClientMessagesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" x-cloak>
+                    <div class="glass rounded-2xl p-6 w-full max-w-4xl max-h-[80vh] overflow-auto" @click.outside="showClientMessagesModal = false">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-xl font-bold">
+                                <i class="fas fa-comments mr-2"></i>
+                                Сообщения от <span x-text="selectedClient?.manName"></span>
+                            </h3>
+                            <button @click="showClientMessagesModal = false" class="text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+
+                        <div class="space-y-3">
+                            <template x-for="msg in clientMessages" :key="msg.id">
+                                <div class="p-4 bg-gray-50 rounded-xl">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <span class="text-sm text-gray-500">Анкета: <span class="font-mono" x-text="msg.profileId"></span></span>
+                                        <span class="text-xs text-gray-400" x-text="formatDateTime(msg.createdAt)"></span>
+                                    </div>
+                                    <p class="text-gray-700" x-text="msg.messageText || '(текст не сохранён)'"></p>
+                                </div>
+                            </template>
+                            <div x-show="clientMessages.length === 0" class="text-center py-8 text-gray-500">
+                                Сообщения не найдены
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

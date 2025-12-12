@@ -264,6 +264,9 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_incoming_first ON incoming_messages(is_first_from_man)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_incoming_translator ON incoming_messages(translator_id)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_incoming_admin ON incoming_messages(admin_id)`);
+        // Миграция: добавляем текст сообщения для CRM клиентов
+        await pool.query(`ALTER TABLE incoming_messages ADD COLUMN IF NOT EXISTS message_text TEXT`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_incoming_type ON incoming_messages(type)`);
         await fixSerialSequence('incoming_messages');
 
         // 12. Таблица настроек
