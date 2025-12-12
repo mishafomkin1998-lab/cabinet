@@ -37,6 +37,52 @@
         let globalSettings = JSON.parse(localStorage.getItem('globalSettings')) || defaultSettings;
         globalSettings = { ...defaultSettings, ...globalSettings };
 
+        // ============= FOCUS DEBUG (для отладки бага с потерей фокуса) =============
+        window._focusLog = [];
+        window._focusLogEnabled = true; // Поставить false чтобы отключить
+
+        window.addEventListener('blur', () => {
+            if (!window._focusLogEnabled) return;
+            window._focusLog.push({
+                time: new Date().toISOString(),
+                event: 'WINDOW_BLUR',
+                activeElement: document.activeElement?.tagName + '#' + (document.activeElement?.id || document.activeElement?.className?.split(' ')[0] || '')
+            });
+            localStorage.setItem('_focusLog', JSON.stringify(window._focusLog.slice(-100)));
+            console.warn('[FOCUS DEBUG] Window BLUR, activeElement:', document.activeElement);
+        });
+
+        document.addEventListener('focusout', (e) => {
+            if (!window._focusLogEnabled) return;
+            window._focusLog.push({
+                time: new Date().toISOString(),
+                event: 'FOCUS_OUT',
+                from: e.target?.tagName + '#' + (e.target?.id || ''),
+                to: e.relatedTarget?.tagName + '#' + (e.relatedTarget?.id || '')
+            });
+        });
+
+        // Мониторинг webview после их создания
+        setTimeout(() => {
+            document.querySelectorAll('webview').forEach((wv, i) => {
+                wv.addEventListener('did-focus', () => {
+                    if (!window._focusLogEnabled) return;
+                    window._focusLog.push({
+                        time: new Date().toISOString(),
+                        event: 'WEBVIEW_FOCUS',
+                        index: i,
+                        webviewId: wv.id || 'no-id'
+                    });
+                    localStorage.setItem('_focusLog', JSON.stringify(window._focusLog.slice(-100)));
+                    console.error('[FOCUS DEBUG] 🔴 WebView', i, 'получил фокус!');
+                });
+            });
+            console.log('[FOCUS DEBUG] Мониторинг webview установлен для', document.querySelectorAll('webview').length, 'элементов');
+        }, 10000);
+
+        console.log('[FOCUS DEBUG] ✅ Логирование фокуса активно. После бага выполни: JSON.parse(localStorage.getItem("_focusLog"))');
+        // ============= END FOCUS DEBUG =============
+
         // ============= MACHINE ID (уникальный ID программы-бота) =============
         // Генерируется один раз при первом запуске и сохраняется в localStorage
         function getMachineId() {
