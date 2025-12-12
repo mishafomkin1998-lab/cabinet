@@ -161,10 +161,15 @@ ipcMain.handle('set-session-proxy', async (event, { botId, proxyString }) => {
         } else if (parts.length === 4) {
             // Формат: domain:port:user:pass
             const [host, port, user, pass] = parts;
-            proxyUrl = `http://${host}:${port}`;
+
+            // URL-encode пароля для специальных символов (например +)
+            const encodedPass = encodeURIComponent(pass);
+
+            // ВАЖНО: Встраиваем credentials В URL для более надежной работы
+            proxyUrl = `http://${user}:${encodedPass}@${host}:${port}`;
             username = user;
             password = pass;
-            console.log(`[Proxy MAIN] Формат: domain:port:user:pass → ${proxyUrl} (auth: ${username})`);
+            console.log(`[Proxy MAIN] Формат: domain:port:user:pass → ${proxyUrl}`);
         } else if (trimmed.includes('://')) {
             // Формат: http://domain:port (уже с протоколом)
             proxyUrl = trimmed;
@@ -245,10 +250,15 @@ ipcMain.handle('set-default-session-proxy', async (event, { proxyString }) => {
             console.log(`[Proxy Default MAIN] Формат: ip:port / domain:port → ${proxyUrl}`);
         } else if (parts.length === 4) {
             const [host, port, user, pass] = parts;
-            proxyUrl = `http://${host}:${port}`;
+
+            // URL-encode пароля для специальных символов (например +)
+            const encodedPass = encodeURIComponent(pass);
+
+            // ВАЖНО: Встраиваем credentials В URL для более надежной работы
+            proxyUrl = `http://${user}:${encodedPass}@${host}:${port}`;
             username = user;
             password = pass;
-            console.log(`[Proxy Default MAIN] Формат: domain:port:user:pass → ${proxyUrl} (auth: ${username})`);
+            console.log(`[Proxy Default MAIN] Формат: domain:port:user:pass → ${proxyUrl}`);
         } else if (trimmed.includes('://')) {
             proxyUrl = trimmed;
             console.log(`[Proxy Default MAIN] Формат: полный URL → ${proxyUrl}`);
