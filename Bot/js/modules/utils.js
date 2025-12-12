@@ -45,6 +45,52 @@ function parseSimpleProxy(proxyString) {
     };
 }
 
+// ============= ПРОКСИ ДЛЯ WEBVIEW =============
+// Получить прокси для анкеты по её номеру (порядку добавления)
+// proxy1 → анкеты 1-10, proxy2 → анкеты 11-20, и т.д.
+function getProxyForAccountNumber(accountNumber) {
+    if (!accountNumber || accountNumber < 1) return null;
+
+    // Определяем какой прокси использовать (1-10 → proxy1, 11-20 → proxy2, ...)
+    const proxyIndex = Math.ceil(accountNumber / 10);
+
+    // Максимум 6 прокси
+    if (proxyIndex > 6) return null;
+
+    const proxyKey = `proxy${proxyIndex}`;
+    const proxyValue = globalSettings[proxyKey];
+
+    if (!proxyValue || proxyValue.trim() === '') return null;
+
+    return proxyValue.trim();
+}
+
+// Получить номер анкеты по её botId (порядок в объекте bots)
+function getAccountNumber(botId) {
+    const botIds = Object.keys(bots);
+    const index = botIds.indexOf(botId);
+    return index >= 0 ? index + 1 : null;
+}
+
+// Установить прокси для webview сессии бота
+async function setWebviewProxy(botId) {
+    const accountNumber = getAccountNumber(botId);
+    const proxyString = getProxyForAccountNumber(accountNumber);
+
+    try {
+        const result = await ipcRenderer.invoke('set-session-proxy', { botId, proxyString });
+        if (result.success) {
+            console.log(`[Proxy] Бот ${botId} (анкета #${accountNumber}): ${proxyString || 'без прокси'}`);
+        } else {
+            console.error(`[Proxy] Ошибка для ${botId}:`, result.error);
+        }
+        return result;
+    } catch (err) {
+        console.error(`[Proxy] IPC ошибка для ${botId}:`, err);
+        return { success: false, error: err.message };
+    }
+}
+
 const LADADATE_BASE_URL = 'https://ladadate.com';
 const OPENAI_API_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 

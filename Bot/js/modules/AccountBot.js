@@ -212,7 +212,10 @@ class AccountBot {
     }
 
     // === ВАЖНОЕ ДОБАВЛЕНИЕ: Метод для создания скрытого WebView ===
-    createWebview() {
+    async createWebview() {
+        // Устанавливаем прокси для сессии ПЕРЕД созданием webview
+        await setWebviewProxy(this.id);
+
         const webview = document.createElement('webview');
         webview.id = `webview-${this.id}`;
         webview.src = "https://ladadate.com/login";

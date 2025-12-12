@@ -122,6 +122,50 @@ ipcMain.handle('get-app-version', () => {
 });
 
 // =====================================================
+// === ПРОКСИ ДЛЯ WEBVIEW СЕССИЙ ===
+// =====================================================
+
+// IPC: Установить прокси для сессии бота
+ipcMain.handle('set-session-proxy', async (event, { botId, proxyString }) => {
+    try {
+        const ses = session.fromPartition(`persist:${botId}`);
+
+        if (!proxyString || proxyString.trim() === '') {
+            // Убираем прокси - прямое соединение
+            await ses.setProxy({ proxyRules: '' });
+            console.log(`[Proxy] ${botId}: прокси отключен (прямое соединение)`);
+            return { success: true, proxy: null };
+        }
+
+        // Формат: ip:port или http://ip:port
+        let proxyUrl = proxyString.trim();
+        if (!proxyUrl.includes('://')) {
+            proxyUrl = 'http://' + proxyUrl;
+        }
+
+        // Устанавливаем прокси для сессии
+        await ses.setProxy({ proxyRules: proxyUrl });
+        console.log(`[Proxy] ${botId}: установлен прокси ${proxyUrl}`);
+
+        return { success: true, proxy: proxyUrl };
+    } catch (error) {
+        console.error(`[Proxy] ${botId}: ошибка установки прокси:`, error.message);
+        return { success: false, error: error.message };
+    }
+});
+
+// IPC: Получить текущий прокси сессии
+ipcMain.handle('get-session-proxy', async (event, { botId }) => {
+    try {
+        const ses = session.fromPartition(`persist:${botId}`);
+        const proxy = await ses.resolveProxy('https://ladadate.com');
+        return { success: true, proxy };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+});
+
+// =====================================================
 
 // === КРИТИЧЕСКИ ВАЖНО: Флаги для поддержания ОНЛАЙНА ===
 // Эти настройки запрещают Chromium "усыплять" скрытые вкладки.
