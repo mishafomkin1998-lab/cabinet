@@ -303,7 +303,7 @@ function applyVar(textareaId, text, dropdownId) {
 }
 
 // =====================================================
-// === ШАБЛОНЫ ПРОМПТОВ ===
+// === ШАБЛОНЫ ПРОМПТОВ (localStorage + опционально сервер) ===
 // =====================================================
 
 // Маппинг типов промптов к ID элементов
@@ -319,28 +319,52 @@ const promptTypeToSetting = {
     chatPrompt: 'chatPrompt'
 };
 
-// Загрузить шаблоны промптов с сервера
+// Загрузить шаблоны промптов (сначала localStorage, потом сервер если есть ID)
 async function loadPromptTemplates() {
-    if (!globalSettings.translatorId) {
-        console.log('[PromptTemplates] translatorId не задан, пропускаем загрузку');
-        return;
-    }
-
-    try {
-        const response = await axios.get(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}`);
-
-        if (response.data.success) {
-            promptTemplates = response.data.data;
-            console.log('[PromptTemplates] Загружено:', promptTemplates);
-
-            // Обновляем выпадающие списки
-            updatePromptDropdown('myPrompt');
-            updatePromptDropdown('replyPrompt');
-            updatePromptDropdown('chatPrompt');
+    // 1. Загружаем из localStorage
+    const saved = localStorage.getItem('promptTemplates');
+    if (saved) {
+        try {
+            promptTemplates = JSON.parse(saved);
+            console.log('[PromptTemplates] Загружено из localStorage:', promptTemplates);
+        } catch (e) {
+            console.error('[PromptTemplates] Ошибка парсинга localStorage:', e);
+            promptTemplates = { myPrompt: [], replyPrompt: [], chatPrompt: [] };
         }
-    } catch (error) {
-        console.error('[PromptTemplates] Ошибка загрузки:', error.message);
     }
+
+    // 2. Обновляем выпадающие списки
+    updatePromptDropdown('myPrompt');
+    updatePromptDropdown('replyPrompt');
+    updatePromptDropdown('chatPrompt');
+
+    // 3. Если есть translatorId - пробуем загрузить с сервера (для синхронизации)
+    if (globalSettings.translatorId) {
+        try {
+            const response = await axios.get(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}`);
+            if (response.data.success && response.data.data) {
+                // Мержим серверные шаблоны с локальными
+                const serverTemplates = response.data.data;
+                ['myPrompt', 'replyPrompt', 'chatPrompt'].forEach(type => {
+                    if (serverTemplates[type] && serverTemplates[type].length > 0) {
+                        promptTemplates[type] = serverTemplates[type];
+                    }
+                });
+                savePromptTemplatesToStorage();
+                updatePromptDropdown('myPrompt');
+                updatePromptDropdown('replyPrompt');
+                updatePromptDropdown('chatPrompt');
+                console.log('[PromptTemplates] Синхронизировано с сервером');
+            }
+        } catch (error) {
+            console.log('[PromptTemplates] Сервер недоступен, используем localStorage');
+        }
+    }
+}
+
+// Сохранить шаблоны в localStorage
+function savePromptTemplatesToStorage() {
+    localStorage.setItem('promptTemplates', JSON.stringify(promptTemplates));
 }
 
 // Обновить выпадающий список шаблонов
@@ -404,27 +428,22 @@ async function selectPromptTemplate(promptType) {
         globalSettings.activePromptTemplates[promptType] = template.id;
         localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
 
-        // Устанавливаем активный на сервере
-        if (globalSettings.translatorId) {
+        // Устанавливаем активный на сервере (только для серверных шаблонов)
+        if (globalSettings.translatorId && !String(templateId).startsWith('local_')) {
             try {
                 await axios.post(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}/set-active`, {
                     promptType,
                     templateId: template.id
                 });
             } catch (e) {
-                console.error('[PromptTemplates] Ошибка установки активного:', e.message);
+                // Игнорируем ошибки сервера
             }
         }
     }
 }
 
-// Добавить новый шаблон
+// Добавить новый шаблон (сохраняется локально, опционально на сервер)
 async function addPromptTemplate(promptType) {
-    if (!globalSettings.translatorId) {
-        alert('Сначала укажите Translator ID в настройках (вкладка "Другое")');
-        return;
-    }
-
     const name = prompt('Введите название шаблона:');
     if (!name || !name.trim()) return;
 
@@ -436,55 +455,63 @@ async function addPromptTemplate(promptType) {
         return;
     }
 
-    try {
-        const response = await axios.post(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}`, {
-            promptType,
-            name: name.trim(),
-            text,
-            isActive: true
-        });
+    // Генерируем локальный ID
+    const localId = 'local_' + Date.now();
 
-        if (response.data.success) {
-            console.log('[PromptTemplates] Шаблон создан:', response.data.data);
+    // Добавляем в локальный список
+    promptTemplates[promptType] = promptTemplates[promptType] || [];
+    // Деактивируем остальные локально
+    promptTemplates[promptType].forEach(t => t.isActive = false);
 
-            // Добавляем в локальный список
-            promptTemplates[promptType] = promptTemplates[promptType] || [];
-            // Деактивируем остальные локально
-            promptTemplates[promptType].forEach(t => t.isActive = false);
-            promptTemplates[promptType].push({
-                id: response.data.data.id,
-                name: response.data.data.name,
-                text: response.data.data.text,
+    const newTemplate = {
+        id: localId,
+        name: name.trim(),
+        text: text,
+        isActive: true
+    };
+    promptTemplates[promptType].push(newTemplate);
+
+    // Сохраняем в localStorage
+    savePromptTemplatesToStorage();
+
+    // Обновляем dropdown
+    updatePromptDropdown(promptType);
+
+    // Сохраняем активный ID
+    globalSettings.activePromptTemplates = globalSettings.activePromptTemplates || {};
+    globalSettings.activePromptTemplates[promptType] = localId;
+    localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+
+    console.log('[PromptTemplates] Шаблон сохранён локально:', newTemplate);
+
+    // Если есть translatorId - пробуем сохранить на сервер
+    if (globalSettings.translatorId) {
+        try {
+            const response = await axios.post(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}`, {
+                promptType,
+                name: name.trim(),
+                text,
                 isActive: true
             });
-
-            // Обновляем dropdown и выбираем новый шаблон
-            updatePromptDropdown(promptType);
-
-            // Сохраняем активный ID
-            globalSettings.activePromptTemplates = globalSettings.activePromptTemplates || {};
-            globalSettings.activePromptTemplates[promptType] = response.data.data.id;
-            localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
-
-            alert('Шаблон сохранён!');
-        }
-    } catch (error) {
-        console.error('[PromptTemplates] Ошибка создания:', error);
-        if (error.response?.data?.error) {
-            alert('Ошибка: ' + error.response.data.error);
-        } else {
-            alert('Ошибка сохранения шаблона');
+            if (response.data.success) {
+                // Обновляем ID на серверный
+                newTemplate.id = response.data.data.id;
+                globalSettings.activePromptTemplates[promptType] = response.data.data.id;
+                savePromptTemplatesToStorage();
+                localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+                updatePromptDropdown(promptType);
+                console.log('[PromptTemplates] Синхронизировано с сервером');
+            }
+        } catch (error) {
+            console.log('[PromptTemplates] Сервер недоступен, сохранено только локально');
         }
     }
+
+    alert('Шаблон сохранён!');
 }
 
-// Удалить шаблон
+// Удалить шаблон (локально, опционально с сервера)
 async function deletePromptTemplate(promptType) {
-    if (!globalSettings.translatorId) {
-        alert('Translator ID не задан');
-        return;
-    }
-
     const select = document.getElementById(`select-${promptType}`);
     const templateId = select.value;
 
@@ -498,35 +525,39 @@ async function deletePromptTemplate(promptType) {
 
     if (!confirm(`Удалить шаблон "${template.name}"?`)) return;
 
-    try {
-        const response = await axios.delete(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}/${templateId}`);
+    // Удаляем из локального списка
+    promptTemplates[promptType] = (promptTemplates[promptType] || []).filter(t => t.id != templateId);
 
-        if (response.data.success) {
-            console.log('[PromptTemplates] Шаблон удалён');
+    // Сохраняем в localStorage
+    savePromptTemplatesToStorage();
 
-            // Удаляем из локального списка
-            promptTemplates[promptType] = (promptTemplates[promptType] || []).filter(t => t.id != templateId);
+    // Очищаем textarea
+    const textarea = document.getElementById(promptTypeToTextarea[promptType]);
+    textarea.value = '';
 
-            // Очищаем textarea
-            const textarea = document.getElementById(promptTypeToTextarea[promptType]);
-            textarea.value = '';
+    // Сбрасываем активный ID
+    globalSettings.activePromptTemplates = globalSettings.activePromptTemplates || {};
+    globalSettings.activePromptTemplates[promptType] = null;
+    const settingKey = promptTypeToSetting[promptType];
+    globalSettings[settingKey] = '';
+    localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
 
-            // Сбрасываем активный ID
-            globalSettings.activePromptTemplates = globalSettings.activePromptTemplates || {};
-            globalSettings.activePromptTemplates[promptType] = null;
-            const settingKey = promptTypeToSetting[promptType];
-            globalSettings[settingKey] = '';
-            localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+    // Обновляем dropdown
+    updatePromptDropdown(promptType);
 
-            // Обновляем dropdown
-            updatePromptDropdown(promptType);
+    console.log('[PromptTemplates] Шаблон удалён локально');
 
-            alert('Шаблон удалён');
+    // Если есть translatorId и это серверный шаблон - удаляем с сервера
+    if (globalSettings.translatorId && !String(templateId).startsWith('local_')) {
+        try {
+            await axios.delete(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}/${templateId}`);
+            console.log('[PromptTemplates] Удалено с сервера');
+        } catch (error) {
+            console.log('[PromptTemplates] Не удалось удалить с сервера:', error.message);
         }
-    } catch (error) {
-        console.error('[PromptTemplates] Ошибка удаления:', error);
-        alert('Ошибка удаления шаблона');
     }
+
+    alert('Шаблон удалён');
 }
 
 // Сохранить текст промпта (при редактировании)
@@ -539,25 +570,28 @@ async function savePromptText(promptType) {
     globalSettings[settingKey] = text;
     localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
 
-    // Если выбран шаблон - обновляем его на сервере
+    // Если выбран шаблон - обновляем его локально
     const select = document.getElementById(`select-${promptType}`);
     const templateId = select?.value;
 
-    if (templateId && globalSettings.translatorId) {
-        try {
-            await axios.put(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}/${templateId}`, {
-                text
-            });
+    if (templateId) {
+        // Обновляем локальный кеш
+        const template = (promptTemplates[promptType] || []).find(t => t.id == templateId);
+        if (template) {
+            template.text = text;
+            savePromptTemplatesToStorage();
+        }
 
-            // Обновляем локальный кеш
-            const template = (promptTemplates[promptType] || []).find(t => t.id == templateId);
-            if (template) {
-                template.text = text;
+        // Если есть translatorId и это серверный шаблон - обновляем на сервере
+        if (globalSettings.translatorId && !String(templateId).startsWith('local_')) {
+            try {
+                await axios.put(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}/${templateId}`, {
+                    text
+                });
+                console.log('[PromptTemplates] Текст обновлён на сервере');
+            } catch (error) {
+                console.log('[PromptTemplates] Сервер недоступен, сохранено локально');
             }
-
-            console.log('[PromptTemplates] Текст шаблона обновлён');
-        } catch (error) {
-            console.error('[PromptTemplates] Ошибка обновления текста:', error.message);
         }
     }
 }
