@@ -1,13 +1,17 @@
-# Игнорировать папку с зависимостями, которая слишком большая
-node_modules
+# Зависимости
+node_modules/
 
-# Игнорировать системные и временные файлы
+# Сборки (electron-builder)
+dist/
+
+# Системные файлы
 *.DS_Store
-npm-debug.log*# Ignore node_modules directory
-node_modules
+Thumbs.db
 
-# Ignore large system files
-*.DS_Store
-
-# Ignore log and temp files
+# Логи
 npm-debug.log*
+*.log
+
+# Временные файлы
+*.tmp
+*.temp

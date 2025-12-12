@@ -1,7 +1,127 @@
-const { app, BrowserWindow, ipcMain, session, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, session, Menu, dialog } = require('electron');
 const path = require('path');
+const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
+
+// =====================================================
+// === АВТООБНОВЛЕНИЕ ===
+// =====================================================
+
+// Настройка логирования для отладки
+autoUpdater.logger = require('electron').app.getLogger ? require('electron').app.getLogger() : console;
+
+// Отключаем автоматическое скачивание - сначала спрашиваем пользователя
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
+
+// Проверка обновлений при запуске (с задержкой 5 сек)
+function initAutoUpdater() {
+    // Не проверяем в dev режиме
+    if (!app.isPackaged) {
+        console.log('[AutoUpdater] Пропуск проверки - режим разработки');
+        return;
+    }
+
+    setTimeout(() => {
+        console.log('[AutoUpdater] Проверяю обновления...');
+        autoUpdater.checkForUpdates().catch(err => {
+            console.error('[AutoUpdater] Ошибка проверки:', err.message);
+        });
+    }, 5000);
+}
+
+// Найдено обновление
+autoUpdater.on('update-available', (info) => {
+    console.log('[AutoUpdater] Доступно обновление:', info.version);
+
+    dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Доступно обновление',
+        message: `Найдена новая версия: ${info.version}`,
+        detail: `Текущая версия: ${app.getVersion()}\n\nСкачать обновление сейчас?`,
+        buttons: ['Скачать', 'Позже'],
+        defaultId: 0,
+        cancelId: 1
+    }).then(result => {
+        if (result.response === 0) {
+            // Показываем прогресс в главном окне
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('update-downloading', { version: info.version });
+            }
+            autoUpdater.downloadUpdate();
+        }
+    });
+});
+
+// Обновление не найдено
+autoUpdater.on('update-not-available', (info) => {
+    console.log('[AutoUpdater] Обновлений нет, версия актуальна:', info.version);
+});
+
+// Прогресс скачивания
+autoUpdater.on('download-progress', (progress) => {
+    const percent = Math.round(progress.percent);
+    console.log(`[AutoUpdater] Скачивание: ${percent}%`);
+
+    // Отправляем прогресс в renderer
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-progress', { percent });
+    }
+});
+
+// Обновление скачано
+autoUpdater.on('update-downloaded', (info) => {
+    console.log('[AutoUpdater] Обновление скачано:', info.version);
+
+    dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Обновление готово',
+        message: 'Обновление загружено!',
+        detail: `Версия ${info.version} готова к установке.\n\nПерезапустить приложение сейчас?`,
+        buttons: ['Перезапустить', 'Позже'],
+        defaultId: 0,
+        cancelId: 1
+    }).then(result => {
+        if (result.response === 0) {
+            autoUpdater.quitAndInstall(false, true);
+        }
+    });
+});
+
+// Ошибка обновления
+autoUpdater.on('error', (err) => {
+    console.error('[AutoUpdater] Ошибка:', err.message);
+
+    // Не показываем ошибку пользователю если это просто проблема с сетью
+    // Можно раскомментировать для отладки:
+    // dialog.showErrorBox('Ошибка обновления', err.message);
+});
+
+// IPC: Ручная проверка обновлений (из настроек)
+ipcMain.handle('check-for-updates', async () => {
+    if (!app.isPackaged) {
+        return { available: false, message: 'Режим разработки' };
+    }
+
+    try {
+        const result = await autoUpdater.checkForUpdates();
+        return {
+            available: result?.updateInfo?.version !== app.getVersion(),
+            version: result?.updateInfo?.version,
+            currentVersion: app.getVersion()
+        };
+    } catch (err) {
+        return { available: false, error: err.message };
+    }
+});
+
+// IPC: Получить текущую версию
+ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
+});
+
+// =====================================================
 
 // === КРИТИЧЕСКИ ВАЖНО: Флаги для поддержания ОНЛАЙНА ===
 // Эти настройки запрещают Chromium "усыплять" скрытые вкладки.
@@ -92,7 +212,10 @@ function createWindow() {
     require('events').EventEmitter.defaultMaxListeners = 100;
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+    createWindow();
+    initAutoUpdater(); // Проверка обновлений при запуске
+});
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
