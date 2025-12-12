@@ -675,13 +675,15 @@
                                     isMyAdmin: false,
                                     salary: null,
                                     balance: 0,
+                                    aiEnabled: this.currentUser.aiEnabled || false,
                                     translators: translatorsList.map(t => ({
                                         id: t.id,
                                         name: t.username,
                                         login: t.username,
                                         conversion: t.conversion || 0,
                                         accounts: t.accounts || [],
-                                        accountsCount: t.accounts_count || 0
+                                        accountsCount: t.accounts_count || 0,
+                                        aiEnabled: t.ai_enabled || false
                                     }))
                                 }];
                                 // Также сохраняем в отдельный массив для удобства
@@ -691,7 +693,8 @@
                                     login: t.username,
                                     conversion: t.conversion || 0,
                                     accounts: t.accounts || [],
-                                    accountsCount: t.accounts_count || 0
+                                    accountsCount: t.accounts_count || 0,
+                                    aiEnabled: t.ai_enabled || false
                                 }));
                             } else {
                                 // Для директора: показываем всех админов с их переводчиками
@@ -705,13 +708,15 @@
                                     isMyAdmin: a.is_restricted || false,
                                     salary: a.salary !== null && a.salary !== undefined ? a.salary : null,
                                     balance: a.balance || 0,
+                                    aiEnabled: a.ai_enabled || false,
                                     translators: translatorsList.filter(t => t.owner_id === a.id).map(t => ({
                                         id: t.id,
                                         name: t.username,
                                         login: t.username,
                                         conversion: t.conversion || 0,
                                         accounts: t.accounts || [],
-                                        accountsCount: t.accounts_count || 0
+                                        accountsCount: t.accounts_count || 0,
+                                        aiEnabled: t.ai_enabled || false
                                     }))
                                 }));
                                 this.myTranslators = [];
@@ -741,7 +746,8 @@
                                         accounts: t.accounts || [],
                                         accountsCount: t.accounts_count || 0,
                                         adminId: t.owner_id,
-                                        adminName: admin ? admin.username : null
+                                        adminName: admin ? admin.username : null,
+                                        aiEnabled: t.ai_enabled || false
                                     };
                                 });
                             }
