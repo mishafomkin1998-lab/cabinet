@@ -741,3 +741,195 @@ async function generateAIForResponseWindow(win) {
         } catch (e) {}
     }
 }
+
+// =====================================================
+// === ВИДЕОЧАТ (SHARE MY CAM) ===
+// =====================================================
+
+const videoChatWindows = new Map();
+
+// Открыть окно видеочата
+ipcMain.handle('open-video-chat-window', async (event, data) => {
+    const { botId, displayId, login, pass, cameraId } = data;
+
+    // Если окно уже открыто - фокусируем
+    if (videoChatWindows.has(botId)) {
+        const existingWin = videoChatWindows.get(botId);
+        if (existingWin && !existingWin.isDestroyed()) {
+            existingWin.focus();
+            return { success: true, focused: true };
+        }
+    }
+
+    // Используем partition для сессии
+    const ses = session.fromPartition(`persist:${botId}`);
+
+    const win = new BrowserWindow({
+        width: 1000,
+        height: 700,
+        minWidth: 800,
+        minHeight: 600,
+        title: `Видеочат - ${displayId}`,
+        webPreferences: {
+            partition: `persist:${botId}`,
+            nodeIntegration: false,
+            contextIsolation: true
+        }
+    });
+
+    win.setMenuBarVisibility(false);
+
+    // Обработка закрытия
+    win.on('closed', () => {
+        videoChatWindows.delete(botId);
+        // Уведомляем renderer
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('video-chat-window-closed', botId);
+        }
+    });
+
+    // Сохраняем окно
+    videoChatWindows.set(botId, win);
+
+    // Загружаем страницу чата
+    try {
+        await win.loadURL('https://ladadate.com/chat#');
+
+        // Проверяем на редирект на логин
+        const currentUrl = win.webContents.getURL();
+        if (currentUrl.includes('/login') && login && pass) {
+            // Авто-логин
+            await win.webContents.executeJavaScript(`
+                setTimeout(() => {
+                    const emailInput = document.querySelector('input[name="login"]');
+                    const passInput = document.querySelector('input[name="password"]');
+                    const btn = document.querySelector('button[type="submit"]');
+
+                    if(emailInput && passInput) {
+                        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+
+                        nativeInputValueSetter.call(emailInput, "${login}");
+                        emailInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        emailInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+                        nativeInputValueSetter.call(passInput, "${pass}");
+                        passInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        passInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+                        console.log("VideoChat: Данные введены. Нажимаем войти...");
+                        if(btn) setTimeout(() => btn.click(), 500);
+                    }
+                }, 2000);
+            `);
+        }
+
+        // Запускаем мониторинг камеры мужчины (каждые 10 секунд)
+        startVideoChatMonitoring(botId, win);
+
+        return { success: true };
+
+    } catch (error) {
+        console.error('[VideoChat] Error loading:', error);
+        win.close();
+        return { success: false, error: error.message };
+    }
+});
+
+// Фокус на окно видеочата
+ipcMain.handle('focus-video-chat-window', async (event, data) => {
+    const { botId } = data;
+    const win = videoChatWindows.get(botId);
+    if (win && !win.isDestroyed()) {
+        win.focus();
+        return { success: true };
+    }
+    return { success: false };
+});
+
+// Мониторинг камеры мужчины
+function startVideoChatMonitoring(botId, win) {
+    // Состояние мониторинга
+    let lastManCameraState = false;
+    let lastWatchingState = false;
+
+    const checkInterval = setInterval(async () => {
+        if (!win || win.isDestroyed()) {
+            clearInterval(checkInterval);
+            return;
+        }
+
+        try {
+            // Проверяем наличие видео мужчины и смотрит ли он нашу камеру
+            const result = await win.webContents.executeJavaScript(`
+                (function() {
+                    // Ищем видео элемент партнёра (мужчины)
+                    // Обычно это video элемент в области партнёра или с определённым классом
+                    const partnerVideos = document.querySelectorAll('video');
+                    let manCameraOn = false;
+                    let manWatching = false;
+                    let manName = '';
+                    let manId = '';
+
+                    // Проверяем все video элементы
+                    partnerVideos.forEach(video => {
+                        // Если видео имеет srcObject и играет - камера включена
+                        if (video.srcObject && !video.paused && video.videoWidth > 0) {
+                            // Проверяем, не наша ли это камера (обычно наша камера меньше или в другом месте)
+                            const rect = video.getBoundingClientRect();
+                            // Видео партнёра обычно больше и справа/сверху
+                            if (rect.width > 200) {
+                                manCameraOn = true;
+                            }
+                        }
+                    });
+
+                    // Пытаемся найти имя активного собеседника
+                    const activeChat = document.querySelector('.chat-item.active, .user-item.active, [class*="active"] .user-name');
+                    if (activeChat) {
+                        const nameEl = activeChat.querySelector('.name, .user-name, span');
+                        if (nameEl) manName = nameEl.textContent.trim();
+                    }
+
+                    // Проверяем, смотрит ли мужчина нашу камеру (ищем индикатор просмотра)
+                    const viewerIndicator = document.querySelector('.viewer-count, .watching-indicator, [class*="viewer"]');
+                    if (viewerIndicator && viewerIndicator.textContent.includes('1')) {
+                        manWatching = true;
+                    }
+
+                    return { manCameraOn, manWatching, manName, manId };
+                })()
+            `);
+
+            // Уведомляем если состояние изменилось
+            if (result.manCameraOn && !lastManCameraState) {
+                // Камера мужчины включилась
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('video-chat-man-camera', {
+                        botId,
+                        manName: result.manName || 'Мужчина',
+                        manId: result.manId || '?',
+                        type: 'camera_on'
+                    });
+                }
+            }
+
+            if (result.manWatching && !lastWatchingState) {
+                // Мужчина начал смотреть нашу камеру
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.webContents.send('video-chat-man-camera', {
+                        botId,
+                        manName: result.manName || 'Мужчина',
+                        manId: result.manId || '?',
+                        type: 'watching'
+                    });
+                }
+            }
+
+            lastManCameraState = result.manCameraOn;
+            lastWatchingState = result.manWatching;
+
+        } catch (error) {
+            // Ошибки игнорируем (страница могла ещё не загрузиться)
+        }
+    }, 10000); // Каждые 10 секунд
+}

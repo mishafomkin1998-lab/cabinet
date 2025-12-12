@@ -1633,6 +1633,88 @@
         }
 
         /* =====================================================
+           === КНОПКА SHARE MY CAM (ВИДЕОЧАТ) ===
+           ===================================================== */
+        .btn-share-cam {
+            background: linear-gradient(135deg, #20c997 0%, #17a2b8 100%);
+            color: white;
+            border: none;
+            font-weight: 600;
+            font-size: 13px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-share-cam:hover {
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(32, 201, 151, 0.3);
+        }
+        .btn-share-cam:active {
+            transform: translateY(0);
+        }
+        .btn-share-cam i {
+            font-size: 14px;
+        }
+        .btn-share-cam.cam-active {
+            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            animation: camPulse 1.5s infinite;
+        }
+        @keyframes camPulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(220, 53, 69, 0); }
+        }
+
+        /* Темная тема для кнопки камеры */
+        body.theme-dark .btn-share-cam {
+            background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
+        }
+        body.theme-dark .btn-share-cam:hover {
+            background: linear-gradient(135deg, #16a085 0%, #138d75 100%);
+        }
+
+        /* Toast уведомление о камере */
+        .camera-toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(23, 162, 184, 0.4);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+        .camera-toast.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        .camera-toast i {
+            font-size: 20px;
+            animation: cameraPulse 1s infinite;
+        }
+        @keyframes cameraPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+        body.theme-dark .camera-toast {
+            background: linear-gradient(135deg, #1abc9c 0%, #16a085 100%);
+            box-shadow: 0 5px 20px rgba(26, 188, 156, 0.4);
+        }
+
+        /* =====================================================
            === АВТООТВЕТЫ НА ВХОДЯЩИЕ ЧАТЫ ===
            ===================================================== */
         .auto-reply-section {
