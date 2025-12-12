@@ -4,6 +4,7 @@ window.onload = async function() {
     toggleExtendedFeatures();
     initHotkeys();
     initTooltips();
+    initFocusProtection(); // КРИТИЧНО: Защита от потери фокуса
     updateDisabledStatusesUI(); // Отображаем отключенные статусы
     startGlobalMenOnlineUpdater(); // Запускаем обновление "Мужчины онлайн"
 
@@ -25,6 +26,43 @@ window.onload = async function() {
         }
     };
 };
+
+// ============= ЗАЩИТА ОТ ПОТЕРИ ФОКУСА =============
+function initFocusProtection() {
+    let lastActiveInput = null;
+
+    // Отслеживаем последний активный input/textarea
+    document.addEventListener('focusin', (e) => {
+        if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+            lastActiveInput = e.target;
+        }
+    });
+
+    // Блокируем кнопки от получения фокуса (они забирают фокус с textarea)
+    document.addEventListener('focusin', (e) => {
+        // Если фокус ушёл на кнопку, webview или другой не-input элемент
+        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'WEBVIEW') {
+            // Возвращаем фокус на последний активный input
+            if (lastActiveInput && document.body.contains(lastActiveInput)) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Небольшая задержка чтобы не конфликтовать с кликом
+                setTimeout(() => {
+                    lastActiveInput.focus();
+                    console.log('[Focus Protection] Фокус возвращён на:', lastActiveInput.id || lastActiveInput.className);
+                }, 10);
+            }
+        }
+    }, true);
+
+    // Добавляем tabindex="-1" всем кнопкам без ID чтобы они не получали фокус через Tab
+    document.querySelectorAll('button:not([id])').forEach(btn => {
+        btn.setAttribute('tabindex', '-1');
+    });
+
+    console.log('%c[Focus Protection] Защита от потери фокуса активирована', 'color: green; font-weight: bold');
+}
 
 function setGlobalTarget(targetType) {
     Object.values(bots).forEach(bot => {

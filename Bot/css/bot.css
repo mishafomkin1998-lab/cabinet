@@ -22,6 +22,21 @@
         
         /* === КОНЕЦ ДОБАВЛЕНИЙ === */
 
+        /* === ЗАЩИТА ФОКУСА: Кнопки не должны забирать фокус с полей ввода === */
+        button:not([id]):focus,
+        .btn:not([id]):focus {
+            outline: none !important;
+            box-shadow: none !important;
+        }
+
+        /* Кнопки в панели инструментов не получают фокус */
+        .toolbar button:focus,
+        .bl-actions button:focus,
+        .btn-circle:focus {
+            outline: none !important;
+        }
+        /* === КОНЕЦ ЗАЩИТЫ ФОКУСА === */
+
         :root {
             --bg-color: #f8f9fa;
             --text-color: #000;
