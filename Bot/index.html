@@ -352,16 +352,47 @@
                         <small class="text-muted" style="font-size:10px">Опционально: для обхода блокировок OpenAI</small>
                     </div>
                 </div>
+
+                <!-- My Prompt с шаблонами -->
                 <div class="settings-section">
                     <div class="settings-section-title"><i class="fa fa-comment-dots"></i> My Prompt</div>
-                    <label class="form-label small">Введите свой промт для кнопки "My Prompt"</label>
-                    <textarea id="set-prompt" class="form-control" rows="3" placeholder="Напиши здесь промт для AI..." onchange="saveGlobalSettings()"></textarea>
+                    <div class="prompt-template-selector">
+                        <select id="select-myPrompt" class="form-control form-control-sm" onchange="selectPromptTemplate('myPrompt')">
+                            <option value="">-- Без шаблона --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-success" onclick="addPromptTemplate('myPrompt')" title="Добавить шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('myPrompt')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
+                    </div>
+                    <textarea id="set-prompt" class="form-control mt-2" rows="3" placeholder="Напиши здесь промт для AI..." onchange="savePromptText('myPrompt')"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется для кнопки "My Prompt" при улучшении текста</small>
                 </div>
+
+                <!-- Промпт для ответов на письма -->
                 <div class="settings-section">
-                    <div class="settings-section-title"><i class="fa fa-reply"></i> Промпт для ответов</div>
-                    <label class="form-label small">Инструкция для AI при генерации ответов на письма</label>
-                    <textarea id="set-ai-reply-prompt" class="form-control" rows="2" placeholder="Напр: отвечай романтично, с комплиментами, задавай вопросы" onchange="saveGlobalSettings()"></textarea>
-                    <small class="text-muted" style="font-size:10px">Используется в MiniChat при нажатии кнопки AI</small>
+                    <div class="settings-section-title"><i class="fa fa-envelope"></i> Промпт для писем</div>
+                    <div class="prompt-template-selector">
+                        <select id="select-replyPrompt" class="form-control form-control-sm" onchange="selectPromptTemplate('replyPrompt')">
+                            <option value="">-- Без шаблона --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-success" onclick="addPromptTemplate('replyPrompt')" title="Добавить шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('replyPrompt')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
+                    </div>
+                    <textarea id="set-ai-reply-prompt" class="form-control mt-2" rows="2" placeholder="Напр: отвечай романтично, с комплиментами" onchange="savePromptText('replyPrompt')"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется в MiniChat для ответов на письма</small>
+                </div>
+
+                <!-- Промпт для чатов (новый) -->
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-comments"></i> Промпт для чатов</div>
+                    <div class="prompt-template-selector">
+                        <select id="select-chatPrompt" class="form-control form-control-sm" onchange="selectPromptTemplate('chatPrompt')">
+                            <option value="">-- Без шаблона --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-success" onclick="addPromptTemplate('chatPrompt')" title="Добавить шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('chatPrompt')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
+                    </div>
+                    <textarea id="set-chat-prompt" class="form-control mt-2" rows="2" placeholder="Напр: пиши коротко, игриво, задавай вопросы" onchange="savePromptText('chatPrompt')"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется для AI ответов в чатах</small>
                 </div>
             </div>
 

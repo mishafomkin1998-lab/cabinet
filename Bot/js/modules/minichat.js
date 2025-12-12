@@ -256,8 +256,11 @@ async function generateMiniChatAIReply() {
         const isChat = minichatType === 'chat';
         const partnerName = document.getElementById('minichat-partner-name').textContent;
 
-        // Используем кастомный промпт из настроек если есть, иначе дефолтный
-        const basePrompt = globalSettings.aiReplyPrompt || '';
+        // Используем разные промпты для чатов и писем
+        const basePrompt = isChat
+            ? (globalSettings.chatPrompt || '')      // Промпт для чатов
+            : (globalSettings.aiReplyPrompt || '');  // Промпт для писем
+
         let styleInstruction = userPrompt
             ? `Reply style: ${userPrompt}.`
             : basePrompt

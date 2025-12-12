@@ -13,6 +13,7 @@ const dashboardRoutes = require('./dashboard');
 const favoriteTemplatesRoutes = require('./favoriteTemplates');
 const billingRoutes = require('./billing');
 const botDataRoutes = require('./botData');
+const promptTemplatesRoutes = require('./promptTemplates');
 
 module.exports = {
     authRoutes,
@@ -24,5 +25,6 @@ module.exports = {
     dashboardRoutes,
     favoriteTemplatesRoutes,
     billingRoutes,
-    botDataRoutes
+    botDataRoutes,
+    promptTemplatesRoutes
 };

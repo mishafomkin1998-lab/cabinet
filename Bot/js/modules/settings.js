@@ -8,12 +8,16 @@ function loadGlobalSettingsUI() {
     document.getElementById('set-apikey').value = globalSettings.apiKey || '';
     document.getElementById('set-prompt').value = globalSettings.myPrompt || '';
     document.getElementById('set-ai-reply-prompt').value = globalSettings.aiReplyPrompt || '';
+    document.getElementById('set-chat-prompt').value = globalSettings.chatPrompt || '';
     document.getElementById('set-sounds').checked = globalSettings.soundsEnabled;
     document.getElementById('set-confirm-close').checked = globalSettings.confirmTabClose;
     document.getElementById('set-extended').checked = globalSettings.extendedFeatures;
     document.getElementById('set-skip-delete-confirm').checked = globalSettings.skipDeleteConfirm;
     document.getElementById('set-translator-id').value = globalSettings.translatorId || '';
     applyTheme(globalSettings.theme);
+
+    // Загружаем шаблоны промптов с сервера
+    loadPromptTemplates();
 }
 
 function applyTheme(theme) {
@@ -39,6 +43,7 @@ function saveGlobalSettings() {
     globalSettings.apiKey = document.getElementById('set-apikey').value;
     globalSettings.myPrompt = document.getElementById('set-prompt').value;
     globalSettings.aiReplyPrompt = document.getElementById('set-ai-reply-prompt').value;
+    globalSettings.chatPrompt = document.getElementById('set-chat-prompt').value;
     globalSettings.soundsEnabled = document.getElementById('set-sounds').checked;
     globalSettings.confirmTabClose = document.getElementById('set-confirm-close').checked;
     globalSettings.extendedFeatures = document.getElementById('set-extended').checked;
@@ -78,6 +83,7 @@ function openGlobalSettings() {
     document.getElementById('set-apikey').value = globalSettings.apiKey || '';
     document.getElementById('set-prompt').value = globalSettings.myPrompt || '';
     document.getElementById('set-ai-reply-prompt').value = globalSettings.aiReplyPrompt || '';
+    document.getElementById('set-chat-prompt').value = globalSettings.chatPrompt || '';
     document.getElementById('set-sounds').checked = globalSettings.soundsEnabled;
     document.getElementById('set-confirm-close').checked = globalSettings.confirmTabClose;
     document.getElementById('set-extended').checked = globalSettings.extendedFeatures;
@@ -90,6 +96,9 @@ function openGlobalSettings() {
             proxyInput.value = globalSettings[`proxy${i}`] || '';
         }
     }
+
+    // Загружаем шаблоны промптов
+    loadPromptTemplates();
 
     // Показываем первую вкладку
     switchSettingsTab('interface');
@@ -291,4 +300,264 @@ function applyVar(textareaId, text, dropdownId) {
     const ta = document.getElementById(textareaId);
     ta.value = ta.value.endsWith('{') ? ta.value.slice(0, -1) + text : ta.value + text;
     document.getElementById(dropdownId).style.display='none'; ta.focus();
+}
+
+// =====================================================
+// === ШАБЛОНЫ ПРОМПТОВ ===
+// =====================================================
+
+// Маппинг типов промптов к ID элементов
+const promptTypeToTextarea = {
+    myPrompt: 'set-prompt',
+    replyPrompt: 'set-ai-reply-prompt',
+    chatPrompt: 'set-chat-prompt'
+};
+
+const promptTypeToSetting = {
+    myPrompt: 'myPrompt',
+    replyPrompt: 'aiReplyPrompt',
+    chatPrompt: 'chatPrompt'
+};
+
+// Загрузить шаблоны промптов с сервера
+async function loadPromptTemplates() {
+    if (!globalSettings.translatorId) {
+        console.log('[PromptTemplates] translatorId не задан, пропускаем загрузку');
+        return;
+    }
+
+    try {
+        const response = await axios.get(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}`);
+
+        if (response.data.success) {
+            promptTemplates = response.data.data;
+            console.log('[PromptTemplates] Загружено:', promptTemplates);
+
+            // Обновляем выпадающие списки
+            updatePromptDropdown('myPrompt');
+            updatePromptDropdown('replyPrompt');
+            updatePromptDropdown('chatPrompt');
+        }
+    } catch (error) {
+        console.error('[PromptTemplates] Ошибка загрузки:', error.message);
+    }
+}
+
+// Обновить выпадающий список шаблонов
+function updatePromptDropdown(promptType) {
+    const select = document.getElementById(`select-${promptType}`);
+    if (!select) return;
+
+    const templates = promptTemplates[promptType] || [];
+    const activeId = globalSettings.activePromptTemplates?.[promptType];
+
+    // Очищаем и заполняем заново
+    select.innerHTML = '<option value="">-- Без шаблона --</option>';
+
+    templates.forEach(tpl => {
+        const option = document.createElement('option');
+        option.value = tpl.id;
+        option.textContent = tpl.name;
+        if (tpl.isActive || tpl.id === activeId) {
+            option.selected = true;
+        }
+        select.appendChild(option);
+    });
+
+    // Если есть активный шаблон - загружаем его текст
+    const activeTemplate = templates.find(t => t.isActive || t.id === activeId);
+    if (activeTemplate) {
+        const textarea = document.getElementById(promptTypeToTextarea[promptType]);
+        if (textarea) {
+            textarea.value = activeTemplate.text;
+            // Также обновляем globalSettings
+            const settingKey = promptTypeToSetting[promptType];
+            globalSettings[settingKey] = activeTemplate.text;
+        }
+    }
+}
+
+// Выбрать шаблон из выпадающего списка
+async function selectPromptTemplate(promptType) {
+    const select = document.getElementById(`select-${promptType}`);
+    const templateId = select.value;
+    const textarea = document.getElementById(promptTypeToTextarea[promptType]);
+
+    if (!templateId) {
+        // Очищаем текст если выбрано "Без шаблона"
+        textarea.value = '';
+        const settingKey = promptTypeToSetting[promptType];
+        globalSettings[settingKey] = '';
+        globalSettings.activePromptTemplates = globalSettings.activePromptTemplates || {};
+        globalSettings.activePromptTemplates[promptType] = null;
+        localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+        return;
+    }
+
+    // Находим шаблон и загружаем его текст
+    const template = (promptTemplates[promptType] || []).find(t => t.id == templateId);
+    if (template) {
+        textarea.value = template.text;
+        const settingKey = promptTypeToSetting[promptType];
+        globalSettings[settingKey] = template.text;
+        globalSettings.activePromptTemplates = globalSettings.activePromptTemplates || {};
+        globalSettings.activePromptTemplates[promptType] = template.id;
+        localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+
+        // Устанавливаем активный на сервере
+        if (globalSettings.translatorId) {
+            try {
+                await axios.post(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}/set-active`, {
+                    promptType,
+                    templateId: template.id
+                });
+            } catch (e) {
+                console.error('[PromptTemplates] Ошибка установки активного:', e.message);
+            }
+        }
+    }
+}
+
+// Добавить новый шаблон
+async function addPromptTemplate(promptType) {
+    if (!globalSettings.translatorId) {
+        alert('Сначала укажите Translator ID в настройках (вкладка "Другое")');
+        return;
+    }
+
+    const name = prompt('Введите название шаблона:');
+    if (!name || !name.trim()) return;
+
+    const textarea = document.getElementById(promptTypeToTextarea[promptType]);
+    const text = textarea.value.trim();
+
+    if (!text) {
+        alert('Сначала введите текст промпта в поле ниже');
+        return;
+    }
+
+    try {
+        const response = await axios.post(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}`, {
+            promptType,
+            name: name.trim(),
+            text,
+            isActive: true
+        });
+
+        if (response.data.success) {
+            console.log('[PromptTemplates] Шаблон создан:', response.data.data);
+
+            // Добавляем в локальный список
+            promptTemplates[promptType] = promptTemplates[promptType] || [];
+            // Деактивируем остальные локально
+            promptTemplates[promptType].forEach(t => t.isActive = false);
+            promptTemplates[promptType].push({
+                id: response.data.data.id,
+                name: response.data.data.name,
+                text: response.data.data.text,
+                isActive: true
+            });
+
+            // Обновляем dropdown и выбираем новый шаблон
+            updatePromptDropdown(promptType);
+
+            // Сохраняем активный ID
+            globalSettings.activePromptTemplates = globalSettings.activePromptTemplates || {};
+            globalSettings.activePromptTemplates[promptType] = response.data.data.id;
+            localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+
+            alert('Шаблон сохранён!');
+        }
+    } catch (error) {
+        console.error('[PromptTemplates] Ошибка создания:', error);
+        if (error.response?.data?.error) {
+            alert('Ошибка: ' + error.response.data.error);
+        } else {
+            alert('Ошибка сохранения шаблона');
+        }
+    }
+}
+
+// Удалить шаблон
+async function deletePromptTemplate(promptType) {
+    if (!globalSettings.translatorId) {
+        alert('Translator ID не задан');
+        return;
+    }
+
+    const select = document.getElementById(`select-${promptType}`);
+    const templateId = select.value;
+
+    if (!templateId) {
+        alert('Сначала выберите шаблон для удаления');
+        return;
+    }
+
+    const template = (promptTemplates[promptType] || []).find(t => t.id == templateId);
+    if (!template) return;
+
+    if (!confirm(`Удалить шаблон "${template.name}"?`)) return;
+
+    try {
+        const response = await axios.delete(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}/${templateId}`);
+
+        if (response.data.success) {
+            console.log('[PromptTemplates] Шаблон удалён');
+
+            // Удаляем из локального списка
+            promptTemplates[promptType] = (promptTemplates[promptType] || []).filter(t => t.id != templateId);
+
+            // Очищаем textarea
+            const textarea = document.getElementById(promptTypeToTextarea[promptType]);
+            textarea.value = '';
+
+            // Сбрасываем активный ID
+            globalSettings.activePromptTemplates = globalSettings.activePromptTemplates || {};
+            globalSettings.activePromptTemplates[promptType] = null;
+            const settingKey = promptTypeToSetting[promptType];
+            globalSettings[settingKey] = '';
+            localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+
+            // Обновляем dropdown
+            updatePromptDropdown(promptType);
+
+            alert('Шаблон удалён');
+        }
+    } catch (error) {
+        console.error('[PromptTemplates] Ошибка удаления:', error);
+        alert('Ошибка удаления шаблона');
+    }
+}
+
+// Сохранить текст промпта (при редактировании)
+async function savePromptText(promptType) {
+    const textarea = document.getElementById(promptTypeToTextarea[promptType]);
+    const text = textarea.value;
+    const settingKey = promptTypeToSetting[promptType];
+
+    // Сохраняем в локальные настройки
+    globalSettings[settingKey] = text;
+    localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+
+    // Если выбран шаблон - обновляем его на сервере
+    const select = document.getElementById(`select-${promptType}`);
+    const templateId = select?.value;
+
+    if (templateId && globalSettings.translatorId) {
+        try {
+            await axios.put(`${LABABOT_SERVER}/api/prompt-templates/${globalSettings.translatorId}/${templateId}`, {
+                text
+            });
+
+            // Обновляем локальный кеш
+            const template = (promptTemplates[promptType] || []).find(t => t.id == templateId);
+            if (template) {
+                template.text = text;
+            }
+
+            console.log('[PromptTemplates] Текст шаблона обновлён');
+        } catch (error) {
+            console.error('[PromptTemplates] Ошибка обновления текста:', error.message);
+        }
+    }
 }

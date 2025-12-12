@@ -318,6 +318,26 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_profile_bot_data_profile_id ON profile_bot_data(profile_id)`);
         await fixSerialSequence('profile_bot_data');
 
+        // 13.2. Таблица шаблонов промптов (по translator_id)
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS prompt_templates (
+                id SERIAL PRIMARY KEY,
+                translator_id INTEGER NOT NULL,
+                prompt_type VARCHAR(50) NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                text TEXT NOT NULL,
+                is_active BOOLEAN DEFAULT FALSE,
+                sort_order INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP DEFAULT NOW(),
+                CONSTRAINT unique_translator_prompt_type_name UNIQUE (translator_id, prompt_type, name)
+            )
+        `);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_prompt_templates_translator ON prompt_templates(translator_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_prompt_templates_type ON prompt_templates(translator_id, prompt_type)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_prompt_templates_active ON prompt_templates(translator_id, prompt_type, is_active)`);
+        await fixSerialSequence('prompt_templates');
+
         // 14. Таблица истории действий с анкетами
         await pool.query(`
             CREATE TABLE IF NOT EXISTS profile_actions (

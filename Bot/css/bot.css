@@ -1866,3 +1866,64 @@
         body.theme-ladadate .auto-reply-number {
             background: linear-gradient(135deg, #f472b6, #a78bfa);
         }
+
+        /* === ШАБЛОНЫ ПРОМПТОВ === */
+        .prompt-template-selector {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .prompt-template-selector select {
+            flex: 1;
+            max-width: 250px;
+        }
+
+        .prompt-template-selector .btn {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+
+        /* Темная тема */
+        body.theme-dark .prompt-template-selector select {
+            background: var(--input-bg);
+            color: var(--text-color);
+            border-color: var(--input-border);
+        }
+
+        body.theme-dark .prompt-template-selector .btn-outline-success {
+            color: #00ff88;
+            border-color: #00ff88;
+        }
+
+        body.theme-dark .prompt-template-selector .btn-outline-success:hover {
+            background: #00ff88;
+            color: #000;
+        }
+
+        body.theme-dark .prompt-template-selector .btn-outline-danger {
+            color: #ff4757;
+            border-color: #ff4757;
+        }
+
+        body.theme-dark .prompt-template-selector .btn-outline-danger:hover {
+            background: #ff4757;
+            color: #fff;
+        }
+
+        /* LadaDate тема */
+        body.theme-ladadate .prompt-template-selector select {
+            background: rgba(255,255,255,0.05);
+            color: var(--text-color);
+            border-color: rgba(244, 114, 182, 0.3);
+        }
+
+        body.theme-ladadate .prompt-template-selector .btn-outline-success {
+            color: #34d399;
+            border-color: #34d399;
+        }
+
+        body.theme-ladadate .prompt-template-selector .btn-outline-danger {
+            color: #f87171;
+            border-color: #f87171;
+        }
