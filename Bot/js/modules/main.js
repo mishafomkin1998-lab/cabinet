@@ -1053,8 +1053,9 @@ async function performLogin(login, pass, displayId) {
 
             // ВАЖНО: Создаём WebView ПОСЛЕ настройки прокси!
             // Это гарантирует что WebView будет работать через прокси с первого запроса
-            bot.createWebview();
-            console.log(`[Proxy] ✅ WebView создан ПОСЛЕ настройки прокси для ${displayId}`);
+            // await нужен т.к. createWebview теперь ждёт инициализации сессии
+            await bot.createWebview();
+            console.log(`[Proxy] ✅ WebView создан и загружен ПОСЛЕ настройки прокси для ${displayId}`);
 
             createInterface(bot); selectTab(bid); saveSession();
 

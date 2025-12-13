@@ -219,12 +219,15 @@ class AccountBot {
     // === ВАЖНОЕ ДОБАВЛЕНИЕ: Метод для создания скрытого WebView ===
     async createWebview() {
         // ПРОКСИ УСТАНАВЛИВАЕТСЯ СНАРУЖИ после добавления в bots (чтобы getAccountNumber работал)
+        console.log(`[WebView] 🔧 Создание WebView для ${this.id}...`);
 
         const webview = document.createElement('webview');
         webview.id = `webview-${this.id}`;
-        webview.src = "https://ladadate.com/login";
+        // ВАЖНО: НЕ устанавливаем src сразу! Установим после добавления в DOM
         webview.partition = `persist:${this.id}`;
         webview.useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+        console.log(`[WebView] 📦 Partition: persist:${this.id}`);
 
         // Функция для отключения звука и внедрения скрипта блокировки Audio
         const muteWebview = () => {
@@ -292,6 +295,14 @@ class AccountBot {
         // ВАЖНО: Добавляем webview в скрытый контейнер
         document.getElementById('browsers-container').appendChild(webview);
         this.webview = webview;
+
+        // КРИТИЧНО: Устанавливаем src ПОСЛЕ добавления в DOM и небольшой задержки
+        // Это даёт время для инициализации сессии с прокси
+        console.log(`[WebView] ⏳ WebView добавлен в DOM, ждём 500мс перед загрузкой...`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        console.log(`[WebView] 🚀 Устанавливаем src и начинаем загрузку через прокси`);
+        webview.src = "https://ladadate.com/login";
     }
 
     // Heartbeat на сервер Lababot
