@@ -6,6 +6,8 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
+const multer = require('multer');
+const fs = require('fs');
 
 // Модули
 const pool = require('./config/database');
@@ -239,6 +241,58 @@ app.get('/recalculate-stats', async (req, res) => {
         res.json({ success: true, message: 'Статистика пересчитана' });
     } catch(e) {
         res.status(500).json({ error: e.message });
+    }
+});
+
+// ==========================================
+// ЗАГРУЗКА ФАЙЛОВ
+// ==========================================
+
+// Настройка хранилища для multer
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        const fileName = file.originalname.toLowerCase();
+
+        // Логотипы в /public/
+        if (fileName.includes('logo') || fileName.includes('лого') || fileName.includes('ярлык')) {
+            cb(null, path.join(__dirname, 'public'));
+        } else {
+            // Установщики в /public/download/
+            const downloadDir = path.join(__dirname, 'public', 'download');
+            if (!fs.existsSync(downloadDir)) {
+                fs.mkdirSync(downloadDir, { recursive: true });
+            }
+            cb(null, downloadDir);
+        }
+    },
+    filename: function (req, file, cb) {
+        let fileName = file.originalname;
+
+        // Переименовываем логотип
+        if (fileName.toLowerCase().includes('лого')) {
+            fileName = 'nova-logo.png';
+        }
+
+        cb(null, fileName);
+    }
+});
+
+const upload = multer({ storage: storage });
+
+// API endpoint для загрузки файлов
+app.post('/api/upload', upload.single('file'), (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ success: false, error: 'No file uploaded' });
+        }
+
+        res.json({
+            success: true,
+            file: req.file.filename,
+            path: req.file.path
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
     }
 });
 
