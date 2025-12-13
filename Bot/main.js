@@ -288,7 +288,7 @@ ipcMain.handle('set-default-session-proxy', async (event, { proxyString }) => {
 
 // =====================================================
 
-// IPC: Реальное тестирование прокси через запрос (используем Node.js https с tunnel)
+// IPC: Реальное тестирование прокси через HttpsProxyAgent
 ipcMain.handle('test-proxy', async (event, { proxyString }) => {
     console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
     console.log(`[Proxy Test] Тестирование прокси: "${proxyString}"`);
@@ -299,103 +299,35 @@ ipcMain.handle('test-proxy', async (event, { proxyString }) => {
     }
 
     try {
+        const axios = require('axios');
+        const { HttpsProxyAgent } = require('https-proxy-agent');
+
         // Парсим прокси
         const trimmed = proxyString.trim();
         const parts = trimmed.split(':');
 
-        let host, port, username, password;
-
+        let proxyUrl;
         if (parts.length === 2) {
-            [host, port] = parts;
+            proxyUrl = `http://${parts[0]}:${parts[1]}`;
         } else if (parts.length === 4) {
-            [host, port, username, password] = parts;
+            const [host, port, user, pass] = parts;
+            proxyUrl = `http://${user}:${pass}@${host}:${port}`;
         } else {
             return { success: false, error: 'Неверный формат прокси. Используйте ip:port или domain:port:user:pass' };
         }
 
-        console.log(`[Proxy Test] Host: ${host}, Port: ${port}`);
-        console.log(`[Proxy Test] Auth: ${username ? username + ':***' : 'none'}`);
+        console.log(`[Proxy Test] Proxy URL: ${proxyUrl.replace(/:[^:@]+@/, ':***@')}`);
 
-        // Используем Node.js http модуль для CONNECT запроса
-        const http = require('http');
-        const https = require('https');
+        const agent = new HttpsProxyAgent(proxyUrl);
 
-        return new Promise((resolve) => {
-            const timeout = setTimeout(() => {
-                resolve({ success: false, error: 'Таймаут (10 сек)' });
-            }, 10000);
-
-            // Создаём CONNECT запрос к прокси
-            const proxyReq = http.request({
-                host: host,
-                port: parseInt(port),
-                method: 'CONNECT',
-                path: 'api.ipify.org:443',
-                headers: username && password ? {
-                    'Proxy-Authorization': 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64')
-                } : {}
-            });
-
-            proxyReq.on('connect', (res, socket, head) => {
-                console.log(`[Proxy Test] CONNECT response: ${res.statusCode}`);
-
-                if (res.statusCode !== 200) {
-                    clearTimeout(timeout);
-                    socket.destroy();
-                    resolve({ success: false, error: `Прокси вернул ${res.statusCode}` });
-                    return;
-                }
-
-                // Теперь делаем HTTPS запрос через туннель
-                const tlsSocket = require('tls').connect({
-                    socket: socket,
-                    servername: 'api.ipify.org'
-                }, () => {
-                    const req = https.request({
-                        hostname: 'api.ipify.org',
-                        path: '/?format=json',
-                        method: 'GET',
-                        socket: tlsSocket,
-                        agent: false,
-                        createConnection: () => tlsSocket
-                    }, (response) => {
-                        let data = '';
-                        response.on('data', chunk => data += chunk);
-                        response.on('end', () => {
-                            clearTimeout(timeout);
-                            try {
-                                const json = JSON.parse(data);
-                                console.log(`[Proxy Test] ✅ Успех! IP: ${json.ip}`);
-                                resolve({ success: true, ip: json.ip });
-                            } catch (e) {
-                                console.log(`[Proxy Test] ✅ Ответ получен`);
-                                resolve({ success: true, ip: 'unknown' });
-                            }
-                            tlsSocket.destroy();
-                        });
-                    });
-                    req.on('error', (err) => {
-                        clearTimeout(timeout);
-                        resolve({ success: false, error: err.message });
-                        tlsSocket.destroy();
-                    });
-                    req.end();
-                });
-
-                tlsSocket.on('error', (err) => {
-                    clearTimeout(timeout);
-                    resolve({ success: false, error: `TLS ошибка: ${err.message}` });
-                });
-            });
-
-            proxyReq.on('error', (err) => {
-                clearTimeout(timeout);
-                console.error(`[Proxy Test] ❌ Ошибка:`, err.message);
-                resolve({ success: false, error: err.message });
-            });
-
-            proxyReq.end();
+        const response = await axios.get('https://api.ipify.org?format=json', {
+            httpsAgent: agent,
+            proxy: false,
+            timeout: 10000
         });
+
+        console.log(`[Proxy Test] ✅ Успех! IP: ${response.data.ip}`);
+        return { success: true, ip: response.data.ip };
 
     } catch (error) {
         console.error(`[Proxy Test] ❌ Ошибка:`, error.message);
