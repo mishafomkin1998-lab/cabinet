@@ -95,6 +95,9 @@ function getAccountNumber(botId) {
     return index >= 0 ? index + 1 : null;
 }
 
+// Флаг - был ли установлен глобальный прокси для defaultSession
+let defaultProxySet = false;
+
 // Установить прокси для webview сессии бота
 async function setWebviewProxy(botId) {
     console.log(`%c[Proxy DEBUG] setWebviewProxy вызван для botId: ${botId}`, 'color: blue; font-weight: bold');
@@ -123,14 +126,15 @@ async function setWebviewProxy(botId) {
         }
 
         // 2. Устанавливаем прокси для default session (для axios запросов)
-        // Используем прокси первой анкеты для всех axios запросов
-        if (accountNumber === 1 && proxyString) {
+        // Устанавливаем при первом боте с прокси (для всех последующих axios запросов)
+        if (!defaultProxySet && proxyString) {
             try {
                 console.log(`[Proxy DEBUG] Вызываю IPC set-default-session-proxy...`);
                 const defaultResult = await ipcRenderer.invoke('set-default-session-proxy', { proxyString });
                 console.log(`[Proxy DEBUG] Результат IPC set-default-session-proxy:`, defaultResult);
 
                 if (defaultResult.success) {
+                    defaultProxySet = true;
                     console.log(`%c[Proxy Default] Установлен глобальный прокси: ${proxyString}`, 'color: green; font-weight: bold');
                 } else {
                     console.error(`[Proxy Default] Ошибка:`, defaultResult.error);
@@ -138,8 +142,10 @@ async function setWebviewProxy(botId) {
             } catch (e) {
                 console.error('[Proxy Default] IPC ошибка:', e);
             }
+        } else if (defaultProxySet) {
+            console.log(`[Proxy DEBUG] Default session прокси уже установлен`);
         } else {
-            console.log(`[Proxy DEBUG] Пропуск default session (accountNumber=${accountNumber}, proxyString="${proxyString}")`);
+            console.log(`[Proxy DEBUG] Нет прокси для установки в default session`);
         }
 
         return result;

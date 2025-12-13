@@ -424,29 +424,9 @@ async function makeApiRequest(bot, method, path, data = null, isRetry = false) {
     };
     if (bot && bot.token) config.headers.Authorization = `Bearer ${bot.token}`;
 
-    // Определяем прокси для запроса
-    let proxyConfig = null;
-
-    // 1. Сначала пробуем прокси по позиции бота (ip:port)
-    if (bot && bot.id) {
-        const positionProxy = getProxyForBot(bot.id);
-        if (positionProxy) {
-            proxyConfig = parseSimpleProxy(positionProxy);
-            if (proxyConfig) {
-                console.log(`🌐 Прокси для ${bot.displayId || bot.id}: ${positionProxy}`);
-            }
-        }
-    }
-
-    // 2. Если нет прокси по позиции, используем общий proxyURL (http://user:pass@ip:port)
-    if (!proxyConfig && globalSettings.proxyURL) {
-        proxyConfig = parseProxyUrl(globalSettings.proxyURL);
-    }
-
-    // 3. Применяем прокси если он есть (без прокси тоже работает)
-    if (proxyConfig) {
-        config.proxy = proxyConfig;
-    }
+    // ВАЖНО: Прокси применяется через Electron defaultSession (устанавливается в setWebviewProxy)
+    // config.proxy НЕ работает в browser контексте Electron!
+    // Запросы автоматически идут через прокси настроенный в defaultSession
 
     try {
         return await axios(config);

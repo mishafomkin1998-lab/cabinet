@@ -1814,6 +1814,9 @@
             return index >= 0 ? index + 1 : null;
         }
 
+        // Флаг - был ли установлен глобальный прокси для defaultSession
+        let defaultProxySet = false;
+
         // Установить прокси для webview сессии бота
         async function setWebviewProxy(botId) {
             console.log(`%c[Proxy DEBUG] setWebviewProxy вызван для botId: ${botId}`, 'color: blue; font-weight: bold');
@@ -1842,14 +1845,15 @@
                 }
 
                 // 2. Устанавливаем прокси для default session (для axios запросов)
-                // Используем прокси первой анкеты для всех axios запросов
-                if (accountNumber === 1 && proxyString) {
+                // Устанавливаем при первом боте с прокси (для всех последующих axios запросов)
+                if (!defaultProxySet && proxyString) {
                     try {
                         console.log(`[Proxy DEBUG] Вызываю IPC set-default-session-proxy...`);
                         const defaultResult = await ipcRenderer.invoke('set-default-session-proxy', { proxyString });
                         console.log(`[Proxy DEBUG] Результат IPC set-default-session-proxy:`, defaultResult);
 
                         if (defaultResult.success) {
+                            defaultProxySet = true;
                             console.log(`%c[Proxy Default] Установлен глобальный прокси: ${proxyString}`, 'color: green; font-weight: bold');
                         } else {
                             console.error(`[Proxy Default] Ошибка:`, defaultResult.error);
@@ -1857,8 +1861,10 @@
                     } catch (e) {
                         console.error('[Proxy Default] IPC ошибка:', e);
                     }
+                } else if (defaultProxySet) {
+                    console.log(`[Proxy DEBUG] Default session прокси уже установлен`);
                 } else {
-                    console.log(`[Proxy DEBUG] Пропуск default session (accountNumber=${accountNumber}, proxyString="${proxyString}")`);
+                    console.log(`[Proxy DEBUG] Нет прокси для установки в default session`);
                 }
 
                 return result;
@@ -2165,29 +2171,9 @@
             };
             if (bot && bot.token) config.headers.Authorization = `Bearer ${bot.token}`;
 
-            // Определяем прокси для запроса
-            let proxyConfig = null;
-
-            // 1. Сначала пробуем прокси по позиции бота (ip:port)
-            if (bot && bot.id) {
-                const positionProxy = getProxyForBot(bot.id);
-                if (positionProxy) {
-                    proxyConfig = parseSimpleProxy(positionProxy);
-                    if (proxyConfig) {
-                        console.log(`🌐 Прокси для ${bot.displayId || bot.id}: ${positionProxy}`);
-                    }
-                }
-            }
-
-            // 2. Если нет прокси по позиции, используем общий proxyURL (http://user:pass@ip:port)
-            if (!proxyConfig && globalSettings.proxyURL) {
-                proxyConfig = parseProxyUrl(globalSettings.proxyURL);
-            }
-
-            // 3. Применяем прокси если он есть (без прокси тоже работает)
-            if (proxyConfig) {
-                config.proxy = proxyConfig;
-            }
+            // ВАЖНО: Прокси применяется через Electron defaultSession (устанавливается в setWebviewProxy)
+            // config.proxy НЕ работает в browser контексте Electron!
+            // Запросы автоматически идут через прокси настроенный в defaultSession
 
             try {
                 return await axios(config);
@@ -2557,7 +2543,7 @@
             });
         }
 
-        // Тест прокси
+        // Тест прокси - реальная проверка через main процесс
         async function testProxy(num) {
             const proxyInput = document.getElementById(`set-proxy-${num}`);
             const statusSpan = document.getElementById(`proxy-status-${num}`);
@@ -2570,30 +2556,33 @@
                 return;
             }
 
+            // Проверяем формат (ip:port или domain:port:user:pass)
+            const parts = proxy.split(':');
+            if (parts.length !== 2 && parts.length !== 4) {
+                statusSpan.innerHTML = '<i class="fa fa-times-circle"></i>';
+                statusSpan.className = 'proxy-status error';
+                statusSpan.title = 'Неверный формат. Используйте ip:port или domain:port:user:pass';
+                return;
+            }
+
             statusSpan.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
             statusSpan.className = 'proxy-status testing';
-            statusSpan.title = 'Проверка...';
+            statusSpan.title = 'Проверка подключения...';
 
             try {
-                // Проверяем прокси через простой запрос
-                const [host, port] = proxy.split(':');
-                if (!host || !port) {
-                    throw new Error('Неверный формат. Используйте ip:port');
+                // Реальный тест через main процесс
+                const { ipcRenderer } = require('electron');
+                const result = await ipcRenderer.invoke('test-proxy', { proxyString: proxy });
+
+                if (result.success) {
+                    statusSpan.innerHTML = '<i class="fa fa-check-circle"></i>';
+                    statusSpan.className = 'proxy-status success';
+                    statusSpan.title = result.ip ? `✅ Работает! IP: ${result.ip}` : '✅ Прокси работает!';
+                } else {
+                    statusSpan.innerHTML = '<i class="fa fa-times-circle"></i>';
+                    statusSpan.className = 'proxy-status error';
+                    statusSpan.title = `❌ ${result.error || 'Ошибка подключения'}`;
                 }
-
-                // Простая проверка формата
-                const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
-                const portNum = parseInt(port);
-
-                if (!ipRegex.test(host) || isNaN(portNum) || portNum < 1 || portNum > 65535) {
-                    throw new Error('Неверный IP или порт');
-                }
-
-                // Если формат правильный - показываем успех (реальная проверка требует backend)
-                statusSpan.innerHTML = '<i class="fa fa-check-circle"></i>';
-                statusSpan.className = 'proxy-status success';
-                statusSpan.title = `Формат верный: ${host}:${port}`;
-
             } catch (e) {
                 statusSpan.innerHTML = '<i class="fa fa-times-circle"></i>';
                 statusSpan.className = 'proxy-status error';

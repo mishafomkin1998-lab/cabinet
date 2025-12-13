@@ -288,6 +288,113 @@ ipcMain.handle('set-default-session-proxy', async (event, { proxyString }) => {
 
 // =====================================================
 
+// IPC: Реальное тестирование прокси через запрос
+ipcMain.handle('test-proxy', async (event, { proxyString }) => {
+    console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+    console.log(`[Proxy Test] Тестирование прокси: "${proxyString}"`);
+    console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+
+    if (!proxyString || proxyString.trim() === '') {
+        return { success: false, error: 'Прокси не указан' };
+    }
+
+    try {
+        // Парсим прокси
+        const trimmed = proxyString.trim();
+        const parts = trimmed.split(':');
+
+        let proxyUrl, username, password;
+
+        if (parts.length === 2) {
+            const [host, port] = parts;
+            proxyUrl = `http://${host}:${port}`;
+        } else if (parts.length === 4) {
+            const [host, port, user, pass] = parts;
+            proxyUrl = `http://${host}:${port}`;
+            username = user;
+            password = pass;
+        } else {
+            return { success: false, error: 'Неверный формат прокси. Используйте ip:port или domain:port:user:pass' };
+        }
+
+        console.log(`[Proxy Test] Parsed proxyUrl: ${proxyUrl}`);
+        console.log(`[Proxy Test] Auth: ${username ? username + ':***' : 'none'}`);
+
+        // Создаём временную сессию для теста
+        const testSession = session.fromPartition(`test-proxy-${Date.now()}`);
+
+        // Настраиваем авторизацию если есть
+        if (username && password) {
+            testSession.on('login', (loginEvent, webContents, request, authInfo, callback) => {
+                console.log(`[Proxy Test Auth] Отправляю credentials: ${username}`);
+                loginEvent.preventDefault();
+                callback(username, password);
+            });
+        }
+
+        // Устанавливаем прокси
+        await testSession.setProxy({ proxyRules: proxyUrl });
+        console.log(`[Proxy Test] Прокси установлен, делаю запрос...`);
+
+        // Делаем тестовый запрос через net модуль с этой сессией
+        const { net } = require('electron');
+
+        return new Promise((resolve) => {
+            const request = net.request({
+                method: 'GET',
+                url: 'https://api.ipify.org?format=json',
+                session: testSession
+            });
+
+            let responseData = '';
+            const timeout = setTimeout(() => {
+                request.abort();
+                resolve({ success: false, error: 'Таймаут (10 сек)' });
+            }, 10000);
+
+            request.on('response', (response) => {
+                console.log(`[Proxy Test] Response status: ${response.statusCode}`);
+
+                if (response.statusCode === 407) {
+                    clearTimeout(timeout);
+                    resolve({ success: false, error: 'Прокси требует авторизацию (407)' });
+                    return;
+                }
+
+                response.on('data', (chunk) => {
+                    responseData += chunk.toString();
+                });
+
+                response.on('end', () => {
+                    clearTimeout(timeout);
+                    try {
+                        const data = JSON.parse(responseData);
+                        console.log(`[Proxy Test] ✅ Успех! IP: ${data.ip}`);
+                        resolve({ success: true, ip: data.ip });
+                    } catch (e) {
+                        console.log(`[Proxy Test] ✅ Ответ получен: ${responseData.substring(0, 100)}`);
+                        resolve({ success: true, ip: 'unknown' });
+                    }
+                });
+            });
+
+            request.on('error', (error) => {
+                clearTimeout(timeout);
+                console.error(`[Proxy Test] ❌ Ошибка:`, error.message);
+                resolve({ success: false, error: error.message });
+            });
+
+            request.end();
+        });
+
+    } catch (error) {
+        console.error(`[Proxy Test] ❌ Ошибка:`, error.message);
+        return { success: false, error: error.message };
+    }
+});
+
+// =====================================================
+
 // === КРИТИЧЕСКИ ВАЖНО: Флаги для поддержания ОНЛАЙНА ===
 // Эти настройки запрещают Chromium "усыплять" скрытые вкладки.
 app.commandLine.appendSwitch('disable-site-isolation-trials');

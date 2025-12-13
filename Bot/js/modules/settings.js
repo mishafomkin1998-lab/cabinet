@@ -132,7 +132,7 @@ function switchSettingsTab(tabName) {
     });
 }
 
-// Тест прокси
+// Тест прокси - реальная проверка через main процесс
 async function testProxy(num) {
     const proxyInput = document.getElementById(`set-proxy-${num}`);
     const statusSpan = document.getElementById(`proxy-status-${num}`);
@@ -145,30 +145,33 @@ async function testProxy(num) {
         return;
     }
 
+    // Проверяем формат (ip:port или domain:port:user:pass)
+    const parts = proxy.split(':');
+    if (parts.length !== 2 && parts.length !== 4) {
+        statusSpan.innerHTML = '<i class="fa fa-times-circle"></i>';
+        statusSpan.className = 'proxy-status error';
+        statusSpan.title = 'Неверный формат. Используйте ip:port или domain:port:user:pass';
+        return;
+    }
+
     statusSpan.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
     statusSpan.className = 'proxy-status testing';
-    statusSpan.title = 'Проверка...';
+    statusSpan.title = 'Проверка подключения...';
 
     try {
-        // Проверяем прокси через простой запрос
-        const [host, port] = proxy.split(':');
-        if (!host || !port) {
-            throw new Error('Неверный формат. Используйте ip:port');
+        // Реальный тест через main процесс
+        const { ipcRenderer } = require('electron');
+        const result = await ipcRenderer.invoke('test-proxy', { proxyString: proxy });
+
+        if (result.success) {
+            statusSpan.innerHTML = '<i class="fa fa-check-circle"></i>';
+            statusSpan.className = 'proxy-status success';
+            statusSpan.title = result.ip ? `✅ Работает! IP: ${result.ip}` : '✅ Прокси работает!';
+        } else {
+            statusSpan.innerHTML = '<i class="fa fa-times-circle"></i>';
+            statusSpan.className = 'proxy-status error';
+            statusSpan.title = `❌ ${result.error || 'Ошибка подключения'}`;
         }
-
-        // Простая проверка формата
-        const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
-        const portNum = parseInt(port);
-
-        if (!ipRegex.test(host) || isNaN(portNum) || portNum < 1 || portNum > 65535) {
-            throw new Error('Неверный IP или порт');
-        }
-
-        // Если формат правильный - показываем успех (реальная проверка требует backend)
-        statusSpan.innerHTML = '<i class="fa fa-check-circle"></i>';
-        statusSpan.className = 'proxy-status success';
-        statusSpan.title = `Формат верный: ${host}:${port}`;
-
     } catch (e) {
         statusSpan.innerHTML = '<i class="fa fa-times-circle"></i>';
         statusSpan.className = 'proxy-status error';
