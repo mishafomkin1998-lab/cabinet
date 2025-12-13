@@ -47,8 +47,9 @@ class AccountBot {
         this.lababotHeartbeatTimer = null; // Таймер для heartbeat на Lababot сервер
         this.tabColorState = 0;
         this.selectedBlacklistId = null;
-        
+
         this.isMonitoring = false;
+        this.webviewReady = false; // Флаг: WebView загружен и dom-ready сработал
         this.lastChatSessions = [];
         this.lastMailId = 0;
         this.myBirthday = null;
@@ -297,6 +298,10 @@ class AccountBot {
         webview.addEventListener('did-finish-load', muteWebview);
 
         webview.addEventListener('dom-ready', () => {
+            // ВАЖНО: Устанавливаем флаг готовности WebView
+            this.webviewReady = true;
+            console.log(`[WebView ${this.id}] ✅ dom-ready - WebView готов к использованию`);
+
             // 0. Отключаем звук в WebView (чтобы не дублировался со звуком бота)
             muteWebview();
 
@@ -458,7 +463,8 @@ class AccountBot {
             // Используем WebView для запроса (там есть session cookies)
             let data = null;
 
-            if (this.webview) {
+            // ВАЖНО: Проверяем что WebView существует И готов (dom-ready сработал)
+            if (this.webview && this.webviewReady) {
                 try {
                     const result = await this.webview.executeJavaScript(`
                         (async () => {
