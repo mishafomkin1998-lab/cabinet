@@ -1,8 +1,8 @@
-version: 1.1.0
+version: 1.2.0
 files:
-  - url: Ladabot Setup 1.1.0.exe
-    sha512: qpTz1uzMA9bXO6lNgXbOSG3ID5HG0HT5EhMrkpQ2Id2GUITqfdWI3hRe4n0SqO98DgNxSQxa91op/LncrqS0DA==
-    size: 76417250
-path: Ladabot Setup 1.1.0.exe
-sha512: qpTz1uzMA9bXO6lNgXbOSG3ID5HG0HT5EhMrkpQ2Id2GUITqfdWI3hRe4n0SqO98DgNxSQxa91op/LncrqS0DA==
-releaseDate: '2025-12-12T19:58:11.801Z'
+  - url: Novabot Setup 1.2.0.exe
+    sha512: VIsxwUJHtgqDQEPknFwgjenVAa1jCYt50X6WYp/vI9blgWjq6KruCUghcWnwjcnb6ruM71uaLJe2hR05P0gTSw==
+    size: 76419568
+path: Novabot Setup 1.2.0.exe
+sha512: VIsxwUJHtgqDQEPknFwgjenVAa1jCYt50X6WYp/vI9blgWjq6KruCUghcWnwjcnb6ruM71uaLJe2hR05P0gTSw==
+releaseDate: '2025-12-13T01:13:35.646Z'
