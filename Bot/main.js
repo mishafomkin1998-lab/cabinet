@@ -405,6 +405,179 @@ ipcMain.handle('test-proxy', async (event, { proxyString }) => {
 
 // =====================================================
 
+// Хранилище прокси настроек для ботов
+let proxySettings = {};
+
+// IPC: API запросы через main процесс с поддержкой прокси
+ipcMain.handle('api-request', async (event, { method, url, headers, data, botId }) => {
+    console.log(`[API Request] ${method} ${url} (bot: ${botId || 'none'})`);
+
+    try {
+        // Получаем прокси для этого бота
+        const proxyString = proxySettings[botId] || proxySettings['default'] || null;
+
+        const https = require('https');
+        const http = require('http');
+        const urlParsed = new URL(url);
+
+        // Если нет прокси - делаем обычный запрос
+        if (!proxyString) {
+            return await makeDirectRequest(method, url, headers, data);
+        }
+
+        // Парсим прокси
+        const proxyParts = proxyString.split(':');
+        if (proxyParts.length !== 2 && proxyParts.length !== 4) {
+            console.error('[API Request] Неверный формат прокси:', proxyString);
+            return await makeDirectRequest(method, url, headers, data);
+        }
+
+        const [proxyHost, proxyPort, proxyUser, proxyPass] = proxyParts;
+
+        console.log(`[API Request] Используем прокси: ${proxyHost}:${proxyPort}`);
+
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                resolve({ success: false, error: 'Таймаут (30 сек)' });
+            }, 30000);
+
+            // CONNECT запрос к прокси
+            const proxyReq = http.request({
+                host: proxyHost,
+                port: parseInt(proxyPort),
+                method: 'CONNECT',
+                path: `${urlParsed.hostname}:${urlParsed.port || 443}`,
+                headers: proxyUser && proxyPass ? {
+                    'Proxy-Authorization': 'Basic ' + Buffer.from(`${proxyUser}:${proxyPass}`).toString('base64')
+                } : {}
+            });
+
+            proxyReq.on('connect', (res, socket, head) => {
+                if (res.statusCode !== 200) {
+                    clearTimeout(timeout);
+                    socket.destroy();
+                    resolve({ success: false, error: `Прокси вернул ${res.statusCode}`, response: { status: res.statusCode } });
+                    return;
+                }
+
+                // TLS соединение через туннель
+                const tls = require('tls');
+                const tlsSocket = tls.connect({
+                    socket: socket,
+                    servername: urlParsed.hostname
+                }, () => {
+                    // HTTPS запрос через туннель
+                    const reqOptions = {
+                        hostname: urlParsed.hostname,
+                        path: urlParsed.pathname + urlParsed.search,
+                        method: method,
+                        headers: headers,
+                        socket: tlsSocket,
+                        agent: false,
+                        createConnection: () => tlsSocket
+                    };
+
+                    const req = https.request(reqOptions, (response) => {
+                        let responseData = '';
+                        response.on('data', chunk => responseData += chunk);
+                        response.on('end', () => {
+                            clearTimeout(timeout);
+                            try {
+                                const jsonData = JSON.parse(responseData);
+                                resolve({ success: true, data: jsonData, status: response.statusCode, headers: response.headers });
+                            } catch (e) {
+                                resolve({ success: true, data: responseData, status: response.statusCode, headers: response.headers });
+                            }
+                            tlsSocket.destroy();
+                        });
+                    });
+
+                    req.on('error', (err) => {
+                        clearTimeout(timeout);
+                        resolve({ success: false, error: err.message });
+                        tlsSocket.destroy();
+                    });
+
+                    if (data) {
+                        req.write(JSON.stringify(data));
+                    }
+                    req.end();
+                });
+
+                tlsSocket.on('error', (err) => {
+                    clearTimeout(timeout);
+                    resolve({ success: false, error: `TLS: ${err.message}` });
+                });
+            });
+
+            proxyReq.on('error', (err) => {
+                clearTimeout(timeout);
+                resolve({ success: false, error: err.message });
+            });
+
+            proxyReq.end();
+        });
+
+    } catch (error) {
+        console.error('[API Request] Ошибка:', error.message);
+        return { success: false, error: error.message };
+    }
+});
+
+// Прямой запрос без прокси
+async function makeDirectRequest(method, url, headers, data) {
+    const https = require('https');
+    const urlParsed = new URL(url);
+
+    return new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+            resolve({ success: false, error: 'Таймаут (30 сек)' });
+        }, 30000);
+
+        const req = https.request({
+            hostname: urlParsed.hostname,
+            path: urlParsed.pathname + urlParsed.search,
+            method: method,
+            headers: headers
+        }, (response) => {
+            let responseData = '';
+            response.on('data', chunk => responseData += chunk);
+            response.on('end', () => {
+                clearTimeout(timeout);
+                try {
+                    const jsonData = JSON.parse(responseData);
+                    resolve({ success: true, data: jsonData, status: response.statusCode, headers: response.headers });
+                } catch (e) {
+                    resolve({ success: true, data: responseData, status: response.statusCode, headers: response.headers });
+                }
+            });
+        });
+
+        req.on('error', (err) => {
+            clearTimeout(timeout);
+            resolve({ success: false, error: err.message });
+        });
+
+        if (data) {
+            req.write(JSON.stringify(data));
+        }
+        req.end();
+    });
+}
+
+// IPC: Установить прокси для бота
+ipcMain.handle('set-bot-proxy', async (event, { botId, proxyString }) => {
+    console.log(`[Proxy] Устанавливаю прокси для ${botId || 'default'}: ${proxyString || 'none'}`);
+    if (proxyString) {
+        proxySettings[botId || 'default'] = proxyString;
+    } else {
+        delete proxySettings[botId || 'default'];
+    }
+    return { success: true };
+});
+
+// =====================================================
+
 // === КРИТИЧЕСКИ ВАЖНО: Флаги для поддержания ОНЛАЙНА ===
 // Эти настройки запрещают Chromium "усыплять" скрытые вкладки.
 app.commandLine.appendSwitch('disable-site-isolation-trials');

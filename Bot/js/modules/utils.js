@@ -125,27 +125,20 @@ async function setWebviewProxy(botId) {
             console.error(`[Proxy] Ошибка для ${botId}:`, result.error);
         }
 
-        // 2. Устанавливаем прокси для default session (для axios запросов)
-        // Устанавливаем при первом боте с прокси (для всех последующих axios запросов)
-        if (!defaultProxySet && proxyString) {
-            try {
-                console.log(`[Proxy DEBUG] Вызываю IPC set-default-session-proxy...`);
-                const defaultResult = await ipcRenderer.invoke('set-default-session-proxy', { proxyString });
-                console.log(`[Proxy DEBUG] Результат IPC set-default-session-proxy:`, defaultResult);
+        // 2. Сохраняем прокси для API запросов через main процесс
+        try {
+            // Устанавливаем прокси для конкретного бота (для IPC api-request)
+            await ipcRenderer.invoke('set-bot-proxy', { botId, proxyString });
+            console.log(`[Proxy] Прокси сохранён для ${botId}: ${proxyString || 'none'}`);
 
-                if (defaultResult.success) {
-                    defaultProxySet = true;
-                    console.log(`%c[Proxy Default] Установлен глобальный прокси: ${proxyString}`, 'color: green; font-weight: bold');
-                } else {
-                    console.error(`[Proxy Default] Ошибка:`, defaultResult.error);
-                }
-            } catch (e) {
-                console.error('[Proxy Default] IPC ошибка:', e);
+            // Также устанавливаем как default если это первый бот с прокси
+            if (!defaultProxySet && proxyString) {
+                await ipcRenderer.invoke('set-bot-proxy', { botId: 'default', proxyString });
+                defaultProxySet = true;
+                console.log(`%c[Proxy Default] Установлен глобальный прокси: ${proxyString}`, 'color: green; font-weight: bold');
             }
-        } else if (defaultProxySet) {
-            console.log(`[Proxy DEBUG] Default session прокси уже установлен`);
-        } else {
-            console.log(`[Proxy DEBUG] Нет прокси для установки в default session`);
+        } catch (e) {
+            console.error('[Proxy] IPC ошибка:', e);
         }
 
         return result;

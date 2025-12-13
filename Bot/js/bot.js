@@ -1844,27 +1844,20 @@
                     console.error(`[Proxy] Ошибка для ${botId}:`, result.error);
                 }
 
-                // 2. Устанавливаем прокси для default session (для axios запросов)
-                // Устанавливаем при первом боте с прокси (для всех последующих axios запросов)
-                if (!defaultProxySet && proxyString) {
-                    try {
-                        console.log(`[Proxy DEBUG] Вызываю IPC set-default-session-proxy...`);
-                        const defaultResult = await ipcRenderer.invoke('set-default-session-proxy', { proxyString });
-                        console.log(`[Proxy DEBUG] Результат IPC set-default-session-proxy:`, defaultResult);
+                // 2. Сохраняем прокси для API запросов через main процесс
+                try {
+                    // Устанавливаем прокси для конкретного бота (для IPC api-request)
+                    await ipcRenderer.invoke('set-bot-proxy', { botId, proxyString });
+                    console.log(`[Proxy] Прокси сохранён для ${botId}: ${proxyString || 'none'}`);
 
-                        if (defaultResult.success) {
-                            defaultProxySet = true;
-                            console.log(`%c[Proxy Default] Установлен глобальный прокси: ${proxyString}`, 'color: green; font-weight: bold');
-                        } else {
-                            console.error(`[Proxy Default] Ошибка:`, defaultResult.error);
-                        }
-                    } catch (e) {
-                        console.error('[Proxy Default] IPC ошибка:', e);
+                    // Также устанавливаем как default если это первый бот с прокси
+                    if (!defaultProxySet && proxyString) {
+                        await ipcRenderer.invoke('set-bot-proxy', { botId: 'default', proxyString });
+                        defaultProxySet = true;
+                        console.log(`%c[Proxy Default] Установлен глобальный прокси: ${proxyString}`, 'color: green; font-weight: bold');
                     }
-                } else if (defaultProxySet) {
-                    console.log(`[Proxy DEBUG] Default session прокси уже установлен`);
-                } else {
-                    console.log(`[Proxy DEBUG] Нет прокси для установки в default session`);
+                } catch (e) {
+                    console.error('[Proxy] IPC ошибка:', e);
                 }
 
                 return result;
@@ -2162,21 +2155,29 @@
 
         async function makeApiRequest(bot, method, path, data = null, isRetry = false) {
             let endpoint = `${LADADATE_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
-            let config = {
-                method: method,
-                url: endpoint,
-                headers: { 'Content-Type': 'application/json' },
-                data: data,
-                withCredentials: true // Для сохранения и отправки cookies (нужно для /chat-* эндпоинтов)
-            };
-            if (bot && bot.token) config.headers.Authorization = `Bearer ${bot.token}`;
 
-            // ВАЖНО: Прокси применяется через Electron defaultSession (устанавливается в setWebviewProxy)
-            // config.proxy НЕ работает в browser контексте Electron!
-            // Запросы автоматически идут через прокси настроенный в defaultSession
+            // Собираем headers
+            const headers = { 'Content-Type': 'application/json' };
+            if (bot && bot.token) headers.Authorization = `Bearer ${bot.token}`;
 
+            // Используем IPC для запросов через main процесс (с правильным прокси)
             try {
-                return await axios(config);
+                const result = await ipcRenderer.invoke('api-request', {
+                    method: method,
+                    url: endpoint,
+                    headers: headers,
+                    data: data,
+                    botId: bot ? bot.id : null
+                });
+
+                if (!result.success) {
+                    const error = new Error(result.error || 'Request failed');
+                    error.response = result.response;
+                    throw error;
+                }
+
+                // Возвращаем в формате совместимом с axios
+                return { data: result.data, status: result.status, headers: result.headers };
             } catch (error) {
                 if (error.response && error.response.status === 401 && bot && !isRetry) {
                     console.log(`[Auto-Relogin] Token expired for ${bot.displayId}. Attempting silent relogin...`);

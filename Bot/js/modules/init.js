@@ -415,21 +415,31 @@ function startGlobalMenOnlineUpdater() {
 
 async function makeApiRequest(bot, method, path, data = null, isRetry = false) {
     let endpoint = `${LADADATE_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
-    let config = {
-        method: method,
-        url: endpoint,
-        headers: { 'Content-Type': 'application/json' },
-        data: data,
-        withCredentials: true // Для сохранения и отправки cookies (нужно для /chat-* эндпоинтов)
-    };
-    if (bot && bot.token) config.headers.Authorization = `Bearer ${bot.token}`;
 
-    // ВАЖНО: Прокси применяется через Electron defaultSession (устанавливается в setWebviewProxy)
-    // config.proxy НЕ работает в browser контексте Electron!
-    // Запросы автоматически идут через прокси настроенный в defaultSession
+    // Собираем headers
+    const headers = { 'Content-Type': 'application/json' };
+    if (bot && bot.token) headers.Authorization = `Bearer ${bot.token}`;
+
+    // Используем IPC для запросов через main процесс (с правильным прокси)
+    const { ipcRenderer } = require('electron');
 
     try {
-        return await axios(config);
+        const result = await ipcRenderer.invoke('api-request', {
+            method: method,
+            url: endpoint,
+            headers: headers,
+            data: data,
+            botId: bot ? bot.id : null
+        });
+
+        if (!result.success) {
+            const error = new Error(result.error || 'Request failed');
+            error.response = result.response;
+            throw error;
+        }
+
+        // Возвращаем в формате совместимом с axios
+        return { data: result.data, status: result.status, headers: result.headers };
     } catch (error) {
         if (error.response && error.response.status === 401 && bot && !isRetry) {
             console.log(`[Auto-Relogin] Token expired for ${bot.displayId}. Attempting silent relogin...`);
