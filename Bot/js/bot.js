@@ -4337,7 +4337,55 @@
                         }
 
                     } catch (chatErr) {
-                        // Fallback: пытаемся отправить как письмо
+                        // Проверяем тип ошибки - если это "финальная" ошибка (лимит, игнор, блок), не делаем fallback
+                        const chatErrorMsg = (chatErr.response?.data?.Error || chatErr.response?.data?.Message || chatErr.message || '').toLowerCase();
+                        const isFinalError = chatErrorMsg.includes('лимит') ||
+                                            chatErrorMsg.includes('limit') ||
+                                            chatErrorMsg.includes('игнор') ||
+                                            chatErrorMsg.includes('ignore') ||
+                                            chatErrorMsg.includes('block') ||
+                                            chatErrorMsg.includes('блок') ||
+                                            chatErrorMsg.includes('banned') ||
+                                            chatErrorMsg.includes('бан') ||
+                                            chatErrorMsg.includes('запрещ') ||
+                                            chatErrorMsg.includes('forbid') ||
+                                            chatErrorMsg.includes('reject') ||
+                                            chatErrorMsg.includes('отклон');
+
+                        if (isFinalError) {
+                            // Это финальная ошибка - сразу считаем как ошибку без fallback
+                            const errorReason = chatErr.response?.data?.Error || chatErr.response?.data?.Message || chatErr.message;
+                            this.incrementStat('chat', 'errors');
+                            this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
+                            this.log(`❌ Ошибка чата ${user.Name} (${user.AccountId}): ${errorReason}`);
+
+                            // Добавляем в contacted чтобы не пытаться снова
+                            this.chatContactedUsers.add(user.AccountId.toString());
+
+                            // Отправляем ошибку на сервер
+                            await sendMessageToLababot({
+                                botId: this.id,
+                                accountDisplayId: this.displayId,
+                                recipientId: user.AccountId,
+                                type: 'chat_msg',
+                                textContent: msgBody || '',
+                                status: 'failed',
+                                responseTime: 0,
+                                isFirst: false,
+                                isLast: false,
+                                convId: this.getConvId(user.AccountId),
+                                mediaUrl: null,
+                                fileName: null,
+                                translatorId: this.translatorId,
+                                errorReason: errorReason,
+                                usedAi: false
+                            });
+
+                            this.updateUI();
+                            return; // Не пробуем fallback
+                        }
+
+                        // Fallback: пытаемся отправить как письмо (только для не-финальных ошибок)
                         try {
                             const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
                             if (checkRes.data.CheckId) {
@@ -5480,7 +5528,13 @@
             showBulkNotification('Шаблон удалён у всех анкет', count);
         }
 
-        function openBlacklistModal(botId) { currentModalBotId=botId; document.getElementById('bl-modal-input').value=''; openModal('bl-modal'); }
+        function openBlacklistModal(botId) {
+            currentModalBotId=botId;
+            document.getElementById('bl-modal-input').value='';
+            openModal('bl-modal');
+            // Автофокус на поле ввода после открытия модалки
+            setTimeout(() => document.getElementById('bl-modal-input').focus(), 100);
+        }
         async function saveBlacklistID(event) {
             const val = document.getElementById('bl-modal-input').value.trim();
             if (!val) {
