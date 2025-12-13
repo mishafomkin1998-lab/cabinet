@@ -195,12 +195,20 @@ ipcMain.handle('set-session-proxy', async (event, { botId, proxyString }) => {
             // Это нужно потому что Decodo прокси не отправляет 407, а ожидает header сразу
             const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
 
-            ses.webRequest.onBeforeSendHeaders((details, callback) => {
+            // Счётчик запросов для отладки
+            let requestCount = 0;
+
+            ses.webRequest.onBeforeSendHeaders({ urls: ['*://*/*'] }, (details, callback) => {
+                requestCount++;
+                // Логируем первые 5 запросов для отладки
+                if (requestCount <= 5) {
+                    console.log(`[Proxy WebRequest #${requestCount}] ${botId}: ${details.method} ${details.url.substring(0, 80)}...`);
+                }
                 details.requestHeaders['Proxy-Authorization'] = authHeader;
                 callback({ requestHeaders: details.requestHeaders });
             });
 
-            console.log(`[Proxy MAIN] ✅ Настроен Proxy-Authorization header для всех запросов`);
+            console.log(`[Proxy MAIN] ✅ Настроен Proxy-Authorization header для всех запросов (с URL filter)`);
         }
 
         // Устанавливаем прокси для сессии
