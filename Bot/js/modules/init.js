@@ -1,7 +1,13 @@
 window.onload = async function() {
-    restoreSession();
+    // ВАЖНО: Сначала загружаем настройки
     loadGlobalSettingsUI();
     toggleExtendedFeatures();
+
+    // КРИТИЧНО: Ждём установки default прокси ПЕРЕД любыми логинами!
+    await initDefaultProxy();
+
+    // Только после установки прокси - восстанавливаем сессию (логины)
+    restoreSession();
     initHotkeys();
     initTooltips();
     initFocusProtection(); // КРИТИЧНО: Защита от потери фокуса

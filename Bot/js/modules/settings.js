@@ -18,6 +18,28 @@ function loadGlobalSettingsUI() {
 
     // Загружаем шаблоны промптов с сервера
     loadPromptTemplates();
+
+    // ВАЖНО: Устанавливаем default прокси в main процесс при старте
+    initDefaultProxy();
+}
+
+// Установить default прокси из настроек в main процесс
+async function initDefaultProxy() {
+    const { ipcRenderer } = require('electron');
+
+    // Берём первый доступный прокси (proxy1)
+    const defaultProxy = globalSettings.proxy1 || globalSettings.proxy || null;
+
+    if (defaultProxy && defaultProxy.trim()) {
+        try {
+            await ipcRenderer.invoke('set-bot-proxy', { botId: 'default', proxyString: defaultProxy.trim() });
+            console.log(`%c[Proxy Init] Default прокси установлен: ${defaultProxy}`, 'color: green; font-weight: bold');
+        } catch (e) {
+            console.error('[Proxy Init] Ошибка:', e);
+        }
+    } else {
+        console.log('[Proxy Init] Default прокси не настроен');
+    }
 }
 
 function applyTheme(theme) {
@@ -70,6 +92,9 @@ function saveGlobalSettings() {
     Object.values(bots).forEach(bot => {
         bot.translatorId = globalSettings.translatorId;
     });
+
+    // ВАЖНО: Обновляем default прокси в main процесс
+    initDefaultProxy();
 }
 
 function openGlobalSettings() {
