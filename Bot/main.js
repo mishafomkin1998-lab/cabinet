@@ -416,6 +416,7 @@ ipcMain.handle('api-request', async (event, { method, url, headers, data, botId 
 
     try {
         const axios = require('axios');
+        const { HttpsProxyAgent } = require('https-proxy-agent');
 
         // Получаем прокси для этого бота
         const proxyString = proxySettings[botId] || proxySettings['default'] || null;
@@ -432,33 +433,26 @@ ipcMain.handle('api-request', async (event, { method, url, headers, data, botId 
             axiosConfig.data = data;
         }
 
-        // Если есть прокси - используем встроенную поддержку axios
+        // Если есть прокси - используем HttpsProxyAgent (как в примере Decodo)
         if (proxyString) {
             const proxyParts = proxyString.split(':');
 
+            let proxyUrl;
             if (proxyParts.length === 2) {
                 // Формат: host:port
-                axiosConfig.proxy = {
-                    protocol: 'http',
-                    host: proxyParts[0],
-                    port: parseInt(proxyParts[1])
-                };
-                console.log(`[API Request] Прокси: ${proxyParts[0]}:${proxyParts[1]}`);
+                proxyUrl = `http://${proxyParts[0]}:${proxyParts[1]}`;
             } else if (proxyParts.length === 4) {
                 // Формат: host:port:user:pass
                 const [host, port, user, pass] = proxyParts;
-                axiosConfig.proxy = {
-                    protocol: 'http',
-                    host: host,
-                    port: parseInt(port),
-                    auth: {
-                        username: user,
-                        password: pass
-                    }
-                };
-                console.log(`[API Request] Прокси: ${host}:${port} (user: ${user})`);
+                proxyUrl = `http://${user}:${pass}@${host}:${port}`;
             } else {
                 console.error('[API Request] Неверный формат прокси:', proxyString);
+            }
+
+            if (proxyUrl) {
+                console.log(`[API Request] Прокси URL: ${proxyUrl.replace(/:[^:@]+@/, ':***@')}`);
+                axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl);
+                axiosConfig.proxy = false; // Отключаем встроенный proxy axios
             }
         }
 
