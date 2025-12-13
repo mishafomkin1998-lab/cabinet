@@ -1640,11 +1640,23 @@
         .bl-input-row input { flex: 1; min-width: 0; }
         .bl-input-row .btn { padding: 2px 8px; font-size: 12px; }
 
-        /* Кнопка VIP - жёлтый контур и звёздочка */
-        .btn-outline-warning { background: #fff; border: 1px solid #ffc107; color: #ffc107; }
-        .btn-outline-warning:hover { background: #fff3cd; border-color: #ffc107; color: #e0a800; }
-        .btn-outline-warning i { color: #ffc107; }
-        .btn-outline-warning:hover i { color: #e0a800; }
+        /* Кнопка VIP - белый фон, жёлтый контур и звёздочка */
+        .bl-actions .btn-outline-warning {
+            background: #fff !important;
+            border: 2px solid #ffc107 !important;
+            color: #ffc107 !important;
+        }
+        .bl-actions .btn-outline-warning:hover {
+            background: #fff3cd !important;
+            border-color: #e0a800 !important;
+            color: #e0a800 !important;
+        }
+        .bl-actions .btn-outline-warning i.fa-star {
+            color: #ffc107 !important;
+        }
+        .bl-actions .btn-outline-warning:hover i.fa-star {
+            color: #e0a800 !important;
+        }
 
         /* === Анимации для массовых уведомлений === */
         @keyframes bulkNotifIn {

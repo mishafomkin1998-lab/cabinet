@@ -154,10 +154,14 @@ function createInterface(bot) {
         <div class="panel-col">
             <div class="col-title">Blacklist</div>
             <div id="bl-list-${bot.id}" class="scroll-list"></div>
-            <button class="btn btn-success w-100 btn-sm" onclick="openBlacklistModal('${bot.id}')" data-tip="Добавить ID">+ Добавить ID</button>
+            <div class="bl-input-row">
+                <input type="text" id="bl-input-${bot.id}" class="form-control form-control-sm" placeholder="ID..." onkeydown="handleBlacklistKeydown(event, '${bot.id}')">
+                <button class="btn btn-success btn-sm" onclick="addBlacklistFromInput('${bot.id}', false)" title="Добавить">+</button>
+                <button class="btn btn-outline-success btn-sm" onclick="addBlacklistFromInput('${bot.id}', true)" title="Добавить всем">All</button>
+            </div>
             <div class="bl-actions">
                 <button class="btn btn-outline-danger btn-sm flex-fill" onclick="removeSelectedBlacklist('${bot.id}')" data-tip="Удалить выбранный"><i class="fa fa-trash"></i></button>
-                <button class="btn btn-vip btn-sm flex-fill" onclick="toggleVipStatus('${bot.id}')" data-tip="VIP Клиент (Отслеживать онлайн)"><i class="fa fa-star"></i></button>
+                <button class="btn btn-outline-warning btn-sm flex-fill" onclick="toggleVipStatus('${bot.id}')" data-tip="VIP Клиент (Отслеживать онлайн)"><i class="fa fa-star"></i></button>
             </div>
         </div>`;
     row.appendChild(col4);
@@ -907,32 +911,50 @@ async function deleteTemplateFromAll() {
     showBulkNotification('Шаблон удалён у всех анкет', count);
 }
 
-function openBlacklistModal(botId) { currentModalBotId=botId; document.getElementById('bl-modal-input').value=''; openModal('bl-modal'); }
-async function saveBlacklistID(event) {
-    const val = document.getElementById('bl-modal-input').value.trim();
-    if (!val) {
-        closeModal('bl-modal');
-        return;
+// Обработка Enter в поле ввода blacklist
+function handleBlacklistKeydown(event, botId) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        addBlacklistFromInput(botId, event.shiftKey);
     }
+}
 
-    // Shift + клик = добавить в ЧС всем анкетам
-    if (event && event.shiftKey) {
-        await addBlacklistToAll(val);
-        closeModal('bl-modal');
-        return;
-    }
+// Добавить ID из inline поля (toAll = добавить всем анкетам)
+async function addBlacklistFromInput(botId, toAll) {
+    const input = document.getElementById(`bl-input-${botId}`);
+    const val = input.value.trim();
+    if (!val) return;
 
-    if(currentModalBotId) {
-        const bot = bots[currentModalBotId];
+    // Поддержка нескольких ID через запятую, пробел или перенос строки
+    const ids = val.split(/[\s,]+/).filter(id => id.length > 0);
+
+    if (toAll) {
+        // Добавить всем анкетам
+        for (const id of ids) {
+            await addBlacklistToAll(id);
+        }
+    } else {
+        // Добавить только этому боту
+        const bot = bots[botId];
         const isChat = globalMode === 'chat';
         const list = isChat ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
-        if(!list.includes(val)) {
-            list.push(val);
-            renderBlacklist(currentModalBotId);
+        let added = 0;
+
+        for (const id of ids) {
+            if (!list.includes(id)) {
+                list.push(id);
+                added++;
+            }
+        }
+
+        if (added > 0) {
+            renderBlacklist(botId);
             await saveBlacklistToServer(bot.displayId, isChat ? 'chat' : 'mail', list);
         }
     }
-    closeModal('bl-modal');
+
+    input.value = '';
+    input.focus();
 }
 
 // Добавить в ЧС для ВСЕХ анкет
