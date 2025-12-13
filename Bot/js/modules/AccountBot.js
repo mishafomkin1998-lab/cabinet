@@ -233,9 +233,16 @@ class AccountBot {
 
         console.log(`[WebView] 📦 Partition: persist:${this.id}`);
 
-        // Promise для ожидания настройки прокси через webContentsId
+        // Promise для ожидания настройки прокси через webContentsId (с таймаутом)
         const proxyConfigured = new Promise((resolve) => {
+            // Таймаут 5 секунд - если did-attach не сработает, продолжаем без прокси webContents
+            const timeout = setTimeout(() => {
+                console.warn(`[WebView] ⚠️ Таймаут did-attach для ${botId}, продолжаем без webContents прокси`);
+                resolve();
+            }, 5000);
+
             webview.addEventListener('did-attach', async () => {
+                clearTimeout(timeout);
                 console.log(`[WebView] 📎 did-attach для ${botId}`);
 
                 try {
