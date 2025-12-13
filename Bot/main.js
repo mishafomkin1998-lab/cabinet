@@ -224,6 +224,74 @@ ipcMain.handle('set-session-proxy', async (event, { botId, proxyString }) => {
     }
 });
 
+// IPC: Настроить прокси для конкретного webContents (по ID)
+ipcMain.handle('set-webcontents-proxy', async (event, { webContentsId, proxyString, botId }) => {
+    const { webContents } = require('electron');
+
+    console.log(`\n[Proxy WebContents] Настройка прокси для webContentsId: ${webContentsId}`);
+    console.log(`[Proxy WebContents] proxyString: "${proxyString}"`);
+
+    try {
+        const wc = webContents.fromId(webContentsId);
+        if (!wc) {
+            console.error(`[Proxy WebContents] ❌ webContents с ID ${webContentsId} не найден!`);
+            return { success: false, error: 'WebContents not found' };
+        }
+
+        const ses = wc.session;
+        console.log(`[Proxy WebContents] ✅ Получена сессия webContents`);
+
+        if (!proxyString || proxyString.trim() === '') {
+            await ses.setProxy({ proxyRules: '' });
+            console.log(`[Proxy WebContents] Прокси отключен`);
+            return { success: true, proxy: null };
+        }
+
+        // Парсим прокси
+        const parts = proxyString.trim().split(':');
+        let proxyUrl, username, password;
+
+        if (parts.length === 4) {
+            const [host, port, user, pass] = parts;
+            proxyUrl = `http://${host}:${port}`;
+            username = user;
+            password = pass;
+        } else if (parts.length === 2) {
+            proxyUrl = `http://${parts[0]}:${parts[1]}`;
+        } else {
+            return { success: false, error: 'Неверный формат прокси' };
+        }
+
+        // Настраиваем аутентификацию
+        if (username && password) {
+            ses.removeAllListeners('login');
+            ses.on('login', (loginEvent, request, authInfo, callback) => {
+                console.log(`[Proxy WebContents Auth] Запрос авторизации для ${authInfo.host}`);
+                loginEvent.preventDefault();
+                callback(username, password);
+            });
+
+            // Добавляем Proxy-Authorization header
+            const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
+
+            ses.webRequest.onBeforeSendHeaders({ urls: ['*://*/*'] }, (details, callback) => {
+                details.requestHeaders['Proxy-Authorization'] = authHeader;
+                callback({ requestHeaders: details.requestHeaders });
+            });
+
+            console.log(`[Proxy WebContents] ✅ Аутентификация настроена`);
+        }
+
+        await ses.setProxy({ proxyRules: proxyUrl });
+        console.log(`[Proxy WebContents] ✅ Прокси установлен: ${proxyUrl}`);
+
+        return { success: true, proxy: proxyUrl };
+    } catch (error) {
+        console.error(`[Proxy WebContents] ❌ Ошибка:`, error.message);
+        return { success: false, error: error.message };
+    }
+});
+
 // IPC: Получить текущий прокси сессии
 ipcMain.handle('get-session-proxy', async (event, { botId }) => {
     try {
