@@ -219,18 +219,20 @@ class AccountBot {
 
     // === ВАЖНОЕ ДОБАВЛЕНИЕ: Метод для создания скрытого WebView ===
     createWebview() {
-        // ПРОКСИ уже настроен через setWebviewProxy() в performLogin()
-        // WebView использует тот же partition, поэтому прокси должен работать автоматически
-        console.log(`[WebView] 🔧 Создание WebView для ${this.id}...`);
+        // ВАЖНО: WebView работает БЕЗ прокси (прямое соединение)
+        // Причина: Decodo HTTP прокси не поддерживает CONNECT туннели с аутентификацией через Electron
+        // API запросы идут через прокси (HttpsProxyAgent), а WebView только для поддержания сессии
+        console.log(`[WebView] 🔧 Создание WebView для ${this.id} (без прокси)...`);
 
         const webview = document.createElement('webview');
         webview.id = `webview-${this.id}`;
-        webview.partition = `persist:${this.id}`;
+        // Используем отдельную сессию БЕЗ прокси для каждого WebView
+        // Название отличается от bot partition чтобы прокси не применялся
+        webview.partition = `persist:wv_${this.id}`;
         webview.useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-        // Устанавливаем src сразу - прокси уже настроен на partition
         webview.src = "https://ladadate.com/login";
 
-        console.log(`[WebView] 📦 Partition: persist:${this.id}, src: ${webview.src}`);
+        console.log(`[WebView] 📦 Partition: persist:wv_${this.id} (без прокси), src: ${webview.src}`);
 
         // Функция для отключения звука и внедрения скрипта блокировки Audio
         const muteWebview = () => {
