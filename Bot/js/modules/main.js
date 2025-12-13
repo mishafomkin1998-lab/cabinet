@@ -156,11 +156,10 @@ function createInterface(bot) {
             <div id="bl-list-${bot.id}" class="scroll-list"></div>
             <div class="bl-input-row">
                 <input type="text" id="bl-input-${bot.id}" class="form-control form-control-sm" placeholder="ID..." onkeydown="handleBlacklistKeydown(event, '${bot.id}')">
-                <button class="btn btn-success btn-sm" onclick="addBlacklistFromInput('${bot.id}', false)" title="Добавить">+</button>
-                <button class="btn btn-outline-success btn-sm" onclick="addBlacklistFromInput('${bot.id}', true)" title="Добавить всем">All</button>
+                <button class="btn btn-success btn-sm" onclick="addBlacklistFromInput('${bot.id}')" title="1 ID = этому боту, несколько = всем">+</button>
             </div>
             <div class="bl-actions">
-                <button class="btn btn-outline-danger btn-sm flex-fill" onclick="removeSelectedBlacklist('${bot.id}')" data-tip="Удалить выбранный"><i class="fa fa-trash"></i></button>
+                <button class="btn btn-outline-danger btn-sm flex-fill" onclick="removeSelectedBlacklist('${bot.id}')" data-tip="Удалить выбранные"><i class="fa fa-trash"></i></button>
                 <button class="btn btn-outline-warning btn-sm flex-fill" onclick="toggleVipStatus('${bot.id}')" data-tip="VIP Клиент (Отслеживать онлайн)"><i class="fa fa-star"></i></button>
             </div>
         </div>`;
@@ -915,12 +914,13 @@ async function deleteTemplateFromAll() {
 function handleBlacklistKeydown(event, botId) {
     if (event.key === 'Enter') {
         event.preventDefault();
-        addBlacklistFromInput(botId, event.shiftKey);
+        addBlacklistFromInput(botId);
     }
 }
 
-// Добавить ID из inline поля (toAll = добавить всем анкетам)
-async function addBlacklistFromInput(botId, toAll) {
+// Добавить ID из inline поля
+// 1 ID = добавить этому боту, несколько ID = добавить всем анкетам
+async function addBlacklistFromInput(botId) {
     const input = document.getElementById(`bl-input-${botId}`);
     const val = input.value.trim();
     if (!val) return;
@@ -928,26 +928,19 @@ async function addBlacklistFromInput(botId, toAll) {
     // Поддержка нескольких ID через запятую, пробел или перенос строки
     const ids = val.split(/[\s,]+/).filter(id => id.length > 0);
 
-    if (toAll) {
-        // Добавить всем анкетам
+    if (ids.length > 1) {
+        // Несколько ID = добавить всем анкетам
         for (const id of ids) {
             await addBlacklistToAll(id);
         }
     } else {
-        // Добавить только этому боту
+        // Один ID = добавить только этому боту
         const bot = bots[botId];
         const isChat = globalMode === 'chat';
         const list = isChat ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
-        let added = 0;
 
-        for (const id of ids) {
-            if (!list.includes(id)) {
-                list.push(id);
-                added++;
-            }
-        }
-
-        if (added > 0) {
+        if (!list.includes(ids[0])) {
+            list.push(ids[0]);
             renderBlacklist(botId);
             await saveBlacklistToServer(bot.displayId, isChat ? 'chat' : 'mail', list);
         }
@@ -979,39 +972,90 @@ async function addBlacklistToAll(val) {
     showBulkNotification(`ID ${val} добавлен в ЧС всех анкет`, count);
 }
 
+// Хранение последнего выбранного индекса для Shift-выбора
+let lastSelectedBlacklistIndex = {};
+
 function renderBlacklist(botId) {
     const listEl=document.getElementById(`bl-list-${botId}`); listEl.innerHTML="";
     const bot = bots[botId];
     const data = globalMode === 'chat' ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
-    
-    data.forEach(id => {
-        const d=document.createElement('div'); 
-        d.className='list-item'; 
+
+    // Инициализируем массив выбранных если нет
+    if (!bot.selectedBlacklistIds) bot.selectedBlacklistIds = [];
+
+    data.forEach((id, index) => {
+        const d=document.createElement('div');
+        d.className='list-item';
+        d.dataset.index = index;
         d.innerText=id;
-        
+
         if (bot.vipList.includes(id)) {
             d.classList.add('is-vip');
             d.innerHTML = `<i class="fa fa-star text-warning me-2"></i> ${id}`;
         }
-        
-        d.onclick=()=>{
-            listEl.querySelectorAll('.list-item').forEach(i=>i.classList.remove('selected')); 
-            d.classList.add('selected'); 
-            bots[botId].selectedBlacklistId=id;
+
+        // Восстанавливаем выбор если элемент был выбран
+        if (bot.selectedBlacklistIds.includes(id)) {
+            d.classList.add('selected');
+        }
+
+        d.onclick=(e)=>{
+            if (e.shiftKey && lastSelectedBlacklistIndex[botId] !== undefined) {
+                // Shift+клик - выбрать диапазон
+                const start = Math.min(lastSelectedBlacklistIndex[botId], index);
+                const end = Math.max(lastSelectedBlacklistIndex[botId], index);
+
+                // Снимаем старый выбор
+                listEl.querySelectorAll('.list-item').forEach(i=>i.classList.remove('selected'));
+                bot.selectedBlacklistIds = [];
+
+                // Выбираем диапазон
+                for (let i = start; i <= end; i++) {
+                    const item = listEl.querySelector(`[data-index="${i}"]`);
+                    if (item) {
+                        item.classList.add('selected');
+                        bot.selectedBlacklistIds.push(data[i]);
+                    }
+                }
+            } else if (e.ctrlKey || e.metaKey) {
+                // Ctrl+клик - добавить/убрать из выбора
+                d.classList.toggle('selected');
+                if (d.classList.contains('selected')) {
+                    if (!bot.selectedBlacklistIds.includes(id)) bot.selectedBlacklistIds.push(id);
+                } else {
+                    bot.selectedBlacklistIds = bot.selectedBlacklistIds.filter(x => x !== id);
+                }
+                lastSelectedBlacklistIndex[botId] = index;
+            } else {
+                // Обычный клик - выбрать только один
+                listEl.querySelectorAll('.list-item').forEach(i=>i.classList.remove('selected'));
+                d.classList.add('selected');
+                bot.selectedBlacklistIds = [id];
+                lastSelectedBlacklistIndex[botId] = index;
+            }
         };
         listEl.appendChild(d);
     });
 }
 
 async function removeSelectedBlacklist(botId) {
-    const bot = bots[botId]; const s = bot.selectedBlacklistId;
-    if(s) {
+    const bot = bots[botId];
+    const selected = bot.selectedBlacklistIds || [];
+
+    if (selected.length > 0) {
         const isChat = globalMode === 'chat';
-        if(isChat) bot.chatSettings.blacklist = bot.chatSettings.blacklist.filter(x=>x!==s);
-        else bot.mailSettings.blacklist = bot.mailSettings.blacklist.filter(x=>x!==s);
-        bot.vipList = bot.vipList.filter(x=>x!==s);
-        bot.selectedBlacklistId = null;
+
+        // Удаляем все выбранные
+        for (const s of selected) {
+            if(isChat) bot.chatSettings.blacklist = bot.chatSettings.blacklist.filter(x=>x!==s);
+            else bot.mailSettings.blacklist = bot.mailSettings.blacklist.filter(x=>x!==s);
+            bot.vipList = bot.vipList.filter(x=>x!==s);
+        }
+
+        bot.selectedBlacklistIds = [];
+        lastSelectedBlacklistIndex[botId] = undefined;
         renderBlacklist(botId);
+
         // Сохраняем на сервер
         const list = isChat ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
         await saveBlacklistToServer(bot.displayId, isChat ? 'chat' : 'mail', list);
@@ -1019,16 +1063,29 @@ async function removeSelectedBlacklist(botId) {
 }
 
 function toggleVipStatus(botId) {
-    const bot = bots[botId]; const s = bot.selectedBlacklistId;
-    if(!s) return alert("Выберите ID из списка");
-    
-    if(bot.vipList.includes(s)) {
-        bot.vipList = bot.vipList.filter(x=>x!==s);
-    } else {
-        bot.vipList.push(s);
-        alert(`ID ${s} отмечен как VIP.\nБот будет уведомлять о его Online/Offline статусе.`);
+    const bot = bots[botId];
+    const selected = bot.selectedBlacklistIds || [];
+
+    if (selected.length === 0) return alert("Выберите ID из списка");
+
+    let added = [];
+    let removed = [];
+
+    for (const s of selected) {
+        if(bot.vipList.includes(s)) {
+            bot.vipList = bot.vipList.filter(x=>x!==s);
+            removed.push(s);
+        } else {
+            bot.vipList.push(s);
+            added.push(s);
+        }
     }
-    saveSession(); 
+
+    if (added.length > 0) {
+        alert(`${added.length} ID отмечено как VIP.\nБот будет уведомлять о их Online/Offline статусе.`);
+    }
+
+    saveSession();
     renderBlacklist(botId);
 }
 
