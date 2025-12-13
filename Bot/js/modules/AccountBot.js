@@ -303,6 +303,26 @@ class AccountBot {
 
         console.log(`[WebView] 🚀 Устанавливаем src и начинаем загрузку через прокси`);
         webview.src = "https://ladadate.com/login";
+
+        // DEBUG: Проверяем IP через WebView через 5 секунд после загрузки
+        setTimeout(async () => {
+            try {
+                const ip = await webview.executeJavaScript(`
+                    (async () => {
+                        try {
+                            const res = await fetch('https://api.ipify.org?format=json');
+                            const data = await res.json();
+                            return data.ip;
+                        } catch(e) {
+                            return 'error: ' + e.message;
+                        }
+                    })()
+                `);
+                console.log(`[WebView ${this.id}] 🌐 IP через WebView: ${ip}`);
+            } catch(e) {
+                console.log(`[WebView ${this.id}] ⚠️ Не удалось проверить IP: ${e.message}`);
+            }
+        }, 8000);
     }
 
     // Heartbeat на сервер Lababot
