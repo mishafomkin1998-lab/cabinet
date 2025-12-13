@@ -262,6 +262,29 @@ class AccountBot {
         // Отключаем звук при каждой загрузке страницы
         webview.addEventListener('did-finish-load', muteWebview);
 
+        // DEBUG: Отслеживаем ошибки загрузки WebView
+        webview.addEventListener('did-fail-load', (event) => {
+            console.error(`[WebView ${this.id}] ❌ did-fail-load:`, {
+                errorCode: event.errorCode,
+                errorDescription: event.errorDescription,
+                validatedURL: event.validatedURL
+            });
+        });
+
+        webview.addEventListener('did-start-loading', () => {
+            console.log(`[WebView ${this.id}] 🔄 did-start-loading...`);
+        });
+
+        webview.addEventListener('did-stop-loading', () => {
+            console.log(`[WebView ${this.id}] ⏹️ did-stop-loading`);
+        });
+
+        webview.addEventListener('console-message', (e) => {
+            if (e.level >= 2) { // warnings and errors only
+                console.log(`[WebView ${this.id} console] ${e.message}`);
+            }
+        });
+
         webview.addEventListener('dom-ready', () => {
             // ВАЖНО: Устанавливаем флаг готовности WebView
             this.webviewReady = true;
