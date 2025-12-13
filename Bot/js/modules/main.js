@@ -1051,6 +1051,11 @@ async function performLogin(login, pass, displayId) {
             // ТЕПЕРЬ устанавливаем прокси (после добавления в bots чтобы getAccountNumber работал)
             await setWebviewProxy(bid);
 
+            // ВАЖНО: Создаём WebView ПОСЛЕ настройки прокси!
+            // Это гарантирует что WebView будет работать через прокси с первого запроса
+            bot.createWebview();
+            console.log(`[Proxy] ✅ WebView создан ПОСЛЕ настройки прокси для ${displayId}`);
+
             createInterface(bot); selectTab(bid); saveSession();
 
             // Загружаем данные с сервера (шаблоны, blacklist, статистику)

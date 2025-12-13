@@ -68,13 +68,15 @@ class AccountBot {
         // === Статус разрешения рассылки (управляется с сервера) ===
         this.mailingEnabled = true; // По умолчанию разрешено, сервер может отключить
 
-        // === ВАЖНОЕ ДОБАВЛЕНИЕ: Создаем WebView для поддержания онлайн ===
+        // === ВАЖНОЕ ДОБАВЛЕНИЕ: Запуск функций после авторизации ===
+        // ВАЖНО: createWebview() НЕ вызывается здесь!
+        // WebView создаётся ПОСЛЕ настройки прокси в performLogin()
         if (this.token) {
             this.startKeepAlive();
             this.startMonitoring();
             this.getProfileData();
-            this.createWebview();
-            
+            // this.createWebview() - вызывается из performLogin() после setWebviewProxy()
+
             // Запускаем heartbeat на сервер Lababot
             this.startLababotHeartbeat();
         }
