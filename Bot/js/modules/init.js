@@ -429,6 +429,8 @@ async function makeApiRequest(bot, method, path, data = null, isRetry = false) {
     // Используем IPC для запросов через main процесс (с правильным прокси)
     const { ipcRenderer } = require('electron');
 
+    console.log(`%c[API Request] ${method} ${path} (botId: ${bot ? bot.id : 'null'})`, 'color: blue');
+
     try {
         const result = await ipcRenderer.invoke('api-request', {
             method: method,
@@ -437,6 +439,11 @@ async function makeApiRequest(bot, method, path, data = null, isRetry = false) {
             data: data,
             botId: bot ? bot.id : null
         });
+
+        console.log(`%c[API Response] success=${result.success}, status=${result.status}`, result.success ? 'color: green' : 'color: red');
+        if (!result.success) {
+            console.error('[API Error]', result.error);
+        }
 
         if (!result.success) {
             const error = new Error(result.error || 'Request failed');

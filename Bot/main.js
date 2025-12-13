@@ -410,11 +410,15 @@ let proxySettings = {};
 
 // IPC: API запросы через main процесс с поддержкой прокси
 ipcMain.handle('api-request', async (event, { method, url, headers, data, botId }) => {
-    console.log(`[API Request] ${method} ${url} (bot: ${botId || 'none'})`);
+    console.log(`\n========== API REQUEST ==========`);
+    console.log(`[API Request] ${method} ${url}`);
+    console.log(`[API Request] botId: ${botId || 'none'}`);
+    console.log(`[API Request] proxySettings keys:`, Object.keys(proxySettings));
 
     try {
         // Получаем прокси для этого бота
         const proxyString = proxySettings[botId] || proxySettings['default'] || null;
+        console.log(`[API Request] proxyString: ${proxyString || 'НЕТ ПРОКСИ'}`);
 
         const https = require('https');
         const http = require('http');
@@ -422,11 +426,14 @@ ipcMain.handle('api-request', async (event, { method, url, headers, data, botId 
 
         // Если нет прокси - делаем обычный запрос
         if (!proxyString) {
+            console.log(`[API Request] Прокси не найден, прямой запрос`);
             return await makeDirectRequest(method, url, headers, data);
         }
 
         // Парсим прокси
         const proxyParts = proxyString.split(':');
+        console.log(`[API Request] proxyParts:`, proxyParts, `(${proxyParts.length} частей)`);
+
         if (proxyParts.length !== 2 && proxyParts.length !== 4) {
             console.error('[API Request] Неверный формат прокси:', proxyString);
             return await makeDirectRequest(method, url, headers, data);
@@ -434,7 +441,7 @@ ipcMain.handle('api-request', async (event, { method, url, headers, data, botId 
 
         const [proxyHost, proxyPort, proxyUser, proxyPass] = proxyParts;
 
-        console.log(`[API Request] Используем прокси: ${proxyHost}:${proxyPort}`);
+        console.log(`[API Request] Используем прокси: ${proxyHost}:${proxyPort} (user: ${proxyUser || 'none'})`);
 
         return new Promise((resolve) => {
             const timeout = setTimeout(() => {
@@ -453,12 +460,15 @@ ipcMain.handle('api-request', async (event, { method, url, headers, data, botId 
             });
 
             proxyReq.on('connect', (res, socket, head) => {
+                console.log(`[API Request] CONNECT response: ${res.statusCode}`);
                 if (res.statusCode !== 200) {
                     clearTimeout(timeout);
                     socket.destroy();
+                    console.error(`[API Request] Прокси отклонил CONNECT: ${res.statusCode}`);
                     resolve({ success: false, error: `Прокси вернул ${res.statusCode}`, response: { status: res.statusCode } });
                     return;
                 }
+                console.log(`[API Request] Туннель установлен, подключаю TLS...`);
 
                 // TLS соединение через туннель
                 const tls = require('tls');
@@ -511,10 +521,12 @@ ipcMain.handle('api-request', async (event, { method, url, headers, data, botId 
             });
 
             proxyReq.on('error', (err) => {
+                console.error(`[API Request] CONNECT ошибка:`, err.message);
                 clearTimeout(timeout);
                 resolve({ success: false, error: err.message });
             });
 
+            console.log(`[API Request] Отправляю CONNECT запрос к ${proxyHost}:${proxyPort}...`);
             proxyReq.end();
         });
 
