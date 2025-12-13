@@ -413,169 +413,72 @@ ipcMain.handle('api-request', async (event, { method, url, headers, data, botId 
     console.log(`\n========== API REQUEST ==========`);
     console.log(`[API Request] ${method} ${url}`);
     console.log(`[API Request] botId: ${botId || 'none'}`);
-    console.log(`[API Request] proxySettings keys:`, Object.keys(proxySettings));
 
     try {
+        const axios = require('axios');
+        const { HttpsProxyAgent } = require('https-proxy-agent');
+
         // Получаем прокси для этого бота
         const proxyString = proxySettings[botId] || proxySettings['default'] || null;
         console.log(`[API Request] proxyString: ${proxyString || 'НЕТ ПРОКСИ'}`);
 
-        const https = require('https');
-        const http = require('http');
-        const urlParsed = new URL(url);
+        let axiosConfig = {
+            method: method,
+            url: url,
+            headers: headers,
+            timeout: 30000
+        };
 
-        // Если нет прокси - делаем обычный запрос
-        if (!proxyString) {
-            console.log(`[API Request] Прокси не найден, прямой запрос`);
-            return await makeDirectRequest(method, url, headers, data);
+        if (data) {
+            axiosConfig.data = data;
         }
 
-        // Парсим прокси
-        const proxyParts = proxyString.split(':');
-        console.log(`[API Request] proxyParts:`, proxyParts, `(${proxyParts.length} частей)`);
+        // Если есть прокси - настраиваем agent
+        if (proxyString) {
+            const proxyParts = proxyString.split(':');
 
-        if (proxyParts.length !== 2 && proxyParts.length !== 4) {
-            console.error('[API Request] Неверный формат прокси:', proxyString);
-            return await makeDirectRequest(method, url, headers, data);
+            if (proxyParts.length === 2) {
+                // Формат: host:port
+                const proxyUrl = `http://${proxyParts[0]}:${proxyParts[1]}`;
+                console.log(`[API Request] Прокси URL: ${proxyUrl}`);
+                axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl);
+            } else if (proxyParts.length === 4) {
+                // Формат: host:port:user:pass
+                const [host, port, user, pass] = proxyParts;
+                const proxyUrl = `http://${user}:${pass}@${host}:${port}`;
+                console.log(`[API Request] Прокси URL: http://${user}:***@${host}:${port}`);
+                axiosConfig.httpsAgent = new HttpsProxyAgent(proxyUrl);
+            } else {
+                console.error('[API Request] Неверный формат прокси:', proxyString);
+            }
         }
 
-        const [proxyHost, proxyPort, proxyUser, proxyPass] = proxyParts;
+        const response = await axios(axiosConfig);
+        console.log(`[API Request] ✅ Успех: ${response.status}`);
 
-        console.log(`[API Request] Используем прокси: ${proxyHost}:${proxyPort} (user: ${proxyUser || 'none'})`);
-
-        return new Promise((resolve) => {
-            const timeout = setTimeout(() => {
-                resolve({ success: false, error: 'Таймаут (30 сек)' });
-            }, 30000);
-
-            // CONNECT запрос к прокси
-            const proxyReq = http.request({
-                host: proxyHost,
-                port: parseInt(proxyPort),
-                method: 'CONNECT',
-                path: `${urlParsed.hostname}:${urlParsed.port || 443}`,
-                headers: proxyUser && proxyPass ? {
-                    'Proxy-Authorization': 'Basic ' + Buffer.from(`${proxyUser}:${proxyPass}`).toString('base64')
-                } : {}
-            });
-
-            proxyReq.on('connect', (res, socket, head) => {
-                console.log(`[API Request] CONNECT response: ${res.statusCode}`);
-                if (res.statusCode !== 200) {
-                    clearTimeout(timeout);
-                    socket.destroy();
-                    console.error(`[API Request] Прокси отклонил CONNECT: ${res.statusCode}`);
-                    resolve({ success: false, error: `Прокси вернул ${res.statusCode}`, response: { status: res.statusCode } });
-                    return;
-                }
-                console.log(`[API Request] Туннель установлен, подключаю TLS...`);
-
-                // TLS соединение через туннель
-                const tls = require('tls');
-                const tlsSocket = tls.connect({
-                    socket: socket,
-                    servername: urlParsed.hostname
-                }, () => {
-                    // HTTPS запрос через туннель
-                    const reqOptions = {
-                        hostname: urlParsed.hostname,
-                        path: urlParsed.pathname + urlParsed.search,
-                        method: method,
-                        headers: headers,
-                        socket: tlsSocket,
-                        agent: false,
-                        createConnection: () => tlsSocket
-                    };
-
-                    const req = https.request(reqOptions, (response) => {
-                        let responseData = '';
-                        response.on('data', chunk => responseData += chunk);
-                        response.on('end', () => {
-                            clearTimeout(timeout);
-                            try {
-                                const jsonData = JSON.parse(responseData);
-                                resolve({ success: true, data: jsonData, status: response.statusCode, headers: response.headers });
-                            } catch (e) {
-                                resolve({ success: true, data: responseData, status: response.statusCode, headers: response.headers });
-                            }
-                            tlsSocket.destroy();
-                        });
-                    });
-
-                    req.on('error', (err) => {
-                        clearTimeout(timeout);
-                        resolve({ success: false, error: err.message });
-                        tlsSocket.destroy();
-                    });
-
-                    if (data) {
-                        req.write(JSON.stringify(data));
-                    }
-                    req.end();
-                });
-
-                tlsSocket.on('error', (err) => {
-                    clearTimeout(timeout);
-                    resolve({ success: false, error: `TLS: ${err.message}` });
-                });
-            });
-
-            proxyReq.on('error', (err) => {
-                console.error(`[API Request] CONNECT ошибка:`, err.message);
-                clearTimeout(timeout);
-                resolve({ success: false, error: err.message });
-            });
-
-            console.log(`[API Request] Отправляю CONNECT запрос к ${proxyHost}:${proxyPort}...`);
-            proxyReq.end();
-        });
+        return {
+            success: true,
+            data: response.data,
+            status: response.status,
+            headers: response.headers
+        };
 
     } catch (error) {
-        console.error('[API Request] Ошибка:', error.message);
+        console.error('[API Request] ❌ Ошибка:', error.message);
+
+        if (error.response) {
+            return {
+                success: false,
+                error: error.message,
+                data: error.response.data,
+                status: error.response.status,
+                response: { status: error.response.status }
+            };
+        }
+
         return { success: false, error: error.message };
     }
 });
-
-// Прямой запрос без прокси
-async function makeDirectRequest(method, url, headers, data) {
-    const https = require('https');
-    const urlParsed = new URL(url);
-
-    return new Promise((resolve) => {
-        const timeout = setTimeout(() => {
-            resolve({ success: false, error: 'Таймаут (30 сек)' });
-        }, 30000);
-
-        const req = https.request({
-            hostname: urlParsed.hostname,
-            path: urlParsed.pathname + urlParsed.search,
-            method: method,
-            headers: headers
-        }, (response) => {
-            let responseData = '';
-            response.on('data', chunk => responseData += chunk);
-            response.on('end', () => {
-                clearTimeout(timeout);
-                try {
-                    const jsonData = JSON.parse(responseData);
-                    resolve({ success: true, data: jsonData, status: response.statusCode, headers: response.headers });
-                } catch (e) {
-                    resolve({ success: true, data: responseData, status: response.statusCode, headers: response.headers });
-                }
-            });
-        });
-
-        req.on('error', (err) => {
-            clearTimeout(timeout);
-            resolve({ success: false, error: err.message });
-        });
-
-        if (data) {
-            req.write(JSON.stringify(data));
-        }
-        req.end();
-    });
-}
 
 // IPC: Установить прокси для бота
 ipcMain.handle('set-bot-proxy', async (event, { botId, proxyString }) => {
