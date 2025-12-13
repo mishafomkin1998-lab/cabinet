@@ -1327,6 +1327,106 @@
         }
         .log-entry { position: relative; }
 
+        /* IMPORT RESULT MODAL - Результаты импорта */
+        .import-result-card {
+            width: 500px;
+            max-width: 95vw;
+        }
+        .import-result-body {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .import-section {
+            margin-bottom: 12px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .import-section-header {
+            padding: 10px 14px;
+            font-weight: 600;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .import-section-header i {
+            font-size: 16px;
+        }
+        .import-count {
+            background: rgba(255,255,255,0.3);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: auto;
+        }
+        .import-section-list {
+            padding: 8px 14px;
+            font-size: 12px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        .import-item {
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .import-item:last-child {
+            border-bottom: none;
+        }
+        .import-id {
+            background: rgba(0,0,0,0.1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-weight: 600;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        /* Успешные - зелёный */
+        .import-success .import-section-header {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+        .import-success .import-section-list {
+            background: #d4edda;
+            color: #155724;
+        }
+        .import-success .import-id {
+            background: #28a745;
+            color: white;
+        }
+
+        /* Дубликаты - жёлтый */
+        .import-duplicate .import-section-header {
+            background: linear-gradient(135deg, #ffc107, #fd7e14);
+            color: #212529;
+        }
+        .import-duplicate .import-section-list {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .import-duplicate .import-id {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        /* Ошибки - красный */
+        .import-error .import-section-header {
+            background: linear-gradient(135deg, #dc3545, #c82333);
+            color: white;
+        }
+        .import-error .import-section-list {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .import-error .import-id {
+            background: #dc3545;
+            color: white;
+        }
+
         /* RESPONSE WINDOWS - перетаскиваемые окна ответа */
         #response-windows-container {
             position: fixed;

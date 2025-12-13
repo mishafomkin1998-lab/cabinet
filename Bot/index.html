@@ -449,6 +449,22 @@
         </div>
     </div>
 
+    <!-- Модальное окно результатов импорта -->
+    <div id="import-result-modal" class="modal-overlay">
+        <div class="modal-card import-result-card">
+            <div class="modal-header">
+                <h5><i class="fa fa-download"></i> Результат импорта</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeModal('import-result-modal')"><i class="fa fa-times"></i></button>
+            </div>
+            <div class="modal-body import-result-body">
+                <div id="import-result-content"></div>
+            </div>
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-primary flex-fill" onclick="closeModal('import-result-modal')"><i class="fa fa-check"></i> Закрыть</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Модули (разделённый bot.js) - порядок загрузки критичен! -->
     <script src="js/modules/config.js"></script>      <!-- 1. Глобальные переменные и константы -->
     <script src="js/modules/utils.js"></script>       <!-- 2. Утилиты, parseProxy, validateInput -->

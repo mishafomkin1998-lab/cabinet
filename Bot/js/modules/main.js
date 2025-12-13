@@ -356,6 +356,55 @@ function exportAccounts() {
     const blob = new Blob([localStorage.getItem('savedBots') || '[]'], {type: 'application/json'});
     const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'lababot_accounts.json'; a.click(); URL.revokeObjectURL(url);
 }
+// Функция показа красивого модального окна результатов импорта
+function showImportResult(successList, duplicateList, errorList) {
+    let html = '';
+
+    // Успешные
+    if (successList.length > 0) {
+        html += `<div class="import-section import-success">
+            <div class="import-section-header">
+                <i class="fa fa-check-circle"></i> Успешно добавлены <span class="import-count">${successList.length}</span>
+            </div>
+            <div class="import-section-list">
+                ${successList.map(item => `<div class="import-item"><span class="import-id">${item.displayId}</span> ${item.login}</div>`).join('')}
+            </div>
+        </div>`;
+    }
+
+    // Дубликаты
+    if (duplicateList.length > 0) {
+        html += `<div class="import-section import-duplicate">
+            <div class="import-section-header">
+                <i class="fa fa-clone"></i> Пропущены (дубли) <span class="import-count">${duplicateList.length}</span>
+            </div>
+            <div class="import-section-list">
+                ${duplicateList.map(item => `<div class="import-item"><span class="import-id">${item.displayId}</span> ${item.login}</div>`).join('')}
+            </div>
+        </div>`;
+    }
+
+    // Ошибки
+    if (errorList.length > 0) {
+        html += `<div class="import-section import-error">
+            <div class="import-section-header">
+                <i class="fa fa-times-circle"></i> Ошибки входа <span class="import-count">${errorList.length}</span>
+            </div>
+            <div class="import-section-list">
+                ${errorList.map(item => `<div class="import-item"><span class="import-id">${item.displayId}</span> ${item.login}</div>`).join('')}
+            </div>
+        </div>`;
+    }
+
+    // Если всё пусто
+    if (successList.length === 0 && duplicateList.length === 0 && errorList.length === 0) {
+        html = '<div class="text-center text-muted p-3"><i class="fa fa-info-circle"></i> Нет данных для импорта</div>';
+    }
+
+    document.getElementById('import-result-content').innerHTML = html;
+    openModal('import-result-modal');
+}
+
 async function handleUniversalImport(input) {
     if (!input.files.length) return;
     const file = input.files[0];
@@ -372,11 +421,22 @@ async function handleUniversalImport(input) {
         reader.onload = async function(e) {
             try {
                 const data = JSON.parse(e.target.result);
+                const successList = [], duplicateList = [], errorList = [];
 
                 if (data.bots && Array.isArray(data.bots)) {
                     for (const botData of data.bots) {
                         if (botData.login && botData.displayId) {
-                            await performLogin(botData.login, botData.pass || 'password', botData.displayId);
+                            if (checkDuplicate(botData.login, botData.displayId)) {
+                                duplicateList.push({ login: botData.login, displayId: botData.displayId });
+                                continue;
+                            }
+                            const success = await performLogin(botData.login, botData.pass || 'password', botData.displayId);
+                            if (success) {
+                                successList.push({ login: botData.login, displayId: botData.displayId });
+                            } else {
+                                errorList.push({ login: botData.login, displayId: botData.displayId });
+                            }
+                            await new Promise(r => setTimeout(r, 100));
                         }
                     }
                 }
@@ -393,10 +453,10 @@ async function handleUniversalImport(input) {
                     localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
                 }
 
-                alert('Данные успешно импортированы!');
+                showImportResult(successList, duplicateList, errorList);
                 renderManagerList();
             } catch (error) {
-                alert('Ошибка импорта JSON: ' + error.message);
+                showImportResult([], [], [{ login: 'JSON Error', displayId: error.message }]);
             }
             input.value = '';
         };
@@ -407,25 +467,34 @@ async function handleUniversalImport(input) {
         const reader = new FileReader();
         reader.onload = async function(e) {
             const lines = e.target.result.split('\n');
-            let count = 0, skipped = 0, errors = 0;
+            const successList = [], duplicateList = [], errorList = [];
 
             for (let line of lines) {
                 const parts = line.trim().split(/\s+/);
                 if (parts.length >= 3) {
-                    if (checkDuplicate(parts[1], parts[0])) { skipped++; continue; }
-                    if (await performLogin(parts[1], parts[2], parts[0])) count++; else errors++;
+                    const [displayId, login, pass] = parts;
+                    if (checkDuplicate(login, displayId)) {
+                        duplicateList.push({ login, displayId });
+                        continue;
+                    }
+                    const success = await performLogin(login, pass, displayId);
+                    if (success) {
+                        successList.push({ login, displayId });
+                    } else {
+                        errorList.push({ login, displayId });
+                    }
                     await new Promise(r => setTimeout(r, 100));
                 }
             }
 
-            alert(`Импорт TXT: Успешно ${count}, Дубли ${skipped}, Ошибки ${errors}`);
+            showImportResult(successList, duplicateList, errorList);
             input.value = '';
             renderManagerList();
         };
         reader.readAsText(file);
 
     } else {
-        alert('Неподдерживаемый формат. Используйте .txt или .json');
+        showImportResult([], [], [{ login: 'Файл', displayId: 'Неподдерживаемый формат. Используйте .txt или .json' }]);
         input.value = '';
     }
 }
