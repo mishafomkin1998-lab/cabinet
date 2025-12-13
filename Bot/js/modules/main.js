@@ -1051,15 +1051,11 @@ async function performLogin(login, pass, displayId) {
             // ТЕПЕРЬ устанавливаем прокси (после добавления в bots чтобы getAccountNumber работал)
             await setWebviewProxy(bid);
 
-            // СНАЧАЛА показываем UI (не блокируем на createWebview)
+            // Показываем UI и создаём WebView
             createInterface(bot); selectTab(bid); saveSession();
 
-            // WebView создаём в фоне - НЕ блокируем UI
-            bot.createWebview().then(() => {
-                console.log(`[Proxy] ✅ WebView создан для ${displayId}`);
-            }).catch(err => {
-                console.error(`[WebView] ❌ Ошибка создания WebView для ${displayId}:`, err);
-            });
+            // Создаём WebView (синхронно, прокси уже настроен на partition)
+            bot.createWebview();
 
             // Загружаем данные с сервера (шаблоны, blacklist, статистику)
             const serverData = await loadBotDataFromServer(displayId);

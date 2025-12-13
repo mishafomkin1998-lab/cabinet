@@ -218,61 +218,19 @@ class AccountBot {
     }
 
     // === ВАЖНОЕ ДОБАВЛЕНИЕ: Метод для создания скрытого WebView ===
-    async createWebview() {
-        // ПРОКСИ УСТАНАВЛИВАЕТСЯ ЧЕРЕЗ webContentsId ПОСЛЕ did-attach
+    createWebview() {
+        // ПРОКСИ уже настроен через setWebviewProxy() в performLogin()
+        // WebView использует тот же partition, поэтому прокси должен работать автоматически
         console.log(`[WebView] 🔧 Создание WebView для ${this.id}...`);
-
-        const { ipcRenderer } = require('electron');
-        const botId = this.id;
 
         const webview = document.createElement('webview');
         webview.id = `webview-${this.id}`;
-        // ВАЖНО: НЕ устанавливаем src сразу! Установим после настройки прокси
         webview.partition = `persist:${this.id}`;
         webview.useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+        // Устанавливаем src сразу - прокси уже настроен на partition
+        webview.src = "https://ladadate.com/login";
 
-        console.log(`[WebView] 📦 Partition: persist:${this.id}`);
-
-        // Promise для ожидания настройки прокси через webContentsId (с таймаутом)
-        const proxyConfigured = new Promise((resolve) => {
-            // Таймаут 5 секунд - если did-attach не сработает, продолжаем без прокси webContents
-            const timeout = setTimeout(() => {
-                console.warn(`[WebView] ⚠️ Таймаут did-attach для ${botId}, продолжаем без webContents прокси`);
-                resolve();
-            }, 5000);
-
-            webview.addEventListener('did-attach', async () => {
-                clearTimeout(timeout);
-                console.log(`[WebView] 📎 did-attach для ${botId}`);
-
-                try {
-                    const webContentsId = webview.getWebContentsId();
-                    console.log(`[WebView] 🆔 webContentsId: ${webContentsId}`);
-
-                    // Получаем прокси для этого бота
-                    const accountNumber = getAccountNumber(botId);
-                    const proxyString = getProxyForAccountNumber(accountNumber);
-                    console.log(`[WebView] 🌐 Прокси для анкеты #${accountNumber}: "${proxyString}"`);
-
-                    // Настраиваем прокси через webContentsId
-                    const result = await ipcRenderer.invoke('set-webcontents-proxy', {
-                        webContentsId,
-                        proxyString,
-                        botId
-                    });
-
-                    if (result.success) {
-                        console.log(`[WebView] ✅ Прокси настроен через webContentsId: ${result.proxy}`);
-                    } else {
-                        console.error(`[WebView] ❌ Ошибка настройки прокси: ${result.error}`);
-                    }
-                } catch (e) {
-                    console.error(`[WebView] ❌ Исключение при настройке прокси:`, e);
-                }
-
-                resolve();
-            }, { once: true });
-        });
+        console.log(`[WebView] 📦 Partition: persist:${this.id}, src: ${webview.src}`);
 
         // Функция для отключения звука и внедрения скрипта блокировки Audio
         const muteWebview = () => {
@@ -344,20 +302,14 @@ class AccountBot {
         // ВАЖНО: Добавляем webview в скрытый контейнер
         document.getElementById('browsers-container').appendChild(webview);
         this.webview = webview;
-        console.log(`[WebView] 📎 WebView добавлен в DOM, ждём did-attach...`);
+        console.log(`[WebView] ✅ WebView добавлен в DOM и начал загрузку`);
 
-        // Ждём пока прокси настроится через webContentsId
-        await proxyConfigured;
-        console.log(`[WebView] ✅ Прокси настроен, теперь устанавливаем src`);
-
-        // Небольшая задержка после настройки прокси
-        await new Promise(resolve => setTimeout(resolve, 200));
-
-        console.log(`[WebView] 🚀 Устанавливаем src и начинаем загрузку через прокси`);
-        webview.src = "https://ladadate.com/login";
-
-        // DEBUG: Проверяем IP через WebView через 8 секунд после загрузки
+        // DEBUG: Проверяем IP через WebView через 10 секунд после загрузки
         setTimeout(async () => {
+            if (!this.webviewReady) {
+                console.log(`[WebView ${this.id}] ⚠️ WebView ещё не готов для проверки IP`);
+                return;
+            }
             try {
                 const ip = await webview.executeJavaScript(`
                     (async () => {
@@ -374,7 +326,7 @@ class AccountBot {
             } catch(e) {
                 console.log(`[WebView ${this.id}] ⚠️ Не удалось проверить IP: ${e.message}`);
             }
-        }, 8000);
+        }, 10000);
     }
 
     // Heartbeat на сервер Lababot
