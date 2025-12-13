@@ -1068,21 +1068,12 @@ function toggleVipStatus(botId) {
 
     if (selected.length === 0) return alert("Выберите ID из списка");
 
-    let added = [];
-    let removed = [];
-
     for (const s of selected) {
         if(bot.vipList.includes(s)) {
             bot.vipList = bot.vipList.filter(x=>x!==s);
-            removed.push(s);
         } else {
             bot.vipList.push(s);
-            added.push(s);
         }
-    }
-
-    if (added.length > 0) {
-        alert(`${added.length} ID отмечено как VIP.\nБот будет уведомлять о их Online/Offline статусе.`);
     }
 
     saveSession();

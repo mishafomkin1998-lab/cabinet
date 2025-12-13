@@ -237,6 +237,7 @@ const Logger = {
 
             if(l.type !== 'log') {
                 html += `<div class="log-entry ${colorClass} ${logClass}" data-log-id="${l.id}">
+                    <span class="log-close" onclick="event.stopPropagation(); Logger.removeLog(${l.id})" title="Закрыть (отключить звук)">×</span>
                     <span class="log-time">${timeStr} | Анкета ${targetBotDisplayId}</span><br>
                     <span class="log-link" onclick="${linkAction}">${content}</span>
                 </div>`;

@@ -1305,6 +1305,28 @@
         .log-link { text-decoration: underline; cursor: pointer; color: inherit; }
         .log-link:hover { color: var(--mode-color); }
 
+        /* Крестик закрытия уведомления */
+        .log-close {
+            position: absolute;
+            top: 4px;
+            right: 6px;
+            width: 18px;
+            height: 18px;
+            line-height: 16px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            color: #999;
+            cursor: pointer;
+            border-radius: 50%;
+            transition: all 0.15s;
+        }
+        .log-close:hover {
+            color: #fff;
+            background: #dc3545;
+        }
+        .log-entry { position: relative; }
+
         /* RESPONSE WINDOWS - перетаскиваемые окна ответа */
         #response-windows-container {
             position: fixed;
