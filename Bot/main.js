@@ -530,13 +530,7 @@ const TRANSCRIPTION_VARS = [
     { var: '{name}', label: '{name} - Имя' },
     { var: '{age}', label: '{age} - Возраст' },
     { var: '{city}', label: '{city} - Город' },
-    { var: '{country}', label: '{country} - Страна' },
-    { var: '{countryCode}', label: '{countryCode} - Код страны' },
-    { var: '{accountId}', label: '{accountId} - ID аккаунта' },
-    { var: '{birthday}', label: '{birthday} - День рождения' },
-    { var: '{ageFrom}', label: '{ageFrom} - Ищет от (возраст)' },
-    { var: '{ageTo}', label: '{ageTo} - Ищет до (возраст)' },
-    { var: '{profilePhoto}', label: '{profilePhoto} - URL фото' }
+    { var: '{country}', label: '{country} - Страна' }
 ];
 
 function createWindow() {

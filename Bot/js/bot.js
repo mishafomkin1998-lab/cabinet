@@ -2865,18 +2865,12 @@
             document.getElementById(dropdownId).style.display='none'; ta.focus();
         }
 
-        // === ПЕРЕМЕННЫЕ ТРАНСКРИПЦИИ (все 10 из API) ===
+        // === ПЕРЕМЕННЫЕ ТРАНСКРИПЦИИ ===
         const TRANSCRIPTION_VARIABLES = [
             { name: '{name}', desc: 'Имя', example: 'John Doe' },
             { name: '{age}', desc: 'Возраст', example: '38' },
             { name: '{city}', desc: 'Город', example: 'Paris' },
-            { name: '{country}', desc: 'Страна', example: 'France' },
-            { name: '{countryCode}', desc: 'Код страны', example: 'FR' },
-            { name: '{accountId}', desc: 'ID аккаунта', example: '123456' },
-            { name: '{birthday}', desc: 'День рождения', example: '1985-01-15' },
-            { name: '{ageFrom}', desc: 'Ищет от (возраст)', example: '25' },
-            { name: '{ageTo}', desc: 'Ищет до (возраст)', example: '35' },
-            { name: '{profilePhoto}', desc: 'URL фото', example: 'https://...' }
+            { name: '{country}', desc: 'Страна', example: 'France' }
         ];
 
         // Текущий textarea для контекстного меню
@@ -4286,15 +4280,57 @@
                     try {
                         // 1. Пытаемся отправить через чат API
                         const payload = { recipientId: user.AccountId, body: msgBody };
-                        await makeApiRequest(this, 'POST', '/chat-send', payload);
+                        const chatResult = await makeApiRequest(this, 'POST', '/chat-send', payload);
 
-                        // 2. Отслеживаем диалог и получаем метаданные
+                        // 2. Проверяем результат на ошибку (игнор, лимит и т.д.)
+                        if (chatResult.data && chatResult.data.IsSuccess === false) {
+                            const errorReason = chatResult.data.Error || 'Chat API error';
+                            this.incrementStat('chat', 'errors');
+                            this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
+                            this.log(`❌ Ошибка чата: ${user.Name} - ${errorReason}`);
+
+                            // Добавляем в очередь повторов
+                            if (!isRetryAttempt) {
+                                this.chatRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
+                            } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
+                                this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
+                                this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                            }
+
+                            // Отправляем ошибку на сервер
+                            try {
+                                await sendErrorToLababot(this.id, this.displayId, 'chat_api_error', errorReason);
+                                const convData = this.trackConversation(user.AccountId);
+                                const convId = this.getConvId(user.AccountId);
+                                await sendMessageToLababot({
+                                    botId: this.id,
+                                    accountDisplayId: this.displayId,
+                                    recipientId: user.AccountId,
+                                    type: 'chat_msg',
+                                    textContent: msgBody,
+                                    status: 'failed',
+                                    responseTime: convData.responseTime,
+                                    isFirst: convData.isFirst,
+                                    isLast: false,
+                                    convId: convId,
+                                    mediaUrl: null,
+                                    fileName: null,
+                                    translatorId: this.translatorId,
+                                    errorReason: errorReason,
+                                    usedAi: false
+                                });
+                            } catch (err) { console.error('sendErrorToLababot failed:', err); }
+
+                            this.updateUI();
+                            return;
+                        }
+
+                        // 3. Отслеживаем диалог и получаем метаданные
                         const convData = this.trackConversation(user.AccountId);
                         const convId = this.getConvId(user.AccountId);
                         const isLast = this.isLastMessageInRotation();
 
-                        // 3. Отправляем полную статистику на НАШ сервер Lababot
-                        // DEBUG: Проверка флага usedAi перед отправкой
+                        // 4. Отправляем полную статистику на НАШ сервер Lababot
                         console.log(`🔍 DEBUG Chat: this.usedAi = ${this.usedAi}, this.id = ${this.id}`);
 
                         const lababotResult = await sendMessageToLababot({
@@ -4518,17 +4554,11 @@
                 if(!text) return "";
                 let res = text;
 
-                // Все 10 переменных транскрипции из API
+                // Переменные транскрипции
                 res = res.replace(/{name}/gi, user.Name || "dear");
                 res = res.replace(/{age}/gi, user.Age || "");
                 res = res.replace(/{city}/gi, user.City || "your city");
                 res = res.replace(/{country}/gi, user.Country || "your country");
-                res = res.replace(/{countryCode}/gi, user.CountryCode || "");
-                res = res.replace(/{accountId}/gi, user.AccountId || "");
-                res = res.replace(/{birthday}/gi, user.Birthday || "");
-                res = res.replace(/{ageFrom}/gi, user.AgeFrom || "");
-                res = res.replace(/{ageTo}/gi, user.AgeTo || "");
-                res = res.replace(/{profilePhoto}/gi, user.ProfilePhoto || "");
 
                 return res;
             }
@@ -5480,7 +5510,7 @@
             showBulkNotification('Шаблон удалён у всех анкет', count);
         }
 
-        function openBlacklistModal(botId) { currentModalBotId=botId; document.getElementById('bl-modal-input').value=''; openModal('bl-modal'); }
+        function openBlacklistModal(botId) { currentModalBotId=botId; document.getElementById('bl-modal-input').value=''; openModal('bl-modal'); setTimeout(() => document.getElementById('bl-modal-input').focus(), 100); }
         async function saveBlacklistID(event) {
             const val = document.getElementById('bl-modal-input').value.trim();
             if (!val) {
