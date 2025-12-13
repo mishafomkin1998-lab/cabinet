@@ -2598,8 +2598,8 @@
 
             if (position <= 0) return null;
 
-            // Определяем какой прокси использовать
-            const proxyIndex = Math.ceil(position / 10); // 1-10 -> 1, 11-20 -> 2, и т.д.
+            // Определяем какой прокси использовать (25 анкет на прокси)
+            const proxyIndex = Math.ceil(position / 25); // 1-25 -> 1, 26-50 -> 2, и т.д.
 
             if (proxyIndex > 6) return null; // У нас только 6 прокси
 
