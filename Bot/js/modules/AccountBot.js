@@ -13,6 +13,7 @@ class AccountBot {
         this.mailStats = { sent: 0, errors: 0, waiting: 0 };
         this.mailHistory = { sent: [], errors: [], waiting: [] };
         this.mailSettings = { target: 'online', speed: 'smart', blacklist: [], photoOnly: false, auto: false };
+        this.isInRetryMode = false; // Флаг режима повторов (циклический)
         this.photoName = null;
         this.mailStartTime = null; // Время начала работы Mail
         this.mailTimerInterval = null; // Интервал обновления таймера Mail
@@ -21,6 +22,7 @@ class AccountBot {
         this.chatTimeout = null;
         this.chatStats = { sent: 0, errors: 0, waiting: 0 };
         this.chatHistory = { sent: [], errors: [], waiting: [] };
+        this.isInRetryModeChat = false; // Флаг режима повторов для чата (циклический)
         this.chatSettings = {
             target: 'online',
             speed: 'smart',
@@ -830,9 +832,17 @@ class AccountBot {
         this.mailTimeout = setTimeout(async () => {
             if (!this.isMailRunning) return;
             await this.processMailUser(text);
-            let nextDelay = 15000;
-            if (this.mailSettings.speed === 'smart') nextDelay = Math.floor(Math.random() * (120000 - 15000 + 1)) + 15000;
-            else nextDelay = parseInt(this.mailSettings.speed) * 1000;
+
+            // Определяем задержку: обычная скорость или 60 сек для повторов
+            let nextDelay;
+            if (this.isInRetryMode) {
+                nextDelay = 60000; // 60 секунд для повторов
+            } else if (this.mailSettings.speed === 'smart') {
+                nextDelay = Math.floor(Math.random() * (120000 - 15000 + 1)) + 15000;
+            } else {
+                nextDelay = parseInt(this.mailSettings.speed) * 1000;
+            }
+
             this.mailStats.waiting = Math.floor(300000 / nextDelay);
             this.updateUI();
             this.scheduleNextMail(text, nextDelay);
@@ -916,25 +926,28 @@ class AccountBot {
             if (users.length === 0) {
                 // Retry queue обрабатывается ТОЛЬКО при target = 'online'
                 if (target === 'online') {
-                    const now = Date.now();
-                    const readyForRetry = this.mailRetryQueue.filter(item =>
-                        now - item.failedAt >= this.retryCooldownMs &&
-                        item.retryCount < this.maxRetries
-                    );
+                    // Фильтруем очередь - оставляем только тех, у кого меньше 3 попыток
+                    const pendingRetries = this.mailRetryQueue.filter(item => item.retryCount < this.maxRetries);
 
-                    if (readyForRetry.length > 0) {
-                        currentRetryItem = readyForRetry[Math.floor(Math.random() * readyForRetry.length)];
+                    if (pendingRetries.length > 0) {
+                        // Входим в режим повторов
+                        if (!this.isInRetryMode) {
+                            this.isInRetryMode = true;
+                            this.log(`🔄 Начинаем цикл повторов (${pendingRetries.length} пользователей)`);
+                        }
+
+                        // Берём первого из очереди (по порядку, не случайно)
+                        currentRetryItem = pendingRetries[0];
                         user = currentRetryItem.user;
                         currentRetryItem.retryCount++;
-                        currentRetryItem.failedAt = now;
                         isRetryAttempt = true;
-                        this.log(`🔄 Повтор для ${user.Name} (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
-                    } else if (this.mailRetryQueue.some(item => item.retryCount < this.maxRetries)) {
-                        // Есть пользователи в очереди, но cooldown ещё не прошёл
-                        this.log(`⏳ Ожидание cooldown для повторов...`);
-                        return;
+                        this.log(`🔄 Повтор: ${user.Name} (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
                     } else {
-                        // Online закончились и retry queue пуст/исчерпан - ждём новых online
+                        // Все повторы исчерпаны или очередь пуста
+                        if (this.isInRetryMode) {
+                            this.isInRetryMode = false;
+                            this.log(`✅ Цикл повторов завершён`);
+                        }
                         this.log(`⏳ Нет онлайн пользователей. Ожидание...`);
                         return;
                     }
@@ -955,6 +968,11 @@ class AccountBot {
                     }
                 }
             } else {
+                // Есть новые пользователи - выходим из режима повторов если были в нём
+                if (this.isInRetryMode) {
+                    this.isInRetryMode = false;
+                    this.log(`📥 Новые онлайн пользователи - прерываем повторы`);
+                }
                 user = users[Math.floor(Math.random() * users.length)];
             }
 
@@ -1286,9 +1304,17 @@ class AccountBot {
         this.chatTimeout = setTimeout(async () => {
             if (!this.isChatRunning) return;
             await this.processChatUser(fullText);
-            let nextDelay = 15000;
-            if (this.chatSettings.speed === 'smart') nextDelay = Math.floor(Math.random() * (120000 - 15000 + 1)) + 15000;
-            else nextDelay = parseInt(this.chatSettings.speed) * 1000;
+
+            // Определяем задержку: обычная скорость или 60 сек для повторов
+            let nextDelay;
+            if (this.isInRetryModeChat) {
+                nextDelay = 60000; // 60 секунд для повторов
+            } else if (this.chatSettings.speed === 'smart') {
+                nextDelay = Math.floor(Math.random() * (120000 - 15000 + 1)) + 15000;
+            } else {
+                nextDelay = parseInt(this.chatSettings.speed) * 1000;
+            }
+
             this.chatStats.waiting = Math.floor(300000 / nextDelay);
             this.updateUI();
             this.scheduleNextChat(fullText, nextDelay);
@@ -1349,24 +1375,28 @@ class AccountBot {
             if (users.length === 0) {
                 // Retry queue обрабатывается ТОЛЬКО при target = 'online'
                 if (target === 'online') {
-                    const now = Date.now();
-                    const readyForRetry = this.chatRetryQueue.filter(item =>
-                        now - item.failedAt >= this.retryCooldownMs &&
-                        item.retryCount < this.maxRetries
-                    );
+                    // Фильтруем очередь - оставляем только тех, у кого меньше 3 попыток
+                    const pendingRetries = this.chatRetryQueue.filter(item => item.retryCount < this.maxRetries);
 
-                    if (readyForRetry.length > 0) {
-                        currentRetryItem = readyForRetry[Math.floor(Math.random() * readyForRetry.length)];
+                    if (pendingRetries.length > 0) {
+                        // Входим в режим повторов
+                        if (!this.isInRetryModeChat) {
+                            this.isInRetryModeChat = true;
+                            this.log(`🔄 Начинаем цикл повторов чата (${pendingRetries.length} пользователей)`);
+                        }
+
+                        // Берём первого из очереди (по порядку, не случайно)
+                        currentRetryItem = pendingRetries[0];
                         user = currentRetryItem.user;
                         currentRetryItem.retryCount++;
-                        currentRetryItem.failedAt = now;
                         isRetryAttempt = true;
-                        this.log(`🔄 Повтор чата для ${user.Name} (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
-                    } else if (this.chatRetryQueue.some(item => item.retryCount < this.maxRetries)) {
-                        this.log(`⏳ Ожидание cooldown для повторов...`);
-                        return;
+                        this.log(`🔄 Повтор чата: ${user.Name} (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
                     } else {
-                        // Online закончились и retry queue пуст/исчерпан - ждём новых online
+                        // Все повторы исчерпаны или очередь пуста
+                        if (this.isInRetryModeChat) {
+                            this.isInRetryModeChat = false;
+                            this.log(`✅ Цикл повторов чата завершён`);
+                        }
                         this.log(`⏳ Нет онлайн пользователей для чата. Ожидание...`);
                         return;
                     }
@@ -1376,6 +1406,11 @@ class AccountBot {
                     return;
                 }
             } else {
+                // Есть новые пользователи - выходим из режима повторов если были в нём
+                if (this.isInRetryModeChat) {
+                    this.isInRetryModeChat = false;
+                    this.log(`📥 Новые онлайн пользователи - прерываем повторы чата`);
+                }
                 user = users[Math.floor(Math.random() * users.length)];
             }
 
