@@ -1018,7 +1018,7 @@ class AccountBot {
                 }
             } else {
                 // Нет CheckId - считаем как ошибку
-                const errorReason = checkRes.data?.Message || checkRes.data?.Error || 'нет CheckId';
+                const errorReason = extractApiError({ data: checkRes.data, status: 200 }, 'нет CheckId');
                 this.incrementStat('mail', 'errors');
                 this.mailHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                 this.log(`❌ Ошибка: не могу отправить письмо ${user.Name} (${user.AccountId}): ${errorReason}`);
@@ -1069,7 +1069,7 @@ class AccountBot {
                 this.log(`📡 Ошибка сети. Повторная попытка...`);
             } else if (e.response && e.response.status === 403) {
                 // 403 = пользователь заблокирован или ограничение - СЧИТАЕМ КАК ОШИБКУ
-                const errorReason = e.response?.data?.Error || e.response?.data?.Message || 'Доступ запрещён (403)';
+                const errorReason = extractApiError(e.response, 'Доступ запрещён');
                 this.incrementStat('mail', 'errors');
                 this.mailHistory.errors.push(`${user?.AccountId || 'unknown'}: ${errorReason}`);
                 this.log(`❌ Ошибка: ${user?.Name || user?.AccountId || 'unknown'} - ${errorReason}`);
@@ -1163,7 +1163,7 @@ class AccountBot {
                             mediaUrl: this.photoName ? `attached_photo_${this.photoName}` : null,
                             fileName: this.photoName || null,
                             translatorId: this.translatorId,
-                            errorReason: e.response?.data?.Error || e.message,
+                            errorReason: e.response ? extractApiError(e.response, e.message) : e.message,
                             usedAi: false
                         });
                     } catch (err) { console.error('sendMessageToLababot failed:', err); }
@@ -1463,7 +1463,7 @@ class AccountBot {
                         }
                     } else {
                         // Нет CheckId в fallback - СЧИТАЕМ КАК ОШИБКУ
-                        const errorReason = checkRes.data?.Message || checkRes.data?.Error || 'нет CheckId (fallback)';
+                        const errorReason = extractApiError({ data: checkRes.data, status: 200 }, 'нет CheckId (fallback)');
                         this.incrementStat('chat', 'errors');
                         this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                         this.log(`❌ Ошибка: не могу отправить чат ${user.Name} (${user.AccountId}): ${errorReason}`);
@@ -1510,7 +1510,7 @@ class AccountBot {
                         this.log(`📡 Ошибка сети при отправке чата. Повтор...`);
                     } else {
                         // СЧИТАЕМ КАК ОШИБКУ
-                        const errorReason = fallbackErr.response?.data?.Error || fallbackErr.message;
+                        const errorReason = fallbackErr.response ? extractApiError(fallbackErr.response, fallbackErr.message) : fallbackErr.message;
                         this.incrementStat('chat', 'errors');
                         this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                         this.log(`❌ Ошибка API чата: ${errorReason}`);
@@ -1552,7 +1552,7 @@ class AccountBot {
                                 mediaUrl: null,
                                 fileName: null,
                                 translatorId: this.translatorId,
-                                errorReason: fallbackErr.response?.data?.Error || fallbackErr.message
+                                errorReason: fallbackErr.response ? extractApiError(fallbackErr.response, fallbackErr.message) : fallbackErr.message
                             });
                         }
                     }

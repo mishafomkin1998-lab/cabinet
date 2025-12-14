@@ -219,6 +219,80 @@ function showToast(text) {
     t.hideTimer = setTimeout(() => { t.classList.remove('show'); }, 3000);
 }
 
+// Извлечение реального сообщения об ошибке из API ответа
+function extractApiError(response, defaultMessage = 'Неизвестная ошибка') {
+    if (!response) return defaultMessage;
+
+    const data = response.data;
+
+    // Логируем полный ответ для отладки
+    console.log('📋 API Error Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: data,
+        dataType: typeof data,
+        dataKeys: data ? Object.keys(data) : []
+    });
+
+    if (!data) return `${defaultMessage} (${response.status})`;
+
+    // Проверяем различные возможные поля с сообщением об ошибке
+    const possibleFields = [
+        'Error',           // LadaDate может использовать это
+        'Message',         // Или это
+        'error',           // Стандартное lowercase
+        'message',         // Стандартное lowercase
+        'ErrorMessage',    // Комбинированное
+        'errorMessage',    // Комбинированное lowercase
+        'reason',          // Причина
+        'Reason',          // Причина с большой буквы
+        'description',     // Описание
+        'Description',     // Описание с большой буквы
+        'detail',          // Детали
+        'Detail',          // Детали с большой буквы
+        'text',            // Текст
+        'Text'             // Текст с большой буквы
+    ];
+
+    // Если data - строка, используем её напрямую
+    if (typeof data === 'string') {
+        return data || defaultMessage;
+    }
+
+    // Проверяем каждое возможное поле
+    for (const field of possibleFields) {
+        if (data[field]) {
+            return data[field];
+        }
+    }
+
+    // Проверяем вложенные объекты error/Error
+    if (data.error && typeof data.error === 'object') {
+        for (const field of possibleFields) {
+            if (data.error[field]) {
+                return data.error[field];
+            }
+        }
+    }
+    if (data.Error && typeof data.Error === 'object') {
+        for (const field of possibleFields) {
+            if (data.Error[field]) {
+                return data.Error[field];
+            }
+        }
+    }
+
+    // Если ничего не нашли, возвращаем JSON данных или дефолт
+    try {
+        const jsonStr = JSON.stringify(data);
+        if (jsonStr && jsonStr !== '{}' && jsonStr.length < 200) {
+            return `${defaultMessage}: ${jsonStr}`;
+        }
+    } catch (e) {}
+
+    return `${defaultMessage} (${response.status})`;
+}
+
 function initTooltips() {
     let tooltipTimeout;
     const popup = document.getElementById('tooltip-popup');
