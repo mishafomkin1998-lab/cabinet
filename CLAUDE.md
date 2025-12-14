@@ -2,13 +2,49 @@
 
 ## Обзор проекта
 
-**Lababot** - CRM система для управления анкетами на платформе знакомств LadaDate.
+**Novabot** - приложение для управления анкетами на платформе LadaDate.
+
+---
+
+## ⚠️ ВАЖНО ДЛЯ AI: СТРУКТУРА ФАЙЛОВ БОТА
+
+**БОТ ИСПОЛЬЗУЕТ МОДУЛЬНУЮ СТРУКТУРУ!**
+
+```
+Bot/js/
+├── bot.js              # ❌ СТАРЫЙ ФАЙЛ - НЕ ИСПОЛЬЗУЕТСЯ! НЕ РЕДАКТИРОВАТЬ!
+└── modules/            # ✅ АКТУАЛЬНЫЕ ФАЙЛЫ - РЕДАКТИРОВАТЬ ЗДЕСЬ!
+    ├── config.js       # Глобальные переменные и константы
+    ├── utils.js        # Утилиты, parseProxy, validateInput
+    ├── api.js          # API функции (heartbeat, sendMessage, etc.)
+    ├── logger.js       # Logger, KEEP_ALIVE_SCRIPT
+    ├── minichat.js     # MiniChat функции
+    ├── ai.js           # AI функции
+    ├── settings.js     # Настройки
+    ├── AccountBot.js   # Класс AccountBot (основная логика!)
+    ├── main.js         # UI функции и основная логика
+    └── init.js         # Инициализация (window.onload)
+```
+
+**Порядок загрузки модулей** (см. Bot/index.html строки 468-478):
+1. config.js → 2. utils.js → 3. api.js → 4. logger.js → 5. minichat.js →
+6. ai.js → 7. settings.js → 8. AccountBot.js → 9. main.js → 10. init.js
+
+**При внесении изменений:**
+- Логика отправки писем/чатов → `modules/AccountBot.js`
+- API, heartbeat, статусы → `modules/api.js`
+- UI, вкладки, интерфейс → `modules/main.js`
+- Настройки → `modules/settings.js`
+- AI генерация → `modules/ai.js`
+
+---
 
 ### Структура проекта
 ```
 /home/user/cabinet/
 ├── Bot/                    # Electron приложение (клиент)
-│   ├── js/bot.js          # Основная логика (4647 строк)
+│   ├── js/modules/        # ✅ АКТУАЛЬНЫЙ КОД (модули)
+│   ├── js/bot.js          # ❌ Старый монолит - НЕ ИСПОЛЬЗОВАТЬ
 │   ├── css/bot.css        # Стили + темы
 │   ├── index.html         # UI интерфейс
 │   ├── main.js            # Electron main process
@@ -26,7 +62,7 @@
 
 ---
 
-## БОТ (Bot/js/bot.js)
+## БОТ (Bot/js/modules/)
 
 ### Критически важные глобальные переменные
 
