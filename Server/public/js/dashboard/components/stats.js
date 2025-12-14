@@ -57,10 +57,12 @@ const StatsComponent = {
             const data = await res.json();
 
             if (data.success) {
+                // API возвращает данные в data.dashboard
+                const dashboard = data.dashboard || data;
                 context.stats = {
-                    today: data.today || { letters: 0, chats: 0, uniqueMen: 0 },
-                    month: data.month || { letters: 0, chats: 0, uniqueMen: 0 },
-                    metrics: data.metrics || { workTime: '0ч 0м', workTimeMonth: '0ч 0м' }
+                    today: dashboard.today || { letters: 0, chats: 0, uniqueMen: 0 },
+                    month: dashboard.month || { letters: 0, chats: 0, uniqueMen: 0 },
+                    metrics: dashboard.metrics || { workTime: '0ч 0м', workTimeMonth: '0ч 0м' }
                 };
             }
         } catch (e) {

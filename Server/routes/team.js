@@ -13,9 +13,9 @@ const router = express.Router();
 // Получение команды
 // Только директор и админы могут видеть команду
 router.get('/', async (req, res) => {
-    // Используем проверенную роль из JWT токена, а не из query параметров
-    const role = req.user?.role;
-    const userId = req.user?.id;
+    // Используем роль из JWT токена, с фоллбэком на query параметры для совместимости
+    const role = req.user?.role || req.query.role;
+    const userId = req.user?.id || req.query.userId;
 
     // Проверка прав доступа
     if (!role || !['director', 'admin'].includes(role)) {
@@ -124,7 +124,7 @@ router.get('/', async (req, res) => {
 // Только директор и админы могут создавать пользователей
 router.post('/', async (req, res) => {
     // Проверка прав - только директор и админ могут создавать пользователей
-    const userRole = req.user?.role;
+    const userRole = req.user?.role || req.body.role;
     if (!userRole || !['director', 'admin'].includes(userRole)) {
         return res.status(403).json({ success: false, error: 'Недостаточно прав для создания пользователей' });
     }
@@ -157,7 +157,7 @@ router.post('/', async (req, res) => {
 // Только директор может удалять пользователей
 router.delete('/:id', async (req, res) => {
     // Проверка прав - только директор может удалять пользователей
-    const userRole = req.user?.role;
+    const userRole = req.user?.role || req.query.role;
     if (userRole !== 'director') {
         return res.status(403).json({ success: false, error: 'Только директор может удалять пользователей' });
     }
@@ -178,8 +178,8 @@ router.delete('/:id', async (req, res) => {
 // Редактирование пользователя
 // Директор может редактировать всех, админ - только своих переводчиков
 router.put('/:id', async (req, res) => {
-    const userRole = req.user?.role;
-    const currentUserId = req.user?.id;
+    const userRole = req.user?.role || req.body.role;
+    const currentUserId = req.user?.id || req.body.userId;
 
     // Проверка базовых прав
     if (!userRole || !['director', 'admin'].includes(userRole)) {
@@ -256,8 +256,8 @@ router.put('/:id', async (req, res) => {
 // Получение списка ID анкет, назначенных админу
 // Директор видит всех, админ - только себя
 router.get('/:id/profiles', async (req, res) => {
-    const userRole = req.user?.role;
-    const currentUserId = req.user?.id;
+    const userRole = req.user?.role || req.query.role;
+    const currentUserId = req.user?.id || parseInt(req.query.userId);
     const adminId = req.params.id;
 
     // Проверка прав
@@ -286,7 +286,7 @@ router.get('/:id/profiles', async (req, res) => {
 // Обновление списка анкет админа (полная замена)
 // Только директор может менять анкеты админов
 router.put('/:id/profiles', async (req, res) => {
-    const userRole = req.user?.role;
+    const userRole = req.user?.role || req.body.role;
 
     // Только директор может назначать анкеты админам
     if (userRole !== 'director') {
@@ -344,8 +344,8 @@ router.put('/:id/profiles', async (req, res) => {
 // Получение списка анкет переводчика
 // Директор видит всех, админ - только своих переводчиков
 router.get('/translator/:id/profiles', async (req, res) => {
-    const userRole = req.user?.role;
-    const currentUserId = req.user?.id;
+    const userRole = req.user?.role || req.query.role;
+    const currentUserId = req.user?.id || parseInt(req.query.userId);
     const translatorId = req.params.id;
 
     // Проверка прав
@@ -379,8 +379,8 @@ router.get('/translator/:id/profiles', async (req, res) => {
 // Обновление списка анкет переводчика
 // Директор может всех, админ - только своих переводчиков
 router.put('/translator/:id/profiles', async (req, res) => {
-    const userRole = req.user?.role;
-    const currentUserId = req.user?.id;
+    const userRole = req.user?.role || req.body.role;
+    const currentUserId = req.user?.id || parseInt(req.body.userId);
     const translatorId = req.params.id;
 
     // Проверка прав
