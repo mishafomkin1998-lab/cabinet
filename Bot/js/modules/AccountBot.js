@@ -385,8 +385,8 @@ class AccountBot {
             clearInterval(this.lababotHeartbeatTimer);
             this.lababotHeartbeatTimer = null;
         }
-        // Отправляем последний heartbeat оффлайн
-        sendHeartbeatToLababot(this.id, this.displayId, 'offline');
+        // Отправляем последний heartbeat оффлайн (без обработки команд)
+        sendHeartbeatToLababot(this.id, this.displayId, 'offline', true);
     }
 
     async checkVipStatus() {
@@ -911,35 +911,41 @@ class AccountBot {
                 (!this.mailSettings.photoOnly || u.ProfilePhoto)
             );
 
-            // Если новых пользователей нет - пробуем очередь повторов
+            // Если новых пользователей нет
             if (users.length === 0) {
-                const now = Date.now();
-                const readyForRetry = this.mailRetryQueue.filter(item =>
-                    now - item.failedAt >= this.retryCooldownMs &&
-                    item.retryCount < this.maxRetries
-                );
+                // Retry queue обрабатывается ТОЛЬКО при target = 'online'
+                if (target === 'online') {
+                    const now = Date.now();
+                    const readyForRetry = this.mailRetryQueue.filter(item =>
+                        now - item.failedAt >= this.retryCooldownMs &&
+                        item.retryCount < this.maxRetries
+                    );
 
-                if (readyForRetry.length > 0) {
-                    currentRetryItem = readyForRetry[Math.floor(Math.random() * readyForRetry.length)];
-                    user = currentRetryItem.user;
-                    currentRetryItem.retryCount++;
-                    currentRetryItem.failedAt = now;
-                    isRetryAttempt = true;
-                    this.log(`🔄 Повтор для ${user.Name} (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
-                } else if (this.mailRetryQueue.some(item => item.retryCount < this.maxRetries)) {
-                    // Есть пользователи в очереди, но cooldown ещё не прошёл
-                    this.log(`⏳ Ожидание cooldown для повторов...`);
-                    return;
+                    if (readyForRetry.length > 0) {
+                        currentRetryItem = readyForRetry[Math.floor(Math.random() * readyForRetry.length)];
+                        user = currentRetryItem.user;
+                        currentRetryItem.retryCount++;
+                        currentRetryItem.failedAt = now;
+                        isRetryAttempt = true;
+                        this.log(`🔄 Повтор для ${user.Name} (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
+                    } else if (this.mailRetryQueue.some(item => item.retryCount < this.maxRetries)) {
+                        // Есть пользователи в очереди, но cooldown ещё не прошёл
+                        this.log(`⏳ Ожидание cooldown для повторов...`);
+                        return;
+                    } else {
+                        // Online закончились и retry queue пуст/исчерпан - ждём новых online
+                        this.log(`⏳ Нет онлайн пользователей. Ожидание...`);
+                        return;
+                    }
                 } else {
-                    // Проверяем auto режим
-                    if(this.mailSettings.auto && target !== 'online') {
+                    // Для других статусов (не online) - переключаемся на следующий статус
+                    if (this.mailSettings.auto) {
                         // Используем getNextActiveStatus для пропуска отключенных статусов
                         const newTarget = getNextActiveStatus(target);
                         this.log(`⚠️ Нет пользователей (${target}). Переход на ${newTarget}`);
                         this.mailSettings.target = newTarget;
-                        // Очищаем contacted при смене категории
+                        // Очищаем contacted при смене категории, но НЕ очищаем retry queue
                         this.mailContactedUsers.clear();
-                        this.mailRetryQueue = [];
                         if(activeTabId === this.id) document.getElementById(`target-select-${this.id}`).value = newTarget;
                         return this.processMailUser(msgTemplate);
                     } else {

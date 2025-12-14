@@ -257,7 +257,7 @@ async function sendIncomingMessageToLababot(params) {
 
 // 3. Функция отправки heartbeat с расширенной статистикой
 // ВАЖНО: botId теперь это MACHINE_ID (ID программы), а не ID анкеты!
-async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
+async function sendHeartbeatToLababot(botId, displayId, status = 'online', skipCommands = false) {
     console.log(`❤️ Отправляю heartbeat для анкеты ${displayId} (программа: ${MACHINE_ID})`);
 
     try {
@@ -310,11 +310,13 @@ async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
         const data = await response.json();
         console.log(`✅ Heartbeat отправлен:`, data);
 
-        // После heartbeat проверяем статус управления (panic mode)
-        checkControlStatus();
+        // После heartbeat проверяем статус управления (пропускаем при удалении)
+        if (!skipCommands) {
+            checkControlStatus();
+        }
 
-        // Обрабатываем команды для конкретной анкеты
-        if (data.commands && typeof bots !== 'undefined') {
+        // Обрабатываем команды для конкретной анкеты (пропускаем при удалении)
+        if (data.commands && typeof bots !== 'undefined' && !skipCommands) {
             // Проверяем статус бот-машины (botEnabled) - влияет на ВСЕ анкеты
             const wasBotEnabled = controlStatus.botEnabled !== false;
             controlStatus.botEnabled = data.commands.botEnabled !== false;
