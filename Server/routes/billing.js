@@ -386,6 +386,86 @@ router.get('/pricing', (req, res) => {
 });
 
 /**
+ * POST /api/billing/profiles-status
+ * Получить статусы оплаты для нескольких анкет (batch)
+ * Устраняет N+1 проблему при загрузке списка аккаунтов
+ */
+router.post('/profiles-status', asyncHandler(async (req, res) => {
+    const { profileIds } = req.body;
+
+    if (!profileIds || !Array.isArray(profileIds) || profileIds.length === 0) {
+        return res.json({ success: true, statuses: {} });
+    }
+
+    // Ограничиваем количество для безопасности
+    const limitedIds = profileIds.slice(0, 500);
+
+    const result = await pool.query(`
+        SELECT
+            ap.profile_id,
+            ap.paid_until,
+            ap.is_trial,
+            ap.trial_started_at,
+            ap.assigned_admin_id,
+            u.is_restricted as admin_is_restricted
+        FROM allowed_profiles ap
+        LEFT JOIN users u ON ap.assigned_admin_id = u.id
+        WHERE ap.profile_id = ANY($1::text[])
+    `, [limitedIds]);
+
+    const statuses = {};
+    const now = new Date();
+
+    for (const row of result.rows) {
+        // Если админ - "мой админ", оплата не требуется
+        if (row.admin_is_restricted) {
+            statuses[row.profile_id] = {
+                isPaid: true,
+                isFree: true,
+                isTrial: false,
+                canTrial: false,
+                trialUsed: false,
+                daysLeft: 999
+            };
+            continue;
+        }
+
+        const paidUntil = row.paid_until ? new Date(row.paid_until) : null;
+        const isPaid = paidUntil && paidUntil > now;
+
+        let daysLeft = 0;
+        if (isPaid) {
+            daysLeft = Math.ceil((paidUntil - now) / (1000 * 60 * 60 * 24));
+        }
+
+        statuses[row.profile_id] = {
+            isPaid: isPaid,
+            isFree: false,
+            isTrial: row.is_trial || false,
+            canTrial: !row.trial_started_at && !isPaid,
+            trialUsed: !!row.trial_started_at,
+            daysLeft: daysLeft
+        };
+    }
+
+    // Для профилей, которых нет в базе - пустой статус
+    for (const id of limitedIds) {
+        if (!statuses[id]) {
+            statuses[id] = {
+                isPaid: false,
+                isFree: false,
+                isTrial: false,
+                canTrial: true,
+                trialUsed: false,
+                daysLeft: 0
+            };
+        }
+    }
+
+    res.json({ success: true, statuses });
+}));
+
+/**
  * POST /api/billing/pay-profile
  * Оплатить анкету напрямую (только директор)
  */

@@ -2656,7 +2656,23 @@
 
     <!-- API Module -->
     <script src="public/js/api.js"></script>
-    <!-- Dashboard Logic -->
-    <script src="public/js/dashboard.js"></script>
+
+    <!-- Dashboard Modular Architecture -->
+    <!-- 1. Утилиты и хелперы -->
+    <script src="public/js/dashboard/utils.js"></script>
+    <!-- 2. Управление состоянием -->
+    <script src="public/js/dashboard/state.js"></script>
+    <!-- 3. Компоненты -->
+    <script src="public/js/dashboard/components/stats.js"></script>
+    <script src="public/js/dashboard/components/profiles.js"></script>
+    <script src="public/js/dashboard/components/team.js"></script>
+    <script src="public/js/dashboard/components/billing.js"></script>
+    <script src="public/js/dashboard/components/bots.js"></script>
+    <script src="public/js/dashboard/components/settings.js"></script>
+    <!-- 4. Главный модуль (объединяет всё) -->
+    <script src="public/js/dashboard/index.js"></script>
+
+    <!-- Fallback: оригинальный dashboard.js для совместимости -->
+    <!-- <script src="public/js/dashboard.js"></script> -->
 </body>
 </html>
