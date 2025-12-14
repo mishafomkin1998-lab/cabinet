@@ -1,5 +1,18 @@
         function dashboard() {
             return {
+                // Helper: получить headers с авторизацией
+                getAuthHeaders(contentType = true) {
+                    const headers = {};
+                    if (contentType) {
+                        headers['Content-Type'] = 'application/json';
+                    }
+                    const token = localStorage.getItem('authToken');
+                    if (token) {
+                        headers['Authorization'] = `Bearer ${token}`;
+                    }
+                    return headers;
+                },
+
                 // User data from auth
                 currentUser: novaUserData,
 
@@ -430,7 +443,9 @@
                         if (this.statsFilter.translator) {
                             url += `&filterTranslatorId=${this.statsFilter.translator}`;
                         }
-                        const res = await fetch(url);
+                        const res = await fetch(url, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success) {
                             this.stats = data.dashboard;
@@ -466,7 +481,9 @@
 
                 async loadAccounts() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/profiles?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const res = await fetch(`${API_BASE}/api/profiles?userId=${this.currentUser.id}&role=${this.currentUser.role}`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
 
                         // DEBUG: Проверяем что приходит с сервера
@@ -576,7 +593,9 @@
                     try {
                         const url = `${API_BASE}/api/bots/status?userId=${this.currentUser.id}&role=${this.currentUser.role}`;
                         console.log('🌐 Запрос:', url);
-                        const res = await fetch(url);
+                        const res = await fetch(url, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         console.log('📥 Ответ от сервера:', data);
                         console.log('   bots:', data.bots?.length || 0, 'шт');
@@ -655,7 +674,9 @@
 
                 async loadTeam() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/team?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const res = await fetch(`${API_BASE}/api/team?userId=${this.currentUser.id}&role=${this.currentUser.role}`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success) {
                             this.team = data.list;
@@ -757,7 +778,9 @@
 
                 async loadRecentActivity() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/activity/recent?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=20`);
+                        const res = await fetch(`${API_BASE}/api/activity/recent?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=20`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success) {
                             this.recentActivity = data.activity;
@@ -767,7 +790,9 @@
 
                 async loadFavoriteTemplates() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/favorite-templates?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const res = await fetch(`${API_BASE}/api/favorite-templates?userId=${this.currentUser.id}&role=${this.currentUser.role}`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success) {
                             this.favoriteTemplates = data.templates;
@@ -791,7 +816,9 @@
                         if (this.statsFilter.translator) {
                             url += `&filterTranslatorId=${this.statsFilter.translator}`;
                         }
-                        const res = await fetch(url);
+                        const res = await fetch(url, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success) {
                             this.sentLettersGrouped = data.letters;
@@ -814,7 +841,9 @@
                         if (this.statsFilter.translator) {
                             url += `&filterTranslatorId=${this.statsFilter.translator}`;
                         }
-                        const res = await fetch(url);
+                        const res = await fetch(url, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success) {
                             this.lastResponses = data.responses;
@@ -837,7 +866,9 @@
                         if (this.statsFilter.translator) {
                             url += `&filterTranslatorId=${this.statsFilter.translator}`;
                         }
-                        const res = await fetch(url);
+                        const res = await fetch(url, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success) {
                             this.aiUsageData = data.aiUsage;
@@ -860,7 +891,9 @@
                         if (this.statsFilter.translator) {
                             url += `&filterTranslatorId=${this.statsFilter.translator}`;
                         }
-                        const res = await fetch(url);
+                        const res = await fetch(url, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success) {
                             this.hourlyActivity = data.hourlyData;
@@ -870,7 +903,7 @@
 
                 async loadTranslatorStats() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/stats/translators?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
+                        const res = await fetch(`${API_BASE}/api/stats/translators?userId=${this.currentUser.id}&role=${this.currentUser.role}`, { headers: this.getAuthHeaders(false) });
                         const data = await res.json();
                         if (data.success) {
                             this.translatorStats = data.translators;
@@ -880,7 +913,9 @@
 
                 async loadHistoryActions() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/history?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=50`);
+                        const res = await fetch(`${API_BASE}/api/history?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=50`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success) {
                             this.historyActions = data.list || [];
@@ -1334,7 +1369,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/profiles/toggle-access`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 profileId: profileId,
                                 paused: newPaused
@@ -1364,7 +1399,7 @@
                             const profileId = account.profile_id || account.id;
                             const res = await fetch(`${API_BASE}/api/profiles/${encodeURIComponent(profileId)}`, {
                                 method: 'DELETE',
-                                headers: { 'Content-Type': 'application/json' }
+                                headers: this.getAuthHeaders()
                             });
                             const data = await res.json();
                             if (data.success) {
@@ -1385,7 +1420,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/profiles/assign-admin`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 profileId: account.profile_id,
                                 adminLogin: account.admin || null,
@@ -1417,7 +1452,7 @@
                     // Отправляем на сервер
                     fetch(`${API_BASE}/api/profiles/bulk`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: this.getAuthHeaders(),
                         body: JSON.stringify({
                             profiles: ids,
                             note: this.newAccountComment || '',
@@ -1448,7 +1483,9 @@
                     // Загружаем список назначенных анкет для этого админа
                     let assignedIds = '';
                     try {
-                        const res = await fetch(`/api/team/${admin.id}/profiles`);
+                        const res = await fetch(`/api/team/${admin.id}/profiles`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success && data.profileIds) {
                             assignedIds = data.profileIds.join(', ');
@@ -1494,7 +1531,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/users/${user.id}`, {
                             method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({ aiEnabled: newValue })
                         });
                         const data = await res.json();
@@ -1517,7 +1554,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/users/${admin.id}`, {
                             method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({ is_restricted: newValue })
                         });
                         const data = await res.json();
@@ -1539,7 +1576,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/users/${translator.id}`, {
                             method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({ isOwnTranslator: newValue })
                         });
                         const data = await res.json();
@@ -1592,7 +1629,7 @@
                         // Отправляем на сервер
                         const res = await fetch(`${API_BASE}/api/team/${this.selectedAdmin.id}/profiles`, {
                             method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({ profileIds: allIds })
                         });
                         const data = await res.json();
@@ -1619,7 +1656,9 @@
 
                     // Загружаем уже назначенные анкеты
                     try {
-                        const res = await fetch(`${API_BASE}/api/team/translator/${translator.id}/profiles`);
+                        const res = await fetch(`${API_BASE}/api/team/translator/${translator.id}/profiles`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success && data.profileIds) {
                             this.selectedTranslatorProfileIds = data.profileIds.map(String);
@@ -1649,7 +1688,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/team/translator/${this.selectedTranslatorForProfiles.id}/profiles`, {
                             method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 profileIds: this.selectedTranslatorProfileIds,
                                 translatorName: this.selectedTranslatorForProfiles.name,
@@ -1721,7 +1760,7 @@
 
                             const res = await fetch(`${API_BASE}/api/users/${this.newAdmin.id}`, {
                                 method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: this.getAuthHeaders(),
                                 body: JSON.stringify(updateData)
                             });
                             const data = await res.json();
@@ -1733,7 +1772,7 @@
                             // Создание нового админа
                             const res = await fetch(`${API_BASE}/api/users`, {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: this.getAuthHeaders(),
                                 body: JSON.stringify({
                                     username: this.newAdmin.login,
                                     password: this.newAdmin.password,
@@ -1756,14 +1795,14 @@
                         if (adminId && profileIds.length > 0) {
                             await fetch(`${API_BASE}/api/team/${adminId}/profiles`, {
                                 method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: this.getAuthHeaders(),
                                 body: JSON.stringify({ profileIds })
                             });
                         } else if (adminId && this.newAdmin.id) {
                             // При редактировании обновляем список (может быть пустым)
                             await fetch(`${API_BASE}/api/team/${adminId}/profiles`, {
                                 method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: this.getAuthHeaders(),
                                 body: JSON.stringify({ profileIds })
                             });
                         }
@@ -1845,7 +1884,7 @@
 
                             const res = await fetch(`${API_BASE}/api/users/${this.editingTranslator.id}`, {
                                 method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: this.getAuthHeaders(),
                                 body: JSON.stringify(body)
                             });
                             const data = await res.json();
@@ -1883,7 +1922,7 @@
 
                             const res = await fetch(`${API_BASE}/api/users`, {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: this.getAuthHeaders(),
                                 body: JSON.stringify(createData)
                             });
                             const data = await res.json();
@@ -1962,7 +2001,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/bots/${bot.id}/toggle`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({ active: newActive })
                         });
                         const data = await res.json();
@@ -1978,7 +2017,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/bots/${bot.id}/name`, {
                             method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({ name: bot.name })
                         });
                         const data = await res.json();
@@ -1994,7 +2033,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/bots/sync-prompt`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 prompt: this.generationPrompt,
                                 userId: this.currentUser.id
@@ -2012,7 +2051,9 @@
                 // === Настройки управления ===
                 async loadControlSettings() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/bots/control/settings?userId=${this.currentUser.id}`);
+                        const res = await fetch(`${API_BASE}/api/bots/control/settings?userId=${this.currentUser.id}`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success && data.settings) {
                             this.controlSettings = data.settings;
@@ -2036,7 +2077,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/bots/control/settings`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 userId: this.currentUser.id,
                                 settings: this.controlSettings
@@ -2059,7 +2100,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/bots/control/panic`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 userId: this.currentUser.id,
                                 activate: !this.controlSettings.panicMode
@@ -2090,7 +2131,9 @@
                         if (this.botLogsFilter) {
                             url += `&logType=${this.botLogsFilter}`;
                         }
-                        const res = await fetch(url);
+                        const res = await fetch(url, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success) {
                             if (reset) {
@@ -2116,7 +2159,9 @@
                         this.errorLogs = [];
                     }
                     try {
-                        const res = await fetch(`${API_BASE}/api/activity/error_logs?userId=${this.currentUser.id}&limit=30&offset=${this.errorLogsOffset}`);
+                        const res = await fetch(`${API_BASE}/api/activity/error_logs?userId=${this.currentUser.id}&limit=30&offset=${this.errorLogsOffset}`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success) {
                             if (reset) {
@@ -2402,7 +2447,9 @@
                         if (this.historyFilter.profileId) {
                             url += `&profileId=${this.historyFilter.profileId}`;
                         }
-                        const res = await fetch(url);
+                        const res = await fetch(url, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success) {
                             this.profileHistory = data.history || [];
@@ -2418,7 +2465,9 @@
 
                 async loadSavedPrompt() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/bots/prompt`);
+                        const res = await fetch(`${API_BASE}/api/bots/prompt`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success && data.prompt) {
                             this.generationPrompt = data.prompt;
@@ -2456,7 +2505,9 @@
 
                 async loadUserBalance() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/billing/balance/${this.currentUser.id}`);
+                        const res = await fetch(`${API_BASE}/api/billing/balance/${this.currentUser.id}`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success) {
                             this.userBalance = data.balance || 0;
@@ -2469,7 +2520,9 @@
 
                 async loadPricing() {
                     try {
-                        const res = await fetch(`${API_BASE}/api/billing/pricing`);
+                        const res = await fetch(`${API_BASE}/api/billing/pricing`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
                         if (data.success) {
                             this.pricing = data.pricing;
@@ -2500,7 +2553,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/billing/extend-profile`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 profileId: this.extendingProfile.profile_id,
                                 days: this.selectedDays,
@@ -2527,7 +2580,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/billing/start-trial`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 profileId: account.profile_id,
                                 userId: this.currentUser.id
@@ -2577,7 +2630,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/profiles/assign-admin`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 profileIds: this.selectedProfileIds,
                                 adminId: adminId,
@@ -2613,7 +2666,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/profiles/assign-translator`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 profileIds: this.selectedProfileIds,
                                 translatorId: translatorId,
@@ -2660,7 +2713,7 @@
                         for (const profileId of this.selectedProfileIds) {
                             const res = await fetch(`${API_BASE}/api/billing/pay`, {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: this.getAuthHeaders(),
                                 body: JSON.stringify({
                                     profileId: profileId,
                                     days: 30,
@@ -2695,7 +2748,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/billing/topup`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 userId: this.topupUserId,
                                 amount: this.topupAmount,
@@ -2751,7 +2804,7 @@
 
                         const res = await fetch(`${API_BASE}/api/user/profile`, {
                             method: 'PUT',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify(updateData)
                         });
 
@@ -2850,7 +2903,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/billing/topup`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 userId: this.financeTopup.adminId,
                                 amount: this.financeTopup.amount,
@@ -2889,7 +2942,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/billing/pay-profile`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 profileId: this.profilePayment.profileId,
                                 days: this.profilePayment.days,
@@ -2924,7 +2977,7 @@
                     try {
                         const res = await fetch(`${API_BASE}/api/billing/remove-payment`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 profileId: this.profilePayment.profileId,
                                 byUserId: this.currentUser.id
@@ -3011,7 +3064,7 @@
                         const newStatus = !profile.mailingEnabled;
                         const res = await fetch(`${API_BASE}/api/profiles/${profile.profileId}/mailing`, {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
+                            headers: this.getAuthHeaders(),
                             body: JSON.stringify({
                                 enabled: newStatus,
                                 userId: this.currentUser.id
@@ -3120,7 +3173,9 @@
                         if (this.clientsFilter.dateTo) params.append('dateTo', this.clientsFilter.dateTo);
                         if (this.clientsFilter.search) params.append('search', this.clientsFilter.search);
 
-                        const res = await fetch(`/api/clients?${params}`);
+                        const res = await fetch(`/api/clients?${params}`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
 
                         if (data.success) {
@@ -3141,7 +3196,9 @@
                         if (this.clientsFilter.dateFrom) params.append('dateFrom', this.clientsFilter.dateFrom);
                         if (this.clientsFilter.dateTo) params.append('dateTo', this.clientsFilter.dateTo);
 
-                        const res = await fetch(`/api/clients/stats?${params}`);
+                        const res = await fetch(`/api/clients/stats?${params}`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
 
                         if (data.success) {
@@ -3163,7 +3220,9 @@
                             limit: 100
                         });
 
-                        const res = await fetch(`/api/clients/${client.manId}/messages?${params}`);
+                        const res = await fetch(`/api/clients/${client.manId}/messages?${params}`, {
+                            headers: this.getAuthHeaders(false)
+                        });
                         const data = await res.json();
 
                         if (data.success) {
