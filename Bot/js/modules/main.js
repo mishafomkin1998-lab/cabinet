@@ -1194,9 +1194,10 @@ async function performLogin(login, pass, displayId) {
             const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
             bots[bid] = bot; // СНАЧАЛА добавляем в объект bots
 
-            // Загружаем игнор-лист из localStorage (сохраняется навсегда, по displayId)
-            bot.ignoredUsers = loadIgnoredUsersFromStorage(displayId);
-            console.log(`[IgnoredUsers] Загружено ${bot.ignoredUsers.length} пользователей для анкеты ${displayId}`);
+            // Загружаем игнор-листы из localStorage (сохраняются навсегда, по displayId, раздельно для Mail и Chat)
+            bot.ignoredUsersMail = loadIgnoredUsersFromStorage(displayId, 'mail');
+            bot.ignoredUsersChat = loadIgnoredUsersFromStorage(displayId, 'chat');
+            console.log(`[IgnoredUsers] Загружено: ${bot.ignoredUsersMail.length} (письма), ${bot.ignoredUsersChat.length} (чаты) для анкеты ${displayId}`);
 
             // ТЕПЕРЬ устанавливаем прокси (после добавления в bots чтобы getAccountNumber работал)
             await setWebviewProxy(bid);
@@ -1228,34 +1229,41 @@ async function performLogin(login, pass, displayId) {
     return false;
 }
 
-// === Функции для работы с игнор-листом ===
-function saveIgnoredUsersToStorage(botId, ignoredUsers) {
+// === Функции для работы с игнор-листом (раздельно для Mail и Chat) ===
+function saveIgnoredUsersToStorage(displayId, type, ignoredUsers) {
     try {
-        const allIgnored = JSON.parse(localStorage.getItem('ignoredUsers') || '{}');
-        allIgnored[botId] = ignoredUsers;
-        localStorage.setItem('ignoredUsers', JSON.stringify(allIgnored));
-        console.log(`[IgnoredUsers] Сохранено ${ignoredUsers.length} пользователей для ${botId}`);
+        const storageKey = `ignoredUsers_${type}`; // ignoredUsers_mail или ignoredUsers_chat
+        const allIgnored = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        allIgnored[displayId] = ignoredUsers;
+        localStorage.setItem(storageKey, JSON.stringify(allIgnored));
+        console.log(`[IgnoredUsers] Сохранено ${ignoredUsers.length} пользователей (${type}) для анкеты ${displayId}`);
     } catch (e) {
         console.error('Ошибка сохранения ignoredUsers:', e);
     }
 }
 
-function loadIgnoredUsersFromStorage(botId) {
+function loadIgnoredUsersFromStorage(displayId, type) {
     try {
-        const allIgnored = JSON.parse(localStorage.getItem('ignoredUsers') || '{}');
-        return allIgnored[botId] || [];
+        const storageKey = `ignoredUsers_${type}`; // ignoredUsers_mail или ignoredUsers_chat
+        const allIgnored = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        return allIgnored[displayId] || [];
     } catch (e) {
         console.error('Ошибка загрузки ignoredUsers:', e);
         return [];
     }
 }
 
-function clearIgnoredUsers(botId) {
+function clearIgnoredUsers(botId, type) {
     try {
         const bot = bots[botId];
         if (bot) {
-            bot.ignoredUsers = [];
-            saveIgnoredUsersToStorage(bot.displayId, []);
+            if (type === 'mail') {
+                bot.ignoredUsersMail = [];
+                saveIgnoredUsersToStorage(bot.displayId, 'mail', []);
+            } else {
+                bot.ignoredUsersChat = [];
+                saveIgnoredUsersToStorage(bot.displayId, 'chat', []);
+            }
             bot.updateUI();
         }
     } catch (e) {
@@ -1267,8 +1275,11 @@ function openIgnoredModal(botId) {
     const bot = bots[botId];
     if (!bot) return;
 
-    const count = bot.ignoredUsers ? bot.ignoredUsers.length : 0;
-    const list = bot.ignoredUsers || [];
+    const isChat = globalMode === 'chat';
+    const type = isChat ? 'chat' : 'mail';
+    const typeName = isChat ? 'чатов' : 'писем';
+    const list = isChat ? (bot.ignoredUsersChat || []) : (bot.ignoredUsersMail || []);
+    const count = list.length;
 
     // Создаём содержимое модалки
     const listHtml = list.length > 0
@@ -1277,7 +1288,7 @@ function openIgnoredModal(botId) {
 
     const modalContent = `
         <div class="modal-header">
-            <h5>Игнор-лист (${count})</h5>
+            <h5>Игнор-лист ${typeName} (${count})</h5>
             <button type="button" class="btn-close" onclick="closeModal('ignored-modal')"></button>
         </div>
         <div class="modal-body">
@@ -1287,7 +1298,7 @@ function openIgnoredModal(botId) {
             <button class="btn btn-outline-secondary btn-sm" onclick="copyIgnoredList('${botId}')">
                 <i class="fa fa-copy"></i> Копировать
             </button>
-            <button class="btn btn-danger btn-sm" onclick="confirmClearIgnored('${botId}')">
+            <button class="btn btn-danger btn-sm" onclick="confirmClearIgnored('${botId}', '${type}')">
                 <i class="fa fa-trash"></i> Очистить всё
             </button>
         </div>
@@ -1310,25 +1321,31 @@ function openIgnoredModal(botId) {
 
 function copyIgnoredList(botId) {
     const bot = bots[botId];
-    if (!bot || !bot.ignoredUsers || bot.ignoredUsers.length === 0) {
+    if (!bot) return;
+
+    const isChat = globalMode === 'chat';
+    const list = isChat ? (bot.ignoredUsersChat || []) : (bot.ignoredUsersMail || []);
+
+    if (list.length === 0) {
         showToast('Список пуст');
         return;
     }
 
-    const text = bot.ignoredUsers.join('\n');
+    const text = list.join('\n');
     navigator.clipboard.writeText(text).then(() => {
-        showToast(`Скопировано ${bot.ignoredUsers.length} ID`);
+        showToast(`Скопировано ${list.length} ID`);
     }).catch(err => {
         console.error('Ошибка копирования:', err);
         showToast('Ошибка копирования');
     });
 }
 
-function confirmClearIgnored(botId) {
-    if (confirm('Очистить весь игнор-лист? Это действие нельзя отменить.')) {
-        clearIgnoredUsers(botId);
+function confirmClearIgnored(botId, type) {
+    const typeName = type === 'chat' ? 'чатов' : 'писем';
+    if (confirm(`Очистить игнор-лист ${typeName}? Это действие нельзя отменить.`)) {
+        clearIgnoredUsers(botId, type);
         closeModal('ignored-modal');
-        showToast('Игнор-лист очищен');
+        showToast(`Игнор-лист ${typeName} очищен`);
     }
 }
 

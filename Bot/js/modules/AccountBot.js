@@ -59,8 +59,9 @@ class AccountBot {
         this.chatRetryQueue = [];
         this.mailContactedUsers = new Set(); // ID пользователей которым уже отправили в этой сессии
 
-        // === Список игнорирующих пользователей (сохраняется навсегда) ===
-        this.ignoredUsers = []; // ID пользователей, которые добавили анкету в игнор или заблокировали
+        // === Списки игнорирующих пользователей (сохраняются навсегда, раздельно для Mail и Chat) ===
+        this.ignoredUsersMail = []; // ID пользователей, которые заигнорили в письмах
+        this.ignoredUsersChat = []; // ID пользователей, которые заигнорили в чатах
         this.chatContactedUsers = new Set();
         this.maxRetries = 3; // Максимум попыток
         this.retryCooldownMs = 60000; // 1 минута между попытками
@@ -903,11 +904,11 @@ class AccountBot {
                 }
             }
 
-            // Фильтруем: убираем тех кому уже отправили, кто в ЧС и кто в игноре
+            // Фильтруем: убираем тех кому уже отправили, кто в ЧС и кто в игноре (только для писем)
             users = users.filter(u =>
                 !this.mailContactedUsers.has(u.AccountId.toString()) &&
                 !this.mailSettings.blacklist.includes(u.AccountId.toString()) &&
-                !this.ignoredUsers.includes(u.AccountId.toString()) &&
+                !this.ignoredUsersMail.includes(u.AccountId.toString()) &&
                 (!this.mailSettings.photoOnly || u.ProfilePhoto)
             );
 
@@ -1087,11 +1088,11 @@ class AccountBot {
                 // Добавляем в очередь повторов (если есть смысл)
                 if (user && user.AccountId) {
                     if (skipRetry) {
-                        // Игнор-лист или блокировка - добавляем в постоянный список игнора
-                        if (!this.ignoredUsers.includes(user.AccountId)) {
-                            this.ignoredUsers.push(user.AccountId);
-                            this.log(`⛔ ${user.Name} добавлен в игнор-лист (навсегда)`);
-                            saveIgnoredUsersToStorage(this.displayId, this.ignoredUsers);
+                        // Игнор-лист или блокировка - добавляем в постоянный список игнора ПИСЕМ
+                        if (!this.ignoredUsersMail.includes(user.AccountId)) {
+                            this.ignoredUsersMail.push(user.AccountId);
+                            this.log(`⛔ ${user.Name} добавлен в игнор-лист писем (навсегда)`);
+                            saveIgnoredUsersToStorage(this.displayId, 'mail', this.ignoredUsersMail);
                         }
                         // Удаляем из очереди если уже был там
                         this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
@@ -1337,11 +1338,11 @@ class AccountBot {
             const usersRes = await makeApiRequest(this, 'GET', apiPath);
             let users = usersRes.data.Users || [];
 
-            // Фильтруем: убираем тех кому уже отправили, кто в ЧС и кто в игноре
+            // Фильтруем: убираем тех кому уже отправили, кто в ЧС и кто в игноре (только для чатов)
             users = users.filter(u =>
                 !this.chatContactedUsers.has(u.AccountId.toString()) &&
                 !this.chatSettings.blacklist.includes(u.AccountId.toString()) &&
-                !this.ignoredUsers.includes(u.AccountId.toString())
+                !this.ignoredUsersChat.includes(u.AccountId.toString())
             );
 
             // Если новых пользователей нет
@@ -1496,11 +1497,11 @@ class AccountBot {
 
                         // Добавляем в очередь повторов (если есть смысл)
                         if (skipRetry) {
-                            // Игнор-лист или блокировка - добавляем в постоянный список игнора
-                            if (!this.ignoredUsers.includes(user.AccountId)) {
-                                this.ignoredUsers.push(user.AccountId);
-                                this.log(`⛔ ${user.Name} добавлен в игнор-лист (навсегда)`);
-                                saveIgnoredUsersToStorage(this.displayId, this.ignoredUsers);
+                            // Игнор-лист или блокировка - добавляем в постоянный список игнора ЧАТОВ
+                            if (!this.ignoredUsersChat.includes(user.AccountId)) {
+                                this.ignoredUsersChat.push(user.AccountId);
+                                this.log(`⛔ ${user.Name} добавлен в игнор-лист чатов (навсегда)`);
+                                saveIgnoredUsersToStorage(this.displayId, 'chat', this.ignoredUsersChat);
                             }
                             this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
                         } else if (!isRetryAttempt) {
@@ -1558,11 +1559,11 @@ class AccountBot {
                         // Добавляем в очередь повторов (если есть смысл)
                         if (user && user.AccountId) {
                             if (skipRetry) {
-                                // Игнор-лист или блокировка - добавляем в постоянный список игнора
-                                if (!this.ignoredUsers.includes(user.AccountId)) {
-                                    this.ignoredUsers.push(user.AccountId);
-                                    this.log(`⛔ ${user.Name} добавлен в игнор-лист (навсегда)`);
-                                    saveIgnoredUsersToStorage(this.displayId, this.ignoredUsers);
+                                // Игнор-лист или блокировка - добавляем в постоянный список игнора ЧАТОВ
+                                if (!this.ignoredUsersChat.includes(user.AccountId)) {
+                                    this.ignoredUsersChat.push(user.AccountId);
+                                    this.log(`⛔ ${user.Name} добавлен в игнор-лист чатов (навсегда)`);
+                                    saveIgnoredUsersToStorage(this.displayId, 'chat', this.ignoredUsersChat);
                                 }
                                 this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
                             } else if (!isRetryAttempt) {
@@ -1623,11 +1624,11 @@ class AccountBot {
                 // Добавляем в очередь повторов (если есть смысл)
                 if (user && user.AccountId) {
                     if (skipRetry) {
-                        // Игнор-лист или блокировка - добавляем в постоянный список игнора
-                        if (!this.ignoredUsers.includes(user.AccountId)) {
-                            this.ignoredUsers.push(user.AccountId);
-                            this.log(`⛔ ${user.Name} добавлен в игнор-лист (навсегда)`);
-                            saveIgnoredUsersToStorage(this.displayId, this.ignoredUsers);
+                        // Игнор-лист или блокировка - добавляем в постоянный список игнора ЧАТОВ
+                        if (!this.ignoredUsersChat.includes(user.AccountId)) {
+                            this.ignoredUsersChat.push(user.AccountId);
+                            this.log(`⛔ ${user.Name} добавлен в игнор-лист чатов (навсегда)`);
+                            saveIgnoredUsersToStorage(this.displayId, 'chat', this.ignoredUsersChat);
                         }
                         this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
                     } else if (!isRetryAttempt) {
@@ -1993,7 +1994,9 @@ class AccountBot {
         if(s) s.innerText = stats.sent;
         if(e) e.innerText = stats.errors;
         if(w) w.innerText = "Ожидают: " + stats.waiting;
-        if(ig) ig.innerText = "Игнор: " + (this.ignoredUsers ? this.ignoredUsers.length : 0);
+        // Показываем счетчик игнора в зависимости от режима
+        const ignoredList = isChat ? this.ignoredUsersChat : this.ignoredUsersMail;
+        if(ig) ig.innerText = "Игнор: " + (ignoredList ? ignoredList.length : 0);
         const activeBox = document.getElementById(`active-invite-${this.id}`);
         if(activeBox) {
             if (isChat) {
