@@ -594,12 +594,51 @@
 
                         <!-- Использование ИИ -->
                         <div x-show="monitoringFunction === 'aiUsage'" x-transition class="space-y-4">
-                            <!-- Кнопка экспорта -->
-                            <div class="flex justify-end mb-2" x-show="recentActivity.filter(a => a.used_ai).length > 0">
-                                <button @click="exportAiUsage()" class="px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium transition-all text-xs">
-                                    <i class="fas fa-download mr-1"></i>Выгрузить
-                                </button>
+                            <!-- AI Массовые рассылки (10+ получателей, отправка более 10 минут) -->
+                            <div class="glass p-4 rounded-xl">
+                                <div class="flex justify-between items-center mb-3">
+                                    <div class="font-medium">
+                                        <i class="fas fa-mail-bulk text-orange-500 mr-2"></i>AI Массовые рассылки
+                                    </div>
+                                    <div class="text-sm text-gray-500">10+ получателей</div>
+                                </div>
+                                <div class="space-y-3">
+                                    <template x-for="mailing in aiUsageData.slice(0, showAllAiMass ? undefined : 5)" :key="mailing.id">
+                                        <div class="border-l-4 border-orange-500 pl-3 py-3 bg-gradient-to-r from-orange-50 to-amber-50 rounded-r hover:from-orange-100 hover:to-amber-100 transition-colors">
+                                            <div class="flex justify-between items-start mb-2">
+                                                <div class="text-sm font-medium text-gray-800">
+                                                    <span class="text-orange-600" x-text="mailing.recipientCount"></span> получателей
+                                                    <span class="text-gray-400 mx-1">•</span>
+                                                    Анкета <span x-text="mailing.profileId"></span>
+                                                </div>
+                                                <div class="text-xs text-gray-500" x-text="new Date(mailing.firstSentAt).toLocaleString('ru-RU')"></div>
+                                            </div>
+                                            <div class="text-sm text-gray-700 bg-white/50 p-2 rounded border border-orange-100 whitespace-pre-wrap" x-text="mailing.textContent ? (mailing.textContent.length > 200 ? mailing.textContent.substring(0, 200) + '...' : mailing.textContent) : '(текст не сохранён)'"></div>
+                                            <div class="text-xs text-gray-500 mt-2 flex gap-3">
+                                                <span x-show="mailing.translatorName">
+                                                    <i class="fas fa-user text-blue-400 mr-1"></i><span x-text="mailing.translatorName"></span>
+                                                </span>
+                                                <span x-show="mailing.adminName">
+                                                    <i class="fas fa-user-shield text-indigo-400 mr-1"></i><span x-text="mailing.adminName"></span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <div x-show="aiUsageData.length === 0" class="text-center text-gray-500 py-6">
+                                        <i class="fas fa-robot text-gray-300 text-3xl mb-2 block"></i>
+                                        Нет AI массовых рассылок за выбранный период
+                                    </div>
+                                </div>
+                                <!-- Кнопка Показать еще для массовых рассылок -->
+                                <div x-show="aiUsageData.length > 5" class="text-center mt-3">
+                                    <button @click="showAllAiMass = !showAllAiMass" class="px-4 py-2 text-sm text-orange-600 hover:text-orange-800 font-medium">
+                                        <span x-show="!showAllAiMass">Показать еще (<span x-text="aiUsageData.length - 5"></span>)</span>
+                                        <span x-show="showAllAiMass">Свернуть</span>
+                                    </button>
+                                </div>
                             </div>
+
+                            <!-- Статистика AI использования -->
                             <div class="glass p-4 rounded-xl">
                                 <div class="flex justify-between items-center mb-2">
                                     <div class="font-medium" x-text="t('monitoring.aiGenerations')"></div>
@@ -607,8 +646,15 @@
                                 </div>
                                 <div class="text-sm text-gray-600" x-text="t('monitoring.recentGenerations')"></div>
                             </div>
+
+                            <!-- Последние генерации (индивидуальные) -->
                             <div class="glass p-4 rounded-xl">
-                                <div class="font-medium mb-2">Последние генерации:</div>
+                                <div class="flex justify-between items-center mb-2">
+                                    <div class="font-medium">Последние генерации:</div>
+                                    <button x-show="recentActivity.filter(a => a.used_ai).length > 0" @click="exportAiUsage()" class="px-3 py-1.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium transition-all text-xs">
+                                        <i class="fas fa-download mr-1"></i>Выгрузить
+                                    </button>
+                                </div>
                                 <div class="space-y-2 text-sm">
                                     <template x-for="activity in recentActivity.filter(a => a.used_ai).slice(0, showAllAiUsage ? undefined : 5)" :key="activity.id">
                                         <div class="border-l-4 border-orange-400 pl-3 py-2 bg-orange-50 rounded-r hover:bg-orange-100 transition-colors">

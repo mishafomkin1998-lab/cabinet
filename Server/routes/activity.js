@@ -144,6 +144,16 @@ router.post('/message_sent', asyncHandler(async (req, res) => {
             const crypto = require('crypto');
             const textHash = crypto.createHash('md5').update(textContent.trim()).digest('hex');
 
+            // Извлекаем время генерации из aiSessionId (формат: ai_1702345678901_abc123)
+            let generatedAt = null;
+            const sessionMatch = aiSessionId.match(/^ai_(\d+)_/);
+            if (sessionMatch && sessionMatch[1]) {
+                const timestamp = parseInt(sessionMatch[1], 10);
+                if (!isNaN(timestamp)) {
+                    generatedAt = new Date(timestamp);
+                }
+            }
+
             // Проверяем существует ли уже запись с таким hash и session_id
             const existing = await pool.query(
                 `SELECT id, recipient_count, recipient_ids FROM ai_mass_messages
@@ -172,11 +182,11 @@ router.post('/message_sent', asyncHandler(async (req, res) => {
                     console.log(`📊 AI рассылка обновлена: ${recipientIds.length} получателей (session: ${aiSessionId})`);
                 }
             } else {
-                // Создаем новую запись
+                // Создаем новую запись с временем генерации
                 await pool.query(
                     `INSERT INTO ai_mass_messages
-                     (text_content, text_hash, recipient_count, recipient_ids, profile_id, admin_id, translator_id, generation_session_id, first_sent_at, last_sent_at)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
+                     (text_content, text_hash, recipient_count, recipient_ids, profile_id, admin_id, translator_id, generation_session_id, generated_at, first_sent_at, last_sent_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())`,
                     [
                         textContent,
                         textHash,
@@ -185,11 +195,12 @@ router.post('/message_sent', asyncHandler(async (req, res) => {
                         accountDisplayId,
                         adminId,
                         assignedTranslatorId,
-                        aiSessionId
+                        aiSessionId,
+                        generatedAt
                     ]
                 );
 
-                console.log(`📊 Новая AI рассылка создана (session: ${aiSessionId})`);
+                console.log(`📊 Новая AI рассылка создана (session: ${aiSessionId}, generated_at: ${generatedAt})`);
             }
         }
 

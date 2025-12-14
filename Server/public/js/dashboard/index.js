@@ -312,6 +312,10 @@ function dashboard() {
 
         setMonitoringFunction(func) {
             this.monitoringFunction = func;
+            // Загружаем данные при переключении на AI usage
+            if (func === 'aiUsage') {
+                this.loadAiUsage();
+            }
         },
 
         getMonitoringTitle() {

@@ -93,6 +93,7 @@ function getInitialState() {
         showAllLetters: false,
         showAllTemplates: false,
         showAllAiUsage: false,
+        showAllAiMass: false,
 
         // Статистика переводчиков
         translatorStats: [],

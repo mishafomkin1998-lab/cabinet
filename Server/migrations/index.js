@@ -444,12 +444,14 @@ async function initDatabase() {
                 profile_id VARCHAR(100),
                 admin_id INTEGER,
                 translator_id INTEGER,
+                generated_at TIMESTAMP,
                 first_sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 generation_session_id VARCHAR(100),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        await pool.query(`ALTER TABLE ai_mass_messages ADD COLUMN IF NOT EXISTS generated_at TIMESTAMP`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_mass_hash ON ai_mass_messages(text_hash)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_mass_profile ON ai_mass_messages(profile_id)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_ai_mass_admin ON ai_mass_messages(admin_id)`);
