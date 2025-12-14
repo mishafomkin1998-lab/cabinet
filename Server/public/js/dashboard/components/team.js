@@ -77,7 +77,7 @@ const TeamComponent = {
     async editAdmin(context, admin) {
         let assignedIds = '';
         try {
-            const res = await fetch(`${API_BASE}/api/team/${admin.id}/profiles`);
+            const res = await fetch(`${API_BASE}/api/team/${admin.id}/profiles?userId=${context.currentUser.id}&role=${context.currentUser.role}`);
             const data = await res.json();
             if (data.success && data.profileIds) {
                 assignedIds = data.profileIds.join(', ');
@@ -135,13 +135,15 @@ const TeamComponent = {
                     username: context.newAdmin.login,
                     salary: context.newAdmin.isMyAdmin ? null : parseFloat(context.newAdmin.salary),
                     isRestricted: context.newAdmin.isMyAdmin,
-                    aiEnabled: context.newAdmin.aiEnabled
+                    aiEnabled: context.newAdmin.aiEnabled,
+                    role: context.currentUser.role,
+                    userId: context.currentUser.id
                 };
                 if (passwordChanged) {
                     updateData.password = context.newAdmin.password;
                 }
 
-                const res = await fetch(`${API_BASE}/api/users/${context.newAdmin.id}`, {
+                const res = await fetch(`${API_BASE}/api/team/${context.newAdmin.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(updateData)
@@ -152,7 +154,7 @@ const TeamComponent = {
                     return;
                 }
             } else {
-                const res = await fetch(`${API_BASE}/api/users`, {
+                const res = await fetch(`${API_BASE}/api/team`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -162,7 +164,8 @@ const TeamComponent = {
                         ownerId: context.currentUser.id,
                         salary: context.newAdmin.isMyAdmin ? null : parseFloat(context.newAdmin.salary),
                         isRestricted: context.newAdmin.isMyAdmin,
-                        aiEnabled: context.newAdmin.aiEnabled
+                        aiEnabled: context.newAdmin.aiEnabled,
+                        userRole: context.currentUser.role
                     })
                 });
                 const data = await res.json();
@@ -178,7 +181,7 @@ const TeamComponent = {
                 await fetch(`${API_BASE}/api/team/${adminId}/profiles`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ profileIds })
+                    body: JSON.stringify({ profileIds, role: context.currentUser.role, userId: context.currentUser.id })
                 });
             }
 
@@ -205,7 +208,7 @@ const TeamComponent = {
         if (!confirm(`Удалить админа "${admin.name}"? Все его анкеты будут откреплены.`)) return;
 
         try {
-            const res = await fetch(`${API_BASE}/api/team/${admin.id}`, { method: 'DELETE' });
+            const res = await fetch(`${API_BASE}/api/team/${admin.id}?role=${context.currentUser.role}`, { method: 'DELETE' });
             const data = await res.json();
             if (data.success) {
                 await this.loadTeam(context);
@@ -229,10 +232,10 @@ const TeamComponent = {
     async toggleAiEnabled(context, user) {
         const newValue = !user.aiEnabled;
         try {
-            const res = await fetch(`${API_BASE}/api/users/${user.id}`, {
+            const res = await fetch(`${API_BASE}/api/team/${user.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ aiEnabled: newValue })
+                body: JSON.stringify({ aiEnabled: newValue, role: context.currentUser.role, userId: context.currentUser.id })
             });
             const data = await res.json();
             if (data.success) {
@@ -255,10 +258,10 @@ const TeamComponent = {
     async toggleIsRestricted(context, admin) {
         const newValue = !admin.isMyAdmin;
         try {
-            const res = await fetch(`${API_BASE}/api/users/${admin.id}`, {
+            const res = await fetch(`${API_BASE}/api/team/${admin.id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ is_restricted: newValue })
+                body: JSON.stringify({ isRestricted: newValue, role: context.currentUser.role, userId: context.currentUser.id })
             });
             const data = await res.json();
             if (data.success) {
@@ -336,7 +339,9 @@ const TeamComponent = {
                     }
                 }
 
-                const res = await fetch(`${API_BASE}/api/users/${context.editingTranslator.id}`, {
+                body.role = context.currentUser.role;
+                body.userId = context.currentUser.id;
+                const res = await fetch(`${API_BASE}/api/team/${context.editingTranslator.id}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
@@ -369,7 +374,8 @@ const TeamComponent = {
                     }
                 }
 
-                const res = await fetch(`${API_BASE}/api/users`, {
+                createData.userRole = context.currentUser.role;
+                const res = await fetch(`${API_BASE}/api/team`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(createData)
@@ -403,7 +409,7 @@ const TeamComponent = {
         }
 
         try {
-            const res = await fetch(`${API_BASE}/api/users/${translator.id}`, { method: 'DELETE' });
+            const res = await fetch(`${API_BASE}/api/team/${translator.id}?role=${context.currentUser.role}`, { method: 'DELETE' });
             const data = await res.json();
             if (data.success) {
                 await this.loadTeam(context);
@@ -450,7 +456,7 @@ const TeamComponent = {
         }
 
         try {
-            const currentRes = await fetch(`${API_BASE}/api/team/${context.selectedAdmin.id}/profiles`);
+            const currentRes = await fetch(`${API_BASE}/api/team/${context.selectedAdmin.id}/profiles?userId=${context.currentUser.id}&role=${context.currentUser.role}`);
             const currentData = await currentRes.json();
             const currentIds = currentData.success ? currentData.profileIds : [];
             const allIds = [...new Set([...currentIds, ...ids])];
@@ -458,7 +464,7 @@ const TeamComponent = {
             const res = await fetch(`${API_BASE}/api/team/${context.selectedAdmin.id}/profiles`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ profileIds: allIds })
+                body: JSON.stringify({ profileIds: allIds, role: context.currentUser.role, userId: context.currentUser.id })
             });
             const data = await res.json();
 
@@ -489,7 +495,7 @@ const TeamComponent = {
         context.selectedTranslatorProfileIds = [];
 
         try {
-            const res = await fetch(`${API_BASE}/api/team/translator/${translator.id}/profiles`);
+            const res = await fetch(`${API_BASE}/api/team/translator/${translator.id}/profiles?userId=${context.currentUser.id}&role=${context.currentUser.role}`);
             const data = await res.json();
             if (data.success && data.profileIds) {
                 context.selectedTranslatorProfileIds = data.profileIds.map(String);
@@ -531,7 +537,8 @@ const TeamComponent = {
                     profileIds: context.selectedTranslatorProfileIds,
                     translatorName: context.selectedTranslatorForProfiles.name,
                     userId: context.currentUser.id,
-                    userName: context.currentUser.username
+                    userName: context.currentUser.username,
+                    role: context.currentUser.role
                 })
             });
             const data = await res.json();

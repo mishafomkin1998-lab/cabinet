@@ -91,7 +91,7 @@ const StatsComponent = {
             const data = await res.json();
 
             if (data.success) {
-                context.hourlyActivity = data.hourlyActivity || [];
+                context.hourlyActivity = data.hourlyData || [];
             }
         } catch (e) {
             console.error('loadHourlyActivity error:', e);
@@ -132,7 +132,7 @@ const StatsComponent = {
      */
     async loadSentLettersGrouped(context) {
         try {
-            let url = `${API_BASE}/api/stats/sent-letters?userId=${context.currentUser.id}&role=${context.currentUser.role}`;
+            let url = `${API_BASE}/api/activity/sent-letters-grouped?userId=${context.currentUser.id}&role=${context.currentUser.role}`;
 
             if (context.statsFilter.dateFrom) url += `&dateFrom=${context.statsFilter.dateFrom}`;
             if (context.statsFilter.dateTo) url += `&dateTo=${context.statsFilter.dateTo}`;
@@ -175,7 +175,7 @@ const StatsComponent = {
             const data = await res.json();
 
             if (data.success) {
-                context.aiUsageData = data.usage || [];
+                context.aiUsageData = data.aiUsage || [];
             }
         } catch (e) {
             console.error('loadAiUsage error:', e);
@@ -193,7 +193,7 @@ const StatsComponent = {
             const data = await res.json();
 
             if (data.success) {
-                context.recentActivity = data.activities || [];
+                context.recentActivity = data.activity || [];
             }
         } catch (e) {
             console.error('loadRecentActivity error:', e);
