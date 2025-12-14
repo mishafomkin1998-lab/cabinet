@@ -1796,10 +1796,10 @@
 
         // ============= ПРОКСИ ДЛЯ WEBVIEW =============
         // Получить прокси для анкеты по её номеру (порядку добавления)
-        // proxy1 → анкеты 1-10, proxy2 → анкеты 11-20, и т.д.
+        // proxy1 → анкеты 1-25, proxy2 → анкеты 26-50, и т.д.
         function getProxyForAccountNumber(accountNumber) {
             if (!accountNumber || accountNumber < 1) return null;
-            const proxyIndex = Math.ceil(accountNumber / 10);
+            const proxyIndex = Math.ceil(accountNumber / 25);
             if (proxyIndex > 6) return null;
             const proxyKey = `proxy${proxyIndex}`;
             const proxyValue = globalSettings[proxyKey];

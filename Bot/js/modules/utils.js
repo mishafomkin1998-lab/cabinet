@@ -70,14 +70,14 @@ function parseSimpleProxy(proxyString) {
 
 // ============= ПРОКСИ ДЛЯ WEBVIEW =============
 // Получить прокси для анкеты по её номеру (порядку добавления)
-// proxy1 → анкеты 1-10, proxy2 → анкеты 11-20, и т.д.
+// proxy1 → анкеты 1-25, proxy2 → анкеты 26-50, и т.д.
 function getProxyForAccountNumber(accountNumber) {
     if (!accountNumber || accountNumber < 1) return null;
 
-    // Определяем какой прокси использовать (1-10 → proxy1, 11-20 → proxy2, ...)
-    const proxyIndex = Math.ceil(accountNumber / 10);
+    // Определяем какой прокси использовать (1-25 → proxy1, 26-50 → proxy2, ...)
+    const proxyIndex = Math.ceil(accountNumber / 25);
 
-    // Максимум 6 прокси
+    // Максимум 6 прокси (до 150 анкет)
     if (proxyIndex > 6) return null;
 
     const proxyKey = `proxy${proxyIndex}`;
