@@ -142,17 +142,33 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
             [accountDisplayId, profileStatus]
         );
     } else {
-        await pool.query(
-            `UPDATE profiles SET status = $1, last_online = NOW() WHERE profile_id = $2`,
-            [profileStatus, accountDisplayId]
-        );
+        // Обновляем last_online только если статус 'online'
+        if (profileStatus === 'online') {
+            await pool.query(
+                `UPDATE profiles SET status = $1, last_online = NOW() WHERE profile_id = $2`,
+                [profileStatus, accountDisplayId]
+            );
+        } else {
+            await pool.query(
+                `UPDATE profiles SET status = $1 WHERE profile_id = $2`,
+                [profileStatus, accountDisplayId]
+            );
+        }
     }
 
     // 3.5. ВАЖНО: Также обновляем статус в allowed_profiles (API читает оттуда!)
-    await pool.query(
-        `UPDATE allowed_profiles SET status = $1, last_online = NOW() WHERE profile_id = $2`,
-        [profileStatus, accountDisplayId]
-    );
+    // Обновляем last_online только если статус 'online'
+    if (profileStatus === 'online') {
+        await pool.query(
+            `UPDATE allowed_profiles SET status = $1, last_online = NOW() WHERE profile_id = $2`,
+            [profileStatus, accountDisplayId]
+        );
+    } else {
+        await pool.query(
+            `UPDATE allowed_profiles SET status = $1 WHERE profile_id = $2`,
+            [profileStatus, accountDisplayId]
+        );
+    }
 
     // 4. Обновляем/создаём запись бота в bots для dashboard + верификация ID
     // Собираем расширенные данные в JSON
@@ -302,11 +318,21 @@ router.post('/bot/heartbeat', asyncHandler(async (req, res) => {
         );
 
         // 3. Обновляем статус профиля
-        await pool.query(`
-            UPDATE allowed_profiles
-            SET status = $1, last_online = NOW()
-            WHERE profile_id = $2
-        `, [status || 'online', profileId]);
+        // Обновляем last_online только если статус 'online'
+        const profileStatus = status || 'online';
+        if (profileStatus === 'online') {
+            await pool.query(`
+                UPDATE allowed_profiles
+                SET status = $1, last_online = NOW()
+                WHERE profile_id = $2
+            `, [profileStatus, profileId]);
+        } else {
+            await pool.query(`
+                UPDATE allowed_profiles
+                SET status = $1
+                WHERE profile_id = $2
+            `, [profileStatus, profileId]);
+        }
     }
 
     // 4. Записываем в heartbeats для истории

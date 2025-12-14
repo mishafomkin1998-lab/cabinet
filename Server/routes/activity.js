@@ -346,21 +346,31 @@ router.get('/recent', asyncHandler(async (req, res) => {
 // Статус профиля
 router.post('/profile/status', asyncHandler(async (req, res) => {
     const { botId, profileId, status, lastOnline } = req.body;
+    const profileStatus = status || 'online';
 
-    await pool.query(`
+    // Обновляем last_online только если статус 'online'
+    if (profileStatus === 'online') {
+        await pool.query(`
             UPDATE allowed_profiles
             SET status = $1, last_online = $2
             WHERE profile_id = $3
-        `, [status || 'online', lastOnline || new Date(), profileId]);
+        `, [profileStatus, lastOnline || new Date(), profileId]);
+    } else {
+        await pool.query(`
+            UPDATE allowed_profiles
+            SET status = $1
+            WHERE profile_id = $2
+        `, [profileStatus, profileId]);
+    }
 
-        if (botId) {
-            await pool.query(
-                `INSERT INTO bot_profiles (bot_id, profile_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-                [botId, profileId]
-            );
-        }
+    if (botId) {
+        await pool.query(
+            `INSERT INTO bot_profiles (bot_id, profile_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+            [botId, profileId]
+        );
+    }
 
-        console.log(`👤 Статус профиля ${profileId}: ${status || 'online'}`);
+    console.log(`👤 Статус профиля ${profileId}: ${profileStatus}`);
 
     res.json({ status: 'ok' });
 }));
