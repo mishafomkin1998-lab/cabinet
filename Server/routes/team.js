@@ -124,7 +124,7 @@ router.get('/', async (req, res) => {
 // Только директор и админы могут создавать пользователей
 router.post('/', async (req, res) => {
     // Проверка прав - только директор и админ могут создавать пользователей
-    const userRole = req.user?.role || req.body.role;
+    const userRole = req.user?.role || req.body.userRole;
     if (!userRole || !['director', 'admin'].includes(userRole)) {
         return res.status(403).json({ success: false, error: 'Недостаточно прав для создания пользователей' });
     }
