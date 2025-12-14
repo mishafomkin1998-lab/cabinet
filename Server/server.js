@@ -2,6 +2,9 @@
 // SERVER.JS - v7.0 (Модульная архитектура)
 // ==========================================
 
+// Загрузка переменных окружения из .env файла
+require('dotenv').config();
+
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
@@ -191,58 +194,10 @@ app.post('/api/error', (req, res, next) => {
 });
 
 // ==========================================
-// УТИЛИТЫ
+// УТИЛИТЫ (служебные эндпоинты удалены из соображений безопасности)
 // ==========================================
-
-// Сброс базы данных
-app.get('/reset-database', async (req, res) => {
-    try {
-        console.log('⚠️ ЗАПУЩЕН СБРОС БАЗЫ ДАННЫХ...');
-        await pool.query('DROP TABLE IF EXISTS daily_stats CASCADE');
-        await pool.query('DROP TABLE IF EXISTS error_logs CASCADE');
-        await pool.query('DROP TABLE IF EXISTS message_content CASCADE');
-        await pool.query('DROP TABLE IF EXISTS messages CASCADE');
-        await pool.query('DROP TABLE IF EXISTS allowed_profiles CASCADE');
-        await pool.query('DROP TABLE IF EXISTS users CASCADE');
-
-        console.log('✅ Таблицы удалены. Перезапустите сервер.');
-        res.send('<h1>✅ База данных очищена!</h1><p>Теперь <b>перезапустите server.js</b> чтобы создать новые таблицы.</p>');
-    } catch(e) {
-        res.send('Ошибка: ' + e.message);
-    }
-});
-
-// Пересчет статистики
-app.get('/recalculate-stats', async (req, res) => {
-    try {
-        console.log('🔄 Пересчет ежедневной статистики...');
-
-        await pool.query(`
-            DELETE FROM daily_stats
-            WHERE date >= CURRENT_DATE - INTERVAL '30 days'
-        `);
-
-        await pool.query(`
-            INSERT INTO daily_stats (user_id, date, letters_count, chats_count, unique_men, avg_response_time)
-            SELECT
-                p.assigned_translator_id as user_id,
-                DATE(m.timestamp) as date,
-                COUNT(*) FILTER (WHERE m.type = 'outgoing') as letters_count,
-                COUNT(*) FILTER (WHERE m.type = 'chat_msg') as chats_count,
-                COUNT(DISTINCT m.sender_id) as unique_men,
-                AVG(m.response_time) as avg_response_time
-            FROM messages m
-            JOIN allowed_profiles p ON m.account_id = p.profile_id
-            WHERE m.timestamp >= CURRENT_DATE - INTERVAL '30 days'
-                AND p.assigned_translator_id IS NOT NULL
-            GROUP BY p.assigned_translator_id, DATE(m.timestamp)
-        `);
-
-        res.json({ success: true, message: 'Статистика пересчитана' });
-    } catch(e) {
-        res.status(500).json({ error: e.message });
-    }
-});
+// Для сброса БД используйте: psql -U postgres -d ladabot_stats -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+// Для пересчёта статистики используйте: node scripts/recalculate-stats.js (создайте при необходимости)
 
 // ==========================================
 // ЗАГРУЗКА ФАЙЛОВ

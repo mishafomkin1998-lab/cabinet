@@ -9,40 +9,15 @@ const pool = require('../config/database');
 
 const router = express.Router();
 
-// Создание директора
-router.get('/setup-director', async (req, res) => {
-    const { user, pass } = req.query;
-    if (!user || !pass) return res.send('Ошибка: укажите ?user=Имя&pass=Пароль в ссылке');
-
-    try {
-        const hash = await bcrypt.hash(pass, 10);
-        const exists = await pool.query(`SELECT 1 FROM users WHERE username = $1`, [user]);
-        if (exists.rows.length === 0) {
-            await pool.query(
-                `INSERT INTO users (username, password_hash, role) VALUES ($1, $2, 'director')`, [user, hash]
-            );
-        } else {
-            await pool.query(`UPDATE users SET password_hash = $1 WHERE username = $2`, [hash, user]);
-        }
-        res.send(`<h1>Готово!</h1><p>Директор <b>${user}</b> создан/обновлен.</p>`);
-    } catch (e) { res.send('Ошибка создания: ' + e.message); }
-});
-
-// Сброс пароля
-router.get('/fix-password', async (req, res) => {
-    const user = req.query.user;
-    const newPass = '12345';
-
-    if (!user) return res.send('Укажите ?user=ИМЯ в ссылке');
-
-    try {
-        const hash = await bcrypt.hash(newPass, 10);
-        await pool.query('UPDATE users SET password_hash = $1 WHERE username = $2', [hash, user]);
-        res.send(`<h1>Успех!</h1><p>Пароль для <b>${user}</b> изменен на <b>12345</b></p>`);
-    } catch (e) {
-        res.send('Ошибка: ' + e.message);
-    }
-});
+// ==========================================
+// СЛУЖЕБНЫЕ ЭНДПОИНТЫ УДАЛЕНЫ (безопасность)
+// ==========================================
+// Для создания директора используйте скрипт:
+//   node -e "const bcrypt=require('bcryptjs'); bcrypt.hash('ПАРОЛЬ',10).then(h=>console.log('INSERT INTO users (username, password_hash, role) VALUES (\'ИМЯ\', \''+h+'\', \'director\');'))"
+// Затем выполните SQL в psql
+//
+// Для сброса пароля:
+//   UPDATE users SET password_hash = '$2a$10$...' WHERE username = 'ИМЯ';
 
 // Вход
 router.post('/api/login', async (req, res) => {
