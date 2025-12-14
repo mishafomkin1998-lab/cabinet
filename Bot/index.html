@@ -364,7 +364,21 @@
                         <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('myPrompt')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
                     </div>
                     <textarea id="set-prompt" class="form-control mt-2" rows="3" placeholder="Напиши здесь промт для AI..." onchange="savePromptText('myPrompt')"></textarea>
-                    <small class="text-muted" style="font-size:10px">Используется для кнопки "My Prompt" при улучшении текста</small>
+                    <small class="text-muted" style="font-size:10px">Используется для кнопки "My Prompt" в режиме Mail</small>
+                </div>
+
+                <!-- My Prompt (Chat) с шаблонами -->
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-comments"></i> My Prompt (Chat)</div>
+                    <div class="prompt-template-selector">
+                        <select id="select-myPromptChat" class="form-control form-control-sm" onchange="selectPromptTemplate('myPromptChat')">
+                            <option value="">-- Без шаблона --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-success" onclick="addPromptTemplate('myPromptChat')" title="Добавить шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('myPromptChat')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
+                    </div>
+                    <textarea id="set-prompt-chat" class="form-control mt-2" rows="3" placeholder="Напиши здесь промт для AI (Chat)..." onchange="savePromptText('myPromptChat')"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется для кнопки "My Prompt" в режиме Chat</small>
                 </div>
 
                 <!-- Промпт для ответов на письма -->

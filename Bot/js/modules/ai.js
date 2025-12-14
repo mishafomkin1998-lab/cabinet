@@ -60,8 +60,13 @@ async function handleAIAction(botId, action, event) {
     let systemRole = "You are a helpful dating assistant. Write engaging, short, and natural texts for dating sites.";
 
     if(action === 'myprompt') {
-        if(!globalSettings.myPrompt) { showToast("Заполните 'My Prompt' в настройках!"); return; }
-        prompt = `${globalSettings.myPrompt}. \n\nOriginal text: "${currentText}"`;
+        // В режиме Chat используем myPromptChat, в режиме Mail - myPrompt
+        const isChat = globalMode === 'chat';
+        const myPromptValue = isChat ? globalSettings.myPromptChat : globalSettings.myPrompt;
+        const promptName = isChat ? "My Prompt (Chat)" : "My Prompt";
+
+        if(!myPromptValue) { showToast(`Заполните '${promptName}' в настройках!`); return; }
+        prompt = `${myPromptValue}. \n\nOriginal text: "${currentText}"`;
     } else if (action === 'improve') {
         if(!currentText) { showToast("Напишите что-то, чтобы улучшить!"); return; }
         prompt = `Rewrite the following text to be more engaging, grammatically correct, and flirtatious. Keep it natural. Text: "${currentText}"`;
@@ -131,8 +136,11 @@ async function generateAIForAll(action) {
         let prompt = "";
 
         if(action === 'myprompt') {
-            if(!globalSettings.myPrompt) continue;
-            prompt = `${globalSettings.myPrompt}. \n\nOriginal text: "${currentText}"`;
+            // В режиме Chat используем myPromptChat, в режиме Mail - myPrompt
+            const isChat = globalMode === 'chat';
+            const myPromptValue = isChat ? globalSettings.myPromptChat : globalSettings.myPrompt;
+            if(!myPromptValue) continue;
+            prompt = `${myPromptValue}. \n\nOriginal text: "${currentText}"`;
         } else if (action === 'improve') {
             if(!currentText) continue;
             prompt = `Rewrite the following text to be more engaging, grammatically correct, and flirtatious. Keep it natural. Text: "${currentText}"`;

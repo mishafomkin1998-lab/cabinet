@@ -26,12 +26,12 @@ let accountPreferences = JSON.parse(localStorage.getItem('accountPreferences')) 
 
 let defaultSettings = {
     lang: 'ru', theme: 'light', proxy: '', proxyURL: '', proxyAI: '',
-    hotkeys: true, myPrompt: '', apiKey: '',
+    hotkeys: true, myPrompt: '', myPromptChat: '', apiKey: '',
     soundsEnabled: true, confirmTabClose: true, extendedFeatures: true,
     skipDeleteConfirm: false, // Не спрашивать об удалении шаблона
     translatorId: null, // ID переводчика для статистики
     aiReplyPrompt: '', // Промпт для AI ответов на письма
-    chatPrompt: '', // Промпт для AI ответов в чатах (новый)
+    chatPrompt: '', // Промпт для AI ответов в чатах
     // Прокси для анкет по позициям (1-10, 11-20, 21-30, 31-40, 41-50, 51-60)
     proxy1: '', proxy2: '', proxy3: '', proxy4: '', proxy5: '', proxy6: '',
     // Отключенные статусы (пропускаются в авто-режиме)
@@ -39,6 +39,7 @@ let defaultSettings = {
     // Активные шаблоны промптов (ID из сервера)
     activePromptTemplates: {
         myPrompt: null,
+        myPromptChat: null,
         replyPrompt: null,
         chatPrompt: null
     }
@@ -47,6 +48,7 @@ let defaultSettings = {
 // Шаблоны промптов (загружаются с сервера)
 let promptTemplates = {
     myPrompt: [],
+    myPromptChat: [],
     replyPrompt: [],
     chatPrompt: []
 };

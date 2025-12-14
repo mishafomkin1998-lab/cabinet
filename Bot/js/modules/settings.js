@@ -7,6 +7,7 @@ function loadGlobalSettingsUI() {
     document.getElementById('set-hotkeys').checked = globalSettings.hotkeys;
     document.getElementById('set-apikey').value = globalSettings.apiKey || '';
     document.getElementById('set-prompt').value = globalSettings.myPrompt || '';
+    document.getElementById('set-prompt-chat').value = globalSettings.myPromptChat || '';
     document.getElementById('set-ai-reply-prompt').value = globalSettings.aiReplyPrompt || '';
     document.getElementById('set-chat-prompt').value = globalSettings.chatPrompt || '';
     document.getElementById('set-sounds').checked = globalSettings.soundsEnabled;
@@ -64,6 +65,7 @@ function saveGlobalSettings() {
     globalSettings.hotkeys = document.getElementById('set-hotkeys').checked;
     globalSettings.apiKey = document.getElementById('set-apikey').value;
     globalSettings.myPrompt = document.getElementById('set-prompt').value;
+    globalSettings.myPromptChat = document.getElementById('set-prompt-chat').value;
     globalSettings.aiReplyPrompt = document.getElementById('set-ai-reply-prompt').value;
     globalSettings.chatPrompt = document.getElementById('set-chat-prompt').value;
     globalSettings.soundsEnabled = document.getElementById('set-sounds').checked;
@@ -107,6 +109,7 @@ function openGlobalSettings() {
     document.getElementById('set-hotkeys').checked = globalSettings.hotkeys;
     document.getElementById('set-apikey').value = globalSettings.apiKey || '';
     document.getElementById('set-prompt').value = globalSettings.myPrompt || '';
+    document.getElementById('set-prompt-chat').value = globalSettings.myPromptChat || '';
     document.getElementById('set-ai-reply-prompt').value = globalSettings.aiReplyPrompt || '';
     document.getElementById('set-chat-prompt').value = globalSettings.chatPrompt || '';
     document.getElementById('set-sounds').checked = globalSettings.soundsEnabled;
@@ -337,12 +340,14 @@ function applyVar(textareaId, text, dropdownId) {
 // Маппинг типов промптов к ID элементов
 const promptTypeToTextarea = {
     myPrompt: 'set-prompt',
+    myPromptChat: 'set-prompt-chat',
     replyPrompt: 'set-ai-reply-prompt',
     chatPrompt: 'set-chat-prompt'
 };
 
 const promptTypeToSetting = {
     myPrompt: 'myPrompt',
+    myPromptChat: 'myPromptChat',
     replyPrompt: 'aiReplyPrompt',
     chatPrompt: 'chatPrompt'
 };
@@ -357,12 +362,13 @@ async function loadPromptTemplates() {
             console.log('[PromptTemplates] Загружено из localStorage:', promptTemplates);
         } catch (e) {
             console.error('[PromptTemplates] Ошибка парсинга localStorage:', e);
-            promptTemplates = { myPrompt: [], replyPrompt: [], chatPrompt: [] };
+            promptTemplates = { myPrompt: [], myPromptChat: [], replyPrompt: [], chatPrompt: [] };
         }
     }
 
     // 2. Обновляем выпадающие списки
     updatePromptDropdown('myPrompt');
+    updatePromptDropdown('myPromptChat');
     updatePromptDropdown('replyPrompt');
     updatePromptDropdown('chatPrompt');
 
@@ -373,13 +379,14 @@ async function loadPromptTemplates() {
             if (response.data.success && response.data.data) {
                 // Мержим серверные шаблоны с локальными
                 const serverTemplates = response.data.data;
-                ['myPrompt', 'replyPrompt', 'chatPrompt'].forEach(type => {
+                ['myPrompt', 'myPromptChat', 'replyPrompt', 'chatPrompt'].forEach(type => {
                     if (serverTemplates[type] && serverTemplates[type].length > 0) {
                         promptTemplates[type] = serverTemplates[type];
                     }
                 });
                 savePromptTemplatesToStorage();
                 updatePromptDropdown('myPrompt');
+                updatePromptDropdown('myPromptChat');
                 updatePromptDropdown('replyPrompt');
                 updatePromptDropdown('chatPrompt');
                 console.log('[PromptTemplates] Синхронизировано с сервером');
