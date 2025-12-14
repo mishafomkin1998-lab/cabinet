@@ -65,7 +65,7 @@ function createInterface(bot) {
                     <div class="ai-options" id="ai-options-${bot.id}">
                         <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'improve', event)" title="Shift=всем"><i class="fa fa-check"></i> Improve</button>
                         <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'generate', event)" title="Shift=всем"><i class="fa fa-pencil"></i> Generate</button>
-                        <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'myprompt', event)" title="Shift=всем"><i class="fa fa-user"></i> My Prompt</button>
+                        <button class="btn-ai-sub" id="btn-myprompt-${bot.id}" onclick="handleAIAction('${bot.id}', 'myprompt', event)" title="Shift=всем"><i class="fa fa-user"></i> <span class="myprompt-label">My Prompt</span></button>
                     </div>
             </div>
             </div>
@@ -183,6 +183,12 @@ function updateInterfaceForMode(botId) {
     document.getElementById(`title-tpl-${botId}`).innerText = isChat ? "Шаблоны ЧАТА" : "Шаблоны ПИСЕМ";
     document.getElementById(`title-text-${botId}`).innerText = isChat ? "Сообщения (разд. __)" : "Текст письма";
     document.getElementById(`chat-hint`).style.display = isChat ? 'block' : 'none';
+
+    // Обновляем текст кнопки My Prompt в зависимости от режима
+    const myPromptLabel = document.querySelector(`#btn-myprompt-${botId} .myprompt-label`);
+    if (myPromptLabel) {
+        myPromptLabel.innerText = isChat ? "My Prompt (Chat)" : "My Prompt";
+    }
     const ws = document.getElementById(`ws-${botId}`);
     const targetSelect = document.getElementById(`target-select-${botId}`);
 
