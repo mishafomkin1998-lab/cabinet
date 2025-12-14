@@ -128,7 +128,7 @@ router.get('/', async (req, res) => {
                 admin_name: row.admin_name,
                 admin_is_restricted: row.admin_is_restricted || false,
                 translator_id: row.translator_id,
-                trans_name: row.trans_name,
+                translator_name: row.trans_name,
                 added_at: row.added_at,
                 note: row.note,
                 paused: row.paused || false
