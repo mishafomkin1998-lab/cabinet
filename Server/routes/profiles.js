@@ -52,7 +52,7 @@ router.get('/', async (req, res) => {
                 p.paused,
                 CASE
                     WHEN p.last_online IS NULL THEN 'offline'
-                    WHEN p.last_online > NOW() - INTERVAL '5 minutes' THEN 'online'
+                    WHEN p.last_online > NOW() - INTERVAL '2 minutes' THEN 'online'
                     ELSE 'offline'
                 END as status,
                 p.last_online,
