@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход в личный кабинет - Nova</title>
+    <link rel="icon" type="image/png" href="logo.png">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --glass-bg: rgba(255, 255, 255, 0.9);
+            --glass-border: rgba(255, 255, 255, 0.25);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(102, 126, 234, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(118, 75, 162, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(120, 220, 255, 0.1) 0%, transparent 60%);
+            z-index: -1;
+        }
+        
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+        }
+        
+        .glass-dark {
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            display: inline-block;
+        }
+        
+        .glow-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+        }
+        
+        .glow-button:hover {
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
+            transform: translateY(-2px);
+        }
+        
+        .input-glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .input-glass:focus {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: rgba(102, 126, 234, 0.5);
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.8s ease forwards;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .pulse-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #10b981;
+            position: relative;
+        }
+        
+        .pulse-dot::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(2.5);
+                opacity: 0;
+            }
+        }
+
+        /* ❄️ Новогодняя анимация снега ❄️ */
+        .snowflake {
+            position: fixed;
+            top: -10px;
+            color: #fff;
+            font-size: 1rem;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+            user-select: none;
+            pointer-events: none;
+            z-index: 1000;
+            animation: snowfall linear infinite;
+        }
+
+        @keyframes snowfall {
+            0% {
+                transform: translateY(0) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(360deg);
+                opacity: 0.3;
+            }
+        }
+
+        /* Праздничная картинка */
+        .new-year-decoration {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .new-year-decoration img {
+            max-width: 120px;
+            height: auto;
+            filter: drop-shadow(0 5px 15px rgba(0,0,0,0.2));
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        /* Праздничная гирлянда сверху */
+        .garland {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 30px;
+            background: linear-gradient(90deg,
+                #ff6b6b 0%, #feca57 15%, #48dbfb 30%,
+                #ff9ff3 45%, #1dd1a1 60%, #ff6b6b 75%,
+                #feca57 90%, #48dbfb 100%);
+            background-size: 200% 100%;
+            animation: garlandMove 3s linear infinite;
+            z-index: 999;
+            opacity: 0.8;
+        }
+
+        .garland::after {
+            content: '🎄 С Новым Годом! 🎄';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            font-size: 14px;
+        }
+
+        @keyframes garlandMove {
+            0% { background-position: 0% 0%; }
+            100% { background-position: 200% 0%; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 🎄 Новогодние украшения 🎄 -->
+    <div class="garland"></div>
+
+    <!-- Праздничная картинка (замени new-year.png на свою) -->
+    <div class="new-year-decoration">
+        <img src="new-year.png" alt="С Новым Годом!" onerror="this.parentElement.style.display='none'">
+    </div>
+
+    <!-- Контейнер для снежинок -->
+    <div id="snowContainer"></div>
+
+    <div class="glass rounded-3xl w-full max-w-md overflow-hidden fade-in" style="margin-top: 40px;">
+        <!-- Заголовок -->
+        <div class="p-8 pb-4">
+            <div class="flex justify-center mb-4">
+                <img src="logo.png" alt="Nova" class="h-28 w-auto max-w-full">
+            </div>
+            <div class="flex items-center justify-center space-x-2 mb-2">
+                <div class="pulse-dot"></div>
+                <span class="text-xs text-green-600 font-medium">Система активна</span>
+            </div>
+            <p class="text-gray-500 text-sm text-center">Вход в личный кабинет управления</p>
+        </div>
+        
+        <!-- Форма входа -->
+        <div class="px-8 pb-8">
+            <form id="loginForm">
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-medium mb-2" for="email">
+                        Логин или Email
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-user text-gray-400"></i>
+                        </div>
+                        <input 
+                            class="input-glass w-full pl-10 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all duration-200" 
+                            id="email" 
+                            type="text" 
+                            placeholder="admin@nova.ai"
+                            required
+                        >
+                    </div>
+                </div>
+                
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-medium mb-2" for="password">
+                        Пароль
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fas fa-lock text-gray-400"></i>
+                        </div>
+                        <input 
+                            class="input-glass w-full pl-10 pr-10 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all duration-200" 
+                            id="password" 
+                            type="password" 
+                            placeholder="••••••••"
+                            required
+                        >
+                        <button type="button" class="absolute inset-y-0 right-0 pr-3 flex items-center" id="togglePassword">
+                            <i class="fas fa-eye text-gray-400 hover:text-gray-600 cursor-pointer"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between mb-8">
+                    <div class="flex items-center">
+                        <input 
+                            id="remember" 
+                            type="checkbox" 
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        >
+                        <label for="remember" class="ml-2 block text-sm text-gray-700">
+                            Запомнить меня
+                        </label>
+                    </div>
+                    <a href="#" class="text-sm text-blue-600 hover:text-blue-800 font-medium">
+                        Забыли пароль?
+                    </a>
+                </div>
+                
+                <button type="submit" class="glow-button text-white w-full py-4 rounded-xl font-bold text-lg mb-6">
+                    Войти в личный кабинет
+                </button>
+                
+                <div class="text-center">
+                    <p class="text-gray-600 text-sm">
+                        Нет аккаунта? 
+                        <a href="index.html" class="text-blue-600 hover:text-blue-800 font-medium">
+                            Вернуться на главную
+                        </a>
+                    </p>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Информационная панель -->
+        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 border-t border-gray-100">
+            <div class="flex items-center justify-center space-x-2">
+                <i class="fas fa-shield-alt text-blue-500"></i>
+                <span class="text-sm text-gray-700">Защищено шифрованием AES-256</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Дополнительные элементы фона -->
+    <div class="absolute top-10 left-10 w-64 h-64 rounded-full bg-gradient-to-r from-blue-100 to-purple-100 opacity-30 blur-3xl"></div>
+    <div class="absolute bottom-10 right-10 w-80 h-80 rounded-full bg-gradient-to-r from-pink-100 to-blue-100 opacity-30 blur-3xl"></div>
+    
+    <script>
+        // Конфигурация API - автоматически определяет адрес сервера
+        const API_BASE = window.location.origin;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Если уже авторизован - перенаправляем на dashboard
+            const existingUser = localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser');
+            if (existingUser) {
+                window.location.href = 'dashboard.html';
+                return;
+            }
+
+            // Переключение видимости пароля
+            const togglePassword = document.getElementById('togglePassword');
+            const passwordInput = document.getElementById('password');
+            const eyeIcon = togglePassword.querySelector('i');
+
+            togglePassword.addEventListener('click', function() {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                eyeIcon.classList.toggle('fa-eye');
+                eyeIcon.classList.toggle('fa-eye-slash');
+            });
+
+            // Обработка формы входа
+            const loginForm = document.getElementById('loginForm');
+            loginForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+
+                const username = document.getElementById('email').value.trim();
+                const password = document.getElementById('password').value;
+                const remember = document.getElementById('remember').checked;
+
+                // Валидация
+                if (!username || !password) {
+                    showError('Пожалуйста, заполните все поля');
+                    return;
+                }
+
+                // Показываем загрузку
+                const submitBtn = loginForm.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Вход...';
+                submitBtn.disabled = true;
+
+                try {
+                    // Запрос к реальному API сервера
+                    const response = await fetch(`${API_BASE}/api/login`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        // Успешный вход - сохраняем данные пользователя
+                        const userData = {
+                            id: data.user.id,
+                            username: data.user.username,
+                            role: data.user.role,
+                            salary: data.user.salary,
+                            isRestricted: data.user.isRestricted || false,
+                            aiEnabled: data.user.aiEnabled || false,
+                            loggedIn: true,
+                            loginTime: new Date().toISOString()
+                        };
+
+                        // Сохраняем JWT токен (всегда в localStorage для удобства)
+                        if (data.token) {
+                            localStorage.setItem('authToken', data.token);
+                        }
+
+                        // Если "Запомнить меня" - localStorage, иначе sessionStorage
+                        if (remember) {
+                            localStorage.setItem('novaUser', JSON.stringify(userData));
+                        } else {
+                            sessionStorage.setItem('novaUser', JSON.stringify(userData));
+                        }
+
+                        // Перенаправляем на единый dashboard
+                        window.location.href = 'dashboard.html';
+                    } else {
+                        // Ошибка входа
+                        showError(data.error || 'Ошибка авторизации');
+                        submitBtn.innerHTML = originalText;
+                        submitBtn.disabled = false;
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    showError('Сервер недоступен. Проверьте подключение.');
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.disabled = false;
+                }
+            });
+
+            // Функция показа ошибки
+            function showError(message) {
+                // Удаляем старое сообщение если есть
+                const oldError = document.querySelector('.error-message');
+                if (oldError) oldError.remove();
+
+                // Создаем новое сообщение об ошибке
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 flex items-center';
+                errorDiv.innerHTML = `
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    <span>${message}</span>
+                `;
+
+                // Вставляем перед кнопкой
+                const submitBtn = loginForm.querySelector('button[type="submit"]');
+                submitBtn.parentNode.insertBefore(errorDiv, submitBtn);
+
+                // Автоудаление через 5 секунд
+                setTimeout(() => errorDiv.remove(), 5000);
+            }
+
+            // Анимация появления
+            const elements = document.querySelectorAll('.fade-in');
+            elements.forEach((el, index) => {
+                el.style.animationDelay = `${index * 0.1}s`;
+            });
+
+            // ❄️ Генерация снежинок ❄️
+            createSnowflakes();
+        });
+
+        // Функция создания снежинок
+        function createSnowflakes() {
+            const snowContainer = document.getElementById('snowContainer');
+            const snowflakes = ['❄', '❅', '❆', '✻', '✼', '❉', '✽'];
+            const numberOfSnowflakes = 50;
+
+            for (let i = 0; i < numberOfSnowflakes; i++) {
+                setTimeout(() => {
+                    createSnowflake(snowContainer, snowflakes);
+                }, i * 200); // Постепенное появление
+            }
+
+            // Продолжаем создавать снежинки
+            setInterval(() => {
+                createSnowflake(snowContainer, snowflakes);
+            }, 500);
+        }
+
+        function createSnowflake(container, snowflakes) {
+            const snowflake = document.createElement('div');
+            snowflake.className = 'snowflake';
+            snowflake.innerHTML = snowflakes[Math.floor(Math.random() * snowflakes.length)];
+
+            // Случайные параметры
+            const startPositionX = Math.random() * 100;
+            const size = Math.random() * 1.5 + 0.5;
+            const duration = Math.random() * 5 + 5;
+            const opacity = Math.random() * 0.7 + 0.3;
+
+            snowflake.style.left = startPositionX + 'vw';
+            snowflake.style.fontSize = size + 'rem';
+            snowflake.style.animationDuration = duration + 's';
+            snowflake.style.opacity = opacity;
+
+            container.appendChild(snowflake);
+
+            // Удаляем снежинку после анимации
+            setTimeout(() => {
+                snowflake.remove();
+            }, duration * 1000);
+        }
+    </script>
+</body>
+</html>
