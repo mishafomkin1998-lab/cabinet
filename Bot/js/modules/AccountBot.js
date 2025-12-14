@@ -1074,9 +1074,20 @@ class AccountBot {
                 this.mailHistory.errors.push(`${user?.AccountId || 'unknown'}: ${errorReason}`);
                 this.log(`❌ Ошибка: ${user?.Name || user?.AccountId || 'unknown'} - ${errorReason}`);
 
-                // Добавляем в очередь повторов
+                // Проверяем, стоит ли пытаться повторно (игнор-лист = бессмысленно повторять)
+                const skipRetry = errorReason.toLowerCase().includes('ignore') ||
+                                  errorReason.toLowerCase().includes('игнор') ||
+                                  errorReason.toLowerCase().includes('block') ||
+                                  errorReason.toLowerCase().includes('заблокир');
+
+                // Добавляем в очередь повторов (если есть смысл)
                 if (user && user.AccountId) {
-                    if (!isRetryAttempt) {
+                    if (skipRetry) {
+                        // Игнор-лист или блокировка - не добавляем в очередь повторов
+                        this.log(`⛔ ${user.Name} - повтор не имеет смысла (игнор/блок)`);
+                        // Удаляем из очереди если уже был там
+                        this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
+                    } else if (!isRetryAttempt) {
                         this.mailRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
                     } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
                         this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
@@ -1468,8 +1479,17 @@ class AccountBot {
                         this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                         this.log(`❌ Ошибка: не могу отправить чат ${user.Name} (${user.AccountId}): ${errorReason}`);
 
-                        // Добавляем в очередь повторов
-                        if (!isRetryAttempt) {
+                        // Проверяем, стоит ли пытаться повторно
+                        const skipRetry = errorReason.toLowerCase().includes('ignore') ||
+                                          errorReason.toLowerCase().includes('игнор') ||
+                                          errorReason.toLowerCase().includes('block') ||
+                                          errorReason.toLowerCase().includes('заблокир');
+
+                        // Добавляем в очередь повторов (если есть смысл)
+                        if (skipRetry) {
+                            this.log(`⛔ ${user.Name} - повтор не имеет смысла (игнор/блок)`);
+                            this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
+                        } else if (!isRetryAttempt) {
                             this.chatRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
                         } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
                             this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
@@ -1515,9 +1535,18 @@ class AccountBot {
                         this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                         this.log(`❌ Ошибка API чата: ${errorReason}`);
 
-                        // Добавляем в очередь повторов
+                        // Проверяем, стоит ли пытаться повторно
+                        const skipRetry = errorReason.toLowerCase().includes('ignore') ||
+                                          errorReason.toLowerCase().includes('игнор') ||
+                                          errorReason.toLowerCase().includes('block') ||
+                                          errorReason.toLowerCase().includes('заблокир');
+
+                        // Добавляем в очередь повторов (если есть смысл)
                         if (user && user.AccountId) {
-                            if (!isRetryAttempt) {
+                            if (skipRetry) {
+                                this.log(`⛔ ${user.Name} - повтор не имеет смысла (игнор/блок)`);
+                                this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
+                            } else if (!isRetryAttempt) {
                                 this.chatRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
                             } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
                                 this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
@@ -1562,25 +1591,35 @@ class AccountBot {
             if(e.message === "Network Error" || !e.response) {
                 this.log(`📡 Ошибка сети. Повтор...`);
             } else {
+                const errorReason = e.response ? extractApiError(e.response, e.message) : e.message;
                 this.incrementStat('chat', 'errors');
-                this.chatHistory.errors.push(e.message);
+                this.chatHistory.errors.push(errorReason);
 
-                // Добавляем в очередь повторов
+                // Проверяем, стоит ли пытаться повторно
+                const skipRetry = errorReason.toLowerCase().includes('ignore') ||
+                                  errorReason.toLowerCase().includes('игнор') ||
+                                  errorReason.toLowerCase().includes('block') ||
+                                  errorReason.toLowerCase().includes('заблокир');
+
+                // Добавляем в очередь повторов (если есть смысл)
                 if (user && user.AccountId) {
-                    if (!isRetryAttempt) {
+                    if (skipRetry) {
+                        this.log(`⛔ ${user.Name} - повтор не имеет смысла (игнор/блок)`);
+                        this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
+                    } else if (!isRetryAttempt) {
                         this.chatRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
                     } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
                         this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
                         this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
                     }
                 }
-                
+
                 // Отправляем ошибку на наш сервер
                 await sendErrorToLababot(
                     this.id,
                     this.displayId,
                     'chat_process_error',
-                    e.response?.data?.Error || e.message
+                    errorReason
                 );
             }
         }
