@@ -24,9 +24,15 @@ function getInitialState() {
         // =====================================================
         // Навигация и UI
         // =====================================================
-        activeTab: 'dashboard',
+        activeMenu: localStorage.getItem('dashboard_activeMenu') || 'stats',
+        activeSubmenu: 'general',
         sidebarCollapsed: false,
         language: localStorage.getItem('novaLanguage') || 'ru',
+        darkMode: localStorage.getItem('novaDarkMode') === 'true',
+        loading: true,
+        error: null,
+        expandedAdminId: null,
+        calendarPosition: '',
 
         // Модальные окна
         showAddAccountModal: false,
@@ -67,6 +73,13 @@ function getInitialState() {
 
         // Мониторинг
         monitoringFunction: 'lastResponses',
+        showAllResponses: false,
+        showAllLetters: false,
+        showAllTemplates: false,
+        showAllAiUsage: false,
+
+        // Статистика переводчиков
+        translatorStats: [],
 
         // =====================================================
         // Аккаунты (Анкеты)
@@ -83,6 +96,8 @@ function getInitialState() {
         // Добавление аккаунтов
         newAccountIds: '',
         newAccountComment: '',
+        uniqueProfileNotes: [],
+        selectedProfileNote: '',
 
         // Продление анкеты
         extendingProfile: null,
@@ -150,6 +165,7 @@ function getInitialState() {
         botLogsHasMore: false,
         errorLogs: [],
         errorLogsOffset: 0,
+        logsActiveTab: 'all',
 
         // =====================================================
         // Биллинг и финансы

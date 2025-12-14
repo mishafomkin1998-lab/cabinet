@@ -37,6 +37,78 @@ function dashboard() {
         },
 
         // =====================================================
+        // Локализация
+        // =====================================================
+
+        t(key) {
+            if (typeof LOCALES === 'undefined') return key;
+            const keys = key.split('.');
+            let value = LOCALES[this.language];
+            for (const k of keys) {
+                if (value && value[k] !== undefined) {
+                    value = value[k];
+                } else {
+                    value = LOCALES['ru'];
+                    for (const k2 of keys) {
+                        if (value && value[k2] !== undefined) {
+                            value = value[k2];
+                        } else {
+                            return key;
+                        }
+                    }
+                    return value;
+                }
+            }
+            return value;
+        },
+
+        // =====================================================
+        // Темная тема
+        // =====================================================
+
+        toggleDarkMode() {
+            this.darkMode = !this.darkMode;
+            localStorage.setItem('novaDarkMode', this.darkMode);
+        },
+
+        // =====================================================
+        // Навигация
+        // =====================================================
+
+        setActiveMenu(menu) {
+            this.activeMenu = menu;
+            this.activeSubmenu = 'general';
+            localStorage.setItem('dashboard_activeMenu', menu);
+
+            if (menu === 'control') {
+                this.loadBotsStatus();
+                this.refreshAllLogs();
+            }
+        },
+
+        setActiveSubmenu(submenu) {
+            this.activeSubmenu = submenu;
+        },
+
+        toggleAdminExpanded(adminId) {
+            if (this.expandedAdminId === adminId) {
+                this.expandedAdminId = null;
+            } else {
+                this.expandedAdminId = adminId;
+            }
+        },
+
+        getPageTitle() {
+            const page = this.t('pages.' + this.activeMenu);
+            return page?.title || this.activeMenu;
+        },
+
+        getPageSubtitle() {
+            const page = this.t('pages.' + this.activeMenu);
+            return page?.subtitle || '';
+        },
+
+        // =====================================================
         // Инициализация
         // =====================================================
 
@@ -50,37 +122,113 @@ function dashboard() {
             // Инициализация настроек
             SettingsComponent.initSettings(this);
 
+            // Устанавливаем период по умолчанию
+            this.setDefaultDateRange();
+
+            // Инициализация Flatpickr
+            this.$nextTick(() => this.initFlatpickr());
+
             // Загрузка начальных данных
-            await this.loadInitialData();
+            await this.loadAllData();
 
             // Запуск периодического обновления
             this.startAutoRefresh();
         },
 
-        async loadInitialData() {
+        setDefaultDateRange() {
+            const defaultRange = DashboardUtils.getDefaultDateRange();
+            this.statsFilter.dateFrom = defaultRange.dateFrom;
+            this.statsFilter.dateTo = defaultRange.dateTo;
+            this.statsFilter.quickRange = 'month';
+
+            this.historyFilter.dateFrom = defaultRange.dateFrom;
+            this.historyFilter.dateTo = defaultRange.dateTo;
+        },
+
+        initFlatpickr() {
+            const self = this;
+            const config = {
+                mode: 'range',
+                dateFormat: 'Y-m-d',
+                locale: 'ru',
+                defaultDate: [this.statsFilter.dateFrom, this.statsFilter.dateTo],
+                onChange: function(selectedDates, dateStr) {
+                    if (selectedDates.length === 2) {
+                        const formatDate = (d) => DashboardUtils.formatDateToISO(d);
+                        self.statsFilter.dateFrom = formatDate(selectedDates[0]);
+                        self.statsFilter.dateTo = formatDate(selectedDates[1]);
+                        self.statsFilter.quickRange = '';
+                        self.loadDashboardStats();
+                    }
+                }
+            };
+
+            if (typeof flatpickr !== 'undefined') {
+                this.statsDatePicker = flatpickr('#statsDatePicker', config);
+
+                this.historyDatePicker = flatpickr('#historyDatePicker', {
+                    ...config,
+                    defaultDate: [this.historyFilter.dateFrom, this.historyFilter.dateTo],
+                    onChange: function(selectedDates) {
+                        if (selectedDates.length === 2) {
+                            const formatDate = (d) => DashboardUtils.formatDateToISO(d);
+                            self.historyFilter.dateFrom = formatDate(selectedDates[0]);
+                            self.historyFilter.dateTo = formatDate(selectedDates[1]);
+                            self.loadProfileHistory();
+                        }
+                    }
+                });
+            }
+        },
+
+        async loadAllData() {
+            this.loading = true;
+            this.error = null;
             try {
-                await Promise.all([
+                const loadPromises = [
                     this.loadDashboardStats(),
                     this.loadAccounts(),
+                    this.loadBotsStatus(),
                     this.loadTeam(),
+                    this.loadRecentActivity(),
+                    this.loadSentLettersGrouped(),
+                    this.loadFavoriteTemplates(),
+                    this.loadLastResponses(),
+                    this.loadAiUsage(),
+                    this.loadHourlyActivity(),
+                    this.loadProfileHistory(),
+                    this.loadSavedPrompt(),
                     this.loadUserBalance(),
-                    this.loadPricing()
-                ]);
+                    this.loadPricing(),
+                    this.loadControlSettings()
+                ];
 
-                // Дополнительные данные в зависимости от роли
                 if (this.currentUser.role === 'director') {
-                    await this.loadFinanceData();
+                    loadPromises.push(this.loadFinanceData());
                 }
 
-                // Загружаем остальные данные
+                await Promise.all(loadPromises);
+            } catch (e) {
+                console.error('Error loading data:', e);
+                this.error = 'Ошибка загрузки данных';
+            }
+            this.loading = false;
+        },
+
+        async refreshAllStats() {
+            this.loading = true;
+            try {
                 await Promise.all([
-                    this.loadHourlyActivity(),
-                    this.loadFavoriteTemplates(),
-                    this.loadBotsStatus()
+                    this.loadDashboardStats(true),
+                    this.loadSentLettersGrouped(),
+                    this.loadLastResponses(),
+                    this.loadAiUsage(),
+                    this.loadHourlyActivity()
                 ]);
             } catch (e) {
-                console.error('loadInitialData error:', e);
+                console.error('refreshAllStats error:', e);
             }
+            this.loading = false;
         },
 
         startAutoRefresh() {
@@ -94,6 +242,28 @@ function dashboard() {
             setInterval(() => {
                 this.loadAccounts();
             }, 60000);
+        },
+
+        // =====================================================
+        // Календарь
+        // =====================================================
+
+        openCalendar(event, type) {
+            const btn = event.currentTarget;
+            const rect = btn.getBoundingClientRect();
+            this.calendarPosition = `top: ${rect.bottom + 4}px; left: ${rect.left}px;`;
+
+            if (type === 'stats') {
+                this.showStatsCalendar = !this.showStatsCalendar;
+                this.showHistoryCalendar = false;
+            } else if (type === 'history') {
+                this.showHistoryCalendar = !this.showHistoryCalendar;
+                this.showStatsCalendar = false;
+            }
+        },
+
+        applyDateFilter() {
+            this.applyStatsFilter();
         },
 
         // =====================================================
@@ -152,7 +322,8 @@ function dashboard() {
             return StatsComponent.getActivityLevel(this.hourlyActivity, hour);
         },
 
-        getActivityColor(level) {
+        getActivityColor(hour) {
+            const level = this.getActivityLevel(hour);
             return StatsComponent.getActivityColor(level);
         },
 
@@ -210,6 +381,49 @@ function dashboard() {
 
         async toggleProfileMailing(profile) {
             await ProfilesComponent.toggleProfileMailing(this, profile);
+        },
+
+        async deleteSelectedProfiles() {
+            if (this.selectedProfileIds.length === 0) return;
+            if (!confirm(`Удалить ${this.selectedProfileIds.length} выбранных анкет?`)) return;
+
+            let deletedCount = 0;
+            for (const profileId of this.selectedProfileIds) {
+                try {
+                    const res = await fetch(`${API_BASE}/api/profiles/${encodeURIComponent(profileId)}`, {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    const data = await res.json();
+                    if (data.success) deletedCount++;
+                } catch (e) {
+                    console.error('Error deleting profile:', profileId, e);
+                }
+            }
+
+            alert(`Удалено ${deletedCount} из ${this.selectedProfileIds.length} анкет`);
+            this.selectedProfileIds = [];
+            await this.loadAccounts();
+        },
+
+        getProfileIdsByNote(note) {
+            return this.accounts
+                .filter(acc => acc.note === note)
+                .map(acc => acc.id);
+        },
+
+        selectProfilesByNote() {
+            if (!this.selectedProfileNote) return;
+            const ids = this.getProfileIdsByNote(this.selectedProfileNote);
+            if (ids.length === 0) {
+                alert('Нет анкет с таким комментарием');
+                return;
+            }
+            ids.forEach(id => {
+                if (!this.selectedProfileIds.includes(id)) {
+                    this.selectedProfileIds.push(id);
+                }
+            });
         },
 
         // =====================================================
@@ -484,6 +698,14 @@ function dashboard() {
 
         formatBotName(machineId) {
             return DashboardUtils.formatBotName(machineId);
+        },
+
+        formatHistoryTime(timestamp) {
+            return DashboardUtils.formatHistoryTime(timestamp);
+        },
+
+        formatDate(date, options = {}) {
+            return DashboardUtils.formatDate(date, this.language, options);
         },
 
         // =====================================================
