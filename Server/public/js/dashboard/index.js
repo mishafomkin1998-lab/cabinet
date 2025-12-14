@@ -390,7 +390,12 @@ function dashboard() {
             let deletedCount = 0;
             for (const profileId of this.selectedProfileIds) {
                 try {
-                    const res = await fetch(`${API_BASE}/api/profiles/${encodeURIComponent(profileId)}`, {
+                    const params = new URLSearchParams({
+                        role: this.currentUser.role,
+                        userId: this.currentUser.id,
+                        userName: this.currentUser.username
+                    });
+                    const res = await fetch(`${API_BASE}/api/profiles/${encodeURIComponent(profileId)}?${params}`, {
                         method: 'DELETE',
                         headers: { 'Content-Type': 'application/json' }
                     });

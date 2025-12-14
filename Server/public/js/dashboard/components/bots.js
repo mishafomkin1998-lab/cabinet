@@ -17,9 +17,47 @@ const BotsComponent = {
             const data = await res.json();
 
             if (data.success) {
-                context.bots = data.bots || [];
-                context.botsOnline = data.online || 0;
-                context.botsTotal = data.total || 0;
+                // Используем botsSummary для статистики ПРОГРАММ-ботов
+                context.botsStatus = data.botsSummary || { online: 0, offline: 0, total: 0 };
+
+                // Маппинг данных ботов с сервера
+                const rawBots = data.bots || [];
+                context.bots = rawBots.map(b => ({
+                    id: b.botId || b.bot_id,
+                    name: b.name || DashboardUtils.formatBotName(b.botId || b.bot_id),
+                    icon: b.platform?.includes('Windows') ? 'fas fa-desktop' : 'fas fa-laptop',
+                    status: b.status === 'online' ? 'active' : 'inactive',
+                    os: b.platform || 'Unknown',
+                    ip: b.ip || '-',
+                    version: b.version || '-',
+                    lastHeartbeat: b.lastHeartbeat,
+                    profilesCount: b.profilesCount || 0,
+                    profilesRunning: b.profilesRunning || 0,
+                    profilesStopped: b.profilesStopped || 0,
+                    uptime: b.uptime || 0,
+                    memoryUsage: b.memoryUsage || 0,
+                    globalMode: b.globalMode || 'mail',
+                    sessionStats: b.sessionStats || { letters: 0, chats: 0, errors: 0 }
+                }));
+
+                // Обновляем profiles с данными о ботах
+                if (data.profiles && context.accounts) {
+                    data.profiles.forEach(p => {
+                        const acc = context.accounts.find(a =>
+                            a.profile_id === p.profile_id || a.id === p.profile_id
+                        );
+                        if (acc) {
+                            acc.botId = p.bot_id;
+                            acc.heartbeatStatus = p.heartbeat_status;
+                            acc.connectionStatus = p.connection_status;
+                            acc.mailToday = p.mail_today || 0;
+                            acc.mailHour = p.mail_hour || 0;
+                            acc.chatToday = p.chat_today || 0;
+                            acc.chatHour = p.chat_hour || 0;
+                            acc.errorsToday = p.errors_today || 0;
+                        }
+                    });
+                }
             }
         } catch (e) {
             console.error('loadBotsStatus error:', e);

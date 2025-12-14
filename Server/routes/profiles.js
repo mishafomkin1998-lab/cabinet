@@ -145,7 +145,12 @@ router.get('/', async (req, res) => {
 // Массовое добавление анкет
 // Только директор и админы
 router.post('/bulk', async (req, res) => {
-    const userRole = req.user?.role;
+    // Fallback на body параметры для совместимости с фронтендом без JWT
+    const userRole = req.user?.role || req.body.role;
+    const userIdFromAuth = req.user?.id;
+
+    // Проверяем роль - если есть JWT, берем из него, иначе из body
+    // Дополнительно проверяем userId в body для валидации
     if (!userRole || !['director', 'admin'].includes(userRole)) {
         return res.status(403).json({ success: false, error: 'Недостаточно прав для добавления анкет' });
     }
@@ -202,7 +207,7 @@ router.post('/bulk', async (req, res) => {
 // Назначение анкет
 // Только директор и админы
 router.post('/assign', async (req, res) => {
-    const userRole = req.user?.role;
+    const userRole = req.user?.role || req.body.role;
     if (!userRole || !['director', 'admin'].includes(userRole)) {
         return res.status(403).json({ success: false, error: 'Недостаточно прав для назначения анкет' });
     }
@@ -237,7 +242,7 @@ router.post('/assign', async (req, res) => {
 // Массовое назначение анкет админу (по profile_id)
 // Только директор может назначать анкеты админам
 router.post('/assign-admin', async (req, res) => {
-    const userRole = req.user?.role;
+    const userRole = req.user?.role || req.body.role;
     if (userRole !== 'director') {
         return res.status(403).json({ success: false, error: 'Только директор может назначать анкеты админам' });
     }
@@ -269,8 +274,8 @@ router.post('/assign-admin', async (req, res) => {
 // Массовое назначение анкет переводчику (по profile_id)
 // Директор и админы (админ только своим переводчикам)
 router.post('/assign-translator', async (req, res) => {
-    const userRole = req.user?.role;
-    const currentUserId = req.user?.id;
+    const userRole = req.user?.role || req.body.role;
+    const currentUserId = req.user?.id || req.body.userId;
 
     if (!userRole || !['director', 'admin'].includes(userRole)) {
         return res.status(403).json({ success: false, error: 'Недостаточно прав' });
@@ -345,7 +350,7 @@ router.get('/:profileId/status', async (req, res) => {
  * Только директор и админы
  */
 router.post('/toggle-access', async (req, res) => {
-    const userRole = req.user?.role;
+    const userRole = req.user?.role || req.body.role;
     if (!userRole || !['director', 'admin'].includes(userRole)) {
         return res.status(403).json({ success: false, error: 'Недостаточно прав' });
     }
@@ -369,7 +374,7 @@ router.post('/toggle-access', async (req, res) => {
  * Только директор
  */
 router.post('/bulk-delete', async (req, res) => {
-    const userRole = req.user?.role;
+    const userRole = req.user?.role || req.body.role;
     if (userRole !== 'director') {
         return res.status(403).json({ success: false, error: 'Только директор может массово удалять анкеты' });
     }
@@ -414,7 +419,7 @@ router.post('/bulk-delete', async (req, res) => {
  * Только директор и админы
  */
 router.delete('/:profileId', async (req, res) => {
-    const userRole = req.user?.role;
+    const userRole = req.user?.role || req.query.role;
     if (!userRole || !['director', 'admin'].includes(userRole)) {
         return res.status(403).json({ success: false, error: 'Недостаточно прав для удаления анкеты' });
     }

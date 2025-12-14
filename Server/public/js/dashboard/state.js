@@ -149,8 +149,7 @@ function getInitialState() {
         // Боты
         // =====================================================
         bots: [],
-        botsOnline: 0,
-        botsTotal: 0,
+        botsStatus: { online: 0, offline: 0, total: 0 },
         generationPrompt: '',
         controlSettings: {
             mailingEnabled: true,

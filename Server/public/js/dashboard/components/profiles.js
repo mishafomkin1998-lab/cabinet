@@ -82,7 +82,11 @@ const ProfilesComponent = {
             const res = await fetch(`${API_BASE}/api/profiles/toggle-access`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ profileId, paused: newPaused })
+                body: JSON.stringify({
+                    profileId,
+                    paused: newPaused,
+                    role: context.currentUser.role
+                })
             });
             const data = await res.json();
 
@@ -111,7 +115,12 @@ const ProfilesComponent = {
 
         try {
             const profileId = account.profile_id || account.id;
-            const res = await fetch(`${API_BASE}/api/profiles/${encodeURIComponent(profileId)}`, {
+            const params = new URLSearchParams({
+                role: context.currentUser.role,
+                userId: context.currentUser.id,
+                userName: context.currentUser.username
+            });
+            const res = await fetch(`${API_BASE}/api/profiles/${encodeURIComponent(profileId)}?${params}`, {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -154,7 +163,8 @@ const ProfilesComponent = {
                     note: context.newAccountComment || '',
                     adminId: context.currentUser.role === 'director' ? null : context.currentUser.id,
                     userId: context.currentUser.id,
-                    userName: context.currentUser.username
+                    userName: context.currentUser.username,
+                    role: context.currentUser.role
                 })
             });
             const data = await res.json();
@@ -194,7 +204,8 @@ const ProfilesComponent = {
                     adminId,
                     adminName,
                     userId: context.currentUser.id,
-                    userName: context.currentUser.username
+                    userName: context.currentUser.username,
+                    role: context.currentUser.role
                 })
             });
             const data = await res.json();
@@ -236,7 +247,8 @@ const ProfilesComponent = {
                     translatorId,
                     translatorName,
                     userId: context.currentUser.id,
-                    userName: context.currentUser.username
+                    userName: context.currentUser.username,
+                    role: context.currentUser.role
                 })
             });
             const data = await res.json();
