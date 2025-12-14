@@ -145,7 +145,10 @@ function createInterface(bot) {
             <div class="border-top pt-2">
                 <div class="stat-line text-success"><span>Отправлено:</span> <b id="stat-sent-${bot.id}" class="stat-val" onclick="openStatsModal('${bot.id}', 'sent')">0</b></div>
                 <div class="stat-line text-danger"><span>Ошибки:</span> <b id="stat-err-${bot.id}" class="stat-val" onclick="openStatsModal('${bot.id}', 'errors')">0</b></div>
-                <div id="stat-wait-${bot.id}" class="stat-waiting-text">Ожидают: 0</div>
+                <div class="stat-waiting-row">
+                    <span id="stat-ignored-${bot.id}" class="stat-ignored-text" onclick="openIgnoredModal('${bot.id}')" title="Пользователи в игноре (клик для управления)">Игнор: 0</span>
+                    <span id="stat-wait-${bot.id}" class="stat-waiting-text">Ожидают: 0</span>
+                </div>
             </div>
             <div id="log-${bot.id}" class="action-log mt-2" style="flex-grow: 1;"></div>
         </div>`;
@@ -1191,6 +1194,10 @@ async function performLogin(login, pass, displayId) {
             const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
             bots[bid] = bot; // СНАЧАЛА добавляем в объект bots
 
+            // Загружаем игнор-лист из localStorage (сохраняется навсегда, по displayId)
+            bot.ignoredUsers = loadIgnoredUsersFromStorage(displayId);
+            console.log(`[IgnoredUsers] Загружено ${bot.ignoredUsers.length} пользователей для анкеты ${displayId}`);
+
             // ТЕПЕРЬ устанавливаем прокси (после добавления в bots чтобы getAccountNumber работал)
             await setWebviewProxy(bid);
 
@@ -1219,6 +1226,110 @@ async function performLogin(login, pass, displayId) {
     }
     finally { if(s) s.style.display='none'; }
     return false;
+}
+
+// === Функции для работы с игнор-листом ===
+function saveIgnoredUsersToStorage(botId, ignoredUsers) {
+    try {
+        const allIgnored = JSON.parse(localStorage.getItem('ignoredUsers') || '{}');
+        allIgnored[botId] = ignoredUsers;
+        localStorage.setItem('ignoredUsers', JSON.stringify(allIgnored));
+        console.log(`[IgnoredUsers] Сохранено ${ignoredUsers.length} пользователей для ${botId}`);
+    } catch (e) {
+        console.error('Ошибка сохранения ignoredUsers:', e);
+    }
+}
+
+function loadIgnoredUsersFromStorage(botId) {
+    try {
+        const allIgnored = JSON.parse(localStorage.getItem('ignoredUsers') || '{}');
+        return allIgnored[botId] || [];
+    } catch (e) {
+        console.error('Ошибка загрузки ignoredUsers:', e);
+        return [];
+    }
+}
+
+function clearIgnoredUsers(botId) {
+    try {
+        const bot = bots[botId];
+        if (bot) {
+            bot.ignoredUsers = [];
+            saveIgnoredUsersToStorage(bot.displayId, []);
+            bot.updateUI();
+        }
+    } catch (e) {
+        console.error('Ошибка очистки ignoredUsers:', e);
+    }
+}
+
+function openIgnoredModal(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    const count = bot.ignoredUsers ? bot.ignoredUsers.length : 0;
+    const list = bot.ignoredUsers || [];
+
+    // Создаём содержимое модалки
+    const listHtml = list.length > 0
+        ? list.map(id => `<div class="ignored-item">${id}</div>`).join('')
+        : '<div class="text-muted">Список пуст</div>';
+
+    const modalContent = `
+        <div class="modal-header">
+            <h5>Игнор-лист (${count})</h5>
+            <button type="button" class="btn-close" onclick="closeModal('ignored-modal')"></button>
+        </div>
+        <div class="modal-body">
+            <div class="ignored-list-container">${listHtml}</div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline-secondary btn-sm" onclick="copyIgnoredList('${botId}')">
+                <i class="fa fa-copy"></i> Копировать
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="confirmClearIgnored('${botId}')">
+                <i class="fa fa-trash"></i> Очистить всё
+            </button>
+        </div>
+    `;
+
+    // Проверяем, есть ли уже модалка, иначе создаём
+    let modal = document.getElementById('ignored-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'ignored-modal';
+        modal.className = 'custom-modal';
+        modal.innerHTML = `<div class="modal-backdrop" onclick="closeModal('ignored-modal')"></div><div class="modal-content">${modalContent}</div>`;
+        document.body.appendChild(modal);
+    } else {
+        modal.querySelector('.modal-content').innerHTML = modalContent;
+    }
+
+    modal.classList.add('show');
+}
+
+function copyIgnoredList(botId) {
+    const bot = bots[botId];
+    if (!bot || !bot.ignoredUsers || bot.ignoredUsers.length === 0) {
+        showToast('Список пуст');
+        return;
+    }
+
+    const text = bot.ignoredUsers.join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+        showToast(`Скопировано ${bot.ignoredUsers.length} ID`);
+    }).catch(err => {
+        console.error('Ошибка копирования:', err);
+        showToast('Ошибка копирования');
+    });
+}
+
+function confirmClearIgnored(botId) {
+    if (confirm('Очистить весь игнор-лист? Это действие нельзя отменить.')) {
+        clearIgnoredUsers(botId);
+        closeModal('ignored-modal');
+        showToast('Игнор-лист очищен');
+    }
 }
 
 async function saveSession() {
