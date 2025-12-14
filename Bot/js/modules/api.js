@@ -1,16 +1,7 @@
 // ============= ИНФОРМАЦИЯ О ПРОГРАММЕ =============
-// Получаем версию из package.json (доступно благодаря nodeIntegration)
-let APP_VERSION = '1.0.0';
+// APP_VERSION определена в config.js (загружается раньше)
 let APP_PLATFORM = 'Unknown';
 let APP_ARCH = '';
-
-try {
-    // Получаем версию из package.json
-    const packageJson = require('../package.json');
-    APP_VERSION = packageJson.version || '1.0.0';
-} catch (e) {
-    console.warn('⚠️ Не удалось загрузить версию из package.json:', e.message);
-}
 
 // Получаем информацию о платформе и архитектуре
 try {
