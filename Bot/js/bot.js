@@ -251,7 +251,7 @@
 
         // 3. Функция отправки heartbeat
         // ВАЖНО: botId теперь это MACHINE_ID (ID программы), а не ID анкеты!
-        async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
+        async function sendHeartbeatToLababot(botId, displayId, status = 'online', skipCommands = false) {
             console.log(`❤️ Отправляю heartbeat для анкеты ${displayId} (программа: ${MACHINE_ID})`);
 
             try {
@@ -279,8 +279,8 @@
                 // После heartbeat проверяем статус управления (panic mode)
                 checkControlStatus();
 
-                // Обрабатываем команды для конкретной анкеты
-                if (data.commands) {
+                // Обрабатываем команды для конкретной анкеты (пропускаем при удалении)
+                if (data.commands && !skipCommands) {
                     // Проверяем статус бот-машины (botEnabled) - влияет на ВСЕ анкеты
                     const wasBotEnabled = controlStatus.botEnabled !== false;
                     controlStatus.botEnabled = data.commands.botEnabled !== false;
@@ -3303,8 +3303,8 @@
                     clearInterval(this.lababotHeartbeatTimer);
                     this.lababotHeartbeatTimer = null;
                 }
-                // Отправляем последний heartbeat оффлайн
-                sendHeartbeatToLababot(this.id, this.displayId, 'offline');
+                // Отправляем последний heartbeat оффлайн (без обработки команд)
+                sendHeartbeatToLababot(this.id, this.displayId, 'offline', true);
             }
 
             async checkVipStatus() {
