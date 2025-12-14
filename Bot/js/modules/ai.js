@@ -282,7 +282,7 @@ async function handleAIAction(botId, action, event) {
         prompt = `${myPromptValue}. \n\nOriginal text: "${currentText}"`;
     } else if (action === 'improve') {
         if(!currentText) { showToast("Напишите что-то, чтобы улучшить!"); return; }
-        prompt = `Rewrite the following text to be more engaging, grammatically correct, and flirtatious. Keep it natural. Text: "${currentText}"`;
+        prompt = `Исправь грамматику, сделай текст более человечным и женским. Оставь текст на русском, сохрани естественность и не используй "Приветствие" или подпись. Текст: "${currentText}"`;
     } else if (action === 'generate') {
         prompt = "Write a creative and engaging opening message for a dating site to start a conversation with a man. Keep it short and intriguing.";
     }
@@ -356,7 +356,7 @@ async function generateAIForAll(action) {
             prompt = `${myPromptValue}. \n\nOriginal text: "${currentText}"`;
         } else if (action === 'improve') {
             if(!currentText) continue;
-            prompt = `Rewrite the following text to be more engaging, grammatically correct, and flirtatious. Keep it natural. Text: "${currentText}"`;
+            prompt = `Исправь грамматику, сделай текст более человечным и женским. Оставь текст на русском, сохрани естественность и не используй "Приветствие" или подпись. Текст: "${currentText}"`;
         } else if (action === 'generate') {
             // Каждый раз генерируем уникальный текст
             prompt = "Write a creative and engaging opening message for a dating site to start a conversation with a man. Keep it short and intriguing. Be unique and creative.";
