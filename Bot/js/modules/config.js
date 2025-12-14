@@ -1,3 +1,6 @@
+// Версия приложения
+const APP_VERSION = '1.3.0';
+
 let axios;
 try { axios = require('axios'); } catch(e) { axios = window.axios; }
 

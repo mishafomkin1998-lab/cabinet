@@ -100,27 +100,15 @@ let defaultProxySet = false;
 
 // Установить прокси для webview сессии бота
 async function setWebviewProxy(botId) {
-    console.log(`%c[Proxy DEBUG] setWebviewProxy вызван для botId: ${botId}`, 'color: blue; font-weight: bold');
-
     const accountNumber = getAccountNumber(botId);
-    console.log(`[Proxy DEBUG] Номер анкеты: ${accountNumber}`);
-
     const proxyString = getProxyForAccountNumber(accountNumber);
-    console.log(`[Proxy DEBUG] Прокси строка: "${proxyString}"`);
-
-    // Дополнительная отладка - выводим все прокси из globalSettings
-    console.log(`[Proxy DEBUG] globalSettings.proxy1: "${globalSettings.proxy1}"`);
-    console.log(`[Proxy DEBUG] globalSettings.proxy2: "${globalSettings.proxy2}"`);
-    console.log(`[Proxy DEBUG] globalSettings.proxy3: "${globalSettings.proxy3}"`);
 
     try {
         // 1. Устанавливаем прокси для webview сессии бота
-        console.log(`[Proxy DEBUG] Вызываю IPC set-session-proxy для ${botId}...`);
         const result = await ipcRenderer.invoke('set-session-proxy', { botId, proxyString });
-        console.log(`[Proxy DEBUG] Результат IPC set-session-proxy:`, result);
 
         if (result.success) {
-            console.log(`%c[Proxy] Бот ${botId} (анкета #${accountNumber}): ${proxyString || 'без прокси'}`, 'color: green; font-weight: bold');
+            console.log(`[Proxy] Бот ${botId} (анкета #${accountNumber}): ${proxyString || 'без прокси'}`);
         } else {
             console.error(`[Proxy] Ошибка для ${botId}:`, result.error);
         }
@@ -129,7 +117,6 @@ async function setWebviewProxy(botId) {
         try {
             // Устанавливаем прокси для конкретного бота (для IPC api-request)
             await ipcRenderer.invoke('set-bot-proxy', { botId, proxyString });
-            console.log(`[Proxy] Прокси сохранён для ${botId}: ${proxyString || 'none'}`);
 
             // Также устанавливаем как default если это первый бот с прокси
             if (!defaultProxySet && proxyString) {

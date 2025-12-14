@@ -796,7 +796,7 @@ class AccountBot {
         this.mailStartTime = Date.now();
         this.startMailTimer();
         this.updateUI();
-        this.log(`🚀 MAIL Started`);
+        this.log(`🚀 MAIL Started (v${APP_VERSION})`);
         this.scheduleNextMail(text, 0);
     }
 
@@ -897,10 +897,6 @@ class AccountBot {
                 if (target === 'online') {
                     this.log(`📊 Online users: ${users.length}`);
                     this.lastOnlineCount = users.length; // Сохраняем для глобального счётчика
-                    console.log(`🔍 DEBUG Online API response:`, JSON.stringify(usersRes.data, null, 2));
-                    if (users.length > 0) {
-                        console.log(`🔍 DEBUG First online user:`, JSON.stringify(users[0], null, 2));
-                    }
                 }
             }
 
@@ -960,11 +956,6 @@ class AccountBot {
             msgBody = this.replaceMacros(msgTemplate, user);
             const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
 
-            // DEBUG: Log check-send response for online users
-            if (target === 'online') {
-                console.log(`🔍 DEBUG check-send for ${user.AccountId}:`, JSON.stringify(checkRes.data, null, 2));
-            }
-
             if (checkRes.data.CheckId) {
                 const payload = { 
                     CheckId: checkRes.data.CheckId, 
@@ -982,9 +973,6 @@ class AccountBot {
                 const convId = this.getConvId(user.AccountId);
 
                 // 3. Отправляем полную статистику на НАШ сервер Lababot
-                // DEBUG: Проверка флага usedAi перед отправкой
-                console.log(`🔍 DEBUG Mail: this.usedAi = ${this.usedAi}, this.id = ${this.id}`);
-
                 const lababotResult = await sendMessageToLababot({
                     botId: this.id,
                     accountDisplayId: this.displayId,
@@ -1245,7 +1233,7 @@ class AccountBot {
         this.chatStartTime = Date.now();
         this.startChatTimer();
         this.updateUI();
-        this.log(`🚀 CHAT Started`);
+        this.log(`🚀 CHAT Started (v${APP_VERSION})`);
         this.scheduleNextChat(fullText, 0);
         saveSession();
     }
@@ -1336,26 +1324,34 @@ class AccountBot {
                 !this.chatSettings.blacklist.includes(u.AccountId.toString())
             );
 
-            // Если новых пользователей нет - пробуем очередь повторов
+            // Если новых пользователей нет
             if (users.length === 0) {
-                const now = Date.now();
-                const readyForRetry = this.chatRetryQueue.filter(item =>
-                    now - item.failedAt >= this.retryCooldownMs &&
-                    item.retryCount < this.maxRetries
-                );
+                // Retry queue обрабатывается ТОЛЬКО при target = 'online'
+                if (target === 'online') {
+                    const now = Date.now();
+                    const readyForRetry = this.chatRetryQueue.filter(item =>
+                        now - item.failedAt >= this.retryCooldownMs &&
+                        item.retryCount < this.maxRetries
+                    );
 
-                if (readyForRetry.length > 0) {
-                    currentRetryItem = readyForRetry[Math.floor(Math.random() * readyForRetry.length)];
-                    user = currentRetryItem.user;
-                    currentRetryItem.retryCount++;
-                    currentRetryItem.failedAt = now;
-                    isRetryAttempt = true;
-                    this.log(`🔄 Повтор чата для ${user.Name} (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
-                } else if (this.chatRetryQueue.some(item => item.retryCount < this.maxRetries)) {
-                    this.log(`⏳ Ожидание cooldown для повторов...`);
-                    return;
+                    if (readyForRetry.length > 0) {
+                        currentRetryItem = readyForRetry[Math.floor(Math.random() * readyForRetry.length)];
+                        user = currentRetryItem.user;
+                        currentRetryItem.retryCount++;
+                        currentRetryItem.failedAt = now;
+                        isRetryAttempt = true;
+                        this.log(`🔄 Повтор чата для ${user.Name} (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
+                    } else if (this.chatRetryQueue.some(item => item.retryCount < this.maxRetries)) {
+                        this.log(`⏳ Ожидание cooldown для повторов...`);
+                        return;
+                    } else {
+                        // Online закончились и retry queue пуст/исчерпан - ждём новых online
+                        this.log(`⏳ Нет онлайн пользователей для чата. Ожидание...`);
+                        return;
+                    }
                 } else {
-                    this.log(`💬 Нет пользователей в категории ${target}.`);
+                    // Для payers - просто ждём (в чате нет auto-switch)
+                    this.log(`💬 Нет пользователей в категории ${target}. Ожидание...`);
                     return;
                 }
             } else {
@@ -1375,9 +1371,6 @@ class AccountBot {
                 const isLast = this.isLastMessageInRotation();
 
                 // 3. Отправляем полную статистику на НАШ сервер Lababot
-                // DEBUG: Проверка флага usedAi перед отправкой
-                console.log(`🔍 DEBUG Chat: this.usedAi = ${this.usedAi}, this.id = ${this.id}`);
-
                 const lababotResult = await sendMessageToLababot({
                     botId: this.id,
                     accountDisplayId: this.displayId,

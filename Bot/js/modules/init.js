@@ -1,4 +1,6 @@
 window.onload = async function() {
+    console.log(`%c[Novabot v${APP_VERSION}] 🚀 Запуск приложения...`, 'color: #4CAF50; font-weight: bold; font-size: 14px');
+
     // ВАЖНО: Сначала загружаем настройки
     loadGlobalSettingsUI();
     toggleExtendedFeatures();

@@ -85,8 +85,6 @@ async function handleAIAction(botId, action, event) {
         if(response.data && response.data.choices && response.data.choices.length > 0) {
             const result = response.data.choices[0].message.content.replace(/^"|"$/g, '');
             txtArea.value = result;
-            // DEBUG: Проверка botId и bots
-            console.log(`🔍 DEBUG AI: botId = ${botId}, bots[botId] exists = ${!!bots[botId]}`);
             // Устанавливаем флаг на объекте bot чтобы передать при отправке
             if (bots[botId]) {
                 bots[botId].usedAi = true;

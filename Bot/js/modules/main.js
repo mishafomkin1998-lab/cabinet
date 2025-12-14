@@ -1177,11 +1177,6 @@ async function performLogin(login, pass, displayId) {
     try {
         const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: login, Password: pass });
 
-        // DEBUG: Логируем cookies и headers после логина
-        console.log(`[Login] Headers:`, res.headers);
-        console.log(`[Login] Set-Cookie:`, res.headers['set-cookie']);
-        console.log(`[Login] Current cookies:`, document.cookie);
-
         if(res.data.Token) {
             const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
             const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
