@@ -17,52 +17,97 @@ const TeamComponent = {
             const data = await res.json();
 
             if (data.success) {
-                // API возвращает всех пользователей в data.list, нужно разделить по роли
-                const list = data.list || [];
+                // Сохраняем полный список как в оригинале
+                context.team = data.list;
 
-                // Фильтруем админов
-                const adminsRaw = list.filter(u => u.role === 'admin');
-                context.admins = adminsRaw.map(a => ({
-                    id: a.id,
-                    name: a.username,
-                    login: a.login,
-                    initials: a.username?.substring(0, 2).toUpperCase(),
-                    color: DashboardUtils.getAdminColor(a.id, a.username),
-                    profileCount: a.accounts_count || 0,
-                    translatorCount: list.filter(u => u.role === 'translator' && u.owner_id === a.id).length,
-                    isMyAdmin: a.is_restricted || false,
-                    salary: a.salary,
-                    aiEnabled: a.ai_enabled || false,
-                    balance: a.balance || 0,
-                    lettersToday: a.letters_today || 0,
-                    chatsToday: a.chats_today || 0,
-                    conversion: a.conversion || 0
-                }));
+                // Разделяем по ролям
+                const adminsList = data.list.filter(u => u.role === 'admin');
+                const translatorsList = data.list.filter(u => u.role === 'translator');
 
-                // Фильтруем переводчиков
-                const translatorsRaw = list.filter(u => u.role === 'translator');
-                context.myTranslators = translatorsRaw.map(t => {
-                    // Находим админа для переводчика
-                    const admin = adminsRaw.find(a => a.id === t.owner_id);
-                    return {
+                if (context.currentUser.role === 'admin') {
+                    // Для админа: показываем себя с переводчиками
+                    context.admins = [{
+                        id: context.currentUser.id,
+                        name: context.currentUser.username,
+                        login: context.currentUser.username,
+                        initials: context.currentUser.username.substring(0, 2).toUpperCase(),
+                        accounts: 0,
+                        conversion: 0,
+                        isMyAdmin: false,
+                        salary: null,
+                        balance: 0,
+                        aiEnabled: context.currentUser.aiEnabled || false,
+                        translators: translatorsList.map(t => ({
+                            id: t.id,
+                            name: t.username,
+                            login: t.username,
+                            conversion: t.conversion || 0,
+                            accounts: t.accounts || [],
+                            accountsCount: t.accounts_count || 0,
+                            aiEnabled: t.ai_enabled || false
+                        }))
+                    }];
+                    // Также сохраняем в отдельный массив для удобства
+                    context.myTranslators = translatorsList.map(t => ({
                         id: t.id,
                         name: t.username,
-                        login: t.login,
-                        initials: t.username?.substring(0, 2).toUpperCase(),
-                        profileCount: t.accounts_count || 0,
-                        adminId: t.owner_id,
-                        adminName: admin?.username || '',
-                        aiEnabled: t.ai_enabled || false,
-                        isOwnTranslator: t.is_own_translator !== false,
-                        salary: t.salary,
-                        lettersToday: t.letters_today || 0,
-                        chatsToday: t.chats_today || 0,
-                        conversion: t.conversion || 0
-                    };
-                });
+                        login: t.username,
+                        conversion: t.conversion || 0,
+                        accounts: t.accounts || [],
+                        accountsCount: t.accounts_count || 0,
+                        aiEnabled: t.ai_enabled || false
+                    }));
+                } else {
+                    // Для директора: показываем всех админов с их переводчиками
+                    context.admins = adminsList.map(a => ({
+                        id: a.id,
+                        name: a.username,
+                        login: a.username,
+                        initials: a.username.substring(0, 2).toUpperCase(),
+                        accounts: a.accounts_count || 0,
+                        conversion: a.conversion || 0,
+                        isMyAdmin: a.is_restricted || false,
+                        salary: a.salary !== null && a.salary !== undefined ? a.salary : null,
+                        balance: a.balance || 0,
+                        aiEnabled: a.ai_enabled || false,
+                        translators: translatorsList.filter(t => t.owner_id === a.id).map(t => ({
+                            id: t.id,
+                            name: t.username,
+                            login: t.username,
+                            conversion: t.conversion || 0,
+                            accounts: t.accounts || [],
+                            accountsCount: t.accounts_count || 0,
+                            aiEnabled: t.ai_enabled || false
+                        }))
+                    }));
+                    context.myTranslators = [];
+                    // Для директора: переводчики напрямую под ним (owner_id = директора)
+                    context.directTranslators = translatorsList
+                        .filter(t => t.owner_id === context.currentUser.id)
+                        .map(t => ({
+                            id: t.id,
+                            name: t.username,
+                            login: t.login || t.username,
+                            conversion: t.conversion || 0,
+                            accounts: t.accounts || [],
+                            accountsCount: t.accounts_count || 0,
+                            salary: t.salary,
+                            aiEnabled: t.ai_enabled || false,
+                            isOwnTranslator: t.is_own_translator !== false,
+                            balance: parseFloat(t.balance) || 0
+                        }));
+                }
 
-                context.translators = context.myTranslators;
-                context.allTranslators = context.myTranslators;
+                // Все переводчики для выбора
+                context.allTranslators = translatorsList.map(t => ({
+                    id: t.id,
+                    name: t.username,
+                    login: t.username,
+                    conversion: t.conversion || 0,
+                    accounts: t.accounts || [],
+                    accountsCount: t.accounts_count || 0,
+                    aiEnabled: t.ai_enabled || false
+                }));
             }
         } catch (e) {
             console.error('loadTeam error:', e);

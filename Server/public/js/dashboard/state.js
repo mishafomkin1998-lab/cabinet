@@ -52,9 +52,25 @@ function getInitialState() {
         // Статистика
         // =====================================================
         stats: {
-            today: { letters: 0, chats: 0, uniqueMen: 0 },
-            month: { letters: 0, chats: 0, uniqueMen: 0 },
-            metrics: { workTime: '0ч 0м', workTimeMonth: '0ч 0м', avgResponseTime: '-' }
+            // Данные за выбранный период
+            incomingLetters: 0,
+            incomingChats: 0,
+            uniqueMen: 0,
+            letters: 0,
+            chats: 0,
+            errors: 0,
+            // Новые поля для X/Y отображения
+            incomingChatsTotal: 0,
+            incomingChatsAnswered: 0,
+            uniqueMenLetters: 0,
+            uniqueMenChats: 0,
+            // Метрики
+            metrics: { totalProfiles: 0, profilesOnline: 0, avgResponseTime: 0, medianResponseTime: 0, workTime: '0ч 0м', workTimeMonth: '0ч 0м' },
+            // Для обратной совместимости
+            today: { letters: 0, chats: 0, uniqueMen: 0, errors: 0, incomingLetters: 0, incomingChats: 0 },
+            yesterday: { letters: 0, chats: 0 },
+            week: { letters: 0, chats: 0, uniqueMen: 0, errors: 0 },
+            month: { letters: 0, chats: 0, uniqueMen: 0, incomingLetters: 0, incomingChats: 0 }
         },
         hourlyActivity: [],
         recentActivity: [],
@@ -106,10 +122,12 @@ function getInitialState() {
         // =====================================================
         // Команда
         // =====================================================
+        team: [],
         admins: [],
         myTranslators: [],
         allTranslators: [],
         translators: [],
+        directTranslators: [],
 
         // Создание/редактирование админа
         newAdmin: {
