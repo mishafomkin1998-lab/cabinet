@@ -8,10 +8,28 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const bodyParser = require('body-parser');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+
+// Rate Limiting - защита от brute-force и DoS атак
+const loginLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 минута
+    max: 5, // 5 попыток входа в минуту
+    message: { success: false, error: 'Слишком много попыток входа. Попробуйте через минуту.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+const apiLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 минута
+    max: 100, // 100 запросов в минуту
+    message: { success: false, error: 'Слишком много запросов. Попробуйте позже.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
 
 // Модули
 const pool = require('./config/database');
@@ -55,7 +73,11 @@ app.get('/', (req, res) => {
     res.redirect('/index.html');
 });
 
-// Аутентификация
+// Rate limiting для API
+app.use('/api/', apiLimiter);
+
+// Аутентификация (с усиленным лимитом для логина)
+app.post('/api/login', loginLimiter); // 5 попыток в минуту
 app.use('/', authRoutes);
 
 // Маршрут для обновления пользователей (POST вместо PUT для совместимости с nginx/proxy)
