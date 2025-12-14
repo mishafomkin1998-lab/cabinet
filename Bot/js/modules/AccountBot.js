@@ -565,13 +565,17 @@ class AccountBot {
                     // Запускаем цепочку автоответов если включено
                     this.scheduleAutoReply(partnerId, partnerName);
 
+                    // Получаем аватарку мужчины (разные возможные поля)
+                    const avatarUrl = request.Avatar || request.Photo ||
+                        `https://ladadate.com/photo/${partnerId}/1.jpg`;
+
                     // Уведомление в логгер + звук
                     console.log(`[Lababot] 🆕 НОВЫЙ ЧАТ! От ${partnerName} (${partnerId}): "${truncatedBody}"`);
                     Logger.add(
                         `🆕 Новый чат от <b>${partnerName}</b>: "${truncatedBody}"`,
                         'chat-request',
                         this.id,
-                        { partnerId, partnerName, messageBody: truncatedBody }
+                        { partnerId, partnerName, messageBody: truncatedBody, avatarUrl: avatarUrl }
                     );
                 }
             }
@@ -688,11 +692,16 @@ class AccountBot {
                     });
 
                     if (!msg.IsReplied) {
+                        // Получаем аватарку мужчины (разные возможные поля)
+                        const avatarUrl = msg.User.Avatar || msg.User.Photo ||
+                            (msg.User.Photos && msg.User.Photos[0]) ||
+                            `https://ladadate.com/photo/${partnerId}/1.jpg`;
+
                         Logger.add(
                             `💌 Входящее письмо от <b>${partnerName}</b> (Ждет ответа)`,
                             'mail',
                             this.id,
-                            { partnerId: partnerId, partnerName: partnerName, messageId: msg.MessageId }
+                            { partnerId: partnerId, partnerName: partnerName, messageId: msg.MessageId, avatarUrl: avatarUrl }
                         );
                         // playSound('message') убран - Logger.add уже воспроизводит звук для type='mail'
                     }
@@ -704,7 +713,8 @@ class AccountBot {
             }
         } catch(e) {}
         finally {
-            const nextRun = Math.floor(Math.random() * (75000 - 45000 + 1)) + 45000;
+            // Интервал 20-35 сек (безопасно для 50+ анкет)
+            const nextRun = Math.floor(Math.random() * (35000 - 20000 + 1)) + 20000;
             if(this.isMonitoring) setTimeout(() => this.checkNewMails(), nextRun);
         }
     }

@@ -112,6 +112,9 @@ const Logger = {
             if(!col.classList.contains('show')) {
                 document.getElementById('btn-logger-main').classList.add('blinking');
             }
+
+            // Системное уведомление Windows для чата
+            this.showElectronNotification(data, type, botId);
             return;
         }
 
@@ -188,7 +191,7 @@ const Logger = {
         }
     },
 
-    // Electron уведомление
+    // Electron уведомление (поддерживает mail и chat-request)
     showElectronNotification: function(data, type, botId) {
         if (!data) return;
         const partnerId = data.partnerId || '???';
@@ -196,7 +199,9 @@ const Logger = {
         const messageBody = data.messageBody || '';
         const avatarUrl = data.avatarUrl || null;
 
-        const title = '💌 Входящее письмо';
+        // Разные заголовки для писем и чатов
+        const isChat = type === 'chat-request';
+        const title = isChat ? '💬 Новый чат' : '💌 Входящее письмо';
         const body = `От ${partnerId} ${partnerName}${messageBody ? ': "' + messageBody.slice(0, 50) + '"' : ''}`;
 
         const notification = new Notification(title, {
@@ -206,7 +211,7 @@ const Logger = {
         });
 
         notification.onclick = () => {
-            openResponseWindow(botId, partnerId, partnerName, 'mail');
+            openResponseWindow(botId, partnerId, partnerName, isChat ? 'chat' : 'mail');
         };
     },
 
