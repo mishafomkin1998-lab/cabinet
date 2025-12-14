@@ -398,6 +398,11 @@
                             loginTime: new Date().toISOString()
                         };
 
+                        // Сохраняем JWT токен (всегда в localStorage для удобства)
+                        if (data.token) {
+                            localStorage.setItem('authToken', data.token);
+                        }
+
                         // Если "Запомнить меня" - localStorage, иначе sessionStorage
                         if (remember) {
                             localStorage.setItem('novaUser', JSON.stringify(userData));

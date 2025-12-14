@@ -5,6 +5,54 @@
 
 const api = {
     /**
+     * Получить токен из localStorage
+     */
+    getToken() {
+        return localStorage.getItem('authToken');
+    },
+
+    /**
+     * Сохранить токен в localStorage
+     */
+    setToken(token) {
+        if (token) {
+            localStorage.setItem('authToken', token);
+        } else {
+            localStorage.removeItem('authToken');
+        }
+    },
+
+    /**
+     * Получить заголовки с авторизацией
+     */
+    getHeaders() {
+        const headers = { 'Content-Type': 'application/json' };
+        const token = this.getToken();
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        return headers;
+    },
+
+    /**
+     * Обработка ответа (проверка на истёкший токен)
+     */
+    async handleResponse(res, endpoint) {
+        const data = await res.json();
+
+        // Если токен истёк или невалидный - разлогиниваем
+        if (res.status === 401 && data.code === 'INVALID_TOKEN') {
+            console.warn('🔒 Токен истёк, требуется повторный вход');
+            this.setToken(null);
+            localStorage.removeItem('user');
+            window.location.href = '/login.html';
+            return { success: false, error: 'Сессия истекла' };
+        }
+
+        return data;
+    },
+
+    /**
      * GET запрос
      * @param {string} endpoint - путь API (например '/api/profiles')
      * @param {object} params - query параметры
@@ -19,8 +67,10 @@ const api = {
         });
 
         try {
-            const res = await fetch(url);
-            return await res.json();
+            const res = await fetch(url, {
+                headers: this.getHeaders()
+            });
+            return await this.handleResponse(res, endpoint);
         } catch (e) {
             console.error(`API GET ${endpoint} error:`, e);
             return { success: false, error: e.message };
@@ -37,10 +87,10 @@ const api = {
         try {
             const res = await fetch(`${API_BASE}${endpoint}`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: this.getHeaders(),
                 body: JSON.stringify(data)
             });
-            return await res.json();
+            return await this.handleResponse(res, endpoint);
         } catch (e) {
             console.error(`API POST ${endpoint} error:`, e);
             return { success: false, error: e.message };
@@ -57,10 +107,10 @@ const api = {
         try {
             const res = await fetch(`${API_BASE}${endpoint}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: this.getHeaders(),
                 body: JSON.stringify(data)
             });
-            return await res.json();
+            return await this.handleResponse(res, endpoint);
         } catch (e) {
             console.error(`API PUT ${endpoint} error:`, e);
             return { success: false, error: e.message };
@@ -75,9 +125,10 @@ const api = {
     async delete(endpoint) {
         try {
             const res = await fetch(`${API_BASE}${endpoint}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                headers: this.getHeaders()
             });
-            return await res.json();
+            return await this.handleResponse(res, endpoint);
         } catch (e) {
             console.error(`API DELETE ${endpoint} error:`, e);
             return { success: false, error: e.message };

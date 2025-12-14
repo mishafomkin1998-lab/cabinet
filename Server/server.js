@@ -16,6 +16,7 @@ const fs = require('fs');
 const pool = require('./config/database');
 const { initDatabase } = require('./migrations');
 const { errorHandler } = require('./utils/helpers');
+const { requireAuth, optionalAuth } = require('./middleware/auth');
 const {
     authRoutes,
     teamRoutes,
@@ -53,7 +54,8 @@ app.get('/', (req, res) => {
 app.use('/', authRoutes);
 
 // Маршрут для обновления пользователей (POST вместо PUT для совместимости с nginx/proxy)
-app.post('/api/users/:id/update', async (req, res) => {
+// Защищён авторизацией - только авторизованные пользователи
+app.post('/api/users/:id/update', requireAuth, async (req, res) => {
     console.log(`📝 [POST /api/users/:id/update] userId=${req.params.id}, body=`, req.body);
     const pool = require('./config/database');
     const userId = req.params.id;
@@ -107,7 +109,8 @@ app.post('/api/users/:id/update', async (req, res) => {
 });
 
 // Прямой маршрут для массового удаления анкет
-app.post('/api/profiles/bulk-delete', async (req, res) => {
+// Защищён авторизацией - только авторизованные пользователи
+app.post('/api/profiles/bulk-delete', requireAuth, async (req, res) => {
     console.log(`🗑️ [POST /api/profiles/bulk-delete] body=`, req.body);
     const pool = require('./config/database');
     const { profileIds, userId, userName } = req.body;
@@ -148,17 +151,25 @@ app.post('/api/profiles/bulk-delete', async (req, res) => {
     }
 });
 
-// API маршруты
-app.use('/api/team', teamRoutes);
-app.use('/api/users', teamRoutes); // alias для совместимости
-app.use('/api/profiles', profilesRoutes);
-app.use('/api/bots', botsRoutes);
-app.use('/api/stats', statsRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/favorite-templates', favoriteTemplatesRoutes);
-app.use('/api/billing', billingRoutes);
+// ==========================================
+// API МАРШРУТЫ
+// ==========================================
+
+// Защищённые маршруты (требуют JWT токен) - для Dashboard
+app.use('/api/team', requireAuth, teamRoutes);
+app.use('/api/users', requireAuth, teamRoutes); // alias для совместимости
+app.use('/api/profiles', optionalAuth, profilesRoutes); // optionalAuth - бот тоже использует
+app.use('/api/stats', optionalAuth, statsRoutes);
+app.use('/api/dashboard', requireAuth, dashboardRoutes);
+app.use('/api/favorite-templates', requireAuth, favoriteTemplatesRoutes);
+app.use('/api/prompt-templates', requireAuth, promptTemplatesRoutes);
+
+// Маршруты с частичной защитой (некоторые эндпоинты для бота, некоторые для dashboard)
+app.use('/api/bots', optionalAuth, botsRoutes);
+app.use('/api/billing', optionalAuth, billingRoutes);
+
+// Открытые маршруты (для бота) - не требуют авторизации
 app.use('/api/bot-data', botDataRoutes);
-app.use('/api/prompt-templates', promptTemplatesRoutes);
 
 // Activity маршруты (с разными префиксами для совместимости)
 app.use('/api', activityRoutes);

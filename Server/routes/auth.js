@@ -6,6 +6,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const pool = require('../config/database');
+const { generateToken, requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -42,16 +43,23 @@ router.post('/api/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password_hash);
 
         if (isMatch) {
+            // Генерируем JWT токен
+            const token = generateToken(user);
+
             console.log(`✅ [LOGIN] Успешный вход: ${username} (${user.role})`);
-            res.json({ success: true, user: {
-                id: user.id,
-                username: user.username,
-                role: user.role,
-                avatar_url: user.avatar_url || null,
-                salary: user.salary,
-                isRestricted: user.is_restricted || false,
-                aiEnabled: user.ai_enabled || false
-            } });
+            res.json({
+                success: true,
+                token: token,  // JWT токен для авторизации
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    role: user.role,
+                    avatar_url: user.avatar_url || null,
+                    salary: user.salary,
+                    isRestricted: user.is_restricted || false,
+                    aiEnabled: user.ai_enabled || false
+                }
+            });
         } else {
             console.log(`❌ [LOGIN] Неверный пароль для "${username}"`);
             res.json({ success: false, error: 'Неверный пароль' });
@@ -62,9 +70,14 @@ router.post('/api/login', async (req, res) => {
     }
 });
 
-// Обновление профиля пользователя
-router.put('/api/user/profile', async (req, res) => {
+// Обновление профиля пользователя (требует авторизации)
+router.put('/api/user/profile', requireAuth, async (req, res) => {
     const { userId, username, password, avatarUrl } = req.body;
+
+    // Пользователь может обновить только свой профиль (или директор - любой)
+    if (req.user.role !== 'director' && req.user.id !== userId) {
+        return res.status(403).json({ success: false, error: 'Нет прав на изменение этого профиля' });
+    }
 
     if (!userId) {
         return res.json({ success: false, error: 'userId обязателен' });
