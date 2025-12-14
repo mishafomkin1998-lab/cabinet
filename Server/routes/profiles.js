@@ -286,7 +286,7 @@ router.post('/assign-translator', async (req, res) => {
     // Админ может назначать только своим переводчикам
     if (userRole === 'admin' && translatorId) {
         const translator = await pool.query('SELECT owner_id FROM users WHERE id = $1', [translatorId]);
-        if (translator.rows.length === 0 || translator.rows[0].owner_id !== currentUserId) {
+        if (translator.rows.length === 0 || translator.rows[0].owner_id !== parseInt(currentUserId)) {
             return res.status(403).json({ success: false, error: 'Вы можете назначать анкеты только своим переводчикам' });
         }
     }
