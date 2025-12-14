@@ -180,14 +180,14 @@ app.post('/api/profiles/bulk-delete', requireAuth, async (req, res) => {
 // API МАРШРУТЫ
 // ==========================================
 
-// Защищённые маршруты (требуют JWT токен) - для Dashboard
-app.use('/api/team', requireAuth, teamRoutes);
-app.use('/api/users', requireAuth, teamRoutes); // alias для совместимости
-app.use('/api/profiles', optionalAuth, profilesRoutes); // optionalAuth - бот тоже использует
+// Маршруты Dashboard - optionalAuth с fallback на query/body params
+app.use('/api/team', optionalAuth, teamRoutes);
+app.use('/api/users', optionalAuth, teamRoutes); // alias для совместимости
+app.use('/api/profiles', optionalAuth, profilesRoutes);
 app.use('/api/stats', optionalAuth, statsRoutes);
-app.use('/api/dashboard', requireAuth, dashboardRoutes);
-app.use('/api/favorite-templates', requireAuth, favoriteTemplatesRoutes);
-app.use('/api/prompt-templates', requireAuth, promptTemplatesRoutes);
+app.use('/api/dashboard', optionalAuth, dashboardRoutes);
+app.use('/api/favorite-templates', optionalAuth, favoriteTemplatesRoutes);
+app.use('/api/prompt-templates', optionalAuth, promptTemplatesRoutes);
 
 // Маршруты с частичной защитой (некоторые эндпоинты для бота, некоторые для dashboard)
 app.use('/api/bots', optionalAuth, botsRoutes);

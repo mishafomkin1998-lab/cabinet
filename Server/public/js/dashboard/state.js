@@ -112,6 +112,7 @@ function getInitialState() {
         // Добавление аккаунтов
         newAccountIds: '',
         newAccountComment: '',
+        newAccountAssignTo: null,
         uniqueProfileNotes: [],
         selectedProfileNote: '',
 
