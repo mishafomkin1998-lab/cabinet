@@ -64,6 +64,59 @@ const Logger = {
         const now = Date.now();
         const partnerId = data?.partnerId || '???';
 
+        // === СПЕЦИАЛЬНАЯ ЛОГИКА ДЛЯ CHAT-REQUEST ===
+        // Если от того же мужчины уже есть уведомление - обновляем его вместо создания нового
+        if (type === 'chat-request') {
+            const chatKey = `chat-request-${botId}-${partnerId}`;
+            const existingIndex = this.logs.findIndex(l =>
+                l.type === 'chat-request' && l.botId === botId && l.data?.partnerId === partnerId
+            );
+
+            // Звук играет ВСЕГДА
+            playSound('chat');
+
+            if (existingIndex !== -1) {
+                // Обновляем существующее уведомление
+                const existingLog = this.logs[existingIndex];
+                existingLog.text = text;
+                existingLog.data = data;
+                existingLog.time = new Date();
+                existingLog.id = now; // Обновляем ID для "свежести"
+
+                // Перемещаем наверх списка
+                this.logs.splice(existingIndex, 1);
+                this.logs.unshift(existingLog);
+
+                console.log(`[Logger] chat-request обновлён для ${partnerId}`);
+                this.render();
+
+                // Мигание кнопки если логгер скрыт
+                const col = document.getElementById('logger-column');
+                if(!col.classList.contains('show')) {
+                    document.getElementById('btn-logger-main').classList.add('blinking');
+                }
+                return;
+            }
+
+            // Новое уведомление chat-request (первое от этого мужчины)
+            const logItem = { id: now, text, type, botId, data, time: new Date(), uniqueKey: chatKey };
+            this.logs.unshift(logItem);
+
+            if (this.logs.length > 300) {
+                this.logs = this.logs.slice(0, 300);
+            }
+
+            this.render();
+
+            const col = document.getElementById('logger-column');
+            if(!col.classList.contains('show')) {
+                document.getElementById('btn-logger-main').classList.add('blinking');
+            }
+            return;
+        }
+
+        // === СТАНДАРТНАЯ ЛОГИКА ДЛЯ ОСТАЛЬНЫХ ТИПОВ ===
+
         // Уникальный ключ для дедупликации
         const uniqueKey = `${type}-${botId}-${partnerId}-${data?.messageBody || ''}`;
 
@@ -110,10 +163,8 @@ const Logger = {
             document.getElementById('btn-logger-main').classList.add('blinking');
         }
 
-        // === Звуки ===
-        if (type === 'chat-request') {
-            playSound('chat');
-        } else if (type === 'mail') {
+        // === Звуки (кроме chat-request - он обработан выше) ===
+        if (type === 'mail') {
             playSound('message');
             // Дополнительные звуки через 1 и 2 минуты
             const timer1 = setTimeout(() => {
@@ -268,14 +319,19 @@ let openedResponseWindows = new Set(); // Отслеживаем открыты�
 async function openResponseWindow(botId, partnerId, partnerName, type) {
     const windowId = `rw-${botId}-${partnerId}-${type}`;
 
-    // Если окно уже отмечено как открытое - просто логируем (main process сфокусирует его)
+    console.log(`[ResponseWindow] Клик: botId=${botId}, partnerId=${partnerId}, type=${type}`);
+
+    // Если окно уже отмечено как открытое - пробуем фокусировать через IPC
     if (openedResponseWindows.has(windowId)) {
         console.log(`[ResponseWindow] Окно ${windowId} уже открыто, фокусируем...`);
+        // Продолжаем выполнение - main process сфокусирует если существует, или создаст новое
     }
 
     const bot = bots[botId];
     if (!bot) {
-        console.error(`[ResponseWindow] Бот ${botId} не найден`);
+        console.error(`[ResponseWindow] Бот ${botId} не найден!`);
+        // Показываем сообщение пользователю
+        showToast('Сессия устарела. Перезагрузите бота или закройте это уведомление.');
         return;
     }
 
