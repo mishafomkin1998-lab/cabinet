@@ -88,6 +88,15 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
     // Верификация отключена - теперь один MACHINE_ID может обслуживать много анкет
     // Проверка анкеты делается через allowed_profiles
 
+    // 0. ВАЖНО: Сначала обновляем last_online для корректного отображения статуса
+    // Это нужно делать ДО проверки оплаты, чтобы статус онлайн отображался даже для неоплаченных анкет
+    if (accountDisplayId && profileStatus === 'online') {
+        await pool.query(
+            `UPDATE allowed_profiles SET last_online = NOW() WHERE profile_id = $1`,
+            [accountDisplayId]
+        );
+    }
+
     // 0.5. Проверка оплаты анкеты
     const paymentStatus = await checkProfilePaymentStatus(accountDisplayId);
     if (!paymentStatus.isPaid) {
