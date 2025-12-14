@@ -276,8 +276,10 @@
                 const data = await response.json();
                 console.log(`✅ Heartbeat отправлен:`, data);
 
-                // После heartbeat проверяем статус управления (panic mode)
-                checkControlStatus();
+                // После heartbeat проверяем статус управления (пропускаем при удалении)
+                if (!skipCommands) {
+                    checkControlStatus();
+                }
 
                 // Обрабатываем команды для конкретной анкеты (пропускаем при удалении)
                 if (data.commands && !skipCommands) {
