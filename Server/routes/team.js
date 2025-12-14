@@ -154,23 +154,37 @@ router.post('/', async (req, res) => {
 });
 
 // Удаление пользователя
-// Только директор может удалять пользователей
+// Директор может удалять любых, админ - только своих переводчиков
 router.delete('/:id', async (req, res) => {
-    // Проверка прав - только директор может удалять пользователей
     const userRole = req.user?.role || req.query.role;
-    if (userRole !== 'director') {
-        return res.status(403).json({ success: false, error: 'Только директор может удалять пользователей' });
+    const currentUserId = req.user?.id || req.query.userId;
+    const targetUserId = req.params.id;
+
+    // Проверка базовых прав
+    if (!userRole || !['director', 'admin'].includes(userRole)) {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав' });
     }
 
-    const userId = req.params.id;
     try {
+        // Если админ - проверяем, что удаляет своего переводчика
+        if (userRole === 'admin') {
+            const targetUser = await pool.query('SELECT owner_id, role FROM users WHERE id = $1', [targetUserId]);
+            if (targetUser.rows.length === 0) {
+                return res.status(404).json({ success: false, error: 'Пользователь не найден' });
+            }
+            // Админ может удалять только переводчиков, которые принадлежат ему
+            if (targetUser.rows[0].role !== 'translator' || targetUser.rows[0].owner_id !== parseInt(currentUserId)) {
+                return res.status(403).json({ success: false, error: 'Вы можете удалять только своих переводчиков' });
+            }
+        }
+
         // Обнуляем связи с анкетами
-        await pool.query(`UPDATE allowed_profiles SET assigned_translator_id = NULL WHERE assigned_translator_id = $1`, [userId]);
-        await pool.query(`UPDATE allowed_profiles SET assigned_admin_id = NULL WHERE assigned_admin_id = $1`, [userId]);
+        await pool.query(`UPDATE allowed_profiles SET assigned_translator_id = NULL WHERE assigned_translator_id = $1`, [targetUserId]);
+        await pool.query(`UPDATE allowed_profiles SET assigned_admin_id = NULL WHERE assigned_admin_id = $1`, [targetUserId]);
         // Обнуляем связи с историей биллинга
-        await pool.query(`UPDATE billing_history SET admin_id = NULL WHERE admin_id = $1`, [userId]);
+        await pool.query(`UPDATE billing_history SET admin_id = NULL WHERE admin_id = $1`, [targetUserId]);
         // Удаляем пользователя
-        await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+        await pool.query('DELETE FROM users WHERE id = $1', [targetUserId]);
         res.json({ success: true });
     } catch (e) { res.status(500).json({ error: e.message }); }
 });

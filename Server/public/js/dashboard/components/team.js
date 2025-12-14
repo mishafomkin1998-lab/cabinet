@@ -460,7 +460,7 @@ const TeamComponent = {
         }
 
         try {
-            const res = await fetch(`${API_BASE}/api/team/${translator.id}?role=${context.currentUser.role}`, { method: 'DELETE' });
+            const res = await fetch(`${API_BASE}/api/team/${translator.id}?role=${context.currentUser.role}&userId=${context.currentUser.id}`, { method: 'DELETE' });
             const data = await res.json();
             if (data.success) {
                 await this.loadTeam(context);
