@@ -325,7 +325,6 @@ async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
                 stopAllMailingOnBotDisabled();
             } else if (!wasBotEnabled && controlStatus.botEnabled) {
                 console.log(`🟢 Бот-машина включена администратором`);
-                showToast('Бот включен - можно запускать рассылки', 'success');
             }
 
             // Ищем бота по displayId для обновления mailingEnabled (per-profile)
@@ -347,10 +346,8 @@ async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
                             bot.stopChat();
                             console.log(`⛔ Chat остановлен для ${displayId}`);
                         }
-                        showToast(`Анкета ${displayId}: рассылка отключена администратором`, 'warning');
                     } else if (!wasEnabled && bot.mailingEnabled) {
                         console.log(`✅ Рассылка для ${displayId} включена с сервера`);
-                        showToast(`Анкета ${displayId}: рассылка разрешена`, 'success');
                     }
                     break;
                 }
@@ -392,7 +389,6 @@ async function checkControlStatus() {
                 stopAllMailingOnStopSpam();
             } else if (wasStopSpam && !controlStatus.stopSpam) {
                 console.log('✅ Stop Spam отключен - можно запускать рассылки');
-                showToast('Stop Spam отключен - можно запускать рассылки', 'success');
             }
         }
 
@@ -418,7 +414,7 @@ function stopAllMailingOnPanic() {
             }
         }
     }
-    showToast('🚨 Panic Mode: все рассылки остановлены!', 'error');
+    console.log('🚨 Panic Mode: все рассылки остановлены!');
 }
 
 // Функция остановки всех рассылок при stopSpam (мягкий - можно перезапустить)
@@ -436,7 +432,7 @@ function stopAllMailingOnStopSpam() {
             }
         }
     }
-    showToast('⛔ Stop Spam: все рассылки остановлены администратором', 'warning');
+    console.log('⛔ Stop Spam: все рассылки остановлены администратором');
 }
 
 // Функция остановки всех рассылок при отключении бот-машины (блокирует запуск)
@@ -454,7 +450,7 @@ function stopAllMailingOnBotDisabled() {
             }
         }
     }
-    showToast('🔴 Бот отключен администратором! Все рассылки остановлены.', 'error');
+    console.log('🔴 Бот отключен администратором! Все рассылки остановлены.');
 }
 
 // 5. Функция отправки ошибки
