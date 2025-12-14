@@ -200,7 +200,9 @@ router.put('/:id', async (req, res) => {
         }
     }
 
-    const { username, password, salary, aiEnabled, is_restricted, isOwnTranslator } = req.body;
+    // Поддерживаем оба варианта: is_restricted и isRestricted
+    const { username, password, salary, aiEnabled, is_restricted, isRestricted, isOwnTranslator } = req.body;
+    const restrictedValue = is_restricted !== undefined ? is_restricted : isRestricted;
     try {
         const updates = [];
         const params = [];
@@ -228,9 +230,9 @@ router.put('/:id', async (req, res) => {
             params.push(aiEnabled);
         }
 
-        if (is_restricted !== undefined) {
+        if (restrictedValue !== undefined) {
             updates.push(`is_restricted = $${paramIndex++}`);
-            params.push(is_restricted);
+            params.push(restrictedValue);
         }
 
         if (isOwnTranslator !== undefined) {
