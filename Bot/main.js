@@ -648,12 +648,52 @@ ipcMain.handle('open-response-window', async (event, data) => {
     // Блокируем звук
     win.webContents.setAudioMuted(true);
 
-    // Контекстное меню с AI
-    win.webContents.on('context-menu', (e, params) => {
+    // Контекстное меню с AI (с подменю шаблонов)
+    win.webContents.on('context-menu', async (e, params) => {
+        // Получаем шаблоны из renderer process
+        let templates = [];
+        const isChat = win.windowType === 'chat';
+        const promptType = isChat ? 'chatPrompt' : 'replyPrompt';
+
+        try {
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                templates = await mainWindow.webContents.executeJavaScript(`
+                    (function() {
+                        return promptTemplates && promptTemplates['${promptType}'] ? promptTemplates['${promptType}'] : [];
+                    })()
+                `);
+            }
+        } catch (err) {
+            console.log('[Context Menu] Не удалось получить шаблоны:', err.message);
+        }
+
+        // Строим подменю для AI
+        const aiSubmenu = [
+            {
+                label: 'По умолчанию',
+                click: () => generateAIForResponseWindowWithTemplate(win, null)
+            }
+        ];
+
+        if (templates && templates.length > 0) {
+            aiSubmenu.push({ type: 'separator' });
+            templates.forEach(tpl => {
+                aiSubmenu.push({
+                    label: tpl.name,
+                    click: () => generateAIForResponseWindowWithTemplate(win, tpl.id)
+                });
+            });
+        } else {
+            aiSubmenu.push({
+                label: 'Нет шаблонов',
+                enabled: false
+            });
+        }
+
         const contextMenu = Menu.buildFromTemplate([
             {
                 label: '✨ AI Ответ',
-                click: () => generateAIForResponseWindow(win)
+                submenu: aiSubmenu
             },
             { type: 'separator' },
             { label: 'Вырезать', role: 'cut' },
@@ -1286,6 +1326,211 @@ async function generateAIForResponseWindow(win) {
         console.error('[AI Context Menu] Error:', err);
 
         // Убираем индикатор и показываем ошибку
+        try {
+            await win.webContents.executeJavaScript(`
+                (function() {
+                    const overlay = document.getElementById('lababot-ai-loading');
+                    if (overlay) overlay.remove();
+                    alert('Ошибка: ${err.message.replace(/'/g, "\\'")}');
+                })()
+            `);
+        } catch (e) {}
+    }
+}
+
+// Функция генерации AI ответа с конкретным шаблоном для Response Window
+async function generateAIForResponseWindowWithTemplate(win, templateId) {
+    if (win.isDestroyed()) return;
+
+    const isChat = win.windowType === 'chat';
+    const promptType = isChat ? 'chatPrompt' : 'replyPrompt';
+
+    try {
+        // Показываем индикатор загрузки
+        await win.webContents.executeJavaScript(`
+            (function() {
+                if (!document.getElementById('lababot-ai-loading')) {
+                    const overlay = document.createElement('div');
+                    overlay.id = 'lababot-ai-loading';
+                    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;z-index:99999;';
+                    overlay.innerHTML = '<div style="background:white;padding:20px 40px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.2);font-size:16px;display:flex;align-items:center;gap:12px;"><span style="font-size:24px;">⏳</span> Генерирую AI ответ...</div>';
+                    document.body.appendChild(overlay);
+                }
+            })()
+        `);
+
+        // Собираем историю переписки
+        const historyData = await win.webContents.executeJavaScript(`
+            (function() {
+                let history = '';
+                let lastPartnerMessageLength = 0;
+
+                const messageSelectors = ['.message-text', '.chat-message', '.message-content', '.msg-text', '[class*="message"]'];
+                const allMessages = [];
+                messageSelectors.forEach(sel => {
+                    document.querySelectorAll(sel).forEach(m => {
+                        const text = m.innerText?.trim();
+                        if (text && text.length > 1 && text.length < 2000 && !allMessages.includes(text)) {
+                            allMessages.push(text);
+                        }
+                    });
+                });
+
+                if (allMessages.length > 0) {
+                    history = allMessages.slice(-25).join('\\n---\\n');
+                    if (allMessages.length >= 1) {
+                        lastPartnerMessageLength = allMessages[allMessages.length - 1].length;
+                    }
+                } else {
+                    const mainArea = document.querySelector('main, .chat-body, .messages, .content, [class*="chat"]');
+                    if (mainArea) {
+                        history = mainArea.innerText?.slice(-5000) || '';
+                        const lines = history.split('\\n').filter(l => l.trim().length > 10);
+                        if (lines.length > 0) {
+                            lastPartnerMessageLength = lines[lines.length - 1].length;
+                        }
+                    }
+                }
+
+                return { history, lastPartnerMessageLength };
+            })()
+        `);
+
+        const historyResult = historyData?.history || '';
+        const lastMsgLength = historyData?.lastPartnerMessageLength || 100;
+
+        if (!mainWindow || mainWindow.isDestroyed()) {
+            throw new Error('Main window not available');
+        }
+
+        // Генерируем ответ с учётом templateId
+        const aiResult = await mainWindow.webContents.executeJavaScript(`
+            (async function() {
+                const apiKey = typeof globalSettings !== 'undefined' ? globalSettings.apiKey : null;
+                if (!apiKey) {
+                    return { success: false, error: 'API ключ OpenAI не указан в настройках' };
+                }
+
+                const isChat = ${isChat};
+                const history = ${JSON.stringify(historyResult || '')};
+                const lastMsgLength = ${lastMsgLength};
+                const templateId = ${templateId ? JSON.stringify(templateId) : 'null'};
+                const promptType = '${promptType}';
+
+                // Получаем промпт из шаблона или настроек
+                let userPrompt = '';
+                if (templateId) {
+                    const templates = promptTemplates && promptTemplates[promptType] ? promptTemplates[promptType] : [];
+                    const template = templates.find(t => t.id == templateId);
+                    if (template) {
+                        userPrompt = template.text || '';
+                    }
+                }
+                // Если templateId = null (По умолчанию), не используем пользовательский промпт
+
+                // Инструкция по длине ответа
+                let lengthInstruction = '';
+                if (lastMsgLength < 50) {
+                    lengthInstruction = 'Ответ должен быть коротким (1-2 предложения).';
+                } else if (lastMsgLength < 150) {
+                    lengthInstruction = 'Ответ должен быть средней длины (2-3 предложения).';
+                } else if (lastMsgLength < 300) {
+                    lengthInstruction = 'Ответ должен быть развёрнутым (3-5 предложений).';
+                } else {
+                    lengthInstruction = 'Ответ должен быть большим и подробным, ответь на все вопросы и темы из сообщения мужчины.';
+                }
+
+                // Формируем системный промпт
+                let systemPrompt;
+                if (userPrompt) {
+                    systemPrompt = userPrompt + '\\n\\n' + lengthInstruction + ' Пиши ТОЛЬКО текст ответа, без пояснений и кавычек.';
+                } else {
+                    systemPrompt = isChat
+                        ? 'Ты помощник оператора на сайте знакомств. Пиши ответы в чат от лица девушки, естественно и игриво. Отвечай на последнее сообщение мужчины. ' + lengthInstruction + ' Пиши ТОЛЬКО текст ответа, без пояснений и кавычек.'
+                        : 'Ты помощник оператора на сайте знакомств. Пиши ответы на письма от лица девушки, тепло и романтично. Отвечай на последнее сообщение мужчины. ' + lengthInstruction + ' Пиши ТОЛЬКО текст ответа, без пояснений и кавычек.';
+                }
+
+                let maxTokens = 300;
+                if (lastMsgLength > 300) maxTokens = 600;
+                if (lastMsgLength > 500) maxTokens = 800;
+
+                try {
+                    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+                        model: 'gpt-4o-mini',
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            { role: 'user', content: 'Контекст переписки:\\n' + history + '\\n\\nНапиши ответ:' }
+                        ],
+                        max_tokens: maxTokens,
+                        temperature: 0.8
+                    }, {
+                        headers: {
+                            'Authorization': 'Bearer ' + apiKey,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.data.choices && response.data.choices[0]) {
+                        return { success: true, text: response.data.choices[0].message.content.trim() };
+                    } else {
+                        return { success: false, error: 'Пустой ответ от AI' };
+                    }
+                } catch (err) {
+                    console.error('[AI] Error:', err);
+                    return { success: false, error: err.response?.data?.error?.message || err.message };
+                }
+            })()
+        `);
+
+        // Убираем индикатор загрузки
+        await win.webContents.executeJavaScript(`
+            (function() {
+                const overlay = document.getElementById('lababot-ai-loading');
+                if (overlay) overlay.remove();
+            })()
+        `);
+
+        if (aiResult.success && aiResult.text) {
+            // Вставляем текст в поле ввода
+            await win.webContents.executeJavaScript(`
+                (function() {
+                    const text = ${JSON.stringify(aiResult.text)};
+                    const selectors = ['input[placeholder*="message" i]', 'input[placeholder*="Write" i]', 'textarea[placeholder*="message" i]', 'textarea', 'input[type="text"]'];
+
+                    let inputEl = null;
+                    for (const sel of selectors) {
+                        const el = document.querySelector(sel);
+                        if (el && el.offsetParent !== null) {
+                            inputEl = el;
+                            break;
+                        }
+                    }
+
+                    if (inputEl) {
+                        const proto = inputEl.tagName === 'TEXTAREA'
+                            ? window.HTMLTextAreaElement.prototype
+                            : window.HTMLInputElement.prototype;
+                        const nativeSetter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+                        nativeSetter.call(inputEl, text);
+                        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+                        inputEl.focus();
+                        return { success: true };
+                    } else {
+                        navigator.clipboard.writeText(text);
+                        alert('Текст скопирован в буфер обмена (поле ввода не найдено):\\n\\n' + text);
+                        return { success: false, copied: true };
+                    }
+                })()
+            `);
+        } else {
+            await win.webContents.executeJavaScript(`
+                alert('Ошибка AI: ${(aiResult.error || 'Неизвестная ошибка').replace(/'/g, "\\'")}');
+            `);
+        }
+
+    } catch (err) {
+        console.error('[AI Context Menu] Error:', err);
         try {
             await win.webContents.executeJavaScript(`
                 (function() {

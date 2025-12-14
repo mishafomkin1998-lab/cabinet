@@ -65,7 +65,10 @@ function createInterface(bot) {
                     <div class="ai-options" id="ai-options-${bot.id}">
                         <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'improve', event)" title="Shift=всем"><i class="fa fa-check"></i> Improve</button>
                         <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'generate', event)" title="Shift=всем"><i class="fa fa-pencil"></i> Generate</button>
-                        <button class="btn-ai-sub" id="btn-myprompt-${bot.id}" onclick="handleAIAction('${bot.id}', 'myprompt', event)" title="Shift=всем"><i class="fa fa-user"></i> <span class="myprompt-label">My Prompt</span></button>
+                        <div class="btn-ai-sub-with-submenu" id="btn-myprompt-${bot.id}" onmouseenter="showPromptSubmenu('${bot.id}')" onmouseleave="hidePromptSubmenuDelayed('${bot.id}')">
+                            <span class="btn-ai-sub-trigger"><i class="fa fa-user"></i> <span class="myprompt-label">My Prompt</span> <i class="fa fa-caret-right submenu-arrow"></i></span>
+                            <div class="prompt-submenu" id="prompt-submenu-${bot.id}" onmouseenter="cancelHidePromptSubmenu('${bot.id}')" onmouseleave="hidePromptSubmenuDelayed('${bot.id}')"></div>
+                        </div>
                     </div>
             </div>
             </div>

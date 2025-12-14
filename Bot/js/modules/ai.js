@@ -5,6 +5,219 @@ function toggleAI(botId) {
     if(!wasShown) opts.classList.add('show');
 }
 
+// =====================================================
+// === ПОДМЕНЮ ШАБЛОНОВ ПРОМПТОВ ===
+// =====================================================
+
+let promptSubmenuTimeout = {};
+
+function showPromptSubmenu(botId) {
+    cancelHidePromptSubmenu(botId);
+    const submenu = document.getElementById(`prompt-submenu-${botId}`);
+    if (!submenu) return;
+
+    // Определяем тип промпта в зависимости от режима
+    const isChat = globalMode === 'chat';
+    const promptType = isChat ? 'myPromptChat' : 'myPrompt';
+    const templates = promptTemplates[promptType] || [];
+
+    // Генерируем HTML подменю
+    let html = `<div class="prompt-submenu-item" onclick="handleAIActionWithTemplate('${botId}', 'myprompt', null, event)" title="Shift=всем">По умолчанию</div>`;
+
+    if (templates.length > 0) {
+        templates.forEach(tpl => {
+            html += `<div class="prompt-submenu-item" onclick="handleAIActionWithTemplate('${botId}', 'myprompt', '${tpl.id}', event)" title="Shift=всем">${tpl.name}</div>`;
+        });
+    } else {
+        html += `<div class="prompt-submenu-item disabled">Нет шаблонов</div>`;
+    }
+
+    submenu.innerHTML = html;
+    submenu.classList.add('show');
+}
+
+function hidePromptSubmenuDelayed(botId) {
+    promptSubmenuTimeout[botId] = setTimeout(() => {
+        const submenu = document.getElementById(`prompt-submenu-${botId}`);
+        if (submenu) submenu.classList.remove('show');
+    }, 200);
+}
+
+function cancelHidePromptSubmenu(botId) {
+    if (promptSubmenuTimeout[botId]) {
+        clearTimeout(promptSubmenuTimeout[botId]);
+        promptSubmenuTimeout[botId] = null;
+    }
+}
+
+// Обработка AI действия с конкретным шаблоном
+async function handleAIActionWithTemplate(botId, action, templateId, event) {
+    // Закрываем меню
+    document.getElementById(`ai-options-${botId}`).classList.remove('show');
+    const submenu = document.getElementById(`prompt-submenu-${botId}`);
+    if (submenu) submenu.classList.remove('show');
+
+    // Shift + клик = генерация для всех анкет
+    if (event && event.shiftKey) {
+        await generateAIForAllWithTemplate(action, templateId);
+        return;
+    }
+
+    const btn = document.querySelector(`#ai-options-${botId}`).parentElement.querySelector('.btn-ai-main');
+    const originalHtml = btn.innerHTML;
+
+    // Проверяем, включен ли AI для этой анкеты
+    const bot = bots[botId];
+    if (bot && bot.displayId) {
+        btn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Проверка...`;
+        const aiStatus = await checkProfileAIEnabled(bot.displayId);
+        if (!aiStatus.enabled) {
+            btn.innerHTML = originalHtml;
+            const reason = aiStatus.reason === 'disabled_by_admin'
+                ? 'AI отключен администратором для этой анкеты'
+                : aiStatus.reason === 'no_translator'
+                ? 'Анкете не назначен переводчик'
+                : 'AI недоступен для этой анкеты';
+            showToast(`⚠️ ${reason}`);
+            return;
+        }
+    }
+
+    if(!globalSettings.apiKey) { showToast("Введите OpenAI API Key в настройках!"); return; }
+
+    const txtArea = document.getElementById(`msg-${botId}`);
+    const currentText = txtArea.value;
+
+    let prompt = "";
+    let systemRole = "You are a helpful dating assistant. Write engaging, short, and natural texts for dating sites.";
+
+    if(action === 'myprompt') {
+        const isChat = globalMode === 'chat';
+        const promptType = isChat ? 'myPromptChat' : 'myPrompt';
+
+        let myPromptValue = '';
+        if (templateId) {
+            // Используем конкретный шаблон
+            const template = (promptTemplates[promptType] || []).find(t => t.id == templateId);
+            if (template) {
+                myPromptValue = template.text;
+            }
+        } else {
+            // По умолчанию - используем встроенный промпт
+            myPromptValue = '';
+        }
+
+        if (myPromptValue) {
+            prompt = `${myPromptValue}. \n\nOriginal text: "${currentText}"`;
+        } else {
+            // Встроенный промпт по умолчанию
+            prompt = isChat
+                ? `Write a short, engaging chat message for a dating site. Keep it natural and flirty. Original text: "${currentText}"`
+                : `Write an engaging letter for a dating site. Keep it warm and personal. Original text: "${currentText}"`;
+        }
+    }
+
+    btn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Loading...`;
+    let config = { headers: { 'Authorization': `Bearer ${globalSettings.apiKey}`, 'Content-Type': 'application/json' } };
+    if (globalSettings.proxyAI) {
+         const proxyConfig = parseProxyUrl(globalSettings.proxyAI);
+         if (proxyConfig) config.proxy = proxyConfig;
+    }
+
+    try {
+        const response = await axios.post(OPENAI_API_ENDPOINT, {
+            model: "gpt-3.5-turbo",
+            messages: [ { role: "system", content: systemRole }, { role: "user", content: prompt } ]
+        }, config);
+
+        if(response.data && response.data.choices && response.data.choices.length > 0) {
+            const result = response.data.choices[0].message.content.replace(/^"|"$/g, '');
+            txtArea.value = result;
+            if (bots[botId]) {
+                bots[botId].usedAi = true;
+                console.log(`🤖 AI генерация для бота ${botId} - флаг usedAi установлен`);
+            }
+            validateInput(txtArea);
+        }
+    } catch (e) {
+        console.error(e);
+        showToast("Ошибка AI. Проверьте ключ или прокси.");
+    } finally {
+        btn.innerHTML = originalHtml;
+    }
+}
+
+// Генерация AI для всех анкет с конкретным шаблоном
+async function generateAIForAllWithTemplate(action, templateId) {
+    if(!globalSettings.apiKey) { showToast("Введите OpenAI API Key в настройках!"); return; }
+
+    const botIds = Object.keys(bots);
+    if (botIds.length === 0) return;
+
+    showBulkNotification(`AI My Prompt запущен для всех...`, botIds.length);
+
+    let config = { headers: { 'Authorization': `Bearer ${globalSettings.apiKey}`, 'Content-Type': 'application/json' } };
+    if (globalSettings.proxyAI) {
+        const proxyConfig = parseProxyUrl(globalSettings.proxyAI);
+        if (proxyConfig) config.proxy = proxyConfig;
+    }
+
+    const systemRole = "You are a helpful dating assistant. Write engaging, short, and natural texts for dating sites.";
+    let successCount = 0;
+
+    const isChat = globalMode === 'chat';
+    const promptType = isChat ? 'myPromptChat' : 'myPrompt';
+
+    let myPromptValue = '';
+    if (templateId) {
+        const template = (promptTemplates[promptType] || []).find(t => t.id == templateId);
+        if (template) {
+            myPromptValue = template.text;
+        }
+    }
+
+    for (const botId of botIds) {
+        const bot = bots[botId];
+        const txtArea = document.getElementById(`msg-${botId}`);
+        if (!txtArea) continue;
+
+        const currentText = txtArea.value;
+        let prompt = "";
+
+        if (myPromptValue) {
+            prompt = `${myPromptValue}. \n\nOriginal text: "${currentText}"`;
+        } else {
+            prompt = isChat
+                ? `Write a short, engaging chat message for a dating site. Keep it natural and flirty. Original text: "${currentText}"`
+                : `Write an engaging letter for a dating site. Keep it warm and personal. Original text: "${currentText}"`;
+        }
+
+        try {
+            const response = await axios.post(OPENAI_API_ENDPOINT, {
+                model: "gpt-3.5-turbo",
+                messages: [ { role: "system", content: systemRole }, { role: "user", content: prompt } ],
+                temperature: 0.9
+            }, config);
+
+            if(response.data && response.data.choices && response.data.choices.length > 0) {
+                const result = response.data.choices[0].message.content.replace(/^"|"$/g, '');
+                txtArea.value = result;
+                if (bot) {
+                    bot.usedAi = true;
+                }
+                validateInput(txtArea);
+                successCount++;
+            }
+        } catch (e) {
+            console.error(`AI error for bot ${botId}:`, e);
+        }
+
+        await new Promise(r => setTimeout(r, 300));
+    }
+
+    showBulkNotification(`AI My Prompt выполнен`, successCount);
+}
+
 // Проверка AI статуса для анкеты (по флагу ai_enabled у переводчика)
 async function checkProfileAIEnabled(profileId) {
     try {
