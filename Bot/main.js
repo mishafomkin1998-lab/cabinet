@@ -489,12 +489,17 @@ ipcMain.handle('api-request', async (event, { method, url, headers, data, botId 
         console.error('[API Request] ❌ Ошибка:', error.message);
 
         if (error.response) {
+            console.log('[API Request] Response data:', JSON.stringify(error.response.data));
             return {
                 success: false,
                 error: error.message,
                 data: error.response.data,
                 status: error.response.status,
-                response: { status: error.response.status }
+                response: {
+                    status: error.response.status,
+                    statusText: error.response.statusText,
+                    data: error.response.data
+                }
             };
         }
 
