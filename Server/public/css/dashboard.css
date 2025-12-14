@@ -1,0 +1,57 @@
+/* ============================================
+   DASHBOARD-SPECIFIC STYLES
+   Стили только для dashboard.html
+   ============================================ */
+
+/* Resizable table columns */
+.resizable-table th {
+    position: relative;
+    min-width: 50px;
+}
+
+.resizable-table th .resize-handle {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 5px;
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.2s;
+}
+
+.resizable-table th .resize-handle:hover,
+.resizable-table th .resize-handle.resizing {
+    background: rgba(99, 102, 241, 0.5);
+}
+
+.resizable-table.resizing {
+    user-select: none;
+    cursor: col-resize;
+}
+
+/* Profile checkboxes */
+.profile-checkbox {
+    width: 18px !important;
+    height: 18px !important;
+    cursor: pointer !important;
+    accent-color: #6366f1;
+    border: 2px solid #d1d5db;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.profile-checkbox:hover:not(:disabled) {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.profile-checkbox:checked {
+    background-color: #6366f1;
+    border-color: #6366f1;
+}
+
+.profile-checkbox:disabled {
+    opacity: 0.5;
+    cursor: not-allowed !important;
+}
