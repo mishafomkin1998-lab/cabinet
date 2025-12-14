@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const bodyParser = require('body-parser');
 const path = require('path');
 const multer = require('multer');
@@ -35,6 +36,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
+app.use(helmet({
+    contentSecurityPolicy: false, // Отключаем CSP чтобы не ломать inline скрипты
+    crossOriginEmbedderPolicy: false
+}));
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -56,7 +61,6 @@ app.use('/', authRoutes);
 // Маршрут для обновления пользователей (POST вместо PUT для совместимости с nginx/proxy)
 // Защищён авторизацией - только авторизованные пользователи
 app.post('/api/users/:id/update', requireAuth, async (req, res) => {
-    console.log(`📝 [POST /api/users/:id/update] userId=${req.params.id}, body=`, req.body);
     const pool = require('./config/database');
     const userId = req.params.id;
     const { username, password, salary, aiEnabled, is_restricted } = req.body;
@@ -111,7 +115,6 @@ app.post('/api/users/:id/update', requireAuth, async (req, res) => {
 // Прямой маршрут для массового удаления анкет
 // Защищён авторизацией - только авторизованные пользователи
 app.post('/api/profiles/bulk-delete', requireAuth, async (req, res) => {
-    console.log(`🗑️ [POST /api/profiles/bulk-delete] body=`, req.body);
     const pool = require('./config/database');
     const { profileIds, userId, userName } = req.body;
 
@@ -243,7 +246,30 @@ const storage = multer.diskStorage({
     }
 });
 
-const upload = multer({ storage: storage });
+// Валидация типа файла
+const fileFilter = (req, file, cb) => {
+    const allowedTypes = [
+        'image/png', 'image/jpeg', 'image/gif', 'image/webp',
+        'application/octet-stream', 'application/x-msdownload',
+        'application/zip', 'application/x-zip-compressed'
+    ];
+    const allowedExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.exe', '.zip'];
+
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes.includes(file.mimetype) || allowedExtensions.includes(ext)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Недопустимый тип файла'), false);
+    }
+};
+
+const upload = multer({
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: {
+        fileSize: 100 * 1024 * 1024 // 100MB макс размер
+    }
+});
 
 // API endpoint для загрузки файлов
 app.post('/api/upload', upload.single('file'), (req, res) => {

@@ -44,7 +44,6 @@ router.get('/', async (req, res) => {
                 p.id,
                 p.profile_id,
                 p.login,
-                p.password,
                 p.note,
                 p.paused,
                 CASE
@@ -90,16 +89,6 @@ router.get('/', async (req, res) => {
 
         const result = await pool.query(query, params);
 
-        // DEBUG: Логируем первую строку для проверки
-        if (result.rows.length > 0) {
-            console.log('📊 DEBUG Profiles API - first row:');
-            console.log('   profile_id:', result.rows[0].profile_id);
-            console.log('   last_online:', result.rows[0].last_online);
-            console.log('   incoming_month:', result.rows[0].incoming_month);
-            console.log('   incoming_total:', result.rows[0].incoming_total);
-            console.log('   status:', result.rows[0].status);
-        }
-
         // Также считаем из messages для совместимости
         const msgStatsQuery = `
             SELECT
@@ -124,7 +113,6 @@ router.get('/', async (req, res) => {
             return {
                 profile_id: row.profile_id,
                 login: row.login,
-                password: row.password,
                 status: row.status || 'offline',
                 last_online: row.last_online,
                 letters_today: parseInt(row.letters_today) || parseInt(msgStats.letters_today) || 0,

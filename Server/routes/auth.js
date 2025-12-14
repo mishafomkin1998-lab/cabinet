@@ -22,8 +22,6 @@ const router = express.Router();
 
 // Вход
 router.post('/api/login', async (req, res) => {
-    console.log('👉 [LOGIN DEBUG] Получен запрос:', req.body);
-
     const { username, password } = req.body;
 
     if (!username || !password) {

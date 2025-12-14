@@ -146,7 +146,6 @@ router.delete('/:id', async (req, res) => {
 
 // Редактирование пользователя
 router.put('/:id', async (req, res) => {
-    console.log(`📝 [PUT /api/users/:id] userId=${req.params.id}, body=`, req.body);
     const userId = req.params.id;
     const { username, password, salary, aiEnabled, is_restricted, isOwnTranslator } = req.body;
     try {
