@@ -1078,10 +1078,11 @@ async function generateAIForResponseWindow(win) {
             })()
         `);
 
-        // Собираем историю переписки
-        const historyResult = await win.webContents.executeJavaScript(`
+        // Собираем историю переписки (20-25 последних сообщений) и длину последнего сообщения мужчины
+        const historyData = await win.webContents.executeJavaScript(`
             (function() {
                 let history = '';
+                let lastPartnerMessageLength = 0;
 
                 // Ищем сообщения на странице
                 const messageSelectors = [
@@ -1096,27 +1097,42 @@ async function generateAIForResponseWindow(win) {
                 messageSelectors.forEach(sel => {
                     document.querySelectorAll(sel).forEach(m => {
                         const text = m.innerText?.trim();
-                        if (text && text.length > 1 && text.length < 1000 && !allMessages.includes(text)) {
+                        if (text && text.length > 1 && text.length < 2000 && !allMessages.includes(text)) {
                             allMessages.push(text);
                         }
                     });
                 });
 
                 if (allMessages.length > 0) {
-                    history = allMessages.slice(-15).join('\\n---\\n');
+                    // Берём 20-25 последних сообщений
+                    history = allMessages.slice(-25).join('\\n---\\n');
+
+                    // Определяем длину последнего сообщения (предположительно от мужчины)
+                    // Обычно последнее сообщение в списке - это то, на которое нужно ответить
+                    if (allMessages.length >= 1) {
+                        lastPartnerMessageLength = allMessages[allMessages.length - 1].length;
+                    }
                 } else {
                     // Fallback - берём текст из основной области
                     const mainArea = document.querySelector('main, .chat-body, .messages, .content, [class*="chat"]');
                     if (mainArea) {
-                        history = mainArea.innerText?.slice(-3000) || '';
+                        history = mainArea.innerText?.slice(-5000) || '';
+                        // Примерная оценка длины последнего сообщения
+                        const lines = history.split('\\n').filter(l => l.trim().length > 10);
+                        if (lines.length > 0) {
+                            lastPartnerMessageLength = lines[lines.length - 1].length;
+                        }
                     }
                 }
 
-                return history;
+                return { history, lastPartnerMessageLength };
             })()
         `);
 
-        console.log('[AI Context Menu] History length:', historyResult?.length || 0);
+        const historyResult = historyData?.history || '';
+        const lastMsgLength = historyData?.lastPartnerMessageLength || 100;
+
+        console.log('[AI Context Menu] History length:', historyResult?.length || 0, 'Last msg length:', lastMsgLength);
 
         // Генерируем ответ через main window
         if (!mainWindow || mainWindow.isDestroyed()) {
@@ -1133,10 +1149,41 @@ async function generateAIForResponseWindow(win) {
 
                 const isChat = ${isChat};
                 const history = ${JSON.stringify(historyResult || '')};
+                const lastMsgLength = ${lastMsgLength};
 
-                const systemPrompt = isChat
-                    ? 'Ты помощник оператора на сайте знакомств. Пиши короткие ответы (1-2 предложения) в чат от лица девушки, естественно и игриво. Отвечай на последнее сообщение мужчины. Пиши ТОЛЬКО текст ответа, без пояснений и кавычек.'
-                    : 'Ты помощник оператора на сайте знакомств. Пиши ответы (2-4 предложения) на письма от лица девушки, тепло и романтично. Отвечай на последнее сообщение мужчины. Пиши ТОЛЬКО текст ответа, без пояснений и кавычек.';
+                // Получаем промпт из настроек
+                const userPrompt = isChat
+                    ? (globalSettings.chatPrompt || '').trim()
+                    : (globalSettings.aiReplyPrompt || '').trim();
+
+                // Определяем инструкцию по длине ответа на основе длины последнего сообщения
+                let lengthInstruction = '';
+                if (lastMsgLength < 50) {
+                    lengthInstruction = 'Ответ должен быть коротким (1-2 предложения).';
+                } else if (lastMsgLength < 150) {
+                    lengthInstruction = 'Ответ должен быть средней длины (2-3 предложения).';
+                } else if (lastMsgLength < 300) {
+                    lengthInstruction = 'Ответ должен быть развёрнутым (3-5 предложений).';
+                } else {
+                    lengthInstruction = 'Ответ должен быть большим и подробным, ответь на все вопросы и темы из сообщения мужчины.';
+                }
+
+                // Формируем системный промпт
+                let systemPrompt;
+                if (userPrompt) {
+                    // Если есть пользовательский промпт - используем его + инструкция по длине
+                    systemPrompt = userPrompt + '\\n\\n' + lengthInstruction + ' Пиши ТОЛЬКО текст ответа, без пояснений и кавычек.';
+                } else {
+                    // Дефолтный промпт
+                    systemPrompt = isChat
+                        ? 'Ты помощник оператора на сайте знакомств. Пиши ответы в чат от лица девушки, естественно и игриво. Отвечай на последнее сообщение мужчины. ' + lengthInstruction + ' Пиши ТОЛЬКО текст ответа, без пояснений и кавычек.'
+                        : 'Ты помощник оператора на сайте знакомств. Пиши ответы на письма от лица девушки, тепло и романтично. Отвечай на последнее сообщение мужчины. ' + lengthInstruction + ' Пиши ТОЛЬКО текст ответа, без пояснений и кавычек.';
+                }
+
+                // Адаптивный max_tokens в зависимости от длины сообщения
+                let maxTokens = 300;
+                if (lastMsgLength > 300) maxTokens = 600;
+                if (lastMsgLength > 500) maxTokens = 800;
 
                 try {
                     const response = await axios.post('https://api.openai.com/v1/chat/completions', {
@@ -1145,7 +1192,7 @@ async function generateAIForResponseWindow(win) {
                             { role: 'system', content: systemPrompt },
                             { role: 'user', content: 'Контекст переписки:\\n' + history + '\\n\\nНапиши ответ:' }
                         ],
-                        max_tokens: 300,
+                        max_tokens: maxTokens,
                         temperature: 0.8
                     }, {
                         headers: {
