@@ -200,9 +200,10 @@ router.put('/:id', async (req, res) => {
         }
     }
 
-    // Поддерживаем оба варианта: is_restricted и isRestricted
-    const { username, password, salary, aiEnabled, is_restricted, isRestricted, isOwnTranslator } = req.body;
-    const restrictedValue = is_restricted !== undefined ? is_restricted : isRestricted;
+    const { username, password, salary, aiEnabled, isRestricted, isOwnTranslator } = req.body;
+
+    console.log('📝 Update user request:', { userId, isRestricted, aiEnabled }); // Debug log
+
     try {
         const updates = [];
         const params = [];
@@ -230,9 +231,10 @@ router.put('/:id', async (req, res) => {
             params.push(aiEnabled);
         }
 
-        if (restrictedValue !== undefined) {
+        if (isRestricted !== undefined) {
             updates.push(`is_restricted = $${paramIndex++}`);
-            params.push(restrictedValue);
+            params.push(isRestricted);
+            console.log('📝 Setting is_restricted to:', isRestricted);
         }
 
         if (isOwnTranslator !== undefined) {
@@ -246,8 +248,10 @@ router.put('/:id', async (req, res) => {
 
         params.push(userId);
         const query = `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramIndex}`;
+        console.log('📝 Executing query:', query, 'params:', params);
         await pool.query(query, params);
 
+        console.log('✅ User updated successfully');
         res.json({ success: true });
     } catch (e) {
         console.error('Update user error:', e);
