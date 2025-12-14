@@ -24,8 +24,12 @@ async function logProfileAction(profileId, actionType, performedById, performedB
 }
 
 // Получение анкет
+// Используем роль из JWT если есть, иначе из query (для бота)
 router.get('/', async (req, res) => {
-    const { userId, role } = req.query;
+    // Приоритет: JWT токен, затем query параметры (для совместимости с ботом)
+    const role = req.user?.role || req.query.role;
+    const userId = req.user?.id || req.query.userId;
+
     try {
         let filter = "";
         let params = [];
@@ -139,7 +143,13 @@ router.get('/', async (req, res) => {
 });
 
 // Массовое добавление анкет
+// Только директор и админы
 router.post('/bulk', async (req, res) => {
+    const userRole = req.user?.role;
+    if (!userRole || !['director', 'admin'].includes(userRole)) {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав для добавления анкет' });
+    }
+
     const { profiles, note, adminId, translatorId, userId, userName } = req.body;
     try {
         for (const id of profiles) {
@@ -190,7 +200,13 @@ router.post('/bulk', async (req, res) => {
 });
 
 // Назначение анкет
+// Только директор и админы
 router.post('/assign', async (req, res) => {
+    const userRole = req.user?.role;
+    if (!userRole || !['director', 'admin'].includes(userRole)) {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав для назначения анкет' });
+    }
+
     const { profileIds, targetUserId, roleTarget, targetUserName, userId, userName } = req.body;
     try {
         let field = roleTarget === 'admin' ? 'assigned_admin_id' : 'assigned_translator_id';
@@ -219,7 +235,13 @@ router.post('/assign', async (req, res) => {
 });
 
 // Массовое назначение анкет админу (по profile_id)
+// Только директор может назначать анкеты админам
 router.post('/assign-admin', async (req, res) => {
+    const userRole = req.user?.role;
+    if (userRole !== 'director') {
+        return res.status(403).json({ success: false, error: 'Только директор может назначать анкеты админам' });
+    }
+
     const { profileIds, adminId, adminName, userId, userName } = req.body;
     try {
         const placeholders = profileIds.map((_, i) => `$${i + 2}`).join(',');
@@ -245,8 +267,25 @@ router.post('/assign-admin', async (req, res) => {
 });
 
 // Массовое назначение анкет переводчику (по profile_id)
+// Директор и админы (админ только своим переводчикам)
 router.post('/assign-translator', async (req, res) => {
+    const userRole = req.user?.role;
+    const currentUserId = req.user?.id;
+
+    if (!userRole || !['director', 'admin'].includes(userRole)) {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав' });
+    }
+
     const { profileIds, translatorId, translatorName, userId, userName } = req.body;
+
+    // Админ может назначать только своим переводчикам
+    if (userRole === 'admin' && translatorId) {
+        const translator = await pool.query('SELECT owner_id FROM users WHERE id = $1', [translatorId]);
+        if (translator.rows.length === 0 || translator.rows[0].owner_id !== currentUserId) {
+            return res.status(403).json({ success: false, error: 'Вы можете назначать анкеты только своим переводчикам' });
+        }
+    }
+
     try {
         const placeholders = profileIds.map((_, i) => `$${i + 2}`).join(',');
         const query = `UPDATE allowed_profiles SET assigned_translator_id = $1 WHERE profile_id IN (${placeholders})`;
@@ -303,8 +342,14 @@ router.get('/:profileId/status', async (req, res) => {
 /**
  * POST /api/profiles/toggle-access
  * Переключает статус paused для анкеты (остановить/запустить)
+ * Только директор и админы
  */
 router.post('/toggle-access', async (req, res) => {
+    const userRole = req.user?.role;
+    if (!userRole || !['director', 'admin'].includes(userRole)) {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав' });
+    }
+
     const { profileId, paused } = req.body;
     try {
         await pool.query(
@@ -321,8 +366,14 @@ router.post('/toggle-access', async (req, res) => {
 /**
  * POST /api/profiles/bulk-delete
  * Массовое удаление анкет
+ * Только директор
  */
 router.post('/bulk-delete', async (req, res) => {
+    const userRole = req.user?.role;
+    if (userRole !== 'director') {
+        return res.status(403).json({ success: false, error: 'Только директор может массово удалять анкеты' });
+    }
+
     const { profileIds, userId, userName } = req.body;
     try {
         let deleted = 0;
@@ -360,8 +411,14 @@ router.post('/bulk-delete', async (req, res) => {
 /**
  * DELETE /api/profiles/:profileId
  * Удаляет анкету из базы данных (сохраняя paid_until в истории для восстановления)
+ * Только директор и админы
  */
 router.delete('/:profileId', async (req, res) => {
+    const userRole = req.user?.role;
+    if (!userRole || !['director', 'admin'].includes(userRole)) {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав для удаления анкеты' });
+    }
+
     const { profileId } = req.params;
     const { userId, userName } = req.query;
     try {
@@ -474,7 +531,11 @@ router.get('/:profileId/ai-status', async (req, res) => {
  * Для админов/переводчиков показывает только историю назначенных им анкет
  */
 router.get('/history', async (req, res) => {
-    const { userId, role, adminId, profileId, dateFrom, dateTo, limit = 100 } = req.query;
+    // Используем роль из JWT если есть
+    const role = req.user?.role || req.query.role;
+    const userId = req.user?.id || req.query.userId;
+    const { adminId, profileId, dateFrom, dateTo, limit = 100 } = req.query;
+
     try {
         let filter = 'WHERE 1=1';
         let params = [limit];

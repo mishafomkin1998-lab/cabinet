@@ -272,7 +272,13 @@ const upload = multer({
 });
 
 // API endpoint для загрузки файлов
-app.post('/api/upload', upload.single('file'), (req, res) => {
+// Только директор может загружать файлы (логотипы, установщики)
+app.post('/api/upload', requireAuth, upload.single('file'), (req, res) => {
+    // Проверка прав - только директор
+    if (req.user?.role !== 'director') {
+        return res.status(403).json({ success: false, error: 'Только директор может загружать файлы' });
+    }
+
     try {
         if (!req.file) {
             return res.status(400).json({ success: false, error: 'No file uploaded' });

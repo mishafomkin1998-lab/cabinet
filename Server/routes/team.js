@@ -6,12 +6,22 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const pool = require('../config/database');
+const { requireRole } = require('../middleware/auth');
 
 const router = express.Router();
 
 // Получение команды
+// Только директор и админы могут видеть команду
 router.get('/', async (req, res) => {
-    const { userId, role } = req.query;
+    // Используем проверенную роль из JWT токена, а не из query параметров
+    const role = req.user?.role;
+    const userId = req.user?.id;
+
+    // Проверка прав доступа
+    if (!role || !['director', 'admin'].includes(role)) {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав' });
+    }
+
     try {
         let filter = "";
         let params = [];
@@ -111,8 +121,22 @@ router.get('/', async (req, res) => {
 });
 
 // Создание пользователя
+// Только директор и админы могут создавать пользователей
 router.post('/', async (req, res) => {
+    // Проверка прав - только директор и админ могут создавать пользователей
+    const userRole = req.user?.role;
+    if (!userRole || !['director', 'admin'].includes(userRole)) {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав для создания пользователей' });
+    }
+
     const { username, login, password, role, ownerId, salary, isRestricted, aiEnabled, isOwnTranslator } = req.body;
+
+    // Директор может создавать админов и переводчиков
+    // Админ может создавать только переводчиков
+    if (userRole === 'admin' && role !== 'translator') {
+        return res.status(403).json({ success: false, error: 'Админ может создавать только переводчиков' });
+    }
+
     try {
         const hash = await bcrypt.hash(password, 10);
         // Если login не передан, используем username
@@ -130,7 +154,14 @@ router.post('/', async (req, res) => {
 });
 
 // Удаление пользователя
+// Только директор может удалять пользователей
 router.delete('/:id', async (req, res) => {
+    // Проверка прав - только директор может удалять пользователей
+    const userRole = req.user?.role;
+    if (userRole !== 'director') {
+        return res.status(403).json({ success: false, error: 'Только директор может удалять пользователей' });
+    }
+
     const userId = req.params.id;
     try {
         // Обнуляем связи с анкетами
@@ -145,8 +176,30 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Редактирование пользователя
+// Директор может редактировать всех, админ - только своих переводчиков
 router.put('/:id', async (req, res) => {
+    const userRole = req.user?.role;
+    const currentUserId = req.user?.id;
+
+    // Проверка базовых прав
+    if (!userRole || !['director', 'admin'].includes(userRole)) {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав' });
+    }
+
     const userId = req.params.id;
+
+    // Админ может редактировать только своих переводчиков
+    if (userRole === 'admin') {
+        const targetUser = await pool.query('SELECT owner_id, role FROM users WHERE id = $1', [userId]);
+        if (targetUser.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Пользователь не найден' });
+        }
+        // Проверяем что это переводчик, принадлежащий этому админу
+        if (targetUser.rows[0].role !== 'translator' || targetUser.rows[0].owner_id !== currentUserId) {
+            return res.status(403).json({ success: false, error: 'Вы можете редактировать только своих переводчиков' });
+        }
+    }
+
     const { username, password, salary, aiEnabled, is_restricted, isOwnTranslator } = req.body;
     try {
         const updates = [];
@@ -201,8 +254,22 @@ router.put('/:id', async (req, res) => {
 });
 
 // Получение списка ID анкет, назначенных админу
+// Директор видит всех, админ - только себя
 router.get('/:id/profiles', async (req, res) => {
+    const userRole = req.user?.role;
+    const currentUserId = req.user?.id;
     const adminId = req.params.id;
+
+    // Проверка прав
+    if (!userRole || !['director', 'admin'].includes(userRole)) {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав' });
+    }
+
+    // Админ может смотреть только свои анкеты
+    if (userRole === 'admin' && parseInt(adminId) !== currentUserId) {
+        return res.status(403).json({ success: false, error: 'Вы можете видеть только свои анкеты' });
+    }
+
     try {
         const result = await pool.query(
             `SELECT profile_id FROM allowed_profiles WHERE assigned_admin_id = $1 ORDER BY profile_id`,
@@ -217,7 +284,15 @@ router.get('/:id/profiles', async (req, res) => {
 });
 
 // Обновление списка анкет админа (полная замена)
+// Только директор может менять анкеты админов
 router.put('/:id/profiles', async (req, res) => {
+    const userRole = req.user?.role;
+
+    // Только директор может назначать анкеты админам
+    if (userRole !== 'director') {
+        return res.status(403).json({ success: false, error: 'Только директор может назначать анкеты админам' });
+    }
+
     const adminId = req.params.id;
     const { profileIds } = req.body;
 
@@ -267,8 +342,25 @@ router.put('/:id/profiles', async (req, res) => {
 });
 
 // Получение списка анкет переводчика
+// Директор видит всех, админ - только своих переводчиков
 router.get('/translator/:id/profiles', async (req, res) => {
+    const userRole = req.user?.role;
+    const currentUserId = req.user?.id;
     const translatorId = req.params.id;
+
+    // Проверка прав
+    if (!userRole || !['director', 'admin'].includes(userRole)) {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав' });
+    }
+
+    // Админ может видеть только своих переводчиков
+    if (userRole === 'admin') {
+        const translator = await pool.query('SELECT owner_id FROM users WHERE id = $1', [translatorId]);
+        if (translator.rows.length === 0 || translator.rows[0].owner_id !== currentUserId) {
+            return res.status(403).json({ success: false, error: 'Вы можете видеть только своих переводчиков' });
+        }
+    }
+
     try {
         const result = await pool.query(
             `SELECT profile_id FROM allowed_profiles WHERE assigned_translator_id = $1`,
@@ -285,8 +377,25 @@ router.get('/translator/:id/profiles', async (req, res) => {
 });
 
 // Обновление списка анкет переводчика
+// Директор может всех, админ - только своих переводчиков
 router.put('/translator/:id/profiles', async (req, res) => {
+    const userRole = req.user?.role;
+    const currentUserId = req.user?.id;
     const translatorId = req.params.id;
+
+    // Проверка прав
+    if (!userRole || !['director', 'admin'].includes(userRole)) {
+        return res.status(403).json({ success: false, error: 'Недостаточно прав' });
+    }
+
+    // Админ может назначать анкеты только своим переводчикам
+    if (userRole === 'admin') {
+        const translator = await pool.query('SELECT owner_id FROM users WHERE id = $1', [translatorId]);
+        if (translator.rows.length === 0 || translator.rows[0].owner_id !== currentUserId) {
+            return res.status(403).json({ success: false, error: 'Вы можете назначать анкеты только своим переводчикам' });
+        }
+    }
+
     const { profileIds, translatorName, userId, userName } = req.body;
 
     try {
