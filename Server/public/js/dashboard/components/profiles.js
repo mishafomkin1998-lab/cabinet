@@ -155,13 +155,35 @@ const ProfilesComponent = {
         }
 
         try {
+            // Определяем adminId и translatorId на основе выбора директора
+            let adminId = null;
+            let translatorId = null;
+
+            if (context.currentUser.role === 'director' && context.newAccountAssignTo) {
+                // Директор выбрал кого-то для назначения
+                if (context.newAccountAssignTo.startsWith('admin_')) {
+                    adminId = parseInt(context.newAccountAssignTo.replace('admin_', ''));
+                } else if (context.newAccountAssignTo.startsWith('translator_')) {
+                    translatorId = parseInt(context.newAccountAssignTo.replace('translator_', ''));
+                    // Для переводчика нужно найти его админа
+                    const translator = context.allTranslators?.find(t => t.id === translatorId);
+                    if (translator && translator.adminId) {
+                        adminId = translator.adminId;
+                    }
+                }
+            } else if (context.currentUser.role === 'admin') {
+                // Админ добавляет анкеты себе
+                adminId = context.currentUser.id;
+            }
+
             const res = await fetch(`${API_BASE}/api/profiles/bulk`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     profiles: ids,
                     note: context.newAccountComment || '',
-                    adminId: context.currentUser.role === 'director' ? null : context.currentUser.id,
+                    adminId: adminId,
+                    translatorId: translatorId,
                     userId: context.currentUser.id,
                     userName: context.currentUser.username,
                     role: context.currentUser.role
@@ -172,6 +194,7 @@ const ProfilesComponent = {
             if (data.success) {
                 context.newAccountIds = '';
                 context.newAccountComment = '';
+                context.newAccountAssignTo = null;
                 context.showAddAccountModal = false;
                 alert(`Добавлено ${ids.length} анкет`);
                 await this.loadAccounts(context);

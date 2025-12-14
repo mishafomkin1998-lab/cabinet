@@ -99,15 +99,21 @@ const TeamComponent = {
                 }
 
                 // Все переводчики для выбора
-                context.allTranslators = translatorsList.map(t => ({
-                    id: t.id,
-                    name: t.username,
-                    login: t.username,
-                    conversion: t.conversion || 0,
-                    accounts: t.accounts || [],
-                    accountsCount: t.accounts_count || 0,
-                    aiEnabled: t.ai_enabled || false
-                }));
+                context.allTranslators = translatorsList.map(t => {
+                    // Находим имя админа
+                    const admin = adminsList.find(a => a.id === t.owner_id);
+                    return {
+                        id: t.id,
+                        name: t.username,
+                        login: t.username,
+                        adminId: t.owner_id,
+                        adminName: admin ? admin.username : null,
+                        conversion: t.conversion || 0,
+                        accounts: t.accounts || [],
+                        accountsCount: t.accounts_count || 0,
+                        aiEnabled: t.ai_enabled || false
+                    };
+                });
             }
         } catch (e) {
             console.error('loadTeam error:', e);
