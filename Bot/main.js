@@ -616,6 +616,7 @@ app.on('window-all-closed', () => {
 const responseWindows = new Map();
 
 ipcMain.handle('open-response-window', async (event, data) => {
+    try {
     const { windowId, botId, partnerId, partnerName, type, url, login, pass } = data;
 
     // Если окно уже открыто - фокусируем
@@ -833,7 +834,11 @@ ipcMain.handle('open-response-window', async (event, data) => {
         return { success: true };
     } catch (err) {
         console.error('[ResponseWindow] Error loading URL:', err);
-        return { success: false, error: err.message };
+        return { success: false, error: String(err.message || err) };
+    }
+    } catch (outerErr) {
+        console.error('[ResponseWindow] Unexpected error:', outerErr);
+        return { success: false, error: String(outerErr.message || outerErr) };
     }
 });
 
