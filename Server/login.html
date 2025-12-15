@@ -219,22 +219,23 @@
         /* Контейнер для руки Гринча */
         .grinch-container {
             position: fixed;
-            right: 0;
+            right: -50px;
             top: 50%;
             transform: translateY(-50%);
-            width: 500px;
-            height: 400px;
+            width: 600px;
+            height: 500px;
             overflow: hidden;
             z-index: 10;
             pointer-events: none;
+            mix-blend-mode: multiply;
         }
 
         .grinch-hand {
-            width: 200%;
-            height: 200%;
-            object-fit: cover;
-            object-position: 60% 50%;
-            mix-blend-mode: multiply;
+            position: absolute;
+            top: -80%;
+            left: -50%;
+            width: 250%;
+            height: 250%;
         }
 
         @media (max-width: 1200px) {
