@@ -1046,12 +1046,19 @@ class AccountBot {
                 this.mailHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                 this.log(`❌ Ошибка: не могу отправить письмо ${user.Name} (${user.AccountId}): ${errorReason}`);
 
-                // Добавляем в очередь повторов (если не retry или retry ещё не исчерпан)
+                // Добавляем в очередь повторов (если не retry) или перемещаем в конец (если retry)
                 if (!isRetryAttempt) {
                     this.mailRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
-                } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
+                } else if (isRetryAttempt && currentRetryItem) {
+                    // Удаляем из текущей позиции
                     this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                    this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                    if (currentRetryItem.retryCount < this.maxRetries) {
+                        // Перемещаем в конец очереди для циклической обработки
+                        this.mailRetryQueue.push(currentRetryItem);
+                        this.log(`🔄 ${user.Name} перемещён в конец очереди (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
+                    } else {
+                        this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                    }
                 }
 
                 // Отправляем ошибку на сервер (с защитой от падения)
@@ -1116,9 +1123,16 @@ class AccountBot {
                         this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
                     } else if (!isRetryAttempt) {
                         this.mailRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
-                    } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
+                    } else if (isRetryAttempt && currentRetryItem) {
+                        // Удаляем из текущей позиции
                         this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                        this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                        if (currentRetryItem.retryCount < this.maxRetries) {
+                            // Перемещаем в конец очереди для циклической обработки
+                            this.mailRetryQueue.push(currentRetryItem);
+                            this.log(`🔄 ${user.Name} перемещён в конец очереди (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
+                        } else {
+                            this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                        }
                     }
                 }
 
@@ -1160,13 +1174,20 @@ class AccountBot {
                 this.incrementStat('mail', 'errors');
                 this.mailHistory.errors.push(e.message);
 
-                // Добавляем в очередь повторов
+                // Добавляем в очередь повторов или перемещаем в конец
                 if (user && user.AccountId) {
                     if (!isRetryAttempt) {
                         this.mailRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
-                    } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
+                    } else if (isRetryAttempt && currentRetryItem) {
+                        // Удаляем из текущей позиции
                         this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                        this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                        if (currentRetryItem.retryCount < this.maxRetries) {
+                            // Перемещаем в конец очереди для циклической обработки
+                            this.mailRetryQueue.push(currentRetryItem);
+                            this.log(`🔄 ${user.Name} перемещён в конец очереди (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
+                        } else {
+                            this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                        }
                     }
                 }
 
@@ -1541,9 +1562,16 @@ class AccountBot {
                             this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
                         } else if (!isRetryAttempt) {
                             this.chatRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
-                        } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
+                        } else if (isRetryAttempt && currentRetryItem) {
+                            // Удаляем из текущей позиции
                             this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                            this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                            if (currentRetryItem.retryCount < this.maxRetries) {
+                                // Перемещаем в конец очереди для циклической обработки
+                                this.chatRetryQueue.push(currentRetryItem);
+                                this.log(`🔄 ${user.Name} перемещён в конец очереди (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
+                            } else {
+                                this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                            }
                         }
 
                         // Отправляем ошибку на сервер
@@ -1603,9 +1631,16 @@ class AccountBot {
                                 this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
                             } else if (!isRetryAttempt) {
                                 this.chatRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
-                            } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
+                            } else if (isRetryAttempt && currentRetryItem) {
+                                // Удаляем из текущей позиции
                                 this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                                this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                                if (currentRetryItem.retryCount < this.maxRetries) {
+                                    // Перемещаем в конец очереди для циклической обработки
+                                    this.chatRetryQueue.push(currentRetryItem);
+                                    this.log(`🔄 ${user.Name} перемещён в конец очереди (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
+                                } else {
+                                    this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                                }
                             }
                         }
 
@@ -1668,9 +1703,16 @@ class AccountBot {
                         this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
                     } else if (!isRetryAttempt) {
                         this.chatRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
-                    } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
+                    } else if (isRetryAttempt && currentRetryItem) {
+                        // Удаляем из текущей позиции
                         this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                        this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                        if (currentRetryItem.retryCount < this.maxRetries) {
+                            // Перемещаем в конец очереди для циклической обработки
+                            this.chatRetryQueue.push(currentRetryItem);
+                            this.log(`🔄 ${user.Name} перемещён в конец очереди (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
+                        } else {
+                            this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                        }
                     }
                 }
 
