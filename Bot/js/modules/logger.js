@@ -52,8 +52,12 @@ const loggerTracking = {
     // Таймеры звуковых напоминаний для писем: logId -> [timerId1, timerId2]
     mailSoundTimers: {},
     // Связь логов с окнами: windowId -> logId (для удаления при закрытии)
-    windowToLog: {}
+    windowToLog: {},
+    // Desktop уведомления: ключ -> timestamp (чтобы не показывать дубликаты)
+    desktopNotified: {}
 };
+
+const DESKTOP_NOTIFICATION_COOLDOWN_MS = 60 * 1000; // 1 минута между уведомлениями для одного сообщения
 
 const VIP_COOLDOWN_MS = 60 * 60 * 1000; // 1 час
 const VIP_FADE_MS = 3 * 60 * 1000; // 3 минуты до затухания
@@ -193,11 +197,25 @@ const Logger = {
 
     // Electron уведомление (поддерживает mail и chat-request)
     showElectronNotification: function(data, type, botId) {
+        // Проверяем настройку
+        if (!globalSettings.desktopNotifications) return;
         if (!data) return;
+
         const partnerId = data.partnerId || '???';
         const partnerName = data.partnerName || `ID ${partnerId}`;
         const messageBody = data.messageBody || '';
         const avatarUrl = data.avatarUrl || null;
+
+        // Проверяем на дубликат (1 уведомление на сообщение)
+        const notifyKey = `${type}-${botId}-${partnerId}-${messageBody.slice(0, 20)}`;
+        const now = Date.now();
+        const lastNotified = loggerTracking.desktopNotified[notifyKey] || 0;
+
+        if (now - lastNotified < DESKTOP_NOTIFICATION_COOLDOWN_MS) {
+            console.log(`[Logger] Desktop уведомление пропущено (cooldown): ${notifyKey}`);
+            return;
+        }
+        loggerTracking.desktopNotified[notifyKey] = now;
 
         // Разные заголовки для писем и чатов
         const isChat = type === 'chat-request';

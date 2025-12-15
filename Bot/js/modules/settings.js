@@ -11,6 +11,7 @@ function loadGlobalSettingsUI() {
     document.getElementById('set-ai-reply-prompt').value = globalSettings.aiReplyPrompt || '';
     document.getElementById('set-chat-prompt').value = globalSettings.chatPrompt || '';
     document.getElementById('set-sounds').checked = globalSettings.soundsEnabled;
+    document.getElementById('set-desktop-notifications').checked = globalSettings.desktopNotifications;
     document.getElementById('set-confirm-close').checked = globalSettings.confirmTabClose;
     document.getElementById('set-extended').checked = globalSettings.extendedFeatures;
     document.getElementById('set-skip-delete-confirm').checked = globalSettings.skipDeleteConfirm;
@@ -70,6 +71,7 @@ function saveGlobalSettings() {
     globalSettings.aiReplyPrompt = document.getElementById('set-ai-reply-prompt').value;
     globalSettings.chatPrompt = document.getElementById('set-chat-prompt').value;
     globalSettings.soundsEnabled = document.getElementById('set-sounds').checked;
+    globalSettings.desktopNotifications = document.getElementById('set-desktop-notifications').checked;
     globalSettings.confirmTabClose = document.getElementById('set-confirm-close').checked;
     globalSettings.extendedFeatures = document.getElementById('set-extended').checked;
     globalSettings.skipDeleteConfirm = document.getElementById('set-skip-delete-confirm').checked;
@@ -115,6 +117,7 @@ function openGlobalSettings() {
     document.getElementById('set-ai-reply-prompt').value = globalSettings.aiReplyPrompt || '';
     document.getElementById('set-chat-prompt').value = globalSettings.chatPrompt || '';
     document.getElementById('set-sounds').checked = globalSettings.soundsEnabled;
+    document.getElementById('set-desktop-notifications').checked = globalSettings.desktopNotifications;
     document.getElementById('set-confirm-close').checked = globalSettings.confirmTabClose;
     document.getElementById('set-extended').checked = globalSettings.extendedFeatures;
     document.getElementById('set-skip-delete-confirm').checked = globalSettings.skipDeleteConfirm;
