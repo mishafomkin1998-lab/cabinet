@@ -632,7 +632,11 @@ ipcMain.handle('open-response-window', async (event, data) => {
     const ses = session.fromPartition(`persist:rw_${botId}`);
 
     // Убираем прокси для этой сессии (прямое подключение)
-    await ses.setProxy({ proxyRules: '' });
+    try {
+        await ses.setProxy({ proxyRules: '' });
+    } catch (e) {
+        console.warn('[ResponseWindow] Не удалось отключить прокси:', e.message);
+    }
 
     // Копируем cookies из WebView сессии (там авторизация)
     try {
@@ -640,16 +644,20 @@ ipcMain.handle('open-response-window', async (event, data) => {
         const cookies = await webviewSes.cookies.get({ domain: 'ladadate.com' });
 
         for (const cookie of cookies) {
-            await ses.cookies.set({
-                url: `https://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
-                name: cookie.name,
-                value: cookie.value,
-                domain: cookie.domain,
-                path: cookie.path,
-                secure: cookie.secure,
-                httpOnly: cookie.httpOnly,
-                expirationDate: cookie.expirationDate
-            });
+            try {
+                await ses.cookies.set({
+                    url: `https://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
+                    name: cookie.name,
+                    value: cookie.value,
+                    domain: cookie.domain,
+                    path: cookie.path,
+                    secure: cookie.secure,
+                    httpOnly: cookie.httpOnly,
+                    expirationDate: cookie.expirationDate
+                });
+            } catch (e) {
+                // Игнорируем ошибки отдельных cookies
+            }
         }
         console.log(`[ResponseWindow] Скопировано ${cookies.length} cookies из WebView`);
     } catch (cookieErr) {
