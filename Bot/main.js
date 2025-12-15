@@ -627,8 +627,8 @@ ipcMain.handle('open-response-window', async (event, data) => {
         }
     }
 
-    // Используем сессию WebView бота (persist:wv_botId) - там хранятся cookies авторизации
-    const ses = session.fromPartition(`persist:wv_${botId}`);
+    // Используем сессию бота (persist:botId) - отдельная от WebView чтобы избежать конфликтов
+    const ses = session.fromPartition(`persist:${botId}`);
 
     const win = new BrowserWindow({
         width: 800,
