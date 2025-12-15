@@ -793,6 +793,7 @@ ipcMain.handle('open-response-window', async (event, data) => {
                 Audio.prototype.play = function() { return Promise.resolve(); };
                 HTMLMediaElement.prototype.play = function() { return Promise.resolve(); };
             }
+            null;
         `);
 
         // Инжектируем CSS для улучшения поля ввода
