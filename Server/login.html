@@ -219,17 +219,19 @@
         /* Рука Гринча справа */
         .grinch-hand {
             position: fixed;
-            right: -50px;
+            right: -100px;
             top: 50%;
             transform: translateY(-50%);
-            width: 350px;
-            height: auto;
+            width: 700px;
+            height: 400px;
+            object-fit: cover;
+            object-position: center;
             z-index: 10;
             pointer-events: none;
             mix-blend-mode: multiply;
         }
 
-        @media (max-width: 900px) {
+        @media (max-width: 1200px) {
             .grinch-hand {
                 display: none;
             }
@@ -237,9 +239,6 @@
     </style>
 </head>
 <body>
-    <!-- 🎄 Новогодние украшения 🎄 -->
-    <div class="garland"></div>
-
     <!-- Праздничная картинка (замени new-year.png на свою) -->
     <div class="new-year-decoration">
         <img src="new-year.png" alt="С Новым Годом!" onerror="this.parentElement.style.display='none'">
