@@ -216,23 +216,29 @@
             100% { background-position: 200% 0%; }
         }
 
-        /* Рука Гринча справа */
-        .grinch-hand {
+        /* Контейнер для руки Гринча */
+        .grinch-container {
             position: fixed;
-            right: -100px;
+            right: 0;
             top: 50%;
             transform: translateY(-50%);
-            width: 700px;
+            width: 500px;
             height: 400px;
-            object-fit: cover;
-            object-position: center;
+            overflow: hidden;
             z-index: 10;
             pointer-events: none;
+        }
+
+        .grinch-hand {
+            width: 200%;
+            height: 200%;
+            object-fit: cover;
+            object-position: 60% 50%;
             mix-blend-mode: multiply;
         }
 
         @media (max-width: 1200px) {
-            .grinch-hand {
+            .grinch-container {
                 display: none;
             }
         }
@@ -248,9 +254,11 @@
     <div id="snowContainer"></div>
 
     <!-- Рука Гринча -->
-    <video class="grinch-hand" autoplay loop muted playsinline>
-        <source src="videos/IMG_0911.MP4" type="video/mp4">
-    </video>
+    <div class="grinch-container">
+        <video class="grinch-hand" autoplay loop muted playsinline>
+            <source src="videos/IMG_0911.MP4" type="video/mp4">
+        </video>
+    </div>
 
     <div class="glass rounded-3xl w-full max-w-md overflow-hidden fade-in" style="margin-top: 40px;">
         <!-- Заголовок -->
