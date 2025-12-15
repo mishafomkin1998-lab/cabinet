@@ -627,8 +627,12 @@ ipcMain.handle('open-response-window', async (event, data) => {
         }
     }
 
-    // Используем сессию бота (persist:botId) - отдельная от WebView чтобы избежать конфликтов
-    const ses = session.fromPartition(`persist:${botId}`);
+    // Используем ОТДЕЛЬНУЮ сессию для ResponseWindow (без прокси)
+    // persist:rw_ - Response Window, отдельная от API (persist:botId) и WebView (persist:wv_botId)
+    const ses = session.fromPartition(`persist:rw_${botId}`);
+
+    // Убираем прокси для этой сессии (прямое подключение)
+    await ses.setProxy({ proxyRules: '' });
 
     const win = new BrowserWindow({
         width: 800,
