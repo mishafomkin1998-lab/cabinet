@@ -215,6 +215,25 @@
             0% { background-position: 0% 0%; }
             100% { background-position: 200% 0%; }
         }
+
+        /* Рука Гринча справа */
+        .grinch-hand {
+            position: fixed;
+            right: -50px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 350px;
+            height: auto;
+            z-index: 10;
+            pointer-events: none;
+            mix-blend-mode: multiply;
+        }
+
+        @media (max-width: 900px) {
+            .grinch-hand {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
@@ -228,6 +247,11 @@
 
     <!-- Контейнер для снежинок -->
     <div id="snowContainer"></div>
+
+    <!-- Рука Гринча -->
+    <video class="grinch-hand" autoplay loop muted playsinline>
+        <source src="videos/IMG_0911.MP4" type="video/mp4">
+    </video>
 
     <div class="glass rounded-3xl w-full max-w-md overflow-hidden fade-in" style="margin-top: 40px;">
         <!-- Заголовок -->
