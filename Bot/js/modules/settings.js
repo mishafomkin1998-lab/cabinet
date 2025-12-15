@@ -14,6 +14,7 @@ function loadGlobalSettingsUI() {
     document.getElementById('set-confirm-close').checked = globalSettings.confirmTabClose;
     document.getElementById('set-extended').checked = globalSettings.extendedFeatures;
     document.getElementById('set-skip-delete-confirm').checked = globalSettings.skipDeleteConfirm;
+    document.getElementById('set-keep-logger-entries').checked = globalSettings.keepLoggerEntries;
     document.getElementById('set-translator-id').value = globalSettings.translatorId || '';
     applyTheme(globalSettings.theme);
 
@@ -72,6 +73,7 @@ function saveGlobalSettings() {
     globalSettings.confirmTabClose = document.getElementById('set-confirm-close').checked;
     globalSettings.extendedFeatures = document.getElementById('set-extended').checked;
     globalSettings.skipDeleteConfirm = document.getElementById('set-skip-delete-confirm').checked;
+    globalSettings.keepLoggerEntries = document.getElementById('set-keep-logger-entries').checked;
 
     // Сохраняем Translator ID
     const translatorIdValue = document.getElementById('set-translator-id').value.trim();
@@ -115,6 +117,8 @@ function openGlobalSettings() {
     document.getElementById('set-sounds').checked = globalSettings.soundsEnabled;
     document.getElementById('set-confirm-close').checked = globalSettings.confirmTabClose;
     document.getElementById('set-extended').checked = globalSettings.extendedFeatures;
+    document.getElementById('set-skip-delete-confirm').checked = globalSettings.skipDeleteConfirm;
+    document.getElementById('set-keep-logger-entries').checked = globalSettings.keepLoggerEntries;
     document.getElementById('set-translator-id').value = globalSettings.translatorId || '';
 
     // Загружаем прокси для анкет (1-6)

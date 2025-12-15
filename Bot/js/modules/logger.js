@@ -387,9 +387,13 @@ async function closeResponseWindow(windowId) {
 // Слушаем событие закрытия окна от main process
 ipcRenderer.on('response-window-closed', (event, windowId) => {
     openedResponseWindows.delete(windowId);
-    // Удаляем связанный лог при закрытии окна
-    Logger.removeLogByWindowId(windowId);
-    console.log(`[ResponseWindow] Окно ${windowId} закрыто, лог удалён`);
+    // Удаляем связанный лог при закрытии окна (если не включена настройка сохранения)
+    if (!globalSettings.keepLoggerEntries) {
+        Logger.removeLogByWindowId(windowId);
+        console.log(`[ResponseWindow] Окно ${windowId} закрыто, лог удалён`);
+    } else {
+        console.log(`[ResponseWindow] Окно ${windowId} закрыто, лог сохранён (keepLoggerEntries=true)`);
+    }
 });
 
 // Открытие окна с трекингом для удаления лога при закрытии

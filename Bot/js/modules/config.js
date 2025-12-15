@@ -29,6 +29,7 @@ let defaultSettings = {
     hotkeys: true, myPrompt: '', myPromptChat: '', apiKey: '',
     soundsEnabled: true, confirmTabClose: true, extendedFeatures: true,
     skipDeleteConfirm: false, // Не спрашивать об удалении шаблона
+    keepLoggerEntries: false, // Сохранять записи в логгере после просмотра
     translatorId: null, // ID переводчика для статистики
     aiReplyPrompt: '', // Промпт для AI ответов на письма
     chatPrompt: '', // Промпт для AI ответов в чатах

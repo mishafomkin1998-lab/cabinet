@@ -629,6 +629,67 @@
             opacity: 0.5;
         }
 
+        /* === LOGGER COLUMN - темная тема === */
+        body.theme-dark #logger-column {
+            background: #161616;
+            border-left: 1px solid #252525;
+        }
+
+        body.theme-dark .logger-column-header {
+            background: linear-gradient(90deg, #1a1a1a 0%, #161616 100%);
+            border-bottom: 1px solid #00ff88;
+            color: #f0f0f0;
+        }
+
+        body.theme-dark .logger-column-header span {
+            color: #00ff88;
+        }
+
+        body.theme-dark .logger-column-header button {
+            color: #888;
+        }
+
+        body.theme-dark .logger-column-header button:hover {
+            color: #ff5555;
+        }
+
+        body.theme-dark .logger-column-content {
+            background: #0d0d0d;
+        }
+
+        body.theme-dark .log-entry {
+            border-bottom-color: #252525;
+        }
+
+        body.theme-dark .log-entry.fresh {
+            color: #00ff88;
+        }
+
+        body.theme-dark .log-entry.old {
+            color: #888;
+        }
+
+        body.theme-dark .log-time {
+            color: #666;
+        }
+
+        body.theme-dark .log-link {
+            color: inherit;
+        }
+
+        body.theme-dark .log-link:hover {
+            color: #00ff88;
+        }
+
+        body.theme-dark .log-close {
+            color: #666;
+        }
+
+        body.theme-dark .log-close:hover {
+            color: #ff5555;
+            background: rgba(255, 85, 85, 0.2);
+        }
+
         body.theme-dark .active-invite-box {
             background: #152515;
             border-color: #254525;
