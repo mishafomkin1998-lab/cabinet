@@ -634,6 +634,28 @@ ipcMain.handle('open-response-window', async (event, data) => {
     // Убираем прокси для этой сессии (прямое подключение)
     await ses.setProxy({ proxyRules: '' });
 
+    // Копируем cookies из WebView сессии (там авторизация)
+    try {
+        const webviewSes = session.fromPartition(`persist:wv_${botId}`);
+        const cookies = await webviewSes.cookies.get({ domain: 'ladadate.com' });
+
+        for (const cookie of cookies) {
+            await ses.cookies.set({
+                url: `https://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
+                name: cookie.name,
+                value: cookie.value,
+                domain: cookie.domain,
+                path: cookie.path,
+                secure: cookie.secure,
+                httpOnly: cookie.httpOnly,
+                expirationDate: cookie.expirationDate
+            });
+        }
+        console.log(`[ResponseWindow] Скопировано ${cookies.length} cookies из WebView`);
+    } catch (cookieErr) {
+        console.warn(`[ResponseWindow] Не удалось скопировать cookies:`, cookieErr.message);
+    }
+
     const win = new BrowserWindow({
         width: 800,
         height: 700,
