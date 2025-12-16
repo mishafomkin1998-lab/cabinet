@@ -320,14 +320,15 @@ router.post('/bot/heartbeat', asyncHandler(async (req, res) => {
     res.json({ status: 'ok' });
 }));
 
-// Статус ботов и анкет
+// Статус ботов и анкет (ОПТИМИЗИРОВАНО)
 router.get('/status', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
 
     const { filter: profileFilter, params } = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'WHERE' });
 
-    // 1. Получаем статус анкет (для обновления таблицы анкет)
-    // Оптимизированный запрос: используем CTE для агрегации вместо DISTINCT ON с большим JOIN
+    // ОПТИМИЗАЦИЯ: Ограничиваем heartbeats последним часом вместо ВСЕЙ таблицы
+    // Было: DISTINCT ON по миллионам записей = 27+ секунд
+    // Стало: DISTINCT ON по записям за час = <1 секунды
     const profilesQuery = `
         WITH latest_heartbeats AS (
             SELECT DISTINCT ON (account_display_id)
@@ -339,6 +340,7 @@ router.get('/status', asyncHandler(async (req, res) => {
                 platform,
                 timestamp as last_heartbeat
             FROM heartbeats
+            WHERE timestamp > NOW() - INTERVAL '1 hour'
             ORDER BY account_display_id, timestamp DESC
         ),
         profile_stats AS (

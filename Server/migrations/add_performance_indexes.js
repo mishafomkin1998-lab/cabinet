@@ -91,7 +91,7 @@ async function migrate() {
             sql: 'CREATE INDEX IF NOT EXISTS idx_messages_type ON messages(type)'
         },
 
-        // heartbeats indexes - для онлайн статуса
+        // heartbeats indexes - для онлайн статуса (КРИТИЧНО для /api/bots/status)
         {
             name: 'idx_heartbeats_timestamp',
             sql: 'CREATE INDEX IF NOT EXISTS idx_heartbeats_timestamp ON heartbeats(timestamp)'
@@ -99,6 +99,16 @@ async function migrate() {
         {
             name: 'idx_heartbeats_account_display_id',
             sql: 'CREATE INDEX IF NOT EXISTS idx_heartbeats_account_display_id ON heartbeats(account_display_id)'
+        },
+        {
+            // КРИТИЧЕСКИЙ ИНДЕКС: для DISTINCT ON с фильтром по времени
+            name: 'idx_heartbeats_timestamp_account',
+            sql: 'CREATE INDEX IF NOT EXISTS idx_heartbeats_timestamp_account ON heartbeats(timestamp DESC, account_display_id)'
+        },
+        {
+            // Составной индекс для покрытия запроса
+            name: 'idx_heartbeats_account_timestamp',
+            sql: 'CREATE INDEX IF NOT EXISTS idx_heartbeats_account_timestamp ON heartbeats(account_display_id, timestamp DESC)'
         },
 
         // users indexes
