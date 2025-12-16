@@ -941,10 +941,6 @@ class AccountBot {
 
             user = users[Math.floor(Math.random() * users.length)];
 
-            // DEBUG: Показываем все поля user через alert (ВРЕМЕННО - удалить после отладки!)
-            alert('Поля user из API:\n\n' + Object.keys(user).join('\n'));
-            console.log('[User] Полные данные:', JSON.stringify(user, null, 2));
-
             msgBody = this.replaceMacros(msgTemplate, user);
             const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
 
