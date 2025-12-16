@@ -38,6 +38,20 @@ let defaultSettings = {
     proxy1: '', proxy2: '', proxy3: '', proxy4: '', proxy5: '', proxy6: '',
     // Отключенные статусы (пропускаются в авто-режиме)
     disabledStatuses: [],
+    // Автоочистка ошибок (для Mail)
+    autoClearMail: {
+        byTimeEnabled: true,
+        byTimeMinutes: 120,
+        byErrorsEnabled: false,
+        byErrorsCount: 100
+    },
+    // Автоочистка ошибок (для Chat)
+    autoClearChat: {
+        byTimeEnabled: true,
+        byTimeMinutes: 120,
+        byErrorsEnabled: false,
+        byErrorsCount: 100
+    },
     // Активные шаблоны промптов (ID из сервера)
     activePromptTemplates: {
         myPrompt: null,

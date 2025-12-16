@@ -51,7 +51,7 @@
             <button class="btn btn-circle btn-play" onclick="startAll()" data-tip="Старт (Текущий режим)"><i class="fa fa-play"></i></button>
             
             <button class="btn btn-circle btn-stop" onclick="stopAll()" data-tip="Стоп (Текущий режим)"><i class="fa fa-stop"></i></button>
-            <button class="btn btn-circle btn-clear" onclick="clearAllStats()" data-tip="Сбросить статистику всех"><i class="fa fa-eraser"></i></button>
+            <button class="btn btn-circle btn-clear" onclick="clearAllStats()" oncontextmenu="openAutoClearSettings(event)" data-tip="ЛКМ: Сбросить статистику | ПКМ: Автоочистка"><i class="fa fa-eraser"></i></button>
             <button class="btn btn-circle btn-mode-switch active-mail" id="btn-mode-toggle" onclick="toggleGlobalMode()" data-tip="Переключить режим (Mail/Chat)"><i class="fa fa-envelope"></i></button>
             <button class="btn btn-circle btn-refresh" onclick="reloginAllBots()" data-tip="Перелогинить все анкеты"><i class="fa fa-sync"></i></button>
             
@@ -484,6 +484,44 @@
             <div class="d-flex gap-2 mt-3">
                 <button class="btn btn-primary flex-fill" onclick="closeModal('import-result-modal')"><i class="fa fa-check"></i> Закрыть</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно: Автоочистка ошибок -->
+    <div id="auto-clear-modal" class="modal-overlay">
+        <div class="modal-card" style="width: 380px;">
+            <h5><i class="fa fa-eraser text-warning"></i> Автоочистка ошибок</h5>
+            <p class="text-muted small mb-3">Режим: <b id="auto-clear-mode-label">Mail</b></p>
+
+            <div class="mb-3">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="auto-clear-by-time-enabled" onchange="saveAutoClearSettings()">
+                    <label class="form-check-label" for="auto-clear-by-time-enabled">
+                        Автоочистка через
+                        <input type="number" id="auto-clear-time-value" class="form-control form-control-sm d-inline-block" style="width: 70px;" value="120" min="1" onchange="saveAutoClearSettings()">
+                        минут
+                    </label>
+                </div>
+                <small class="text-muted d-block ms-4">От момента нажатия "Старт"</small>
+            </div>
+
+            <div class="mb-3">
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="auto-clear-by-errors-enabled" onchange="saveAutoClearSettings()">
+                    <label class="form-check-label" for="auto-clear-by-errors-enabled">
+                        Автоочистка через
+                        <input type="number" id="auto-clear-errors-value" class="form-control form-control-sm d-inline-block" style="width: 70px;" value="100" min="1" onchange="saveAutoClearSettings()">
+                        ошибок
+                    </label>
+                </div>
+                <small class="text-muted d-block ms-4">Когда накопится указанное количество</small>
+            </div>
+
+            <div class="alert alert-info small p-2">
+                <i class="fa fa-info-circle"></i> Очистка произойдёт если <b>хотя бы одно</b> условие выполнено
+            </div>
+
+            <button class="btn btn-primary w-100 mb-2" onclick="closeModal('auto-clear-modal')"><i class="fa fa-check"></i> Готово</button>
         </div>
     </div>
 

@@ -489,3 +489,113 @@ async function makeApiRequest(bot, method, path, data = null, isRetry = false) {
         throw error;
     }
 }
+
+// ============= АВТООЧИСТКА ОШИБОК =============
+
+// Открыть модалку настроек автоочистки (ПКМ на кнопке ластика)
+function openAutoClearSettings(event) {
+    event.preventDefault();
+
+    // Определяем текущий режим (Mail/Chat)
+    const isChat = globalMode === 'chat';
+    const settings = isChat ? globalSettings.autoClearChat : globalSettings.autoClearMail;
+
+    // Инициализируем настройки если их нет
+    if (!settings) {
+        if (isChat) {
+            globalSettings.autoClearChat = { byTimeEnabled: true, byTimeMinutes: 120, byErrorsEnabled: false, byErrorsCount: 100 };
+        } else {
+            globalSettings.autoClearMail = { byTimeEnabled: true, byTimeMinutes: 120, byErrorsEnabled: false, byErrorsCount: 100 };
+        }
+    }
+
+    const currentSettings = isChat ? globalSettings.autoClearChat : globalSettings.autoClearMail;
+
+    // Обновляем UI модалки
+    document.getElementById('auto-clear-mode-label').textContent = isChat ? 'Chat' : 'Mail';
+    document.getElementById('auto-clear-by-time-enabled').checked = currentSettings.byTimeEnabled;
+    document.getElementById('auto-clear-time-value').value = currentSettings.byTimeMinutes;
+    document.getElementById('auto-clear-by-errors-enabled').checked = currentSettings.byErrorsEnabled;
+    document.getElementById('auto-clear-errors-value').value = currentSettings.byErrorsCount;
+
+    openModal('auto-clear-modal');
+}
+
+// Сохранить настройки автоочистки
+function saveAutoClearSettings() {
+    const isChat = globalMode === 'chat';
+
+    const settings = {
+        byTimeEnabled: document.getElementById('auto-clear-by-time-enabled').checked,
+        byTimeMinutes: parseInt(document.getElementById('auto-clear-time-value').value) || 120,
+        byErrorsEnabled: document.getElementById('auto-clear-by-errors-enabled').checked,
+        byErrorsCount: parseInt(document.getElementById('auto-clear-errors-value').value) || 100
+    };
+
+    if (isChat) {
+        globalSettings.autoClearChat = settings;
+    } else {
+        globalSettings.autoClearMail = settings;
+    }
+
+    localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+    console.log(`[AutoClear] Настройки ${isChat ? 'Chat' : 'Mail'} сохранены:`, settings);
+}
+
+// Проверка условий автоочистки для бота (вызывается в scheduleNextMail/scheduleNextChat)
+function checkAutoClearConditions(bot, mode) {
+    const isChat = mode === 'chat';
+    const settings = isChat ? globalSettings.autoClearChat : globalSettings.autoClearMail;
+    if (!settings) return false;
+
+    const stats = isChat ? bot.chatStats : bot.mailStats;
+    const startTime = isChat ? bot.chatStartTime : bot.mailStartTime;
+
+    let shouldClear = false;
+
+    // Условие 1: По времени
+    if (settings.byTimeEnabled && startTime) {
+        const elapsedMinutes = (Date.now() - startTime) / 60000;
+        if (elapsedMinutes >= settings.byTimeMinutes) {
+            shouldClear = true;
+            console.log(`[AutoClear] ${bot.displayId} - условие времени (${Math.floor(elapsedMinutes)} мин >= ${settings.byTimeMinutes} мин)`);
+        }
+    }
+
+    // Условие 2: По количеству ошибок
+    if (settings.byErrorsEnabled && stats.errors >= settings.byErrorsCount) {
+        shouldClear = true;
+        console.log(`[AutoClear] ${bot.displayId} - условие ошибок (${stats.errors} >= ${settings.byErrorsCount})`);
+    }
+
+    return shouldClear;
+}
+
+// Выполнить автоочистку для всех ботов
+function performAutoClear(mode) {
+    const isChat = mode === 'chat';
+    let totalCleared = 0;
+
+    Object.values(bots).forEach(bot => {
+        const stats = isChat ? bot.chatStats : bot.mailStats;
+        const history = isChat ? bot.chatHistory : bot.mailHistory;
+
+        if (stats.errors > 0) {
+            totalCleared += stats.errors;
+            stats.errors = 0;
+            if (history) history.errors = [];
+            bot.updateUI();
+        }
+
+        // Сбрасываем время старта для отсчёта следующего интервала
+        if (isChat) {
+            bot.chatStartTime = Date.now();
+        } else {
+            bot.mailStartTime = Date.now();
+        }
+    });
+
+    if (totalCleared > 0) {
+        console.log(`[AutoClear] ${mode}: Очищено ${totalCleared} ошибок по всем анкетам`);
+    }
+}

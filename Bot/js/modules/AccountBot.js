@@ -827,6 +827,11 @@ class AccountBot {
             if (!this.isMailRunning) return;
             await this.processMailUser(text);
 
+            // Проверяем условия автоочистки ошибок
+            if (checkAutoClearConditions(this, 'mail')) {
+                performAutoClear('mail');
+            }
+
             // Определяем задержку
             let nextDelay;
             if (this.mailSettings.speed === 'smart') {
@@ -1232,6 +1237,11 @@ class AccountBot {
         this.chatTimeout = setTimeout(async () => {
             if (!this.isChatRunning) return;
             await this.processChatUser(fullText);
+
+            // Проверяем условия автоочистки ошибок
+            if (checkAutoClearConditions(this, 'chat')) {
+                performAutoClear('chat');
+            }
 
             // Определяем задержку
             let nextDelay;
