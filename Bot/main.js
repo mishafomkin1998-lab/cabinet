@@ -1666,8 +1666,18 @@ ipcMain.handle('open-video-chat-window', async (event, data) => {
 
     win.setMenuBarVisibility(false);
 
-    // Устанавливаем масштаб после загрузки
+    // Сбрасываем сохранённый zoom level для этой сессии
+    win.webContents.setZoomLevel(0);
+    win.webContents.setZoomFactor(1.0);
+
+    // Устанавливаем масштаб после загрузки и при каждой навигации
     win.webContents.on('did-finish-load', () => {
+        win.webContents.setZoomLevel(0);
+        win.webContents.setZoomFactor(1.0);
+    });
+
+    win.webContents.on('did-navigate', () => {
+        win.webContents.setZoomLevel(0);
         win.webContents.setZoomFactor(1.0);
     });
 
