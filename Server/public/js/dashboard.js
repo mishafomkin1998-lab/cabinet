@@ -355,8 +355,7 @@
                 // Установить период по умолчанию - с 1 числа текущего месяца до сегодня
                 setDefaultDateRange() {
                     const now = new Date();
-                    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-                    // Форматируем без UTC чтобы избежать сдвига дат
+                    // По умолчанию загружаем только за СЕГОДНЯ (быстрее)
                     const formatDate = (d) => {
                         const year = d.getFullYear();
                         const month = String(d.getMonth() + 1).padStart(2, '0');
@@ -364,14 +363,17 @@
                         return `${year}-${month}-${day}`;
                     };
 
-                    this.statsFilter.dateFrom = formatDate(firstDay);
+                    // Статистика - только сегодня
+                    this.statsFilter.dateFrom = formatDate(now);
                     this.statsFilter.dateTo = formatDate(now);
-                    this.statsFilter.quickRange = 'month';
+                    this.statsFilter.quickRange = 'today';
 
-                    this.accountsFilter.dateFrom = formatDate(firstDay);
+                    // Анкеты - только сегодня
+                    this.accountsFilter.dateFrom = formatDate(now);
                     this.accountsFilter.dateTo = formatDate(now);
 
-                    this.historyFilter.dateFrom = formatDate(firstDay);
+                    // История - только сегодня
+                    this.historyFilter.dateFrom = formatDate(now);
                     this.historyFilter.dateTo = formatDate(now);
                 },
 
@@ -894,7 +896,7 @@
 
                 async loadHourlyActivity() {
                     try {
-                        let url = `${API_BASE}/api/stats/hourly-activity?userId=${this.currentUser.id}&role=${this.currentUser.role}&days=7`;
+                        let url = `${API_BASE}/api/stats/hourly-activity?userId=${this.currentUser.id}&role=${this.currentUser.role}&days=1`;
                         if (this.statsFilter.dateFrom) {
                             url += `&dateFrom=${this.statsFilter.dateFrom}`;
                         }
