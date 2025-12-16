@@ -23,7 +23,7 @@ async function logProfileAction(profileId, actionType, performedById, performedB
     }
 }
 
-// Получение анкет
+// Получение анкет (ОПТИМИЗИРОВАНО: CTE вместо LATERAL JOIN)
 router.get('/', async (req, res) => {
     const { userId, role } = req.query;
     try {
@@ -39,7 +39,38 @@ router.get('/', async (req, res) => {
         }
         // role === 'director' - без фильтра, показываем все анкеты
 
+        // ОПТИМИЗАЦИЯ: Один запрос с CTE вместо LATERAL + дублирующего запроса
+        // Было: O(N) подзапросов для N анкет
+        // Стало: O(1) - три прохода по таблицам с GROUP BY
         const query = `
+            WITH activity_stats AS (
+                SELECT
+                    profile_id,
+                    COUNT(*) FILTER (WHERE action_type = 'letter' AND DATE(created_at) = CURRENT_DATE) as letters_today,
+                    COUNT(*) FILTER (WHERE action_type = 'chat' AND DATE(created_at) = CURRENT_DATE) as chats_today,
+                    COUNT(*) FILTER (WHERE action_type = 'letter') as letters_total,
+                    COUNT(*) FILTER (WHERE action_type = 'chat') as chats_total
+                FROM activity_log
+                GROUP BY profile_id
+            ),
+            incoming_stats AS (
+                SELECT
+                    profile_id,
+                    COUNT(*) FILTER (WHERE created_at >= DATE_TRUNC('month', CURRENT_DATE) AND (type = 'letter' OR type IS NULL)) as incoming_month,
+                    COUNT(*) FILTER (WHERE type = 'letter' OR type IS NULL) as incoming_total
+                FROM incoming_messages
+                GROUP BY profile_id
+            ),
+            message_stats AS (
+                SELECT
+                    account_id as profile_id,
+                    COUNT(*) FILTER (WHERE type = 'outgoing' AND DATE(timestamp) = CURRENT_DATE) as msg_letters_today,
+                    COUNT(*) FILTER (WHERE type = 'chat_msg' AND DATE(timestamp) = CURRENT_DATE) as msg_chats_today,
+                    COUNT(*) FILTER (WHERE type = 'outgoing') as msg_letters_total,
+                    COUNT(*) FILTER (WHERE type = 'chat_msg') as msg_chats_total
+                FROM messages
+                GROUP BY account_id
+            )
             SELECT
                 p.id,
                 p.profile_id,
@@ -59,89 +90,44 @@ router.get('/', async (req, res) => {
                 u_admin.username as admin_name,
                 u_admin.is_restricted as admin_is_restricted,
                 u_trans.username as trans_name,
-                COALESCE(stats.letters_today, 0) as letters_today,
-                COALESCE(stats.chats_today, 0) as chats_today,
-                COALESCE(stats.letters_total, 0) as letters_total,
-                COALESCE(stats.chats_total, 0) as chats_total,
-                COALESCE(incoming.incoming_month, 0) as incoming_month,
-                COALESCE(incoming.incoming_total, 0) as incoming_total
+                COALESCE(a.letters_today, m.msg_letters_today, 0) as letters_today,
+                COALESCE(a.chats_today, m.msg_chats_today, 0) as chats_today,
+                COALESCE(a.letters_total, m.msg_letters_total, 0) as letters_total,
+                COALESCE(a.chats_total, m.msg_chats_total, 0) as chats_total,
+                COALESCE(i.incoming_month, 0) as incoming_month,
+                COALESCE(i.incoming_total, 0) as incoming_total
             FROM allowed_profiles p
             LEFT JOIN users u_admin ON p.assigned_admin_id = u_admin.id
             LEFT JOIN users u_trans ON p.assigned_translator_id = u_trans.id
-            LEFT JOIN LATERAL (
-                SELECT
-                    COUNT(*) FILTER (WHERE a.action_type = 'letter' AND DATE(a.created_at) = CURRENT_DATE) as letters_today,
-                    COUNT(*) FILTER (WHERE a.action_type = 'chat' AND DATE(a.created_at) = CURRENT_DATE) as chats_today,
-                    COUNT(*) FILTER (WHERE a.action_type = 'letter') as letters_total,
-                    COUNT(*) FILTER (WHERE a.action_type = 'chat') as chats_total
-                FROM activity_log a
-                WHERE a.profile_id = p.profile_id
-            ) stats ON true
-            LEFT JOIN LATERAL (
-                SELECT
-                    COUNT(*) FILTER (WHERE DATE(i.created_at) >= DATE_TRUNC('month', CURRENT_DATE) AND (i.type = 'letter' OR i.type IS NULL)) as incoming_month,
-                    COUNT(*) FILTER (WHERE i.type = 'letter' OR i.type IS NULL) as incoming_total
-                FROM incoming_messages i
-                WHERE i.profile_id = p.profile_id
-            ) incoming ON true
+            LEFT JOIN activity_stats a ON p.profile_id = a.profile_id
+            LEFT JOIN incoming_stats i ON p.profile_id = i.profile_id
+            LEFT JOIN message_stats m ON p.profile_id = m.profile_id
             ${filter}
             ORDER BY p.id DESC
         `;
 
         const result = await pool.query(query, params);
 
-        // DEBUG: Логируем первую строку для проверки
-        if (result.rows.length > 0) {
-            console.log('📊 DEBUG Profiles API - first row:');
-            console.log('   profile_id:', result.rows[0].profile_id);
-            console.log('   last_online:', result.rows[0].last_online);
-            console.log('   incoming_month:', result.rows[0].incoming_month);
-            console.log('   incoming_total:', result.rows[0].incoming_total);
-            console.log('   status:', result.rows[0].status);
-        }
-
-        // Также считаем из messages для совместимости
-        const msgStatsQuery = `
-            SELECT
-                p.profile_id,
-                COUNT(*) FILTER (WHERE m.type = 'outgoing' AND DATE(m.timestamp) = CURRENT_DATE) as letters_today,
-                COUNT(*) FILTER (WHERE m.type = 'chat_msg' AND DATE(m.timestamp) = CURRENT_DATE) as chats_today,
-                COUNT(*) FILTER (WHERE m.type = 'outgoing') as letters_total,
-                COUNT(*) FILTER (WHERE m.type = 'chat_msg') as chats_total
-            FROM allowed_profiles p
-            LEFT JOIN messages m ON p.profile_id = m.account_id
-            ${filter}
-            GROUP BY p.profile_id
-        `;
-        const msgResult = await pool.query(msgStatsQuery, params);
-        const msgStatsMap = {};
-        msgResult.rows.forEach(r => {
-            msgStatsMap[r.profile_id] = r;
-        });
-
-        const list = result.rows.map(row => {
-            const msgStats = msgStatsMap[row.profile_id] || {};
-            return {
-                profile_id: row.profile_id,
-                login: row.login,
-                password: row.password,
-                status: row.status || 'offline',
-                last_online: row.last_online,
-                letters_today: parseInt(row.letters_today) || parseInt(msgStats.letters_today) || 0,
-                letters_total: parseInt(row.letters_total) || parseInt(msgStats.letters_total) || 0,
-                chats_today: parseInt(row.chats_today) || parseInt(msgStats.chats_today) || 0,
-                incoming_month: parseInt(row.incoming_month) || 0,
-                incoming_total: parseInt(row.incoming_total) || 0,
-                admin_id: row.admin_id,
-                admin_name: row.admin_name,
-                admin_is_restricted: row.admin_is_restricted || false,
-                translator_id: row.translator_id,
-                trans_name: row.trans_name,
-                added_at: row.added_at,
-                note: row.note,
-                paused: row.paused || false
-            };
-        });
+        const list = result.rows.map(row => ({
+            profile_id: row.profile_id,
+            login: row.login,
+            password: row.password,
+            status: row.status || 'offline',
+            last_online: row.last_online,
+            letters_today: parseInt(row.letters_today) || 0,
+            letters_total: parseInt(row.letters_total) || 0,
+            chats_today: parseInt(row.chats_today) || 0,
+            incoming_month: parseInt(row.incoming_month) || 0,
+            incoming_total: parseInt(row.incoming_total) || 0,
+            admin_id: row.admin_id,
+            admin_name: row.admin_name,
+            admin_is_restricted: row.admin_is_restricted || false,
+            translator_id: row.translator_id,
+            trans_name: row.trans_name,
+            added_at: row.added_at,
+            note: row.note,
+            paused: row.paused || false
+        }));
 
         res.json({ success: true, list });
     } catch (e) {

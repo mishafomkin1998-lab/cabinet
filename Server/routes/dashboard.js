@@ -221,13 +221,14 @@ router.get('/', asyncHandler(async (req, res) => {
     const incomingResult = await pool.query(incomingQuery, incomingParams);
     const incoming = incomingResult.rows[0] || {};
 
-    // ========== РАСЧЁТ ВРЕМЕНИ РАБОТЫ ПО ACTIVITY PINGS ==========
-    // Получаем все пинги активности пользователя за период
-    // Пинги отправляются когда пользователь активно работает в дашборде
+    // ========== РАСЧЁТ ВРЕМЕНИ РАБОТЫ ПО ACTIVITY PINGS (ОПТИМИЗИРОВАНО) ==========
+    // ОПТИМИЗАЦИЯ: Весь расчёт в SQL вместо загрузки всех записей в JS
+    // Было: загрузка N записей + цикл в JS = O(N) память и время
+    // Стало: один SQL запрос с window function = O(1) на клиенте
 
     /**
-     * Функция расчета времени работы по пингам активности
-     * Поддерживает фильтрацию по админу/переводчику
+     * Функция расчета времени работы по пингам активности (SQL-оптимизированная)
+     * Использует LAG window function для расчёта интервалов прямо в БД
      */
     async function calculateWorkTime(dateFrom, dateTo, options = {}) {
         const { userId, role, filterAdminId, filterTranslatorId } = options;
@@ -241,7 +242,6 @@ router.get('/', asyncHandler(async (req, res) => {
             workTimeParams.push(filterTranslatorId);
             paramIndex++;
         } else if (filterAdminId) {
-            // Фильтр по админу: админ сам ИЛИ переводчики этого админа
             workTimeFilter = `AND (user_id = $${paramIndex} OR user_id IN (SELECT id FROM users WHERE owner_id = $${paramIndex}))`;
             workTimeParams.push(filterAdminId);
             paramIndex++;
@@ -250,41 +250,34 @@ router.get('/', asyncHandler(async (req, res) => {
             workTimeParams.push(userId);
             paramIndex++;
         }
-        // director без фильтра видит всех
 
         let workTimeMinutes = 0;
         try {
-            const pingsResult = await pool.query(`
-                SELECT created_at FROM user_activity
-                WHERE created_at >= $1::date
-                  AND created_at < ($2::date + interval '1 day')
-                  ${workTimeFilter}
-                ORDER BY created_at ASC
+            // Оптимизированный запрос: весь расчёт в SQL
+            const result = await pool.query(`
+                WITH pings AS (
+                    SELECT
+                        created_at,
+                        LAG(created_at) OVER (ORDER BY created_at) as prev_created_at
+                    FROM user_activity
+                    WHERE created_at >= $1::date
+                      AND created_at < ($2::date + interval '1 day')
+                      ${workTimeFilter}
+                ),
+                intervals AS (
+                    SELECT
+                        CASE
+                            WHEN prev_created_at IS NULL THEN 30 -- первый пинг = 30 сек
+                            WHEN EXTRACT(EPOCH FROM (created_at - prev_created_at)) <= 120
+                                THEN EXTRACT(EPOCH FROM (created_at - prev_created_at))
+                            ELSE 30 -- перерыв > 2 мин = считаем как новая сессия
+                        END as seconds
+                    FROM pings
+                )
+                SELECT COALESCE(ROUND(SUM(seconds) / 60), 0) as work_minutes FROM intervals
             `, workTimeParams);
 
-            const INACTIVITY_THRESHOLD = 2 * 60 * 1000; // 2 минуты в мс
-            const PING_INTERVAL = 30 * 1000; // 30 секунд - интервал пинга
-
-            let totalMs = 0;
-            const pings = pingsResult.rows;
-
-            for (let i = 0; i < pings.length; i++) {
-                if (i === 0) {
-                    totalMs += PING_INTERVAL;
-                } else {
-                    const prevTime = new Date(pings[i - 1].created_at).getTime();
-                    const currTime = new Date(pings[i].created_at).getTime();
-                    const diff = currTime - prevTime;
-
-                    if (diff <= INACTIVITY_THRESHOLD) {
-                        totalMs += diff;
-                    } else {
-                        totalMs += PING_INTERVAL;
-                    }
-                }
-            }
-
-            workTimeMinutes = Math.round(totalMs / 60000);
+            workTimeMinutes = parseInt(result.rows[0]?.work_minutes) || 0;
         } catch (e) {
             console.log('user_activity query error:', e.message);
         }
@@ -292,17 +285,19 @@ router.get('/', asyncHandler(async (req, res) => {
         return workTimeMinutes;
     }
 
-    // Время работы за выбранный период
-    const workTimeMinutes = await calculateWorkTime(periodFrom, periodTo, { userId, role, filterAdminId, filterTranslatorId });
+    // Время работы за выбранный период и за месяц - ПАРАЛЛЕЛЬНО
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
+    const [workTimeMinutes, workTimeMonthMinutes] = await Promise.all([
+        calculateWorkTime(periodFrom, periodTo, { userId, role, filterAdminId, filterTranslatorId }),
+        calculateWorkTime(monthStart, monthEnd, { userId, role, filterAdminId, filterTranslatorId })
+    ]);
+
     const workTimeHours = Math.floor(workTimeMinutes / 60);
     const workTimeMins = workTimeMinutes % 60;
     const workTimeFormatted = `${workTimeHours}ч ${workTimeMins}м`;
 
-    // Время работы за текущий месяц (всегда)
-    // Используем уже объявленную переменную now (строка 30)
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
-    const workTimeMonthMinutes = await calculateWorkTime(monthStart, monthEnd, { userId, role, filterAdminId, filterTranslatorId });
     const workTimeMonthHours = Math.floor(workTimeMonthMinutes / 60);
     const workTimeMonthMins = workTimeMonthMinutes % 60;
     const workTimeMonthFormatted = `${workTimeMonthHours}ч ${workTimeMonthMins}м`;
