@@ -66,7 +66,7 @@
             --hover-bg: #1f1f1f;
             --input-bg: #1a1a1a;
             --input-border: #333;
-            --secondary-text: #777;
+            --secondary-text: #bbb; /* Исправлено: было #777 - слишком тёмный */
             --accent-green: #00ff88;
             --accent-cyan: #00d4ff;
             --accent-purple: #bd93f9;
@@ -118,7 +118,7 @@
 
         body.theme-dark .btn-clear {
             background: linear-gradient(145deg, #252525 0%, #1a1a1a 100%);
-            color: #888;
+            color: #bbb; /* Исправлено: было #888 */
         }
 
         body.theme-dark .btn-refresh {
@@ -194,7 +194,7 @@
         }
 
         body.theme-dark .text-muted {
-            color: #666 !important;
+            color: #aaa !important; /* Исправлено: было #666 - слишком тёмный */
         }
 
         body.theme-dark .bot-counter {
@@ -214,7 +214,7 @@
         body.theme-dark .tab-item {
             background: #161616;
             border: 1px solid #252525;
-            color: #888;
+            color: #bbb; /* Исправлено: было #888 */
             border-radius: 8px 8px 0 0;
             margin: 0 2px;
             transition: all 0.3s ease;
@@ -250,7 +250,7 @@
         }
 
         body.theme-dark #welcome-screen {
-            color: #888;
+            color: #bbb; /* Исправлено: было #888 */
         }
 
         body.theme-dark #welcome-screen strong {
@@ -263,7 +263,7 @@
         }
 
         body.theme-dark .btn-group-toggle {
-            color: #666;
+            color: #999; /* Исправлено: было #666 */
         }
 
         body.theme-dark .btn-group-toggle:hover {
@@ -397,7 +397,7 @@
         body.theme-dark .photo-select-area {
             background: #1a1a1a;
             border: 2px dashed #333;
-            color: #888;
+            color: #bbb; /* Исправлено: было #888 */
         }
 
         body.theme-dark .photo-select-area:hover {
@@ -502,7 +502,7 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
         }
         body.theme-dark .transcription-context-menu-header {
-            color: #888;
+            color: #bbb; /* Исправлено: было #888 */
             border-bottom: 1px solid #333;
         }
         body.theme-dark .transcription-context-menu-item {
@@ -515,7 +515,7 @@
             color: #00ff88;
         }
         body.theme-dark .transcription-context-menu-item .var-desc {
-            color: #666;
+            color: #aaa; /* Исправлено: было #666 */
         }
 
         /* Модальные окна */
@@ -596,7 +596,7 @@
         body.theme-dark .action-log {
             background: #0d0d0d;
             border: 1px solid #252525;
-            color: #888;
+            color: #ccc; /* Исправлено: было #888 */
         }
 
         body.theme-dark .log-entry {
@@ -646,7 +646,7 @@
         }
 
         body.theme-dark .logger-column-header button {
-            color: #888;
+            color: #bbb; /* Исправлено: было #888 */
         }
 
         body.theme-dark .logger-column-header button:hover {
@@ -666,11 +666,11 @@
         }
 
         body.theme-dark .log-entry.old {
-            color: #888;
+            color: #bbb; /* Исправлено: было #888 */
         }
 
         body.theme-dark .log-time {
-            color: #666;
+            color: #999; /* Исправлено: было #666 */
         }
 
         body.theme-dark .log-link {
@@ -682,7 +682,7 @@
         }
 
         body.theme-dark .log-close {
-            color: #666;
+            color: #999; /* Исправлено: было #666 */
         }
 
         body.theme-dark .log-close:hover {
@@ -704,7 +704,7 @@
 
         /* Текст статусов */
         body.theme-dark .text-muted {
-            color: #666 !important;
+            color: #aaa !important; /* Исправлено: было #666 - слишком тёмный */
         }
 
         body.theme-dark .text-primary {

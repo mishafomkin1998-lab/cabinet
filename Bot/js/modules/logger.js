@@ -198,8 +198,21 @@ const Logger = {
     // Electron уведомление (поддерживает mail и chat-request)
     showElectronNotification: function(data, type, botId) {
         // Проверяем настройку
-        if (!globalSettings.desktopNotifications) return;
+        if (!globalSettings.desktopNotifications) {
+            console.log('[Logger] Desktop уведомления отключены в настройках');
+            return;
+        }
         if (!data) return;
+
+        // Проверяем разрешение на уведомления
+        if (!('Notification' in window)) {
+            console.log('[Logger] Notification API недоступен');
+            return;
+        }
+        if (Notification.permission !== 'granted') {
+            console.log('[Logger] Нет разрешения на уведомления, permission:', Notification.permission);
+            return;
+        }
 
         const partnerId = data.partnerId || '???';
         const partnerName = data.partnerName || `ID ${partnerId}`;
@@ -222,15 +235,21 @@ const Logger = {
         const title = isChat ? '💬 Новый чат' : '💌 Входящее письмо';
         const body = `От ${partnerId} ${partnerName}${messageBody ? ': "' + messageBody.slice(0, 50) + '"' : ''}`;
 
-        const notification = new Notification(title, {
-            body: body,
-            icon: avatarUrl || undefined,
-            silent: true // Звук уже играет через playSound
-        });
+        try {
+            const notification = new Notification(title, {
+                body: body,
+                icon: avatarUrl || undefined,
+                silent: true // Звук уже играет через playSound
+            });
 
-        notification.onclick = () => {
-            openResponseWindow(botId, partnerId, partnerName, isChat ? 'chat' : 'mail');
-        };
+            notification.onclick = () => {
+                openResponseWindow(botId, partnerId, partnerName, isChat ? 'chat' : 'mail');
+            };
+
+            console.log('[Logger] ✅ Desktop уведомление показано:', title);
+        } catch (e) {
+            console.error('[Logger] Ошибка создания уведомления:', e);
+        }
     },
 
     // Удаление лога по ID

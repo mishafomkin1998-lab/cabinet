@@ -676,8 +676,14 @@ ipcMain.handle('open-response-window', async (event, data) => {
             contextIsolation: true,
             session: ses,
             backgroundThrottling: false,
-            preload: path.join(__dirname, 'preload-response.js')
+            preload: path.join(__dirname, 'preload-response.js'),
+            zoomFactor: 1.0 // Фиксированный масштаб 100%
         }
+    });
+
+    // Устанавливаем масштаб после загрузки
+    win.webContents.on('did-finish-load', () => {
+        win.webContents.setZoomFactor(1.0);
     });
 
     // Сохраняем тип окна для AI
@@ -1619,11 +1625,17 @@ ipcMain.handle('open-video-chat-window', async (event, data) => {
         webPreferences: {
             partition: `persist:${botId}`,
             nodeIntegration: false,
-            contextIsolation: true
+            contextIsolation: true,
+            zoomFactor: 1.0 // Фиксированный масштаб 100%
         }
     });
 
     win.setMenuBarVisibility(false);
+
+    // Устанавливаем масштаб после загрузки
+    win.webContents.on('did-finish-load', () => {
+        win.webContents.setZoomFactor(1.0);
+    });
 
     // Обработка закрытия
     win.on('closed', () => {
