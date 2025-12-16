@@ -1613,8 +1613,42 @@ ipcMain.handle('open-video-chat-window', async (event, data) => {
         }
     }
 
-    // Используем partition для сессии (чтобы использовать cookies бота)
-    const ses = session.fromPartition(`persist:${botId}`);
+    // Используем ОТДЕЛЬНУЮ сессию для VideoChat (без прокси)
+    // persist:vc_ - Video Chat, отдельная от API (persist:botId) и WebView (persist:wv_botId)
+    const ses = session.fromPartition(`persist:vc_${botId}`);
+
+    // Убираем прокси для этой сессии (прямое подключение)
+    try {
+        await ses.setProxy({ proxyRules: '' });
+    } catch (e) {
+        console.warn('[VideoChat] Не удалось отключить прокси:', e.message);
+    }
+
+    // Копируем cookies из WebView сессии (там авторизация)
+    try {
+        const webviewSes = session.fromPartition(`persist:wv_${botId}`);
+        const cookies = await webviewSes.cookies.get({ domain: 'ladadate.com' });
+
+        for (const cookie of cookies) {
+            try {
+                await ses.cookies.set({
+                    url: `https://${cookie.domain.replace(/^\./, '')}${cookie.path}`,
+                    name: cookie.name,
+                    value: cookie.value,
+                    domain: cookie.domain,
+                    path: cookie.path,
+                    secure: cookie.secure,
+                    httpOnly: cookie.httpOnly,
+                    expirationDate: cookie.expirationDate
+                });
+            } catch (e) {
+                // Игнорируем ошибки отдельных cookies
+            }
+        }
+        console.log(`[VideoChat] Скопировано ${cookies.length} cookies из WebView`);
+    } catch (cookieErr) {
+        console.warn(`[VideoChat] Не удалось скопировать cookies:`, cookieErr.message);
+    }
 
     const win = new BrowserWindow({
         width: 1000,
