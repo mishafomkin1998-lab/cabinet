@@ -941,6 +941,17 @@ class AccountBot {
 
             user = users[Math.floor(Math.random() * users.length)];
 
+            // Загружаем полный профиль для расширенных макросов
+            try {
+                const fullProfile = await fetchUserProfile(this, user.AccountId, user.Country);
+                if (fullProfile) {
+                    user = { ...user, ...fullProfile };
+                    console.log(`[Profile] ✅ Данные профиля загружены: Occupation=${user.Occupation}, Marital=${user.MaritalStatus}`);
+                }
+            } catch (profileErr) {
+                console.warn(`⚠️ Не удалось загрузить профиль ${user.AccountId}:`, profileErr.message);
+            }
+
             msgBody = this.replaceMacros(msgTemplate, user);
             const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
 
@@ -1313,8 +1324,16 @@ class AccountBot {
 
             user = users[Math.floor(Math.random() * users.length)];
 
-            // Логируем доступные поля из API users (для отладки макросов)
-            console.log(`[User Chat] ${user.AccountId} - доступные поля:`, Object.keys(user).join(', '));
+            // Загружаем полный профиль для расширенных макросов
+            try {
+                const fullProfile = await fetchUserProfile(this, user.AccountId, user.Country);
+                if (fullProfile) {
+                    user = { ...user, ...fullProfile };
+                    console.log(`[Profile Chat] ✅ Данные профиля загружены`);
+                }
+            } catch (profileErr) {
+                console.warn(`⚠️ Не удалось загрузить профиль ${user.AccountId}:`, profileErr.message);
+            }
 
             let msgBody = this.replaceMacros(currentMsgTemplate, user);
 
