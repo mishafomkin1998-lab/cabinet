@@ -1648,11 +1648,11 @@ function exportAllData() {
     }
 }
 
-// ПОЛНЫЙ ИМПОРТ ВСЕХ ДАННЫХ (последовательный логин без перезагрузки)
+// ПОЛНЫЙ ИМПОРТ ВСЕХ ДАННЫХ ("тихий" - без логина, требует перезапуск)
 async function handleFullImport(input) {
     if (!input.files.length) return;
 
-    if (!confirm('Внимание! Импорт добавит анкеты из файла.\n\nПродолжить?')) {
+    if (!confirm('Импорт добавит анкеты из файла.\nПосле импорта потребуется ПЕРЕЗАПУСК приложения.\n\nПродолжить?')) {
         input.value = '';
         return;
     }
@@ -1664,32 +1664,28 @@ async function handleFullImport(input) {
 
     const reader = new FileReader();
 
-    reader.onload = async function(e) {
+    reader.onload = function(e) {
         try {
             const data = JSON.parse(e.target.result);
             console.log('[Import] 📥 Загружен файл, версия:', data.version || '1.0');
 
-            let importedCount = 0;
-            let errorCount = 0;
-
-            // 1. Импортируем настройки (без перезагрузки)
+            // 1. Импортируем настройки
             if (data.globalSettings) {
-                globalSettings = { ...globalSettings, ...data.globalSettings };
-                localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+                const current = JSON.parse(localStorage.getItem('globalSettings') || '{}');
+                localStorage.setItem('globalSettings', JSON.stringify({ ...current, ...data.globalSettings }));
                 console.log('[Import] ✅ globalSettings');
             }
 
-            // Шаблоны
             const templates = data.botTemplates || data.templates;
             if (templates) {
-                botTemplates = { ...botTemplates, ...templates };
-                localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+                const current = JSON.parse(localStorage.getItem('botTemplates') || '{}');
+                localStorage.setItem('botTemplates', JSON.stringify({ ...current, ...templates }));
                 console.log('[Import] ✅ botTemplates');
             }
 
             if (data.accountPreferences) {
-                accountPreferences = { ...accountPreferences, ...data.accountPreferences };
-                localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
+                const current = JSON.parse(localStorage.getItem('accountPreferences') || '{}');
+                localStorage.setItem('accountPreferences', JSON.stringify({ ...current, ...data.accountPreferences }));
                 console.log('[Import] ✅ accountPreferences');
             }
 
@@ -1710,76 +1706,53 @@ async function handleFullImport(input) {
 
             // 2. Определяем список ботов для импорта
             let botsToImport = [];
-
-            // Новый формат v2.1
             if (data.savedBots && Array.isArray(data.savedBots)) {
                 botsToImport = data.savedBots;
-            }
-            // Старый формат
-            else if (data.bots && Array.isArray(data.bots)) {
-                botsToImport = data.bots;
+            } else if (data.bots && Array.isArray(data.bots)) {
+                // Конвертируем старый формат
+                botsToImport = data.bots.map(bot => ({
+                    login: bot.login,
+                    pass: bot.pass,
+                    displayId: bot.displayId,
+                    vipList: bot.vipList || [],
+                    autoReplies: bot.chatSettings?.autoReplies || [],
+                    autoReplyEnabled: bot.chatSettings?.autoReplyEnabled || false,
+                    mailAuto: bot.mailSettings?.auto || false,
+                    mailTarget: bot.mailSettings?.target || 'online'
+                }));
             }
 
-            // 3. Последовательно логиним каждую анкету
-            const total = botsToImport.length;
-            for (let i = 0; i < total; i++) {
-                const botData = botsToImport[i];
-                const login = botData.login;
-                const pass = botData.pass;
-                const displayId = botData.displayId;
+            // 3. Добавляем новых ботов в savedBots (без логина!)
+            const currentBots = JSON.parse(localStorage.getItem('savedBots') || '[]');
+            const existingLogins = new Set(currentBots.map(b => b.login));
 
-                if (!login || !pass) {
-                    console.warn('[Import] ⚠️ Пропущен бот без логина/пароля');
-                    errorCount++;
+            let addedCount = 0;
+            for (const botData of botsToImport) {
+                if (!botData.login || !botData.pass) continue;
+
+                if (existingLogins.has(botData.login)) {
+                    console.log(`[Import] ⏭️ ${botData.login} уже есть, пропускаем`);
                     continue;
                 }
 
-                // Проверяем, не добавлен ли уже этот бот
-                const existingBot = Object.values(bots).find(b => b.login === login);
-                if (existingBot) {
-                    console.log(`[Import] ⏭️ Бот ${login} уже добавлен, пропускаем`);
-                    continue;
-                }
-
-                btn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> ${i + 1}/${total}...`;
-
-                try {
-                    const ok = await performLogin(login, pass, displayId);
-                    if (ok) {
-                        // Восстанавливаем настройки бота
-                        const bot = Object.values(bots).find(b => b.login === login);
-                        if (bot) {
-                            if (botData.vipList) bot.vipList = botData.vipList;
-                            if (botData.autoReplies) bot.chatSettings.autoReplies = botData.autoReplies;
-                            if (botData.autoReplyEnabled !== undefined) bot.chatSettings.autoReplyEnabled = botData.autoReplyEnabled;
-                            if (botData.mailAuto !== undefined) bot.mailSettings.auto = botData.mailAuto;
-                            if (botData.mailTarget) bot.mailSettings.target = botData.mailTarget;
-                            if (botData.mailSettings) bot.mailSettings = { ...bot.mailSettings, ...botData.mailSettings };
-                            if (botData.chatSettings) bot.chatSettings = { ...bot.chatSettings, ...botData.chatSettings };
-                        }
-                        importedCount++;
-                        console.log(`[Import] ✅ ${i + 1}/${total} ${login}`);
-                    } else {
-                        errorCount++;
-                        console.log(`[Import] ❌ ${i + 1}/${total} ${login} - ошибка логина`);
-                    }
-                } catch (err) {
-                    errorCount++;
-                    console.error(`[Import] ❌ ${login}:`, err.message);
-                }
-
-                // Задержка между логинами
-                await new Promise(r => setTimeout(r, 500));
+                currentBots.push(botData);
+                existingLogins.add(botData.login);
+                addedCount++;
+                console.log(`[Import] ✅ Добавлен ${botData.login}`);
             }
 
-            // Сохраняем сессию
-            saveSession();
+            localStorage.setItem('savedBots', JSON.stringify(currentBots));
+            console.log(`[Import] 📦 Сохранено ${currentBots.length} анкет в localStorage`);
 
             btn.innerHTML = origText;
             btn.disabled = false;
             input.value = '';
 
-            alert(`✅ Импорт завершён!\n\nДобавлено: ${importedCount} анкет${errorCount > 0 ? `\nОшибок: ${errorCount}` : ''}`);
+            if (addedCount > 0) {
+                alert(`✅ Импорт завершён!\n\nДобавлено: ${addedCount} анкет\n\n⚠️ ПЕРЕЗАПУСТИТЕ приложение чтобы анкеты загрузились.`);
+            } else {
+                alert('Все анкеты из файла уже добавлены.');
+            }
 
         } catch (error) {
             console.error('[Import] ❌ Ошибка:', error);
