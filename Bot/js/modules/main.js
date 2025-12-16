@@ -539,7 +539,39 @@ function renderStatsList() {
     else data.forEach(item => { const d = document.createElement('div'); d.className = 'list-item'; d.innerText = item; list.appendChild(d); });
 }
 function copyStats() { navigator.clipboard.writeText((globalMode==='chat' ? bots[currentModalBotId].chatHistory[currentStatsType] : bots[currentModalBotId].mailHistory[currentStatsType]).join('\n')); }
-function clearStats() { if(confirm("Очистить?")){ const b = bots[currentModalBotId]; if(globalMode==='chat') { b.chatHistory[currentStatsType]=[]; b.chatStats[currentStatsType]=0; } else { b.mailHistory[currentStatsType]=[]; b.mailStats[currentStatsType]=0; } b.updateUI(); renderStatsList(); } }
+function clearStats(event) {
+    // Shift + клик = очистить на ВСЕХ анкетах
+    if (event && event.shiftKey) {
+        clearStatsAll();
+        return;
+    }
+    if(confirm("Очистить?")){ const b = bots[currentModalBotId]; if(globalMode==='chat') { b.chatHistory[currentStatsType]=[]; b.chatStats[currentStatsType]=0; } else { b.mailHistory[currentStatsType]=[]; b.mailStats[currentStatsType]=0; } b.updateUI(); renderStatsList(); }
+}
+
+// Очистить статистику (sent/errors) на ВСЕХ анкетах
+function clearStatsAll() {
+    const isChat = globalMode === 'chat';
+    const typeName = currentStatsType === 'sent' ? 'Отправленные' : 'Ошибки';
+    const modeName = isChat ? 'чатов' : 'писем';
+    const botIds = Object.keys(bots);
+    let count = 0;
+
+    for (const botId of botIds) {
+        const b = bots[botId];
+        if (isChat) {
+            b.chatHistory[currentStatsType] = [];
+            b.chatStats[currentStatsType] = 0;
+        } else {
+            b.mailHistory[currentStatsType] = [];
+            b.mailStats[currentStatsType] = 0;
+        }
+        b.updateUI();
+        count++;
+    }
+
+    renderStatsList();
+    showToast(`${typeName} ${modeName} очищены на ${count} анкетах`);
+}
 
 // Генерация имени шаблона на основе даты
 function generateTemplateName(tpls) {
@@ -1298,7 +1330,7 @@ function openIgnoredModal(botId) {
             <button class="btn btn-outline-secondary btn-sm" onclick="copyIgnoredList('${botId}')">
                 <i class="fa fa-copy"></i> Копировать
             </button>
-            <button class="btn btn-danger btn-sm" onclick="confirmClearIgnored('${botId}', '${type}')">
+            <button class="btn btn-danger btn-sm" onclick="confirmClearIgnored('${botId}', '${type}', event)">
                 <i class="fa fa-trash"></i> Очистить всё
             </button>
         </div>
@@ -1344,13 +1376,42 @@ function copyIgnoredList(botId) {
     });
 }
 
-function confirmClearIgnored(botId, type) {
+function confirmClearIgnored(botId, type, event) {
+    // Shift + клик = очистить на ВСЕХ анкетах
+    if (event && event.shiftKey) {
+        clearIgnoredAll(type);
+        return;
+    }
+
     const typeName = type === 'chat' ? 'чатов' : 'писем';
     if (confirm(`Очистить игнор-лист ${typeName}? Это действие нельзя отменить.`)) {
         clearIgnoredUsers(botId, type);
         closeModal('ignored-modal');
         showToast(`Игнор-лист ${typeName} очищен`);
     }
+}
+
+// Очистить игнор-лист на ВСЕХ анкетах
+function clearIgnoredAll(type) {
+    const typeName = type === 'chat' ? 'чатов' : 'писем';
+    const botIds = Object.keys(bots);
+    let count = 0;
+
+    for (const botId of botIds) {
+        const bot = bots[botId];
+        if (type === 'chat') {
+            bot.ignoredUsersChat = [];
+            saveIgnoredUsersToStorage(bot.displayId, 'chat', []);
+        } else {
+            bot.ignoredUsersMail = [];
+            saveIgnoredUsersToStorage(bot.displayId, 'mail', []);
+        }
+        bot.updateUI();
+        count++;
+    }
+
+    closeModal('ignored-modal');
+    showToast(`Игнор-лист ${typeName} очищен на ${count} анкетах`);
 }
 
 async function saveSession() {
