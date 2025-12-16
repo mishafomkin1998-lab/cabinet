@@ -1664,16 +1664,23 @@ async function handleFullImport(input) {
 
     const reader = new FileReader();
 
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
         try {
+            // Пауза перед парсингом - даём event loop обработать другие запросы
+            await new Promise(r => setTimeout(r, 50));
+
             const data = JSON.parse(e.target.result);
             console.log('[Import] 📥 Загружен файл, версия:', data.version || '1.0');
 
-            // 1. Импортируем настройки
+            // Пауза после парсинга
+            await new Promise(r => setTimeout(r, 50));
+
+            // 1. Импортируем настройки (с паузами между операциями)
             if (data.globalSettings) {
                 const current = JSON.parse(localStorage.getItem('globalSettings') || '{}');
                 localStorage.setItem('globalSettings', JSON.stringify({ ...current, ...data.globalSettings }));
                 console.log('[Import] ✅ globalSettings');
+                await new Promise(r => setTimeout(r, 30));
             }
 
             const templates = data.botTemplates || data.templates;
@@ -1681,27 +1688,32 @@ async function handleFullImport(input) {
                 const current = JSON.parse(localStorage.getItem('botTemplates') || '{}');
                 localStorage.setItem('botTemplates', JSON.stringify({ ...current, ...templates }));
                 console.log('[Import] ✅ botTemplates');
+                await new Promise(r => setTimeout(r, 30));
             }
 
             if (data.accountPreferences) {
                 const current = JSON.parse(localStorage.getItem('accountPreferences') || '{}');
                 localStorage.setItem('accountPreferences', JSON.stringify({ ...current, ...data.accountPreferences }));
                 console.log('[Import] ✅ accountPreferences');
+                await new Promise(r => setTimeout(r, 30));
             }
 
             if (data.promptTemplates) {
                 localStorage.setItem('promptTemplates', JSON.stringify(data.promptTemplates));
                 console.log('[Import] ✅ promptTemplates');
+                await new Promise(r => setTimeout(r, 30));
             }
 
             if (data.savedCameras) {
                 localStorage.setItem('savedCameras', JSON.stringify(data.savedCameras));
                 console.log('[Import] ✅ savedCameras');
+                await new Promise(r => setTimeout(r, 30));
             }
 
             if (data.favoriteTemplates) {
                 localStorage.setItem('favoriteTemplates', JSON.stringify(data.favoriteTemplates));
                 console.log('[Import] ✅ favoriteTemplates');
+                await new Promise(r => setTimeout(r, 30));
             }
 
             // 2. Определяем список ботов для импорта
@@ -1722,6 +1734,8 @@ async function handleFullImport(input) {
                 }));
             }
 
+            await new Promise(r => setTimeout(r, 50));
+
             // 3. Добавляем новых ботов в savedBots (без логина!)
             const currentBots = JSON.parse(localStorage.getItem('savedBots') || '[]');
             const existingLogins = new Set(currentBots.map(b => b.login));
@@ -1739,8 +1753,14 @@ async function handleFullImport(input) {
                 existingLogins.add(botData.login);
                 addedCount++;
                 console.log(`[Import] ✅ Добавлен ${botData.login}`);
+
+                // Пауза каждые 5 анкет
+                if (addedCount % 5 === 0) {
+                    await new Promise(r => setTimeout(r, 30));
+                }
             }
 
+            await new Promise(r => setTimeout(r, 50));
             localStorage.setItem('savedBots', JSON.stringify(currentBots));
             console.log(`[Import] 📦 Сохранено ${currentBots.length} анкет в localStorage`);
 
