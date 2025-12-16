@@ -29,6 +29,11 @@ function createInterface(bot) {
                 <button class="btn btn-sm btn-outline-danger btn-xs flex-fill hide-in-chat" id="btn-fav-${bot.id}" onclick="toggleTemplateFavorite('${bot.id}')" data-tip="В избранное"><i class="fa fa-heart"></i></button>
             </div>
 
+            <!-- Кнопка Inbox (только в режиме Mail) -->
+            <button class="btn btn-inbox w-100 mb-2 hide-in-chat" onclick="openInboxWindow('${bot.id}')" data-tip="Открыть входящие на сайте">
+                <i class="fa fa-inbox"></i> Inbox
+            </button>
+
             <!-- Кнопка SHARE MY CAM (только в режиме Chat) -->
             <button class="btn btn-share-cam w-100 mb-2 hide-in-mail" id="btn-share-cam-${bot.id}" onclick="openVideoChatWindow('${bot.id}')">
                 <i class="fa fa-video-camera"></i> SHARE MY CAM
@@ -2134,6 +2139,45 @@ function showCameraToast(message, displayId) {
         toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
     }, 5000);
+}
+
+// === INBOX WINDOW ===
+// Открыть inbox в отдельном окне с авторизацией
+async function openInboxWindow(botId) {
+    const bot = bots[botId];
+    if (!bot) {
+        showToast('Бот не найден');
+        return;
+    }
+
+    const windowId = `inbox-${botId}`;
+    const siteUrl = 'https://ladadate.com/message-inbox';
+
+    console.log(`[InboxWindow] Открываем inbox для ${bot.displayId}`);
+
+    try {
+        const { ipcRenderer } = require('electron');
+        const result = await ipcRenderer.invoke('open-response-window', {
+            windowId,
+            botId,
+            partnerId: null,
+            partnerName: 'Inbox',
+            type: 'inbox',
+            url: siteUrl,
+            login: bot.login,
+            pass: bot.pass
+        });
+
+        if (result.success) {
+            console.log(`[InboxWindow] Окно успешно открыто`);
+        } else {
+            console.error(`[InboxWindow] Ошибка:`, result.error);
+            showToast('Ошибка открытия окна');
+        }
+    } catch (err) {
+        console.error(`[InboxWindow] IPC ошибка:`, err);
+        showToast('Ошибка открытия окна');
+    }
 }
 
 // Мигание вкладки

@@ -1968,6 +1968,52 @@
         }
 
         /* =====================================================
+           === КНОПКА INBOX (ВХОДЯЩИЕ ПИСЬМА) ===
+           ===================================================== */
+        .btn-inbox {
+            background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+            color: white;
+            border: none;
+            font-weight: 600;
+            font-size: 13px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-inbox:hover {
+            background: linear-gradient(135deg, #5a32a3 0%, #4a2886 100%);
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(111, 66, 193, 0.3);
+        }
+        .btn-inbox:active {
+            transform: translateY(0);
+        }
+        .btn-inbox i {
+            font-size: 14px;
+        }
+
+        /* Темная тема для кнопки Inbox */
+        body.theme-dark .btn-inbox {
+            background: linear-gradient(135deg, #7c4dff 0%, #651fff 100%);
+        }
+        body.theme-dark .btn-inbox:hover {
+            background: linear-gradient(135deg, #651fff 0%, #5a1ee6 100%);
+        }
+
+        /* LadaDate тема для кнопки Inbox */
+        body.theme-ladadate .btn-inbox {
+            background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%);
+        }
+        body.theme-ladadate .btn-inbox:hover {
+            background: linear-gradient(135deg, #7b1fa2 0%, #6a1b9a 100%);
+        }
+
+        /* =====================================================
            === КНОПКА SHARE MY CAM (ВИДЕОЧАТ) ===
            ===================================================== */
         .btn-share-cam {
