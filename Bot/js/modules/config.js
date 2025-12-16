@@ -27,7 +27,7 @@ let accountPreferences = JSON.parse(localStorage.getItem('accountPreferences')) 
 
 let defaultSettings = {
     lang: 'ru', theme: 'light', proxy: '', proxyURL: '', proxyAI: '',
-    hotkeys: true, myPrompt: '', myPromptChat: '', apiKey: '',
+    hotkeys: true, myPrompt: '', myPromptChat: '', improvePrompt: '', apiKey: '',
     soundsEnabled: true, desktopNotifications: true, confirmTabClose: true, extendedFeatures: true,
     skipDeleteConfirm: false, // Не спрашивать об удалении шаблона
     keepLoggerEntries: false, // Сохранять записи в логгере после просмотра
@@ -54,6 +54,7 @@ let defaultSettings = {
     },
     // Активные шаблоны промптов (ID из сервера)
     activePromptTemplates: {
+        improvePrompt: null,
         myPrompt: null,
         myPromptChat: null,
         replyPrompt: null,
@@ -63,6 +64,7 @@ let defaultSettings = {
 
 // Шаблоны промптов (загружаются с сервера)
 let promptTemplates = {
+    improvePrompt: [],
     myPrompt: [],
     myPromptChat: [],
     replyPrompt: [],

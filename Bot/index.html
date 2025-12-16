@@ -361,6 +361,20 @@
                     </div>
                 </div>
 
+                <!-- Improve Prompt с шаблонами -->
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-magic"></i> Improve Prompt</div>
+                    <div class="prompt-template-selector">
+                        <select id="select-improvePrompt" class="form-control form-control-sm" onchange="selectPromptTemplate('improvePrompt')">
+                            <option value="">-- Без шаблона --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-success" onclick="addPromptTemplate('improvePrompt')" title="Добавить шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('improvePrompt')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
+                    </div>
+                    <textarea id="set-improve-prompt" class="form-control mt-2" rows="3" placeholder="Промпт для улучшения текста. Используйте {text} для вставки текущего текста." onchange="savePromptText('improvePrompt')"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется для кнопки "Improve" (улучшение текста). {text} = текущий текст</small>
+                </div>
+
                 <!-- My Prompt с шаблонами -->
                 <div class="settings-section">
                     <div class="settings-section-title"><i class="fa fa-comment-dots"></i> My Prompt</div>

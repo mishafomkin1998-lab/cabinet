@@ -346,6 +346,7 @@ function applyVar(textareaId, text, dropdownId) {
 
 // Маппинг типов промптов к ID элементов
 const promptTypeToTextarea = {
+    improvePrompt: 'set-improve-prompt',
     myPrompt: 'set-prompt',
     myPromptChat: 'set-prompt-chat',
     replyPrompt: 'set-ai-reply-prompt',
@@ -353,6 +354,7 @@ const promptTypeToTextarea = {
 };
 
 const promptTypeToSetting = {
+    improvePrompt: 'improvePrompt',
     myPrompt: 'myPrompt',
     myPromptChat: 'myPromptChat',
     replyPrompt: 'aiReplyPrompt',
@@ -369,11 +371,12 @@ async function loadPromptTemplates() {
             console.log('[PromptTemplates] Загружено из localStorage:', promptTemplates);
         } catch (e) {
             console.error('[PromptTemplates] Ошибка парсинга localStorage:', e);
-            promptTemplates = { myPrompt: [], myPromptChat: [], replyPrompt: [], chatPrompt: [] };
+            promptTemplates = { improvePrompt: [], myPrompt: [], myPromptChat: [], replyPrompt: [], chatPrompt: [] };
         }
     }
 
     // 2. Обновляем выпадающие списки
+    updatePromptDropdown('improvePrompt');
     updatePromptDropdown('myPrompt');
     updatePromptDropdown('myPromptChat');
     updatePromptDropdown('replyPrompt');
@@ -386,12 +389,13 @@ async function loadPromptTemplates() {
             if (response.data.success && response.data.data) {
                 // Мержим серверные шаблоны с локальными
                 const serverTemplates = response.data.data;
-                ['myPrompt', 'myPromptChat', 'replyPrompt', 'chatPrompt'].forEach(type => {
+                ['improvePrompt', 'myPrompt', 'myPromptChat', 'replyPrompt', 'chatPrompt'].forEach(type => {
                     if (serverTemplates[type] && serverTemplates[type].length > 0) {
                         promptTemplates[type] = serverTemplates[type];
                     }
                 });
                 savePromptTemplatesToStorage();
+                updatePromptDropdown('improvePrompt');
                 updatePromptDropdown('myPrompt');
                 updatePromptDropdown('myPromptChat');
                 updatePromptDropdown('replyPrompt');
