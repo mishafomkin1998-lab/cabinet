@@ -828,15 +828,13 @@ ipcMain.handle('open-response-window', async (event, data) => {
             }
         `);
 
-        // Инжектируем кнопку AI после загрузки страницы
-        win.webContents.on('did-finish-load', () => {
-            injectAIButton(win);
-        });
-
-        // Также инжектируем при навигации внутри SPA
-        win.webContents.on('did-navigate-in-page', () => {
-            setTimeout(() => injectAIButton(win), 500);
-        });
+        // AI кнопка на сайте отключена - используйте правый клик для AI
+        // win.webContents.on('did-finish-load', () => {
+        //     injectAIButton(win);
+        // });
+        // win.webContents.on('did-navigate-in-page', () => {
+        //     setTimeout(() => injectAIButton(win), 500);
+        // });
 
         return { success: true };
     } catch (err) {

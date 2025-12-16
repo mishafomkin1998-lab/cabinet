@@ -1316,6 +1316,8 @@ function openIgnoredModal(botId) {
         modal.querySelector('.modal-content').innerHTML = modalContent;
     }
 
+    // Сбрасываем inline-стиль (closeModal устанавливает display:none)
+    modal.style.display = '';
     modal.classList.add('show');
 }
 
@@ -1373,7 +1375,10 @@ async function saveSession() {
                 customIdsSent: b.customIdsSent || [],
                 // Автоответы
                 autoReplies: b.chatSettings.autoReplies || [],
-                autoReplyEnabled: b.chatSettings.autoReplyEnabled || false
+                autoReplyEnabled: b.chatSettings.autoReplyEnabled || false,
+                // Blacklist (локальное сохранение)
+                mailBlacklist: b.mailSettings.blacklist || [],
+                chatBlacklist: b.chatSettings.blacklist || []
             };
         }).filter(item => item !== null);
 
@@ -1422,6 +1427,9 @@ async function restoreSession() {
                 // Восстанавливаем автоответы
                 if (a.autoReplies) bot.chatSettings.autoReplies = a.autoReplies;
                 if (a.autoReplyEnabled !== undefined) bot.chatSettings.autoReplyEnabled = a.autoReplyEnabled;
+                // Восстанавливаем blacklist из localStorage (будет перезаписан сервером если доступен)
+                if (a.mailBlacklist && a.mailBlacklist.length > 0) bot.mailSettings.blacklist = a.mailBlacklist;
+                if (a.chatBlacklist && a.chatBlacklist.length > 0) bot.chatSettings.blacklist = a.chatBlacklist;
 
                 updateInterfaceForMode(bot.id);
                 // Показываем поле Custom IDs если выбран этот режим
