@@ -1594,95 +1594,173 @@ async function reloginAllBots() {
     btn.disabled = false;
 }
 
-// ОБНОВЛЕННАЯ ФУНКЦИЯ exportAllData
+// ПОЛНЫЙ ЭКСПОРТ ВСЕХ ДАННЫХ (включая пароли для восстановления)
 async function exportAllData() {
     try {
         const data = {
+            version: '2.0', // Версия формата экспорта
+            exportDate: new Date().toISOString(),
+
+            // Все боты с полными данными для восстановления
             bots: [],
+
+            // Шаблоны писем и чатов по логинам
             templates: botTemplates,
+
+            // Настройки каждого аккаунта
             accountPreferences: accountPreferences,
+
+            // Глобальные настройки (включая промпты, API ключи, прокси)
             globalSettings: globalSettings,
-            exportDate: new Date().toISOString()
+
+            // Сохранённые камеры для видеочата
+            savedCameras: JSON.parse(localStorage.getItem('savedCameras')) || {}
         };
-        
-        // Сохраняем данные ботов
+
+        // Сохраняем ПОЛНЫЕ данные ботов (включая пароли!)
         Object.values(bots).forEach(bot => {
             data.bots.push({
                 id: bot.id,
                 login: bot.login,
+                pass: bot.pass,           // Пароль для восстановления!
                 displayId: bot.displayId,
-                token: bot.token ? '[HIDDEN]' : null,
+                token: bot.token,         // Токен
+
+                // Настройки Mail
                 mailSettings: bot.mailSettings,
+
+                // Настройки Chat (включая автоответы)
                 chatSettings: bot.chatSettings,
-                vipList: bot.vipList
+
+                // VIP список
+                vipList: bot.vipList || [],
+                vipStatus: bot.vipStatus || {},
+
+                // Статистика
+                mailStats: bot.mailStats,
+                chatStats: bot.chatStats,
+
+                // Игнор-листы
+                ignoredUsersMail: bot.ignoredUsersMail || [],
+                ignoredUsersChat: bot.ignoredUsersChat || []
             });
         });
-        
+
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `lababot_backup_${new Date().toISOString().split('T')[0]}.json`;
+        a.download = `novabot_full_backup_${new Date().toISOString().split('T')[0]}.json`;
         a.click();
         URL.revokeObjectURL(url);
-        
+
+        showToast('✅ Полный бекап сохранён');
         return true;
     } catch (error) {
         console.error('Error exporting data:', error);
+        showToast('❌ Ошибка экспорта: ' + error.message);
         return false;
     }
 }
 
-// ОБНОВЛЕННАЯ ФУНКЦИЯ handleFullImport
+// ПОЛНЫЙ ИМПОРТ ВСЕХ ДАННЫХ (восстановление из бекапа)
 async function handleFullImport(input) {
     if (!input.files.length) return;
-    
+
     if (!confirm('Внимание! Импорт перезапишет существующие данные. Продолжить?')) {
         input.value = '';
         return;
     }
-    
+
     const btn = input.parentElement.querySelector('button');
     const origText = btn.innerHTML;
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Импорт...';
     btn.disabled = true;
-    
+
     try {
         const reader = new FileReader();
-        
+
         reader.onload = async function(e) {
             try {
                 const data = JSON.parse(e.target.result);
-                
-                // Импортируем ботов
-                if (data.bots && Array.isArray(data.bots)) {
-                    for (const botData of data.bots) {
-                        if (botData.login && botData.displayId) {
-                            await performLogin(botData.login, botData.pass || 'password', botData.displayId);
-                        }
-                    }
-                }
-                
-                // Импортируем шаблоны
-                if (data.templates) {
-                    botTemplates = data.templates;
-                    localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
-                }
-                
-                // Импортируем настройки
-                if (data.accountPreferences) {
-                    accountPreferences = data.accountPreferences;
-                    localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
-                }
-                
+                let importedCount = 0;
+                let errorCount = 0;
+
+                // 1. Сначала импортируем глобальные настройки (промпты, API ключи, прокси)
                 if (data.globalSettings) {
                     globalSettings = { ...globalSettings, ...data.globalSettings };
                     localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+                    console.log('[Import] ✅ Глобальные настройки восстановлены');
                 }
-                
-                alert('Данные успешно импортированы! Перезагрузите приложение.');
+
+                // 2. Импортируем шаблоны
+                if (data.templates) {
+                    botTemplates = data.templates;
+                    localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+                    console.log('[Import] ✅ Шаблоны восстановлены');
+                }
+
+                // 3. Импортируем настройки аккаунтов
+                if (data.accountPreferences) {
+                    accountPreferences = data.accountPreferences;
+                    localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
+                    console.log('[Import] ✅ Настройки аккаунтов восстановлены');
+                }
+
+                // 4. Импортируем сохранённые камеры
+                if (data.savedCameras) {
+                    localStorage.setItem('savedCameras', JSON.stringify(data.savedCameras));
+                    console.log('[Import] ✅ Настройки камер восстановлены');
+                }
+
+                // 5. Импортируем ботов с полными настройками
+                if (data.bots && Array.isArray(data.bots)) {
+                    for (const botData of data.bots) {
+                        if (!botData.login || !botData.pass) {
+                            console.warn('[Import] ⚠️ Пропущен бот без логина/пароля:', botData.login);
+                            errorCount++;
+                            continue;
+                        }
+
+                        try {
+                            // Логинимся
+                            await performLogin(botData.login, botData.pass, botData.displayId);
+
+                            // Находим созданного бота и восстанавливаем его настройки
+                            const bot = Object.values(bots).find(b => b.login === botData.login);
+                            if (bot) {
+                                // Восстанавливаем настройки Mail
+                                if (botData.mailSettings) {
+                                    bot.mailSettings = { ...bot.mailSettings, ...botData.mailSettings };
+                                }
+                                // Восстанавливаем настройки Chat
+                                if (botData.chatSettings) {
+                                    bot.chatSettings = { ...bot.chatSettings, ...botData.chatSettings };
+                                }
+                                // Восстанавливаем VIP список
+                                if (botData.vipList) bot.vipList = botData.vipList;
+                                if (botData.vipStatus) bot.vipStatus = botData.vipStatus;
+                                // Восстанавливаем игнор-листы
+                                if (botData.ignoredUsersMail) bot.ignoredUsersMail = botData.ignoredUsersMail;
+                                if (botData.ignoredUsersChat) bot.ignoredUsersChat = botData.ignoredUsersChat;
+
+                                console.log(`[Import] ✅ Бот ${botData.login} восстановлен с настройками`);
+                                importedCount++;
+                            }
+                        } catch (err) {
+                            console.error(`[Import] ❌ Ошибка импорта бота ${botData.login}:`, err.message);
+                            errorCount++;
+                        }
+                    }
+                }
+
+                // Сохраняем сессию
+                saveSession();
+
+                const message = `Импорт завершён!\n✅ Успешно: ${importedCount} анкет\n${errorCount > 0 ? `❌ Ошибок: ${errorCount}` : ''}\n\nПриложение будет перезагружено.`;
+                alert(message);
                 setTimeout(() => location.reload(), 1000);
-                
+
             } catch (error) {
                 console.error('Import error:', error);
                 alert('Ошибка импорта: ' + error.message);
@@ -1692,14 +1770,14 @@ async function handleFullImport(input) {
                 input.value = '';
             }
         };
-        
+
         reader.onerror = function(error) {
             alert('Ошибка чтения файла');
             btn.innerHTML = origText;
             btn.disabled = false;
             input.value = '';
         };
-        
+
         reader.readAsText(input.files[0]);
 
     } catch (error) {
