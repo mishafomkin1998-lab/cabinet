@@ -425,6 +425,45 @@ async function handleUniversalImport(input) {
     const file = input.files[0];
     const fileName = file.name.toLowerCase();
 
+    // Параллельный импорт - до 5 анкет одновременно
+    const PARALLEL_LIMIT = 5;
+
+    async function importBatch(accounts) {
+        const successList = [], duplicateList = [], errorList = [];
+
+        // Фильтруем дубликаты сразу
+        const toImport = [];
+        for (const acc of accounts) {
+            if (checkDuplicate(acc.login, acc.displayId)) {
+                duplicateList.push({ login: acc.login, displayId: acc.displayId });
+            } else {
+                toImport.push(acc);
+            }
+        }
+
+        // Импортируем параллельно батчами
+        for (let i = 0; i < toImport.length; i += PARALLEL_LIMIT) {
+            const batch = toImport.slice(i, i + PARALLEL_LIMIT);
+            const results = await Promise.all(
+                batch.map(acc => performLoginFast(acc.login, acc.pass, acc.displayId))
+            );
+
+            results.forEach((success, idx) => {
+                const acc = batch[idx];
+                if (success) {
+                    successList.push({ login: acc.login, displayId: acc.displayId });
+                } else {
+                    errorList.push({ login: acc.login, displayId: acc.displayId });
+                }
+            });
+        }
+
+        // После всех логинов - загружаем данные с сервера в фоне
+        loadServerDataForAllBots();
+
+        return { successList, duplicateList, errorList };
+    }
+
     if (fileName.endsWith('.json')) {
         // JSON - полный импорт
         if (!confirm('Внимание! Импорт JSON перезапишет существующие данные. Продолжить?')) {
@@ -436,24 +475,13 @@ async function handleUniversalImport(input) {
         reader.onload = async function(e) {
             try {
                 const data = JSON.parse(e.target.result);
-                const successList = [], duplicateList = [], errorList = [];
+                let result = { successList: [], duplicateList: [], errorList: [] };
 
                 if (data.bots && Array.isArray(data.bots)) {
-                    for (const botData of data.bots) {
-                        if (botData.login && botData.displayId) {
-                            if (checkDuplicate(botData.login, botData.displayId)) {
-                                duplicateList.push({ login: botData.login, displayId: botData.displayId });
-                                continue;
-                            }
-                            const success = await performLogin(botData.login, botData.pass || 'password', botData.displayId);
-                            if (success) {
-                                successList.push({ login: botData.login, displayId: botData.displayId });
-                            } else {
-                                errorList.push({ login: botData.login, displayId: botData.displayId });
-                            }
-                            await new Promise(r => setTimeout(r, 100));
-                        }
-                    }
+                    const accounts = data.bots
+                        .filter(b => b.login && b.displayId)
+                        .map(b => ({ login: b.login, pass: b.pass || 'password', displayId: b.displayId }));
+                    result = await importBatch(accounts);
                 }
                 if (data.templates) {
                     botTemplates = data.templates;
@@ -468,7 +496,7 @@ async function handleUniversalImport(input) {
                     localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
                 }
 
-                showImportResult(successList, duplicateList, errorList);
+                showImportResult(result.successList, result.duplicateList, result.errorList);
                 renderManagerList();
             } catch (error) {
                 showImportResult([], [], [{ login: 'JSON Error', displayId: error.message }]);
@@ -482,27 +510,18 @@ async function handleUniversalImport(input) {
         const reader = new FileReader();
         reader.onload = async function(e) {
             const lines = e.target.result.split('\n');
-            const successList = [], duplicateList = [], errorList = [];
+            const accounts = [];
 
             for (let line of lines) {
                 const parts = line.trim().split(/\s+/);
                 if (parts.length >= 3) {
                     const [displayId, login, pass] = parts;
-                    if (checkDuplicate(login, displayId)) {
-                        duplicateList.push({ login, displayId });
-                        continue;
-                    }
-                    const success = await performLogin(login, pass, displayId);
-                    if (success) {
-                        successList.push({ login, displayId });
-                    } else {
-                        errorList.push({ login, displayId });
-                    }
-                    await new Promise(r => setTimeout(r, 100));
+                    accounts.push({ login, pass, displayId });
                 }
             }
 
-            showImportResult(successList, duplicateList, errorList);
+            const result = await importBatch(accounts);
+            showImportResult(result.successList, result.duplicateList, result.errorList);
             input.value = '';
             renderManagerList();
         };
@@ -512,6 +531,74 @@ async function handleUniversalImport(input) {
         showImportResult([], [], [{ login: 'Файл', displayId: 'Неподдерживаемый формат. Используйте .txt или .json' }]);
         input.value = '';
     }
+}
+
+// Быстрый логин без загрузки данных с сервера
+async function performLoginFast(login, pass, displayId) {
+    try {
+        const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: login, Password: pass });
+
+        if(res.data.Token) {
+            const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
+            const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
+            bots[bid] = bot;
+
+            // Загружаем игнор-листы из localStorage
+            bot.ignoredUsersMail = loadIgnoredUsersFromStorage(displayId, 'mail');
+            bot.ignoredUsersChat = loadIgnoredUsersFromStorage(displayId, 'chat');
+
+            // Устанавливаем прокси
+            await setWebviewProxy(bid);
+
+            // Показываем UI
+            createInterface(bot);
+
+            // Создаём WebView
+            bot.createWebview();
+
+            // Помечаем что данные ещё не загружены
+            bot.serverDataLoaded = false;
+
+            return true;
+        }
+    } catch(err) {
+        console.error(`[Login Error] ${displayId}:`, err.message);
+    }
+    return false;
+}
+
+// Загрузка данных с сервера для всех ботов (в фоне)
+async function loadServerDataForAllBots() {
+    const botsToLoad = Object.values(bots).filter(b => !b.serverDataLoaded);
+    if (botsToLoad.length === 0) return;
+
+    console.log(`[Server Data] Загрузка данных для ${botsToLoad.length} анкет...`);
+
+    // Загружаем параллельно по 3 штуки
+    for (let i = 0; i < botsToLoad.length; i += 3) {
+        const batch = botsToLoad.slice(i, i + 3);
+        await Promise.all(batch.map(async (bot) => {
+            try {
+                const serverData = await loadBotDataFromServer(bot.displayId);
+                if (serverData) {
+                    bot.loadFromServerData(serverData);
+                    bot.updateUI();
+                    updateTemplateDropdown(bot.id);
+                    renderBlacklist(bot.id);
+                }
+                bot.serverDataLoaded = true;
+            } catch (e) {
+                console.error(`[Server Data] Ошибка для ${bot.displayId}:`, e);
+            }
+        }));
+    }
+
+    // Выбираем первую вкладку и сохраняем сессию
+    const firstBot = Object.keys(bots)[0];
+    if (firstBot) selectTab(firstBot);
+    saveSession();
+
+    console.log(`[Server Data] ✅ Загрузка завершена`);
 }
 function editAccount(id) {
     const bot = bots[id];
