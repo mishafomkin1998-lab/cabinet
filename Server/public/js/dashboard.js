@@ -824,7 +824,11 @@
                     } catch (e) { console.error('loadFavoriteTemplates error:', e); }
                 },
 
+                // Защита от дублирования
+                _loadingSentLetters: false,
                 async loadSentLettersGrouped() {
+                    if (this._loadingSentLetters) return;
+                    this._loadingSentLetters = true;
                     try {
                         let url = `${API_BASE}/api/activity/sent-letters-grouped?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=50`;
                         if (this.statsFilter.dateFrom) {
@@ -846,6 +850,7 @@
                             this.sentLettersGrouped = data.letters;
                         }
                     } catch (e) { console.error('loadSentLettersGrouped error:', e); }
+                    finally { this._loadingSentLetters = false; }
                 },
 
                 async loadLastResponses() {
@@ -917,7 +922,11 @@
                     } catch (e) { console.error('loadHourlyActivity error:', e); }
                 },
 
+                // Защита от дублирования запросов
+                _loadingTranslatorStats: false,
                 async loadTranslatorStats() {
+                    if (this._loadingTranslatorStats) return; // Уже загружается
+                    this._loadingTranslatorStats = true;
                     try {
                         const res = await fetch(`${API_BASE}/api/stats/translators?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
                         const data = await res.json();
@@ -925,6 +934,7 @@
                             this.translatorStats = data.translators;
                         }
                     } catch (e) { console.error('loadTranslatorStats error:', e); }
+                    finally { this._loadingTranslatorStats = false; }
                 },
 
                 async loadHistoryActions() {
