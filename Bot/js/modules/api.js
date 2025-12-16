@@ -796,7 +796,7 @@ function cleanProfileCache() {
 }
 setInterval(cleanProfileCache, 5 * 60 * 1000); // Очищаем каждые 5 минут
 
-// Получение полного профиля пользователя
+// Получение полного профиля пользователя через WebView
 async function fetchUserProfile(bot, userId, country = '') {
     // Проверяем кэш
     const cacheKey = `${userId}`;
@@ -806,56 +806,53 @@ async function fetchUserProfile(bot, userId, country = '') {
         return cached.data;
     }
 
-    try {
-        console.log(`🔍 Загрузка профиля ${userId} (country: ${country})...`);
+    // Проверяем что у бота есть webview
+    if (!bot || !bot.webview) {
+        console.warn(`⚠️ WebView не доступен для загрузки профиля ${userId}`);
+        return null;
+    }
 
-        // Формируем slug из country: "Sweden" -> "men-from-sweden"
+    try {
+        console.log(`🔍 Загрузка профиля ${userId} через WebView (country: ${country})...`);
+
+        // Формируем slug из country: "United States" -> "united-states"
         const countrySlug = country ? country.toLowerCase().replace(/\s+/g, '-') : '';
 
         // Правильный формат URL: /profile/{id}-men-from-{country}
         const profileUrl = countrySlug
-            ? `/profile/${userId}-men-from-${countrySlug}`
-            : `/profile/${userId}`;
+            ? `https://ladadate.com/profile/${userId}-men-from-${countrySlug}`
+            : `https://ladadate.com/profile/${userId}`;
 
-        console.log(`[Profile] Запрос: ${profileUrl}`);
+        console.log(`[Profile] Загрузка через WebView: ${profileUrl}`);
 
-        let res = null;
-        try {
-            res = await makeApiRequest(bot, 'GET', profileUrl);
-        } catch (e) {
-            console.log(`[Profile] ❌ ${profileUrl}: ${e.message}`);
-            throw e;
+        // Загружаем HTML через WebView (который авторизован)
+        const html = await bot.webview.executeJavaScript(`
+            (async () => {
+                try {
+                    const res = await fetch('${profileUrl}', { credentials: 'include' });
+                    if (!res.ok) return { error: 'HTTP ' + res.status };
+                    return { html: await res.text() };
+                } catch (e) {
+                    return { error: e.message };
+                }
+            })()
+        `);
+
+        if (html.error) {
+            throw new Error(html.error);
         }
 
-        if (!res || !res.data) {
-            throw new Error('Пустой ответ от сервера');
+        if (!html.html || html.html.length < 100) {
+            throw new Error('Пустой ответ');
         }
 
-        const html = res.data;
-
-        console.log(`[Profile HTML] Получено ${html ? html.length : 0} символов, тип: ${typeof html}`);
-
-        // Если вернулся объект вместо строки - возможно это JSON ответ
-        if (html && typeof html === 'object') {
-            console.log(`[Profile] Получен JSON объект, парсим как JSON`);
-            const profile = parseProfileJson(html, userId);
-            userProfileCache.set(cacheKey, { data: profile, timestamp: Date.now() });
-            console.log(`✅ Профиль ${userId} загружен из JSON:`, {
-                Name: profile.Name, Occupation: profile.Occupation, MaritalStatus: profile.MaritalStatus
-            });
-            return profile;
-        }
-
-        if (!html || typeof html !== 'string' || html.length < 100) {
-            console.warn(`⚠️ Пустой или короткий ответ для профиля ${userId}`);
-            return null;
-        }
+        console.log(`[Profile HTML] Получено ${html.html.length} символов через WebView`);
 
         // Логируем первые 500 символов для отладки
-        console.log(`[Profile HTML] Первые 500 символов: ${html.substring(0, 500)}`);
+        console.log(`[Profile HTML] Первые 500 символов: ${html.html.substring(0, 500)}`);
 
         // Парсим HTML страницу профиля
-        const profile = parseProfileHtml(html, userId);
+        const profile = parseProfileHtml(html.html, userId);
 
         // Сохраняем в кэш
         userProfileCache.set(cacheKey, {
