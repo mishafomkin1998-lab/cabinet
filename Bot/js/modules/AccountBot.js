@@ -1337,17 +1337,93 @@ class AccountBot {
 
             let msgBody = this.replaceMacros(currentMsgTemplate, user);
 
-            try {
-                // 1. Пытаемся отправить через чат API
-                const payload = { recipientId: user.AccountId, body: msgBody };
-                await makeApiRequest(this, 'POST', '/chat-send', payload);
+            // === ОТПРАВКА ЧАТА ЧЕРЕЗ WEBVIEW (требуются session cookies) ===
+            let sendSuccess = false;
+            let sendError = null;
 
-                // 2. Отслеживаем диалог и получаем метаданные
+            // 1. Пытаемся отправить через WebView (правильный способ)
+            if (this.webview && this.webviewReady) {
+                try {
+                    // Блокируем звук перед отправкой
+                    if (this.webview.setAudioMuted) {
+                        this.webview.setAudioMuted(true);
+                    }
+
+                    console.log(`[Chat] Отправка через WebView chat-send для ${user.Name}...`);
+                    const result = await this.webview.executeJavaScript(`
+                        (async () => {
+                            // Блокируем Audio API
+                            if (!window.__audioMuted) {
+                                window.__audioMuted = true;
+                                Audio.prototype.play = function() { return Promise.resolve(); };
+                                HTMLMediaElement.prototype.play = function() { return Promise.resolve(); };
+                            }
+                            try {
+                                const res = await fetch('https://ladadate.com/chat-send', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ id: ${user.AccountId}, body: ${JSON.stringify(msgBody)} }),
+                                    credentials: 'include'
+                                });
+                                if (!res.ok) {
+                                    return { success: false, error: 'HTTP ' + res.status, status: res.status };
+                                }
+                                const text = await res.text();
+                                console.log('[Chat WebView] chat-send response:', text);
+                                try {
+                                    const json = JSON.parse(text);
+                                    if (json.IsSuccess === false) {
+                                        return { success: false, error: json.Error || 'API error', data: json };
+                                    }
+                                    return { success: true, data: json };
+                                } catch {
+                                    return { success: true, data: text };
+                                }
+                            } catch (e) {
+                                return { success: false, error: e.message };
+                            }
+                        })()
+                    `);
+
+                    console.log(`[Chat] WebView chat-send result:`, result);
+                    if (result.success) {
+                        sendSuccess = true;
+                        console.log(`[Chat] ✅ Чат отправлен через WebView!`);
+                    } else {
+                        sendError = result.error || 'WebView error';
+                        console.log(`[Chat] ❌ WebView chat-send ошибка:`, sendError);
+                    }
+                } catch (e) {
+                    sendError = e.message;
+                    console.log(`[Chat] ⚠️ WebView executeJavaScript error:`, e.message);
+                }
+            } else {
+                sendError = 'WebView не готов';
+                console.log(`[Chat] ⚠️ WebView не готов (webview: ${!!this.webview}, ready: ${this.webviewReady})`);
+            }
+
+            // 2. Fallback: пробуем через API (без cookies, может не работать)
+            if (!sendSuccess) {
+                console.log(`[Chat] Fallback: отправка через /chat-send API...`);
+                try {
+                    const payload = { recipientId: user.AccountId, body: msgBody };
+                    await makeApiRequest(this, 'POST', '/chat-send', payload);
+                    sendSuccess = true;
+                    sendError = null;
+                    console.log(`[Chat] ✅ Чат отправлен через API fallback!`);
+                } catch (apiErr) {
+                    sendError = apiErr.response ? extractApiError(apiErr.response, apiErr.message) : apiErr.message;
+                    console.log(`[Chat] ❌ API fallback не сработал:`, sendError);
+                }
+            }
+
+            // 3. Обрабатываем результат
+            if (sendSuccess) {
+                // УСПЕХ - отправляем статистику
                 const convData = this.trackConversation(user.AccountId);
                 const convId = this.getConvId(user.AccountId);
                 const isLast = this.isLastMessageInRotation();
 
-                // 3. Отправляем полную статистику на НАШ сервер Lababot
                 const lababotResult = await sendMessageToLababot({
                     botId: this.id,
                     accountDisplayId: this.displayId,
@@ -1383,161 +1459,55 @@ class AccountBot {
                 // Добавляем в "отправленные"
                 this.chatContactedUsers.add(user.AccountId.toString());
 
-            } catch (chatErr) {
-                // Fallback: пытаемся отправить как письмо
-                try {
-                    const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
-                    if (checkRes.data.CheckId) {
-                        const mailPayload = { 
-                            CheckId: checkRes.data.CheckId, 
-                            RecipientAccountId: user.AccountId, 
-                            Body: msgBody, 
-                            ReplyForMessageId: null, 
-                            AttachmentName: null, 
-                            AttachmentHash: null, 
-                            AttachmentFile: null 
-                        };
-                        await makeApiRequest(this, 'POST', '/api/messages/send', mailPayload);
+            } else {
+                // ОШИБКА - НЕ отправляем как письмо, только фиксируем ошибку!
+                const errorReason = sendError || 'Неизвестная ошибка чата';
 
-                        // Отслеживаем диалог и получаем метаданные (fallback)
-                        const convData = this.trackConversation(user.AccountId);
-                        const convId = this.getConvId(user.AccountId);
+                this.incrementStat('chat', 'errors');
+                this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
+                this.log(`❌ Ошибка чата ${user.Name} (${user.AccountId}): ${errorReason}`);
 
-                        // Отправляем полную статистику на НАШ сервер Lababot (как письмо fallback)
-                        const lababotResult = await sendMessageToLababot({
-                            botId: this.id,
-                            accountDisplayId: this.displayId,
-                            recipientId: user.AccountId,
-                            type: 'outgoing', // Fallback как письмо = $1.5
-                            textContent: msgBody,
-                            status: 'success',
-                            responseTime: convData.responseTime,
-                            isFirst: convData.isFirst,
-                            isLast: false,
-                            convId: convId,
-                            mediaUrl: null,
-                            fileName: null,
-                            translatorId: this.translatorId,
-                            errorReason: null,
-                            usedAi: this.usedAi || false
-                        });
+                // Проверяем игнор-лист или блокировку
+                const isIgnored = errorReason.toLowerCase().includes('ignore') ||
+                                  errorReason.toLowerCase().includes('игнор') ||
+                                  errorReason.toLowerCase().includes('block') ||
+                                  errorReason.toLowerCase().includes('заблокир');
 
-                        if (!lababotResult.success) {
-                            console.warn(`⚠️ Не удалось отправить статистику на Lababot (fallback): ${lababotResult.error}`);
-                        }
-                        
-                        this.incrementStat('chat', 'sent');
-                        this.chatHistory.sent.push(`${user.AccountId} (${user.Name})`);
-                        this.log(`💬 Сообщение отправлено через письмо (fallback): ${user.Name}`);
-
-                        // Добавляем в "отправленные"
-                        this.chatContactedUsers.add(user.AccountId.toString());
-                    } else {
-                        // Нет CheckId в fallback - СЧИТАЕМ КАК ОШИБКУ
-                        const errorReason = extractApiError({ data: checkRes.data, status: 200 }, 'нет CheckId (fallback)');
-                        this.incrementStat('chat', 'errors');
-                        this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
-                        this.log(`❌ Ошибка: не могу отправить чат ${user.Name} (${user.AccountId}): ${errorReason}`);
-
-                        // Проверяем игнор-лист или блокировку
-                        const isIgnored = errorReason.toLowerCase().includes('ignore') ||
-                                          errorReason.toLowerCase().includes('игнор') ||
-                                          errorReason.toLowerCase().includes('block') ||
-                                          errorReason.toLowerCase().includes('заблокир');
-
-                        // Добавляем в игнор-лист если это блокировка/игнор
-                        if (isIgnored && !this.ignoredUsersChat.includes(user.AccountId)) {
-                            this.ignoredUsersChat.push(user.AccountId);
-                            this.log(`⛔ ${user.Name} добавлен в игнор-лист чатов (навсегда)`);
-                            saveIgnoredUsersToStorage(this.displayId, 'chat', this.ignoredUsersChat);
-                        }
-
-                        // Отправляем ошибку на сервер
-                        await sendErrorToLababot(
-                            this.id,
-                            this.displayId,
-                            'chat_no_checkid',
-                            errorReason
-                        );
-
-                        // Также через message_sent API с status='failed'
-                        const convData = this.trackConversation(user.AccountId);
-                        const convId = this.getConvId(user.AccountId);
-                        await sendMessageToLababot({
-                            botId: this.id,
-                            accountDisplayId: this.displayId,
-                            recipientId: user.AccountId,
-                            type: 'chat_msg',
-                            textContent: msgBody || '',
-                            status: 'failed',
-                            responseTime: convData.responseTime,
-                            isFirst: convData.isFirst,
-                            isLast: false,
-                            convId: convId,
-                            mediaUrl: null,
-                            fileName: null,
-                            translatorId: this.translatorId,
-                            errorReason: errorReason,
-                            usedAi: false
-                        });
-                    }
-                } catch(fallbackErr) {
-                    if(fallbackErr.message === "Network Error" || !fallbackErr.response) {
-                        this.log(`📡 Ошибка сети при отправке чата. Повтор...`);
-                    } else {
-                        // СЧИТАЕМ КАК ОШИБКУ
-                        const errorReason = fallbackErr.response ? extractApiError(fallbackErr.response, fallbackErr.message) : fallbackErr.message;
-                        this.incrementStat('chat', 'errors');
-                        this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
-                        this.log(`❌ Ошибка API чата: ${errorReason}`);
-
-                        // Проверяем игнор-лист или блокировку
-                        const isIgnored = errorReason.toLowerCase().includes('ignore') ||
-                                          errorReason.toLowerCase().includes('игнор') ||
-                                          errorReason.toLowerCase().includes('block') ||
-                                          errorReason.toLowerCase().includes('заблокир');
-
-                        // Добавляем в игнор-лист если это блокировка/игнор
-                        if (user && user.AccountId && isIgnored) {
-                            if (!this.ignoredUsersChat.includes(user.AccountId)) {
-                                this.ignoredUsersChat.push(user.AccountId);
-                                this.log(`⛔ ${user.Name} добавлен в игнор-лист чатов (навсегда)`);
-                                saveIgnoredUsersToStorage(this.displayId, 'chat', this.ignoredUsersChat);
-                            }
-                        }
-
-                        // Отправляем ошибку на наш сервер через старый API
-                        await sendErrorToLababot(
-                            this.id,
-                            this.displayId,
-                            'chat_send_error',
-                            fallbackErr.response?.data?.Error || fallbackErr.message
-                        );
-
-                        // НОВОЕ: Отправляем также через message_sent API с status='failed'
-                        if (user && user.AccountId) {
-                            const convData = this.trackConversation(user.AccountId);
-                            const convId = this.getConvId(user.AccountId);
-
-                            await sendMessageToLababot({
-                                botId: this.id,
-                                accountDisplayId: this.displayId,
-                                recipientId: user.AccountId,
-                                type: 'chat_msg',
-                                textContent: msgBody || '',
-                                status: 'failed',
-                                responseTime: convData.responseTime,
-                                isFirst: convData.isFirst,
-                                isLast: false,
-                                convId: convId,
-                                mediaUrl: null,
-                                fileName: null,
-                                translatorId: this.translatorId,
-                                errorReason: fallbackErr.response ? extractApiError(fallbackErr.response, fallbackErr.message) : fallbackErr.message
-                            });
-                        }
-                    }
+                // Добавляем в игнор-лист если это блокировка/игнор
+                if (isIgnored && !this.ignoredUsersChat.includes(user.AccountId)) {
+                    this.ignoredUsersChat.push(user.AccountId);
+                    this.log(`⛔ ${user.Name} добавлен в игнор-лист чатов (навсегда)`);
+                    saveIgnoredUsersToStorage(this.displayId, 'chat', this.ignoredUsersChat);
                 }
+
+                // Отправляем ошибку на сервер
+                await sendErrorToLababot(
+                    this.id,
+                    this.displayId,
+                    'chat_send_error',
+                    errorReason
+                );
+
+                // Отправляем статистику с status='failed'
+                const convData = this.trackConversation(user.AccountId);
+                const convId = this.getConvId(user.AccountId);
+                await sendMessageToLababot({
+                    botId: this.id,
+                    accountDisplayId: this.displayId,
+                    recipientId: user.AccountId,
+                    type: 'chat_msg',
+                    textContent: msgBody || '',
+                    status: 'failed',
+                    responseTime: convData.responseTime,
+                    isFirst: convData.isFirst,
+                    isLast: false,
+                    convId: convId,
+                    mediaUrl: null,
+                    fileName: null,
+                    translatorId: this.translatorId,
+                    errorReason: errorReason,
+                    usedAi: false
+                });
             }
         } catch (e) {
             if(e.message === "Network Error" || !e.response) {
