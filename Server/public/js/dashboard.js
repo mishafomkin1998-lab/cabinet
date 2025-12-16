@@ -469,35 +469,29 @@
                         const res = await fetch(`${API_BASE}/api/profiles?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
                         const data = await res.json();
 
-                        // DEBUG: Проверяем что приходит с сервера
-                        console.log('📊 DEBUG loadAccounts:', data.list?.length || 0, 'profiles loaded');
-                        if (data.list && data.list.length > 0) {
-                            console.log('   First profile raw data:', {
-                                id: data.list[0].profile_id,
-                                last_online: data.list[0].last_online,
-                                incoming_month: data.list[0].incoming_month,
-                                incoming_total: data.list[0].incoming_total,
-                                status: data.list[0].status
-                            });
-                        }
-
                         if (data.success) {
-                            // Загружаем статус оплаты для каждой анкеты
-                            const accountsWithPayment = await Promise.all(data.list.map(async p => {
-                                let paymentStatus = { isPaid: true, isFree: false, daysLeft: 999, isTrial: false, trialUsed: false };
+                            // Получаем статусы оплаты для всех анкет ОДНИМ запросом (вместо N запросов)
+                            const profileIds = data.list.map(p => p.profile_id);
+                            let paymentStatuses = {};
+
+                            if (profileIds.length > 0) {
                                 try {
-                                    const payRes = await fetch(`${API_BASE}/api/billing/profile-status/${encodeURIComponent(p.profile_id)}`);
+                                    const payRes = await fetch(`${API_BASE}/api/billing/profiles-status`, {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ profileIds })
+                                    });
                                     const payData = await payRes.json();
                                     if (payData.success) {
-                                        paymentStatus = {
-                                            isPaid: payData.isPaid,
-                                            isFree: payData.isFree,
-                                            daysLeft: payData.daysLeft || 0,
-                                            isTrial: payData.isTrial,
-                                            trialUsed: payData.trialUsed
-                                        };
+                                        paymentStatuses = payData.statuses;
                                     }
                                 } catch (e) { /* ignore */ }
+                            }
+
+                            const accountsWithPayment = data.list.map(p => {
+                                const paymentStatus = paymentStatuses[p.profile_id] || {
+                                    isPaid: true, isFree: false, daysLeft: 999, isTrial: false, trialUsed: false
+                                };
 
                                 return {
                                     id: p.profile_id,
@@ -523,17 +517,7 @@
                                     isTrial: paymentStatus.isTrial,
                                     trialUsed: paymentStatus.trialUsed
                                 };
-                            }));
-
-                            // DEBUG: Проверяем обработанные данные
-                            if (accountsWithPayment.length > 0) {
-                                console.log('   First account processed:', {
-                                    id: accountsWithPayment[0].id,
-                                    status: accountsWithPayment[0].status,
-                                    lastOnline: accountsWithPayment[0].lastOnline,
-                                    incoming: accountsWithPayment[0].incoming
-                                });
-                            }
+                            });
 
                             this.accounts = accountsWithPayment;
 

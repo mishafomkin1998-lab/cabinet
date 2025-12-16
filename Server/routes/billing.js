@@ -374,6 +374,82 @@ router.get('/profile-status/:profileId', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * POST /api/billing/profiles-status
+ * Получить статусы оплаты для нескольких анкет одним запросом (bulk)
+ * Это критично для производительности - вместо N запросов делаем 1
+ */
+router.post('/profiles-status', asyncHandler(async (req, res) => {
+    const { profileIds } = req.body;
+
+    if (!profileIds || !Array.isArray(profileIds) || profileIds.length === 0) {
+        return res.json({ success: true, statuses: {} });
+    }
+
+    // Ограничиваем количество анкет для защиты от злоупотреблений
+    const limitedIds = profileIds.slice(0, 500);
+
+    const result = await pool.query(`
+        SELECT
+            ap.profile_id,
+            ap.paid_until,
+            ap.is_trial,
+            ap.trial_started_at,
+            ap.assigned_admin_id,
+            u.is_restricted as admin_is_restricted
+        FROM allowed_profiles ap
+        LEFT JOIN users u ON ap.assigned_admin_id = u.id
+        WHERE ap.profile_id = ANY($1)
+    `, [limitedIds]);
+
+    const now = new Date();
+    const statuses = {};
+
+    for (const row of result.rows) {
+        // Если админ - "мой админ", оплата не требуется
+        if (row.admin_is_restricted) {
+            statuses[row.profile_id] = {
+                isPaid: true,
+                isFree: true,
+                daysLeft: 999,
+                isTrial: false,
+                trialUsed: false
+            };
+            continue;
+        }
+
+        const paidUntil = row.paid_until ? new Date(row.paid_until) : null;
+        const isPaid = paidUntil && paidUntil > now;
+        let daysLeft = 0;
+        if (isPaid) {
+            daysLeft = Math.ceil((paidUntil - now) / (1000 * 60 * 60 * 24));
+        }
+
+        statuses[row.profile_id] = {
+            isPaid: isPaid,
+            isFree: false,
+            daysLeft: daysLeft,
+            isTrial: row.is_trial || false,
+            trialUsed: !!row.trial_started_at
+        };
+    }
+
+    // Для анкет, которых нет в результате - возвращаем дефолт
+    for (const id of limitedIds) {
+        if (!statuses[id]) {
+            statuses[id] = {
+                isPaid: false,
+                isFree: false,
+                daysLeft: 0,
+                isTrial: false,
+                trialUsed: false
+            };
+        }
+    }
+
+    res.json({ success: true, statuses });
+}));
+
+/**
  * GET /api/billing/pricing
  * Получить тарифы
  */
