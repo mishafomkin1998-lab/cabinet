@@ -1586,24 +1586,31 @@ class AccountBot {
 
         // Расширенные макросы (из полного профиля)
         res = res.replace(/{occupation}/gi, user.Occupation || "");
-        res = res.replace(/{job}/gi, user.Occupation || ""); // Алиас для occupation
+        res = res.replace(/{job}/gi, user.Occupation || ""); // Алиас
         res = res.replace(/{marital}/gi, user.MaritalStatus || "");
         res = res.replace(/{children}/gi, user.Children || "");
+        res = res.replace(/{wantchildren}/gi, user.WantChildren || "");
         res = res.replace(/{height}/gi, user.Height || "");
         res = res.replace(/{weight}/gi, user.Weight || "");
         res = res.replace(/{hair}/gi, user.HairColor || "");
-        res = res.replace(/{eyes}/gi, user.EyesColor || "");
+        res = res.replace(/{eye}/gi, user.EyesColor || "");
+        res = res.replace(/{eyes}/gi, user.EyesColor || ""); // Алиас
         res = res.replace(/{body}/gi, user.BodyType || "");
         res = res.replace(/{zodiac}/gi, user.Zodiac || "");
         res = res.replace(/{birthday}/gi, user.Birthday || "");
         res = res.replace(/{religion}/gi, user.Religion || "");
         res = res.replace(/{ethnicity}/gi, user.Ethnicity || "");
         res = res.replace(/{education}/gi, user.Education || "");
-        res = res.replace(/{smoke}/gi, user.Smoke || "");
-        res = res.replace(/{drink}/gi, user.Drink || "");
+        res = res.replace(/{smoking}/gi, user.Smoke || "");
+        res = res.replace(/{smoke}/gi, user.Smoke || ""); // Алиас
+        res = res.replace(/{alcohol}/gi, user.Drink || "");
+        res = res.replace(/{drink}/gi, user.Drink || ""); // Алиас
         res = res.replace(/{english}/gi, user.EnglishLevel || "");
+        res = res.replace(/{languages}/gi, user.Languages || "");
         res = res.replace(/{hobby}/gi, user.Hobby || "");
+        res = res.replace(/{interests}/gi, user.Hobby || ""); // Алиас для hobby
         res = res.replace(/{about}/gi, user.AboutMe || "");
+        res = res.replace(/{lookingfor}/gi, user.AboutPartner || "");
 
         return res;
     }

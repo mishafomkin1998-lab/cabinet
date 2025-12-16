@@ -847,6 +847,7 @@ function parseProfileHtml(html, userId) {
         Occupation: '',
         MaritalStatus: '',
         Children: '',
+        WantChildren: '',
         Height: '',
         Weight: '',
         HairColor: '',
@@ -861,6 +862,7 @@ function parseProfileHtml(html, userId) {
         Smoke: '',
         Drink: '',
         EnglishLevel: '',
+        Languages: '',
         Hobby: '',
         AboutMe: '',
         AboutPartner: ''
@@ -905,6 +907,7 @@ function parseProfileHtml(html, userId) {
         profile.Occupation = extractField('Occupation');
         profile.MaritalStatus = extractField('Marital Status');
         profile.Children = extractField('Children');
+        profile.WantChildren = extractField('Want Children') || extractField('Want children');
         profile.Height = extractField('Height');
         profile.Weight = extractField('Weight');
         profile.HairColor = extractField('Hair Color');
@@ -917,6 +920,7 @@ function parseProfileHtml(html, userId) {
         profile.Smoke = extractField('Smoke');
         profile.Drink = extractField('Drink');
         profile.EnglishLevel = extractField('Level of English');
+        profile.Languages = extractField('Languages') || extractField('Language');
 
         // Birthday и Zodiac
         const birthdayMatch = html.match(/<div[^>]*class="name_row[^"]*"[^>]*>\s*Birthday\s*<\/div>[\s\S]*?<div[^>]*class="value_row[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
