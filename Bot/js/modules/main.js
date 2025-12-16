@@ -1400,11 +1400,6 @@ async function restoreSession() {
         const s = JSON.parse(localStorage.getItem('savedBots') || '[]');
         document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} из кэша...` : "";
 
-        // Адаптивная задержка: чем больше аккаунтов, тем медленнее грузим чтобы не перегрузить сервер
-        // 1-10 аккаунтов: 300мс, 11-30: 500мс, 31-60: 800мс, 61+: 1000мс
-        const delayMs = s.length <= 10 ? 300 : s.length <= 30 ? 500 : s.length <= 60 ? 800 : 1000;
-
-        let loaded = 0;
         for (const a of s) {
             const ok = await performLogin(a.login, a.pass, a.displayId);
             if (ok && bots[Object.keys(bots).pop()]) {
@@ -1434,9 +1429,7 @@ async function restoreSession() {
                     toggleCustomIdsField(bot.id);
                 }
             }
-            loaded++;
-            document.getElementById('restore-status').innerText = `Загрузка ${loaded}/${s.length}...`;
-            await new Promise(r => setTimeout(r, delayMs));
+            await new Promise(r => setTimeout(r, 500));
         }
         
         document.getElementById('restore-status').innerText = "";
@@ -1601,65 +1594,49 @@ async function reloginAllBots() {
     btn.disabled = false;
 }
 
-// ПОЛНЫЙ ЭКСПОРТ ВСЕХ ДАННЫХ (100% локально из localStorage)
-function exportAllData() {
+async function exportAllData() {
     try {
-        // Сначала сохраняем текущее состояние в localStorage
-        saveSession();
-
-        // Собираем ВСЕ данные ТОЛЬКО из localStorage (никаких сетевых запросов!)
         const data = {
-            version: '2.1',
-            exportDate: new Date().toISOString(),
-
-            // Боты из localStorage (уже содержит логины, пароли, настройки)
-            savedBots: JSON.parse(localStorage.getItem('savedBots') || '[]'),
-
-            // Шаблоны писем и чатов
-            botTemplates: JSON.parse(localStorage.getItem('botTemplates') || '{}'),
-
-            // Настройки аккаунтов
-            accountPreferences: JSON.parse(localStorage.getItem('accountPreferences') || '{}'),
-
-            // Глобальные настройки (промпты, API ключи, прокси, тема)
-            globalSettings: JSON.parse(localStorage.getItem('globalSettings') || '{}'),
-
-            // Шаблоны промптов
-            promptTemplates: JSON.parse(localStorage.getItem('promptTemplates') || '{}'),
-
-            // Сохранённые камеры для видеочата
-            savedCameras: JSON.parse(localStorage.getItem('savedCameras') || '{}'),
-
-            // Избранные шаблоны
-            favoriteTemplates: JSON.parse(localStorage.getItem('favoriteTemplates') || '{}')
+            bots: [],
+            templates: botTemplates,
+            accountPreferences: accountPreferences,
+            globalSettings: globalSettings,
+            exportDate: new Date().toISOString()
         };
 
-        // Создаём файл и скачиваем
-        const jsonString = JSON.stringify(data, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json' });
+        // Сохраняем данные ботов
+        Object.values(bots).forEach(bot => {
+            data.bots.push({
+                id: bot.id,
+                login: bot.login,
+                displayId: bot.displayId,
+                token: bot.token ? '[HIDDEN]' : null,
+                mailSettings: bot.mailSettings,
+                chatSettings: bot.chatSettings,
+                vipList: bot.vipList
+            });
+        });
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `save (${new Date().toISOString().split('T')[0]}).json`;
+        a.download = `lababot_backup_${new Date().toISOString().split('T')[0]}.json`;
         a.click();
         URL.revokeObjectURL(url);
 
-        showToast('✅ Бекап сохранён');
-        console.log('[Export] ✅ Экспорт завершён, размер:', (jsonString.length / 1024).toFixed(1), 'KB');
         return true;
-
     } catch (error) {
-        console.error('[Export] ❌ Ошибка:', error);
-        showToast('❌ Ошибка экспорта: ' + error.message);
+        console.error('Error exporting data:', error);
         return false;
     }
 }
 
-// ПОЛНЫЙ ИМПОРТ ВСЕХ ДАННЫХ ("тихий" - без логина, требует перезапуск)
+// ОБНОВЛЕННАЯ ФУНКЦИЯ handleFullImport
 async function handleFullImport(input) {
     if (!input.files.length) return;
 
-    if (!confirm('Импорт добавит анкеты из файла.\nПосле импорта потребуется ПЕРЕЗАПУСК приложения.\n\nПродолжить?')) {
+    if (!confirm('Внимание! Импорт перезапишет существующие данные. Продолжить?')) {
         input.value = '';
         return;
     }
@@ -1669,159 +1646,68 @@ async function handleFullImport(input) {
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Импорт...';
     btn.disabled = true;
 
-    // КРИТИЧНО: Останавливаем ВСЕ запросы от текущих ботов перед импортом
-    // чтобы JSON.parse не блокировал heartbeat и не вызывал таймауты
-    console.log('[Import] ⏸️ Останавливаю все боты перед импортом...');
-    for (const botId of Object.keys(bots)) {
-        const bot = bots[botId];
-        if (bot) {
-            // Останавливаем heartbeat
-            if (bot.lababotHeartbeatTimer) {
-                clearInterval(bot.lababotHeartbeatTimer);
-                bot.lababotHeartbeatTimer = null;
-            }
-            // Останавливаем мониторинг
-            bot.stopMonitoring();
-            // Останавливаем keepAlive
-            if (bot.keepAliveTimer) {
-                clearInterval(bot.keepAliveTimer);
-                bot.keepAliveTimer = null;
-            }
-        }
-    }
-    // Даём время завершиться текущим запросам
-    await new Promise(r => setTimeout(r, 500));
-    console.log('[Import] ✅ Все боты остановлены, начинаю импорт...');
+    try {
+        const reader = new FileReader();
 
-    const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
 
-    reader.onload = async function(e) {
-        try {
-            // Пауза перед парсингом
-            await new Promise(r => setTimeout(r, 100));
-
-            const data = JSON.parse(e.target.result);
-            console.log('[Import] 📥 Загружен файл, версия:', data.version || '1.0');
-
-            // Пауза после парсинга
-            await new Promise(r => setTimeout(r, 50));
-
-            // 1. Импортируем настройки (с паузами между операциями)
-            if (data.globalSettings) {
-                const current = JSON.parse(localStorage.getItem('globalSettings') || '{}');
-                localStorage.setItem('globalSettings', JSON.stringify({ ...current, ...data.globalSettings }));
-                console.log('[Import] ✅ globalSettings');
-                await new Promise(r => setTimeout(r, 30));
-            }
-
-            const templates = data.botTemplates || data.templates;
-            if (templates) {
-                const current = JSON.parse(localStorage.getItem('botTemplates') || '{}');
-                localStorage.setItem('botTemplates', JSON.stringify({ ...current, ...templates }));
-                console.log('[Import] ✅ botTemplates');
-                await new Promise(r => setTimeout(r, 30));
-            }
-
-            if (data.accountPreferences) {
-                const current = JSON.parse(localStorage.getItem('accountPreferences') || '{}');
-                localStorage.setItem('accountPreferences', JSON.stringify({ ...current, ...data.accountPreferences }));
-                console.log('[Import] ✅ accountPreferences');
-                await new Promise(r => setTimeout(r, 30));
-            }
-
-            if (data.promptTemplates) {
-                localStorage.setItem('promptTemplates', JSON.stringify(data.promptTemplates));
-                console.log('[Import] ✅ promptTemplates');
-                await new Promise(r => setTimeout(r, 30));
-            }
-
-            if (data.savedCameras) {
-                localStorage.setItem('savedCameras', JSON.stringify(data.savedCameras));
-                console.log('[Import] ✅ savedCameras');
-                await new Promise(r => setTimeout(r, 30));
-            }
-
-            if (data.favoriteTemplates) {
-                localStorage.setItem('favoriteTemplates', JSON.stringify(data.favoriteTemplates));
-                console.log('[Import] ✅ favoriteTemplates');
-                await new Promise(r => setTimeout(r, 30));
-            }
-
-            // 2. Определяем список ботов для импорта
-            let botsToImport = [];
-            if (data.savedBots && Array.isArray(data.savedBots)) {
-                botsToImport = data.savedBots;
-            } else if (data.bots && Array.isArray(data.bots)) {
-                // Конвертируем старый формат
-                botsToImport = data.bots.map(bot => ({
-                    login: bot.login,
-                    pass: bot.pass,
-                    displayId: bot.displayId,
-                    vipList: bot.vipList || [],
-                    autoReplies: bot.chatSettings?.autoReplies || [],
-                    autoReplyEnabled: bot.chatSettings?.autoReplyEnabled || false,
-                    mailAuto: bot.mailSettings?.auto || false,
-                    mailTarget: bot.mailSettings?.target || 'online'
-                }));
-            }
-
-            await new Promise(r => setTimeout(r, 50));
-
-            // 3. Добавляем новых ботов в savedBots (без логина!)
-            const currentBots = JSON.parse(localStorage.getItem('savedBots') || '[]');
-            const existingLogins = new Set(currentBots.map(b => b.login));
-
-            let addedCount = 0;
-            for (const botData of botsToImport) {
-                if (!botData.login || !botData.pass) continue;
-
-                if (existingLogins.has(botData.login)) {
-                    console.log(`[Import] ⏭️ ${botData.login} уже есть, пропускаем`);
-                    continue;
+                // Импортируем ботов
+                if (data.bots && Array.isArray(data.bots)) {
+                    for (const botData of data.bots) {
+                        if (botData.login && botData.displayId) {
+                            await performLogin(botData.login, botData.pass || 'password', botData.displayId);
+                        }
+                    }
                 }
 
-                currentBots.push(botData);
-                existingLogins.add(botData.login);
-                addedCount++;
-                console.log(`[Import] ✅ Добавлен ${botData.login}`);
-
-                // Пауза каждые 5 анкет
-                if (addedCount % 5 === 0) {
-                    await new Promise(r => setTimeout(r, 30));
+                // Импортируем шаблоны
+                if (data.templates) {
+                    botTemplates = data.templates;
+                    localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
                 }
+
+                // Импортируем настройки
+                if (data.accountPreferences) {
+                    accountPreferences = data.accountPreferences;
+                    localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
+                }
+
+                if (data.globalSettings) {
+                    globalSettings = { ...globalSettings, ...data.globalSettings };
+                    localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+                }
+
+                alert('Данные успешно импортированы! Перезагрузите приложение.');
+                setTimeout(() => location.reload(), 1000);
+
+            } catch (error) {
+                console.error('Import error:', error);
+                alert('Ошибка импорта: ' + error.message);
+            } finally {
+                btn.innerHTML = origText;
+                btn.disabled = false;
+                input.value = '';
             }
+        };
 
-            await new Promise(r => setTimeout(r, 50));
-            localStorage.setItem('savedBots', JSON.stringify(currentBots));
-            console.log(`[Import] 📦 Сохранено ${currentBots.length} анкет в localStorage`);
-
+        reader.onerror = function(error) {
+            alert('Ошибка чтения файла');
             btn.innerHTML = origText;
             btn.disabled = false;
             input.value = '';
+        };
 
-            if (addedCount > 0) {
-                alert(`✅ Импорт завершён!\n\nДобавлено: ${addedCount} анкет\n\n⚠️ ПЕРЕЗАПУСТИТЕ приложение чтобы анкеты загрузились.`);
-            } else {
-                alert('Все анкеты из файла уже добавлены.');
-            }
+        reader.readAsText(input.files[0]);
 
-        } catch (error) {
-            console.error('[Import] ❌ Ошибка:', error);
-            alert('Ошибка импорта: ' + error.message);
-            btn.innerHTML = origText;
-            btn.disabled = false;
-            input.value = '';
-        }
-    };
-
-    reader.onerror = function() {
-        alert('Ошибка чтения файла');
+    } catch (error) {
+        console.error('Import error:', error);
+        alert('Ошибка импорта: ' + error.message);
         btn.innerHTML = origText;
         btn.disabled = false;
         input.value = '';
-    };
-
-    reader.readAsText(input.files[0]);
+    }
 }
 
 // =====================================================
