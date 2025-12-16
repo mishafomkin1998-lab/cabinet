@@ -362,13 +362,18 @@ class AccountBot {
 
     // Heartbeat на сервер Lababot
     startLababotHeartbeat() {
-        // Отправляем первый heartbeat
-        setTimeout(() => sendHeartbeatToLababot(this.id, this.displayId, this.token ? 'online' : 'offline'), 1000);
-        
-        // Потом каждые 30 секунд
-        this.lababotHeartbeatTimer = setInterval(() => {
+        // Случайная задержка 1-15 секунд для первого heartbeat (чтобы не все боты слали одновременно)
+        const randomDelay = 1000 + Math.floor(Math.random() * 14000);
+
+        setTimeout(() => {
             sendHeartbeatToLababot(this.id, this.displayId, this.token ? 'online' : 'offline');
-        }, 30000);
+
+            // После первого heartbeat - запускаем интервал с небольшим jitter
+            const jitter = Math.floor(Math.random() * 5000); // 0-5 сек jitter
+            this.lababotHeartbeatTimer = setInterval(() => {
+                sendHeartbeatToLababot(this.id, this.displayId, this.token ? 'online' : 'offline');
+            }, 30000 + jitter);
+        }, randomDelay);
     }
 
     log(text) {

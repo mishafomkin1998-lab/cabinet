@@ -1400,6 +1400,11 @@ async function restoreSession() {
         const s = JSON.parse(localStorage.getItem('savedBots') || '[]');
         document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} из кэша...` : "";
 
+        // Адаптивная задержка: чем больше аккаунтов, тем медленнее грузим чтобы не перегрузить сервер
+        // 1-10 аккаунтов: 300мс, 11-30: 500мс, 31-60: 800мс, 61+: 1000мс
+        const delayMs = s.length <= 10 ? 300 : s.length <= 30 ? 500 : s.length <= 60 ? 800 : 1000;
+
+        let loaded = 0;
         for (const a of s) {
             const ok = await performLogin(a.login, a.pass, a.displayId);
             if (ok && bots[Object.keys(bots).pop()]) {
@@ -1429,7 +1434,9 @@ async function restoreSession() {
                     toggleCustomIdsField(bot.id);
                 }
             }
-            await new Promise(r => setTimeout(r, 500));
+            loaded++;
+            document.getElementById('restore-status').innerText = `Загрузка ${loaded}/${s.length}...`;
+            await new Promise(r => setTimeout(r, delayMs));
         }
         
         document.getElementById('restore-status').innerText = "";
