@@ -97,7 +97,13 @@ function initFocusProtection() {
     });
 
     // Блокируем кнопки и webview от получения фокуса
+    // ТОЛЬКО если есть активный input для возврата фокуса
     document.addEventListener('focusin', (e) => {
+        // Если нет активного input - не блокируем ничего
+        if (!lastActiveInput || !document.body.contains(lastActiveInput)) {
+            return;
+        }
+
         // Исключаем важные кнопки которым нужен фокус для работы
         const allowedButtonPrefixes = ['btn-share-cam', 'btn-video', 'btn-open-'];
         const buttonId = e.target.id || '';
@@ -112,19 +118,14 @@ function initFocusProtection() {
                 text: e.target.innerText?.substring(0, 20) || ''
             });
 
-            // Возвращаем фокус на последний активный input
-            if (lastActiveInput && document.body.contains(lastActiveInput)) {
-                e.preventDefault();
-                e.stopPropagation();
+            e.preventDefault();
+            e.stopPropagation();
 
-                // Небольшая задержка чтобы не конфликтовать с кликом
-                setTimeout(() => {
-                    lastActiveInput.focus();
-                    console.log('[Focus Protection] ✅ Фокус возвращён на:', lastActiveInput.id || lastActiveInput.className);
-                }, 10);
-            } else {
-                console.error('[Focus Protection] ❌ Нет lastActiveInput для возврата фокуса!');
-            }
+            // Небольшая задержка чтобы не конфликтовать с кликом
+            setTimeout(() => {
+                lastActiveInput.focus();
+                console.log('[Focus Protection] ✅ Фокус возвращён на:', lastActiveInput.id || lastActiveInput.className);
+            }, 10);
         }
     }, true);
 

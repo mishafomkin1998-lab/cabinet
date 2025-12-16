@@ -1915,6 +1915,24 @@
             color: #e0a800 !important;
         }
 
+        /* Кнопка VIP в тёмной теме */
+        body.theme-dark .bl-actions .btn-outline-warning {
+            background: #252525 !important;
+            border: 2px solid #ffc107 !important;
+            color: #ffc107 !important;
+        }
+        body.theme-dark .bl-actions .btn-outline-warning:hover {
+            background: #3a3520 !important;
+            border-color: #ffca2c !important;
+            color: #ffca2c !important;
+        }
+        body.theme-dark .bl-actions .btn-outline-warning i.fa-star {
+            color: #ffc107 !important;
+        }
+        body.theme-dark .bl-actions .btn-outline-warning:hover i.fa-star {
+            color: #ffca2c !important;
+        }
+
         /* === Анимации для массовых уведомлений === */
         @keyframes bulkNotifIn {
             from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
