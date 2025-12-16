@@ -1310,7 +1310,7 @@ function openIgnoredModal(botId) {
         modal = document.createElement('div');
         modal.id = 'ignored-modal';
         modal.className = 'custom-modal';
-        modal.innerHTML = `<div class="modal-backdrop" onclick="closeModal('ignored-modal')"></div><div class="modal-content">${modalContent}</div>`;
+        modal.innerHTML = `<div class="modal-backdrop" onclick="closeModal('ignored-modal')"></div><div class="modal-content" onclick="event.stopPropagation()">${modalContent}</div>`;
         document.body.appendChild(modal);
     } else {
         modal.querySelector('.modal-content').innerHTML = modalContent;
