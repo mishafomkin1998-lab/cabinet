@@ -2,382 +2,18 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Bot Pro Ultimate v10 (Stable & Groups) - Lababot</title>
+    <title>Novabot v1.3.0</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    <style>
-        /* === ВАЖНОЕ ДОБАВЛЕНИЕ: Стили для скрытых браузеров === */
-        #browsers-container {
-            display: none; /* Полностью скрываем контейнер! */
-        }
-        
-        /* WEBVIEW теперь позиционируются за пределами экрана */
-        webview {
-            position: fixed !important;
-            top: -9999px !important; 
-            left: -9999px !important;
-            width: 1px !important; /* Минимальный размер */
-            height: 1px !important;
-            opacity: 0; 
-            z-index: -100;
-        }
-        /* Убираем активные стили, они больше не нужны */
-        webview.active {
-            opacity: 0; 
-        }
-        
-        /* === КОНЕЦ ДОБАВЛЕНИЙ === */
-
-        :root {
-            --bg-color: #f8f9fa;
-            --text-color: #000;
-            --panel-bg: #fff;
-            --tab-bg-active: #e3f2fd;
-            --tab-text-active: #0d6efd;
-            --mode-color: #0d6efd;
-        }
-        
-        body.mode-chat {
-            --mode-color: #6610f2;
-            --tab-bg-active: #f3e5f5;
-            --tab-text-active: #6610f2;
-        }
-
-        body { background-color: var(--bg-color); color: var(--text-color); height: 100vh; display: flex; flex-direction: column; overflow: hidden; user-select: none; font-family: 'Segoe UI', sans-serif; }
-        
-        /* HEADER */
-        .global-toolbar { 
-            background: var(--panel-bg); padding: 10px 20px; border-bottom: 1px solid #dee2e6; 
-            display: flex; align-items: center; position: relative; height: 60px; flex-shrink: 0;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.03); z-index: 10;
-        }
-        .toolbar-left { display: flex; gap: 10px; z-index: 2; }
-        .toolbar-center { position: absolute; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; z-index: 1; align-items: center; }
-        
-        /* ОБНОВЛЕНИЕ 1: Стили для группировки кнопок (стрелочка) */
-        .status-group-wrapper { 
-            display: flex; align-items: center; gap: 5px; 
-            margin-left: 10px; padding-left: 15px; border-left: 1px solid #eee; 
-            position: relative;
-        }
-        
-        .btn-group-toggle {
-            background: transparent; border: none; color: #666; font-size: 18px; 
-            width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
-            cursor: pointer; transition: transform 0.2s ease;
-        }
-        .btn-group-toggle:hover { color: #000; }
-        .btn-group-toggle.open { transform: rotate(90deg); }
-
-        .status-buttons-container {
-            display: flex; gap: 10px; 
-            max-width: 0; opacity: 0; overflow: hidden;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            pointer-events: none; /* Чтобы скрытые кнопки не кликались */
-        }
-        
-        .status-buttons-container.show {
-            max-width: 300px; /* Достаточно места для 5 кнопок */
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .toolbar-right { margin-left: auto; z-index: 2; display: flex; align-items: center; gap: 15px; }
-        
-        .bot-counter { 
-            font-weight: bold; color: #666; font-size: 14px; background: #eee; 
-            padding: 0 15px; border-radius: 20px; height: 40px; display: flex; 
-            align-items: center; justify-content: center;
-        }
-        
-        .btn-circle { border-radius: 50%; width: 40px; height: 40px; padding: 0; display: flex; align-items: center; justify-content: center; transition: 0.2s; border: none; font-size: 18px; position: relative; }
-        .btn-circle:hover { transform: scale(1.1); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
-        
-        @keyframes blink-animation {
-            0% { background-color: #fff3cd; transform: scale(1); }
-            50% { background-color: #ff5722; color: white; transform: scale(1.1); box-shadow: 0 0 10px rgba(255,87,34,0.6); }
-            100% { background-color: #fff3cd; transform: scale(1); }
-        }
-        .btn-logger.blinking { animation: blink-animation 1s infinite; border-color: #ff5722; }
-
-        .btn-play { background: #e8f5e9; color: #28a745; border: 1px solid #c3e6cb; }
-        .btn-stop { background: #fde8e8; color: #dc3545; border: 1px solid #f5c6cb; }
-        .btn-clear { background: #f8f9fa; color: #6c757d; border: 1px solid #dee2e6; }
-        .btn-refresh { background: #e7f1ff; color: #0d6efd; border: 1px solid #cce5ff; }
-        .btn-logger { background: #fff3cd; color: #ffc107; border: 1px solid #ffe69c; }
-        .btn-logger:hover { background: #ffecb5; color: #e0a800; }
-        .btn-settings { background: #f3f3f3; color: #555; border: 1px solid #ddd; }
-        .btn-mode-switch { background: #fff; color: #555; border: 2px solid #ccc; }
-        .btn-mode-switch.active-chat { background: #6610f2; color: white; border-color: #6610f2; }
-        .btn-mode-switch.active-mail { background: #0d6efd; color: white; border-color: #0d6efd; }
-        
-        /* Стили для 5 статусов */
-        .btn-status-circle { background: #fff; border: 1px solid #ccc; transition: 0.2s; }
-        .btn-status-circle.btn-online-color { color: #198754; border-color: #badbcc; }
-        .btn-status-circle.btn-online-color:hover { background: #d1e7dd; }
-        
-        .btn-status-circle.btn-fav-of-color { color: #fd7e14; border-color: #ffc29b; } 
-        .btn-status-circle.btn-fav-of-color:hover { background: #ffe7d1; }
-
-        .btn-status-circle.btn-my-fav-color { color: #ffc107; border-color: #ffe69c; } 
-        .btn-status-circle.btn-my-fav-color:hover { background: #fff3cd; }
-        
-        .btn-status-circle.btn-inbox-color { color: #0d6efd; border-color: #b6d4fe; } 
-        .btn-status-circle.btn-inbox-color:hover { background: #cce5ff; }
-
-        .btn-status-circle.btn-payers-color { color: #6f42c1; border-color: #d6bdf7; }
-        .btn-status-circle.btn-payers-color:hover { background: #e9d5ff; }
-
-
-        /* TABS */
-        .tabs-container { 
-            background: #fdfdfd; padding: 8px 10px; display: flex; flex-wrap: wrap; 
-            align-content: flex-start; gap: 4px; border-bottom: 1px solid #e0e0e0; 
-            min-height: 50px; max-height: 180px; overflow-y: auto; flex-shrink: 0; z-index: 9;
-        }
-        .tab-item {
-            background: #fff; padding: 3px 10px; border-radius: 50rem; font-size: 12px; font-weight: 600;
-            cursor: pointer; position: relative; min-width: 0; color: #555; display: flex; align-items: center; gap: 5px; 
-            border: 1px solid #ddd; transition: all 0.1s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-            /* ОБНОВЛЕНИЕ 2: Улучшенные стили для перетаскивания */
-            user-select: none;
-        }
-        
-        .tab-item.tab-green { background: #d1e7dd !important; border-color: #badbcc !important; color: #0f5132 !important; }
-        .tab-item.tab-yellow { background: #fff3cd !important; border-color: #ffecb5 !important; color: #664d03 !important; }
-        .tab-item.tab-red { background: #f8d7da !important; border-color: #f5c2c7 !important; color: #842029 !important; }
-        .tab-item.active { 
-            background: var(--tab-bg-active); color: var(--tab-text-active); border-color: var(--mode-color); 
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1); z-index: 2;
-        }
-        .tab-item:hover:not(.active) { background: #f1f1f1; }
-        .tab-close { font-size: 14px; margin-left: 2px; opacity: 0.5; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
-        .tab-close:hover { background: #ff4d4d; color: white !important; opacity: 1; }
-        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #ccc; }
-        .status-dot.online { background: #28a745; box-shadow: 0 0 4px #28a745; }
-        
-        /* Стили для "призрака" перетаскивания */
-        .tab-item.dragging {
-            opacity: 0.5;
-            transform: scale(0.95);
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            border-color: var(--mode-color);
-        }
-
-        /* WORKSPACE */
-        #panels-container { flex: 1; overflow: hidden; position: relative; background: var(--bg-color); padding: 10px; }
-        #welcome-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 0; }
-        .workspace { position: absolute; top: 10px; left: 10px; right: 10px; bottom: 10px; display: none; z-index: 5; background: var(--bg-color); }
-        .workspace.active { display: block; }
-
-        .panel-col { background: var(--panel-bg); border: 1px solid #dee2e6; border-radius: 8px; height: 100%; display: flex; flex-direction: column; padding: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.02); }
-        .col-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #888; margin-bottom: 10px; border-bottom: 1px solid #f0f0f0; padding-bottom: 5px; letter-spacing: 0.5px; display: flex; justify-content: space-between; align-items: center; }
-        
-        .ai-container { position: relative; display: inline-block; }
-        .ai-hidden { display: none !important; }
-
-        .btn-ai-main { 
-            font-size: 10px; padding: 1px 8px; border-radius: 10px; border: none; 
-            background: linear-gradient(135deg, #6f42c1, #a66efa); color: white; cursor: pointer;
-            transition: 0.2s; display: flex; align-items: center; gap: 4px;
-        }
-        .btn-ai-main:hover { transform: scale(1.05); box-shadow: 0 2px 5px rgba(111, 66, 193, 0.3); }
-        .btn-ai-main i.fa-spin { animation: fa-spin 1s infinite linear; }
-
-        .ai-options {
-            position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd;
-            border-radius: 6px; padding: 5px; display: none; flex-direction: column; gap: 3px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.15); z-index: 100; min-width: 110px;
-            margin-top: 5px; opacity: 0; transform: translateY(-5px); transition: all 0.2s ease;
-        }
-        .ai-options.show { display: flex; opacity: 1; transform: translateY(0); }
-        .btn-ai-sub {
-            font-size: 11px; padding: 4px 8px; border: none; background: #f8f9fa; border-radius: 4px;
-            text-align: left; cursor: pointer; color: #555; transition: 0.2s;
-        }
-        .btn-ai-sub:hover { background: #e9ecef; color: #6f42c1; }
-
-        .textarea-msg { resize: none; flex: 1; font-size: 14px; border-color: #dee2e6; border-radius: 6px; background: #fafafa; }
-        .textarea-msg:focus { border-color: var(--mode-color); background: #fff; box-shadow: none; }
-        
-        .action-log { font-size: 11px; color: #555; height: 120px; overflow-y: auto; background: #fafafa; border: 1px solid #eee; margin-top: auto; padding: 5px; font-family: monospace; border-radius: 4px; }
-        
-        .stat-line { font-size: 13px; margin-top: 6px; display: flex; justify-content: space-between; border-bottom: 1px dashed #eee; padding-bottom: 2px; }
-        .stat-val { cursor: pointer; text-decoration: none; font-weight: 600; }
-        .stat-waiting-text { font-size: 11px; color: #999; margin-top: 2px; text-align: right; }
-
-        .scroll-list { flex: 1; background: white; border: 1px solid #ddd; overflow-y: auto; margin-bottom: 5px; padding: 5px; font-size: 12px; border-radius: 4px; }
-        .list-item { padding: 4px 8px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-        .list-item:hover { background: #f1f1f1; }
-        .list-item.selected { background: var(--mode-color); color: white; }
-        .list-item.is-vip { background: #fff3cd !important; color: #000 !important; font-weight: bold; }
-        .list-item.is-vip.selected { background: #ffecb5 !important; border: 1px solid #e0a800; }
-
-        body.mode-chat .hide-in-chat { display: none !important; }
-        body.mode-mail .hide-in-mail { display: none !important; }
-
-        .photo-block { margin-top: 10px; display: flex; align-items: stretch; border: 1px solid #dee2e6; border-radius: 6px; overflow: visible; height: 38px; position: relative; }
-        .photo-block:hover .photo-preview-float.has-img { display: block; }
-        .photo-select-area { flex: 1; background: #fff; display: flex; align-items: center; padding: 0 10px; cursor: pointer; transition: 0.2s; border-radius: 6px 0 0 6px; }
-        .photo-select-area:hover { background: #f8f9fa; }
-        .photo-select-area.file-selected { background-color: #d1e7dd; color: #0f5132; border-color: #badbcc; }
-        .photo-select-area i { margin-right: 8px; color: #6c757d; }
-        .photo-select-area.file-selected i { color: #0f5132; }
-        .photo-name { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .btn-remove-photo { width: 38px; border: none; background: white; border-left: 1px solid #dee2e6; color: #dc3545; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; border-radius: 0 6px 6px 0; }
-        .btn-remove-photo:hover { background: #fde8e8; }
-        .photo-preview-float { position: absolute; bottom: 100%; left: 0; background: white; padding: 5px; border: 1px solid #ccc; border-radius: 5px; display: none; z-index: 100; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .photo-preview-float img { max-width: 180px; max-height: 180px; display: block; }
-
-        .active-invite-box { margin-top: 8px; border: 1px solid #badbcc; background: #f0fff4; border-radius: 6px; padding: 8px; max-height: 80px; overflow-y: auto; font-size: 12px; color: #0f5132; display: none; }
-        .active-invite-box.show { display: block; }
-        .invite-status-label { font-size: 10px; font-weight: bold; text-transform: uppercase; color: #198754; margin-bottom: 2px; }
-
-        .vars-dropdown { position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 1px solid #ccc; border-radius: 4px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); z-index: 20; display: none; max-height: 150px; overflow-y: auto; margin-top: 2px; }
-        .vars-item { padding: 8px 10px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #eee; }
-        .vars-item:hover { background: #e9ecef; }
-
-        .custom-tooltip-popup { position: absolute; background: rgba(0,0,0,0.85); color: #fff; padding: 5px 10px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 9999; white-space: nowrap; opacity: 0; transition: opacity 0.2s; }
-        .custom-tooltip-popup.show { opacity: 1; }
-
-        .error-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #dc3545; color: white; padding: 10px 20px; border-radius: 50rem; font-size: 14px; box-shadow: 0 5px 15px rgba(220, 53, 69, 0.4); z-index: 3000; display: none; align-items: center; gap: 10px; }
-        .error-toast.show { display: flex; animation: slideUp 0.3s ease; }
-        @keyframes slideUp { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
-
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); z-index: 2000; display: none; justify-content: center; align-items: center; opacity: 0; transition: opacity 0.3s ease; }
-        .modal-overlay.show { opacity: 1; }
-        .modal-card { 
-            background: white; padding: 25px; border-radius: 12px; width: 400px; 
-            box-shadow: 0 15px 35px rgba(0,0,0,0.25); transform: scale(0.9); transition: transform 0.3s ease; 
-            display: flex; flex-direction: column;
-            max-height: 90vh; overflow-y: auto;
-        }
-        .modal-overlay.show .modal-card { transform: scale(1); }
-        .acc-row { border-bottom: 1px solid #eee; padding: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-        .spinner { display: none; width: 1rem; height: 1rem; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spinner-border .75s linear infinite; }
-        @keyframes spinner-border { to { transform: rotate(360deg); } }
-        .relative-box { position: relative; }
-        .btn-heart-active { color: #dc3545; border-color: #dc3545; background: #fff0f0; }
-        .btn-xs { padding: 0.25rem 0.4rem; font-size: 0.75rem; }
-        
-        .btn-cancel-modal {
-            background-color: transparent;
-            border: 1px solid #6c757d;
-            color: #6c757d;
-            border-radius: 6px;
-            padding: 6px 12px;
-            transition: all 0.2s;
-            text-decoration: none;
-        }
-        .btn-cancel-modal:hover { background-color: #6c757d; color: white; }
-        
-        /* LOGGER WINDOW */
-        #logger-window {
-            position: fixed;
-            top: 70px; right: 20px;
-            width: 350px; 
-            min-width: 250px;
-            max-width: 800px;
-            height: 400px;
-            min-height: 200px;
-            background: #fff;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-            z-index: 1000;
-            display: none;
-            flex-direction: column;
-            overflow: hidden;
-            font-family: 'Segoe UI', sans-serif;
-        }
-        #logger-window.show { display: flex; }
-        
-        .logger-resize-handle {
-            position: absolute; 
-            left: 0; bottom: 0; 
-            width: 15px; height: 15px;
-            background: transparent; 
-            cursor: sw-resize; 
-            z-index: 100;
-        }
-        .logger-resize-handle::after {
-            content: '';
-            position: absolute;
-            left: 2px; bottom: 2px;
-            width: 0; height: 0;
-            border-style: solid;
-            border-width: 8px 0 0 8px;
-            border-color: transparent transparent transparent #ccc;
-        }
-        .logger-resize-handle:hover::after { border-left-color: #999; }
-
-        .logger-header {
-            padding: 8px 12px;
-            background: #f1f1f1;
-            border-bottom: 1px solid #ddd;
-            cursor: move;
-            display: flex; justify-content: space-between; align-items: center;
-            font-weight: bold; font-size: 13px; color: #555;
-        }
-        .logger-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px;
-            background: #fdfdfd;
-            display: flex;
-            flex-direction: column-reverse;
-        }
-        .log-entry {
-            margin-bottom: 8px;
-            padding-bottom: 8px;
-            border-bottom: 1px solid #eee;
-            font-size: 12px;
-            line-height: 1.4;
-            margin-top: 0; 
-            margin-bottom: 0;
-            padding-top: 8px;
-            padding-bottom: 0;
-            border-top: 1px solid #eee;
-            border-bottom: none;
-        }
-        .log-entry:first-child { border-top: none; }
-        .log-entry.fresh { color: #198754; font-weight: 600; }
-        .log-entry.old { color: #777; font-weight: 400; }
-        .log-entry.vip { background: #fff3cd; padding: 4px; border-radius: 4px; border: 1px solid #ffecb5; }
-        .log-time { opacity: 0.7; font-size: 11px; margin-right: 5px; }
-        .log-link { text-decoration: underline; cursor: pointer; color: inherit; }
-        .log-link:hover { color: var(--mode-color); }
-
-        #minichat-modal .modal-card { width: 450px; height: 500px; }
-        .chat-history { flex: 1; overflow-y: auto; background: #fafafa; border: 1px solid #eee; padding: 10px; margin-bottom: 10px; border-radius: 4px; font-size: 13px; }
-        .chat-msg { margin-bottom: 8px; display: flex; flex-direction: column; }
-        .chat-msg.me { align-items: flex-end; }
-        .chat-msg.partner { align-items: flex-start; }
-        .msg-bubble { max-width: 80%; padding: 6px 10px; border-radius: 12px; position: relative; }
-        .chat-msg.me .msg-bubble { background: #d1e7dd; color: #0f5132; border-radius: 12px 12px 0 12px; }
-        .chat-msg.partner .msg-bubble { background: #fff; border: 1px solid #ddd; color: #333; border-radius: 12px 12px 12px 0; }
-        .msg-time { font-size: 10px; color: #999; margin-top: 2px; }
-
-        .bl-actions { display: flex; gap: 5px; margin-top: 8px; }
-        .btn-vip { background: #ffc107; border: 1px solid #e0a800; color: #000; }
-        .btn-vip:hover { background: #e0a800; }
-    </style>
+    <link rel="stylesheet" href="css/bot.css">
 </head>
 <body class="mode-mail"> 
     <div id="error-toast" class="error-toast"><i class="fa fa-exclamation-circle"></i> <span id="error-toast-text">Ошибка</span></div>
     <div id="tooltip-popup" class="custom-tooltip-popup"></div>
 
-    <div id="logger-window">
-        <div class="logger-resize-handle" id="logger-resize-handle" title="Тяните для изменения размера"></div>
-        <div class="logger-header" id="logger-header">
-            <span><i class="fa fa-list"></i> Лог событий</span>
-            <button class="btn btn-sm btn-link text-muted p-0" onclick="toggleLogger()"><i class="fa fa-times"></i></button>
-        </div>
-        <div class="logger-content" id="logger-content">
-            <div class="text-center text-muted small mt-5">Событий пока нет...</div>
-        </div>
-    </div>
+    <!-- Контейнер для перетаскиваемых окон ответа -->
+    <div id="response-windows-container"></div>
 
     <div id="minichat-modal" class="modal-overlay" onclick="closeModal('minichat-modal')">
         <div class="modal-card" onclick="event.stopPropagation()">
@@ -386,6 +22,18 @@
             <div class="chat-history" id="minichat-history">
                 <div class="text-center text-muted small mt-5">Загрузка истории...</div>
             </div>
+
+            <!-- AI генерация ответа -->
+            <div class="mb-2 p-2 rounded" style="background: #f0f7ff; border: 1px solid #cce5ff;">
+                <div class="d-flex gap-2 align-items-center">
+                    <i class="fa fa-robot text-primary"></i>
+                    <input id="minichat-ai-prompt" class="form-control form-control-sm" placeholder="Как ответить? (напр: игриво, романтично)">
+                    <button class="btn btn-primary btn-sm" onclick="generateMiniChatAIReply()" id="minichat-ai-btn" style="white-space: nowrap;">
+                        <i class="fa fa-magic"></i> AI
+                    </button>
+                </div>
+            </div>
+
             <div class="d-flex gap-2">
                 <textarea id="minichat-input" class="form-control" rows="2" placeholder="Сообщение..."></textarea>
                 <button class="btn btn-primary" onclick="sendMiniChatMessage()"><i class="fa fa-paper-plane"></i></button>
@@ -396,8 +44,7 @@
 
     <div class="global-toolbar">
         <div class="toolbar-left">
-            <button class="btn btn-success btn-circle" onclick="openAddModal()" data-tip="Добавить новую анкету"><i class="fa fa-plus"></i></button>
-            <button class="btn btn-primary btn-circle" onclick="openManager()" data-tip="Управление учетными записями"><i class="fa fa-list"></i></button>
+            <button class="btn btn-success btn-circle" onclick="openAddModal()" data-tip="Анкеты"><i class="fa fa-plus"></i></button>
         </div>
         <div class="toolbar-center">
             <button class="btn btn-circle btn-logger" id="btn-logger-main" onclick="toggleLogger()" data-tip="Открыть Логгер"><i class="fa fa-list-alt"></i></button>
@@ -413,11 +60,13 @@
                     <i class="fa fa-caret-right"></i>
                 </button>
                 <div class="status-buttons-container" id="status-buttons-container">
-                    <button class="btn btn-circle btn-status-circle btn-online-color" onclick="setGlobalTarget('online')" data-tip="Установить всем: Online (Online)"><i class="fa fa-globe"></i></button>
-                    <button class="btn btn-circle btn-status-circle btn-fav-of-color" onclick="setGlobalTarget('favorites')" data-tip="Установить всем: I am favorite of (favorites)"><i class="fa fa-star"></i></button>
-                    <button class="btn btn-circle btn-status-circle btn-my-fav-color" onclick="setGlobalTarget('my-favorites')" data-tip="Установить всем: My favorite (my-favorites)"><i class="fa fa-heart"></i></button>
-                    <button class="btn btn-circle btn-status-circle btn-inbox-color" onclick="setGlobalTarget('inbox')" data-tip="Установить всем: Inbox (inbox)"><i class="fa fa-inbox"></i></button>
-                    <button class="btn btn-circle btn-status-circle btn-payers-color" onclick="setGlobalTarget('payers')" data-tip="Установить всем: Payers (payers)"><i class="fa fa-credit-card"></i></button>
+                    <span id="global-men-online" class="men-online-badge" data-tip="Мужчин онлайн (от случайной анкеты)"><i class="fa fa-male"></i> <span id="global-men-count">0</span></span>
+                    <button class="btn btn-circle btn-status-circle btn-online-color" data-status="online" onclick="setGlobalTarget('online')" oncontextmenu="toggleStatusDisabled('online', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-globe"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-fav-of-color" data-status="favorites" onclick="setGlobalTarget('favorites')" oncontextmenu="toggleStatusDisabled('favorites', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-star"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-my-fav-color" data-status="my-favorites" onclick="setGlobalTarget('my-favorites')" oncontextmenu="toggleStatusDisabled('my-favorites', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-heart"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-inbox-color" data-status="inbox" onclick="setGlobalTarget('inbox')" oncontextmenu="toggleStatusDisabled('inbox', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-inbox"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-payers-color" data-status="payers" onclick="setGlobalTarget('payers')" oncontextmenu="toggleStatusDisabled('payers', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-credit-card"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-custom-ids-color" onclick="openGlobalCustomIdsModal()" data-tip="Custom IDs: Рассылка по конкретным ID для всех анкет"><i class="fa fa-list-ol"></i></button>
                 </div>
             </div>
         </div>
@@ -429,71 +78,90 @@
 
     <div class="tabs-container" id="tabs-bar"></div>
 
-    <div id="panels-container">
-        <div id="welcome-screen">
-            <p>Нажмите <strong class="text-success">+</strong> чтобы войти.</p>
-            <small class="text-muted" id="restore-status"></small>
+    <div id="main-content-wrapper">
+        <div id="panels-container">
+            <div id="welcome-screen">
+                <p>Нажмите <strong class="text-success">+</strong> чтобы войти.</p>
+                <small class="text-muted" id="restore-status"></small>
+            </div>
+        </div>
+
+        <!-- 5-я колонка: Logger -->
+        <div id="logger-column">
+            <div class="logger-column-header">
+                <span><i class="fa fa-list"></i> Лог событий</span>
+                <button class="btn btn-sm btn-link text-muted p-0" onclick="toggleLogger()"><i class="fa fa-times"></i></button>
+            </div>
+            <div class="logger-column-content" id="logger-content">
+                <div class="text-center text-muted small mt-5">Событий пока нет...</div>
+            </div>
         </div>
     </div>
-    
+
     <!-- === ВАЖНОЕ ДОБАВЛЕНИЕ: Контейнер для скрытых браузеров === -->
     <div id="browsers-container"></div>
 
     <div id="add-modal" class="modal-overlay">
-        <div class="modal-card">
-            <h5 id="add-modal-title">Новая анкета</h5>
-            <input id="newLogin" class="form-control mb-2" placeholder="Email">
-            <input id="newPass" class="form-control mb-2" placeholder="Пароль">
-            <input id="newId" class="form-control mb-3" placeholder="ID (вид)">
-            <button id="btnLogin" class="btn btn-success w-100 mb-2" onclick="handleLoginOrUpdate()">
-                <div class="spinner" id="loginSpinner"></div> 
-                <span id="btnLoginText">Войти</span>
-            </button>
-            <div id="loginError" class="text-danger small mt-2 text-center"></div>
-            <button class="btn btn-cancel-modal w-100" onclick="closeModal('add-modal')">Отмена</button>
-        </div>
-    </div>
+        <div class="modal-card" style="width: 450px;">
+            <h5>Анкеты</h5>
 
-    <div id="manager-modal" class="modal-overlay">
-        <div class="modal-card">
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h5 class="m-0">Учетные записи</h5>
-                <button class="btn btn-sm btn-outline-primary" onclick="exportAccounts()" data-tip="Скачать список"><i class="fa fa-download"></i></button>
-            </div>
-            <div id="manager-list" class="mb-3" style="max-height: 200px; overflow-y: auto;"></div>
+            <!-- Список анкет -->
+            <div id="manager-list" class="mb-3" style="max-height: 150px; overflow-y: auto;"></div>
+
             <hr>
-            <h6>Импорт TXT</h6>
-            <div class="alert alert-light p-1 small text-muted border">
-                Формат: <b>ID Логин Пароль</b> (через пробел)
-            </div>
-            <div class="input-group mb-2">
-                <input type="file" id="importFile" class="form-control" accept=".txt">
-                <button class="btn btn-primary" onclick="runFileImport()">Загрузить</button>
-            </div>
-            <div class="d-flex gap-2 mt-3">
-                <button class="btn btn-outline-success flex-fill" onclick="exportAllData()">
-                    <i class="fa fa-download"></i> Экспорт всех данных
+
+            <!-- Добавление новой анкеты -->
+            <h6 id="add-modal-title"><i class="fa fa-plus text-success"></i> Добавить анкету</h6>
+            <input id="newLogin" class="form-control form-control-sm mb-2" placeholder="Email">
+            <input id="newPass" class="form-control form-control-sm mb-2" placeholder="Пароль">
+            <input id="newId" class="form-control form-control-sm mb-2" placeholder="ID (вид)">
+            <button id="btnLogin" class="btn btn-success btn-sm w-100 mb-2" onclick="handleLoginOrUpdate()">
+                <div class="spinner" id="loginSpinner"></div>
+                <span id="btnLoginText">Добавить</span>
+            </button>
+            <div id="loginError" class="text-danger small text-center"></div>
+
+            <hr>
+
+            <!-- Импорт / Экспорт -->
+            <div class="d-flex gap-2 mb-3">
+                <button class="btn btn-outline-success btn-sm flex-fill" onclick="exportAllData()">
+                    <i class="fa fa-download"></i> Экспорт
                 </button>
-                <button class="btn btn-outline-info flex-fill" onclick="document.getElementById('importAllFile').click()">
-                    <i class="fa fa-upload"></i> Импорт данных
+                <button class="btn btn-outline-primary btn-sm flex-fill" onclick="document.getElementById('importFile').click()">
+                    <i class="fa fa-upload"></i> Импорт
                 </button>
-                <input type="file" id="importAllFile" hidden accept=".json" onchange="handleFullImport(this)">
+                <input type="file" id="importFile" hidden accept=".txt,.json" onchange="handleUniversalImport(this)">
             </div>
-            <button class="btn btn-cancel-modal w-100 mt-3" onclick="closeModal('manager-modal')">Закрыть</button>
+            <div class="alert alert-light p-2 small text-muted border">
+                <b>Импорт:</b> TXT (ID Логин Пароль) или JSON (полный бекап)
+            </div>
+
+            <button class="btn btn-cancel-modal w-100 mt-3" onclick="closeModal('add-modal')">Закрыть</button>
         </div>
     </div>
 
     <div id="tpl-modal" class="modal-overlay">
-        <div class="modal-card" style="width: 500px;">
+        <div class="modal-card" style="width: 550px;">
             <h5 id="tpl-modal-title">Новый шаблон</h5>
             <div class="mb-2"><input id="tpl-modal-name" class="form-control" placeholder="Название"></div>
-            <div class="mb-3 relative-box">
-                <textarea id="tpl-modal-text" class="form-control" rows="5" placeholder="Текст..." oninput="checkVarTrigger(this, 'tpl-vars-dropdown'); validateInput(this)"></textarea>
-                <div id="tpl-vars-dropdown" class="vars-dropdown">
-                    <div class="vars-item" onclick="applyVar('tpl-modal-text', '{City}', 'tpl-vars-dropdown')"><b>{City}</b> - Город</div>
-                    <div class="vars-item" onclick="applyVar('tpl-modal-text', '{Name}', 'tpl-vars-dropdown')"><b>{Name}</b> - Имя</div>
-                    <div class="vars-item" onclick="applyVar('tpl-modal-text', '{Age}', 'tpl-vars-dropdown')"><b>{Age}</b> - Возраст</div>
+
+            <!-- AI генерация -->
+            <div class="mb-2 p-2 rounded" style="background: #f0f7ff; border: 1px solid #cce5ff;">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="fa fa-robot text-primary"></i>
+                    <small class="text-primary fw-bold">Генерация с помощью AI</small>
                 </div>
+                <div class="d-flex gap-2">
+                    <input id="tpl-ai-prompt" class="form-control form-control-sm" placeholder="Опишите какой текст нужен (например: приглашение на свидание, романтичное)">
+                    <button class="btn btn-primary btn-sm" onclick="generateTemplateWithAI()" id="tpl-ai-btn" style="white-space: nowrap;">
+                        <i class="fa fa-magic"></i> Сгенерировать
+                    </button>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <textarea id="tpl-modal-text" class="form-control" rows="5" placeholder="Текст..." oninput="validateInput(this)"></textarea>
             </div>
             <div class="alert alert-info small p-1 hide-in-mail" style="display:none;" id="chat-hint">
                 В чате разделяйте инвайты через <b>__</b> (два подчеркивания) между абзацами.
@@ -507,8 +175,41 @@
         <div class="modal-card">
             <h5>Добавить в ЧС</h5>
             <input id="bl-modal-input" class="form-control mb-3" placeholder="ID">
-            <button class="btn btn-danger w-100 mb-2" onclick="saveBlacklistID()">Добавить</button>
+            <button class="btn btn-danger w-100 mb-2" onclick="saveBlacklistID(event)" title="Shift = добавить всем анкетам">Добавить (Shift=всем)</button>
             <button class="btn btn-cancel-modal w-100" onclick="closeModal('bl-modal')">Отмена</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно: Выбор камеры для видеочата -->
+    <div id="camera-select-modal" class="modal-overlay">
+        <div class="modal-card" style="width: 400px;">
+            <h5><i class="fa fa-video-camera text-info"></i> Выберите камеру</h5>
+            <p class="text-muted small mb-3">Выберите камеру для видеочата</p>
+            <select id="camera-select-list" class="form-select mb-3">
+                <option value="">Загрузка...</option>
+            </select>
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="camera-remember-choice">
+                <label class="form-check-label" for="camera-remember-choice">Запомнить выбор для этой анкеты</label>
+            </div>
+            <input type="hidden" id="camera-select-bot-id">
+            <button class="btn btn-info w-100 mb-2" onclick="confirmCameraSelection()"><i class="fa fa-check"></i> Открыть видеочат</button>
+            <button class="btn btn-cancel-modal w-100" onclick="closeModal('camera-select-modal')">Отмена</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно: Global Custom IDs -->
+    <div id="global-custom-ids-modal" class="modal-overlay">
+        <div class="modal-card" style="width: 450px;">
+            <h5><i class="fa fa-list-ol text-primary"></i> Custom IDs для всех анкет</h5>
+            <p class="text-muted small mb-3">Введите ID мужчин для рассылки. Эти ID будут применены ко ВСЕМ анкетам (заменяют индивидуальные).</p>
+            <textarea id="global-custom-ids-input" class="form-control mb-3" rows="6" placeholder="ID через запятую, пробел или каждый в новой строке&#10;Пример: 12345, 67890, 11111"></textarea>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <small class="text-muted">Распознано ID: <b id="global-custom-ids-count">0</b></small>
+                <button class="btn btn-sm btn-outline-secondary" onclick="clearGlobalCustomIds()"><i class="fa fa-eraser"></i> Очистить</button>
+            </div>
+            <button class="btn btn-primary w-100 mb-2" onclick="applyGlobalCustomIds()"><i class="fa fa-check"></i> Применить ко всем анкетам</button>
+            <button class="btn btn-cancel-modal w-100" onclick="closeModal('global-custom-ids-modal')">Отмена</button>
         </div>
     </div>
 
@@ -518,7 +219,7 @@
             <div id="stats-list-content" class="scroll-list" style="height: 200px;"></div>
             <div class="d-flex gap-2 mt-2">
                 <button class="btn btn-outline-primary flex-fill" onclick="copyStats()">Копировать все</button>
-                <button class="btn btn-outline-danger flex-fill" onclick="clearStats()">Очистить</button>
+                <button class="btn btn-outline-danger flex-fill" onclick="clearStats(event)">Очистить</button>
             </div>
             <button class="btn btn-cancel-modal w-100 mt-2" onclick="closeModal('stats-modal')">Закрыть</button>
         </div>
@@ -527,2477 +228,275 @@
     <div id="settings-modal" class="modal-overlay">
         <div class="modal-card">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="m-0" id="settings-header-title">Глобальные настройки</h5>
-                <button class="btn btn-sm btn-outline-info" onclick="toggleInstructionView()">
-                    <i class="fa fa-info-circle"></i> <span id="btn-instr-text">Инструкция</span>
-                </button>
+                <h5 class="m-0"><i class="fa fa-cog"></i> Глобальные настройки</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeModal('settings-modal')"><i class="fa fa-times"></i></button>
             </div>
 
-            <div id="settings-main-view">
-                <div class="mb-2">
-                    <label class="form-label small">Язык</label>
-                    <select id="set-lang" class="form-select" onchange="saveGlobalSettings()">
-                        <option value="ru">Русский</option>
-                        <option value="en">English</option>
-                    </select>
+            <!-- Вкладки -->
+            <div class="settings-tabs">
+                <button class="settings-tab active" onclick="switchSettingsTab('interface')"><i class="fa fa-palette"></i> Интерфейс</button>
+                <button class="settings-tab" onclick="switchSettingsTab('proxy')"><i class="fa fa-globe"></i> Прокси</button>
+                <button class="settings-tab" onclick="switchSettingsTab('ai')"><i class="fa fa-robot"></i> AI функции</button>
+                <button class="settings-tab" onclick="switchSettingsTab('other')"><i class="fa fa-ellipsis-h"></i> Другое</button>
+            </div>
+
+            <!-- Панель: Интерфейс -->
+            <div id="settings-panel-interface" class="settings-panel active">
+                <div class="settings-grid">
+                    <div class="settings-section">
+                        <div class="settings-section-title"><i class="fa fa-language"></i> Язык и тема</div>
+                        <div class="mb-2">
+                            <label class="form-label small">Язык интерфейса</label>
+                            <select id="set-lang" class="form-select" onchange="saveGlobalSettings()">
+                                <option value="ru">Русский</option>
+                                <option value="en">English</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Тема оформления</label>
+                            <select id="set-theme" class="form-select" onchange="saveGlobalSettings()">
+                                <option value="light">Светлая</option>
+                                <option value="dark">Тёмная</option>
+                                <option value="ladadate">LadaDate</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title"><i class="fa fa-sliders-h"></i> Поведение</div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="set-sounds" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-sounds">Звуковые уведомления</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="set-desktop-notifications" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-desktop-notifications">Системные уведомления Windows</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="set-confirm-close" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-confirm-close">Подтверждать закрытие вкладки</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="set-hotkeys" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-hotkeys">Горячие клавиши (Ctrl+Tab)</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="set-extended" onchange="saveGlobalSettings(); toggleExtendedFeatures()">
+                            <label class="form-check-label small" for="set-extended">Расширить возможности (AI)</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="set-skip-delete-confirm" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-skip-delete-confirm">Не спрашивать об удалении шаблона</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="set-keep-logger-entries" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-keep-logger-entries">Сохранять записи в логгере после просмотра</label>
+                        </div>
+                    </div>
                 </div>
-                <div class="mb-2">
-                    <label class="form-label small">Тема</label>
-                    <select id="set-theme" class="form-select" onchange="saveGlobalSettings()">
-                        <option value="light">Светлая</option>
-                        <option value="dark">Темная</option>
-                    </select>
+            </div>
+
+            <!-- Панель: Прокси -->
+            <div id="settings-panel-proxy" class="settings-panel">
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-network-wired"></i> Прокси для анкет (по позиции вкладки)</div>
+                    <small class="text-muted d-block mb-3">Формат: <code>ip:port</code> или <code>domain:port:user:pass</code> — Прокси применяется к анкетам по их позиции в списке вкладок</small>
+
+                    <div class="proxy-row">
+                        <label>Анкеты 1-25:</label>
+                        <input id="set-proxy-1" class="form-control form-control-sm" placeholder="ip:port или domain:port:user:pass" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(1)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-1" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 26-50:</label>
+                        <input id="set-proxy-2" class="form-control form-control-sm" placeholder="ip:port или domain:port:user:pass" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(2)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-2" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 51-75:</label>
+                        <input id="set-proxy-3" class="form-control form-control-sm" placeholder="ip:port или domain:port:user:pass" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(3)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-3" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 76-100:</label>
+                        <input id="set-proxy-4" class="form-control form-control-sm" placeholder="ip:port или domain:port:user:pass" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(4)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-4" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 101-125:</label>
+                        <input id="set-proxy-5" class="form-control form-control-sm" placeholder="ip:port или domain:port:user:pass" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(5)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-5" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 126-150:</label>
+                        <input id="set-proxy-6" class="form-control form-control-sm" placeholder="ip:port или domain:port:user:pass" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(6)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-6" class="proxy-status"></span>
+                    </div>
                 </div>
 
-                <div class="mb-3 border p-2 rounded bg-light">
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-sounds" onchange="saveGlobalSettings()">
-                        <label class="form-check-label small" for="set-sounds">Звуковые уведомления</label>
-                    </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-confirm-close" onchange="saveGlobalSettings()">
-                        <label class="form-check-label small" for="set-confirm-close">Подтверждать закрытие вкладки</label>
-                    </div>
-                    <div class="form-check form-switch mb-2">
-                        <input class="form-check-input" type="checkbox" id="set-hotkeys" onchange="saveGlobalSettings()">
-                        <label class="form-check-label small" for="set-hotkeys">Горячие клавиши (Ctrl+Tab)</label>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="set-extended" onchange="saveGlobalSettings(); toggleExtendedFeatures()">
-                        <label class="form-check-label small" for="set-extended">Расширить возможности (AI, Prompts)</label>
-                    </div>
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-server"></i> Прокси для .exe (общий)</div>
+                    <small class="text-muted d-block mb-2">Формат: <code>http://user:pass@ip:port</code></small>
+                    <input id="set-proxy-url" class="form-control" placeholder="URL вашего прокси-сервера для .exe" onchange="saveGlobalSettings()">
                 </div>
-                
-                <div class="mb-2">
-                    <label class="form-label small">Proxy для Ladadate (http://user:pass@ip:port)</label>
-                    <input id="set-proxy-url" class="form-control" placeholder="URL вашего прокси-сервера" onchange="saveGlobalSettings()">
-                    <small class="text-muted" style="font-size:10px">Для работы в .exe: этот URL будет точкой входа в ваш прокси-сервер</small>
+            </div>
+
+            <!-- Панель: AI функции -->
+            <div id="settings-panel-ai" class="settings-panel">
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-key"></i> OpenAI API</div>
+                    <div class="mb-2">
+                        <label class="form-label small">API Key (sk-...)</label>
+                        <input id="set-apikey" class="form-control" type="password" placeholder="Вставьте ключ здесь" onchange="saveGlobalSettings()">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Прокси для AI (http://user:pass@ip:port)</label>
+                        <input id="set-proxy-ai" class="form-control" placeholder="URL промежуточного прокси для OpenAI" onchange="saveGlobalSettings()">
+                        <small class="text-muted" style="font-size:10px">Опционально: для обхода блокировок OpenAI</small>
+                    </div>
                 </div>
 
-                <div class="mb-2 ai-hidden" id="set-prompt-container">
-                    <label class="form-label small">OpenAI API Key (sk-...)</label>
-                    <input id="set-apikey" class="form-control mb-2" type="password" placeholder="Вставьте ключ здесь" onchange="saveGlobalSettings()">
-                    
-                    <label class="form-label small">Proxy для AI (http://user:pass@ip:port)</label>
-                    <input id="set-proxy-ai" class="form-control mb-2" placeholder="URL вашего прокси-сервера для AI" onchange="saveGlobalSettings()">
-                    <small class="text-muted" style="font-size:10px">Этот URL должен быть вашим промежуточным прокси для OpenAI</small>
-                    
-                    <label class="form-label small">Введите свой промт для "My prompt"</label>
-                    <textarea id="set-prompt" class="form-control" rows="2" placeholder="Напиши здесь промт..." onchange="saveGlobalSettings()"></textarea>
+                <!-- My Prompt с шаблонами -->
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-comment-dots"></i> My Prompt</div>
+                    <div class="prompt-template-selector">
+                        <select id="select-myPrompt" class="form-control form-control-sm" onchange="selectPromptTemplate('myPrompt')">
+                            <option value="">-- Без шаблона --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-success" onclick="addPromptTemplate('myPrompt')" title="Добавить шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('myPrompt')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
+                    </div>
+                    <textarea id="set-prompt" class="form-control mt-2" rows="3" placeholder="Напиши здесь промт для AI..." onchange="savePromptText('myPrompt')"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется для кнопки "My Prompt" в режиме Mail</small>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label small">Proxy (http://user:pass@ip:port)</label>
-                    <input id="set-proxy" class="form-control" placeholder="Используйте расширение браузера!" disabled>
-                    <small class="text-muted" style="font-size:10px">Для тестов установите Proxy SwitchyOmega</small>
+                <!-- My Prompt (Chat) с шаблонами -->
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-comments"></i> My Prompt (Chat)</div>
+                    <div class="prompt-template-selector">
+                        <select id="select-myPromptChat" class="form-control form-control-sm" onchange="selectPromptTemplate('myPromptChat')">
+                            <option value="">-- Без шаблона --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-success" onclick="addPromptTemplate('myPromptChat')" title="Добавить шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('myPromptChat')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
+                    </div>
+                    <textarea id="set-prompt-chat" class="form-control mt-2" rows="3" placeholder="Напиши здесь промт для AI (Chat)..." onchange="savePromptText('myPromptChat')"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется для кнопки "My Prompt" в режиме Chat</small>
                 </div>
 
-                <div class="mb-3 border p-2 rounded bg-light">
-                    <label class="form-label small"><i class="fa fa-server"></i> Translator ID (для статистики Lababot)</label>
+                <!-- Промпт для ответов на письма -->
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-envelope"></i> Промпт для писем</div>
+                    <div class="prompt-template-selector">
+                        <select id="select-replyPrompt" class="form-control form-control-sm" onchange="selectPromptTemplate('replyPrompt')">
+                            <option value="">-- Без шаблона --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-success" onclick="addPromptTemplate('replyPrompt')" title="Добавить шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('replyPrompt')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
+                    </div>
+                    <textarea id="set-ai-reply-prompt" class="form-control mt-2" rows="2" placeholder="Напр: отвечай романтично, с комплиментами" onchange="savePromptText('replyPrompt')"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется в MiniChat для ответов на письма</small>
+                </div>
+
+                <!-- Промпт для чатов (новый) -->
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-comments"></i> Промпт для чатов</div>
+                    <div class="prompt-template-selector">
+                        <select id="select-chatPrompt" class="form-control form-control-sm" onchange="selectPromptTemplate('chatPrompt')">
+                            <option value="">-- Без шаблона --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-success" onclick="addPromptTemplate('chatPrompt')" title="Добавить шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('chatPrompt')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
+                    </div>
+                    <textarea id="set-chat-prompt" class="form-control mt-2" rows="2" placeholder="Напр: пиши коротко, игриво, задавай вопросы" onchange="savePromptText('chatPrompt')"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется для AI ответов в чатах</small>
+                </div>
+            </div>
+
+            <!-- Панель: Другое -->
+            <div id="settings-panel-other" class="settings-panel">
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-chart-bar"></i> Статистика Lababot</div>
+                    <label class="form-label small">Translator ID</label>
                     <input id="set-translator-id" class="form-control" type="number" placeholder="Введите ID переводчика (опционально)" onchange="saveGlobalSettings()">
                     <small class="text-muted" style="font-size:10px">Этот ID будет отправляться в статистике на сервер Lababot</small>
                 </div>
-
-                <button class="btn btn-success w-100 mb-2" onclick="saveGlobalSettings(); closeModal('settings-modal')">Сохранить</button>
-            </div>
-
-            <div id="settings-instruction-view" style="display: none;">
-                <div class="alert alert-secondary text-center">
-                    <i class="fa fa-book-open fa-2x mb-2"></i><br>
-                    1. Установите расширение <b>Proxy SwitchyOmega</b> для прокси (для браузера).<br>
-                    2. Для .exe: Убедитесь, что ваш прокси-сервер принимает запросы с <b>set-proxy-url</b> и <b>set-proxy-ai</b>.<br>
-                    3. Получите ключ на <b>platform.openai.com</b>.
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-info-circle"></i> Инструкция</div>
+                    <div class="text-muted small">
+                        <p><b>1.</b> Для браузера: установите расширение <b>Proxy SwitchyOmega</b></p>
+                        <p><b>2.</b> Для .exe: заполните "Прокси для .exe" на вкладке Прокси</p>
+                        <p><b>3.</b> Для AI: получите ключ на <b>platform.openai.com</b></p>
+                    </div>
                 </div>
-                <button class="btn btn-outline-secondary w-100 mt-auto" onclick="toggleInstructionView()">Назад к настройкам</button>
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-database"></i> Данные</div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="exportSettings()"><i class="fa fa-download"></i> Экспорт настроек</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="importSettings()"><i class="fa fa-upload"></i> Импорт настроек</button>
+                    </div>
+                </div>
             </div>
 
-            <button class="btn btn-cancel-modal w-100" onclick="closeModal('settings-modal')">Закрыть</button>
+            <!-- Скрытое поле для совместимости -->
+            <input type="hidden" id="set-proxy" value="">
+
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-success flex-fill" onclick="saveGlobalSettings(); closeModal('settings-modal')"><i class="fa fa-save"></i> Сохранить</button>
+                <button class="btn btn-outline-secondary flex-fill" onclick="closeModal('settings-modal')">Закрыть</button>
+            </div>
         </div>
     </div>
-    
-    <script>
-        let axios;
-        try { axios = require('axios'); } catch(e) { axios = window.axios; }
 
-        const audioFiles = {
-            online: new Audio('Sound/Online.mp3'),
-            message: new Audio('Sound/Message.mp3'),
-            chat: new Audio('Sound/Chat.mp3')
-        };
-        Object.values(audioFiles).forEach(a => a.load());
-
-        function playSound(type) {
-            if(!globalSettings.soundsEnabled) return;
-            try {
-                if(type === 'online') audioFiles.online.play().catch(()=>{});
-                else if(type === 'message') audioFiles.message.play().catch(()=>{});
-                else if (type === 'chat') audioFiles.chat.play().catch(()=>{});
-            } catch(e) { console.warn("Audio play error", e); }
-        }
-
-        let bots = {};
-        let botTemplates = JSON.parse(localStorage.getItem('botTemplates')) || {};
-        let accountPreferences = JSON.parse(localStorage.getItem('accountPreferences')) || {};
-        
-        let defaultSettings = {
-            lang: 'ru', theme: 'light', proxy: '', proxyURL: '', proxyAI: '',
-            hotkeys: true, myPrompt: '', apiKey: '',
-            soundsEnabled: true, confirmTabClose: true, extendedFeatures: true,
-            translatorId: null // ID переводчика для статистики
-        };
-        
-        let globalSettings = JSON.parse(localStorage.getItem('globalSettings')) || defaultSettings;
-        globalSettings = { ...defaultSettings, ...globalSettings };
-
-        let globalMode = 'mail';
-        let activeTabId = null;
-        let currentModalBotId = null;
-        let editingTemplateIndex = null;
-        let editingBotId = null; 
-        let currentStatsType = null;
-        
-        let minichatBotId = null;
-        let minichatPartnerId = null;
-        let minichatLastMessageId = 0;
-
-        // ============= API ДЛЯ ОТПРАВКИ ДАННЫХ НА LABABOT SERVER =============
-        const LABABOT_SERVER = 'http://188.137.253.169:3000';
-
-        // Вспомогательные функции для работы с данными
-
-        // Генерация уникального conversation ID для диалога
-        function generateConvId(botId, recipientId) {
-            return `conv_${botId}_${recipientId}`;
-        }
-
-        // Конвертация миллисекунд в формат PostgreSQL INTERVAL (HH:MM:SS)
-        function millisecondsToInterval(ms) {
-            if (!ms || ms <= 0) return null;
-
-            const totalSeconds = Math.floor(ms / 1000);
-            const hours = Math.floor(totalSeconds / 3600);
-            const minutes = Math.floor((totalSeconds % 3600) / 60);
-            const seconds = totalSeconds % 60;
-
-            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-        }
-
-        // 1. Функция отправки сообщения на Lababot сервер (ПОЛНАЯ СПЕЦИФИКАЦИЯ)
-        async function sendMessageToLababot(params) {
-            // Параметры: botId, accountDisplayId, recipientId, type, textContent, status,
-            // responseTime, errorReason, isFirst, isLast, convId, mediaUrl, fileName, translatorId
-
-            const {
-                botId,
-                accountDisplayId,
-                recipientId,
-                type,
-                textContent = '',
-                status = 'success',
-                responseTime = null,
-                errorReason = null,
-                isFirst = false,
-                isLast = false,
-                convId = null,
-                mediaUrl = null,
-                fileName = null,
-                translatorId = null
-            } = params;
-
-            console.log(`📤 Отправляю сообщение на Lababot сервер: ${botId}, ${accountDisplayId}, ${recipientId}, ${type}`);
-
-            try {
-                const payload = {
-                    botId: botId,
-                    accountDisplayId: accountDisplayId,
-                    recipientId: String(recipientId),
-                    type: type, // 'outgoing' (письмо $1.5) или 'chat_msg' (чат $0.15)
-                    length: textContent.length || 0,
-                    isFirst: isFirst,
-                    isLast: isLast,
-                    convId: convId,
-                    responseTime: responseTime, // Формат PostgreSQL INTERVAL: "00:05:30"
-                    status: status, // 'success', 'failed', 'pending'
-                    textContent: textContent || '',
-                    mediaUrl: mediaUrl,
-                    fileName: fileName,
-                    translatorId: translatorId,
-                    errorReason: errorReason
-                };
-
-                console.log('📦 Payload:', JSON.stringify(payload, null, 2));
-
-                const response = await fetch(`${LABABOT_SERVER}/api/message_sent`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await response.json();
-                console.log(`✅ Ответ от Lababot сервера:`, data);
-
-                if (data.status === 'ok' || data.status === 'ignored') {
-                    return { success: true, data: data };
-                } else {
-                    console.warn(`⚠️ Lababot сервер вернул:`, data);
-                    return { success: false, error: data.error || 'Unknown error' };
-                }
-            } catch (error) {
-                console.error(`❌ Ошибка отправки на Lababot сервер:`, error);
-                return { success: false, error: error.message };
-            }
-        }
-
-        // 2. Функция отправки heartbeat
-        async function sendHeartbeatToLababot(botId, displayId, status = 'online') {
-            console.log(`❤️ Отправляю heartbeat для ${displayId}`);
-            
-            try {
-                const response = await fetch(`${LABABOT_SERVER}/api/heartbeat`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        botId: botId,
-                        accountDisplayId: displayId,
-                        status: status,
-                        timestamp: new Date().toISOString(),
-                        ip: '127.0.0.1',
-                        systemInfo: {
-                            version: '10.0',
-                            platform: navigator.platform
-                        }
-                    })
-                });
-
-                const data = await response.json();
-                console.log(`✅ Heartbeat отправлен:`, data);
-                return data;
-            } catch (error) {
-                console.error(`❌ Ошибка heartbeat:`, error);
-                return null;
-            }
-        }
-
-        // 3. Функция отправки ошибки
-        async function sendErrorToLababot(botId, accountDisplayId, errorType, errorMessage) {
-            console.log(`⚠️ Отправляю ошибку на Lababot сервер: ${errorType}`);
-            
-            try {
-                const response = await fetch(`${LABABOT_SERVER}/api/error`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        botId: botId,
-                        accountDisplayId: accountDisplayId,
-                        endpoint: 'bot_send_message',
-                        errorType: errorType,
-                        message: errorMessage.substring(0, 200) || 'Unknown error',
-                        rawData: null,
-                        userId: null
-                    })
-                });
-
-                const data = await response.json();
-                console.log(`✅ Ошибка отправлена на сервер:`, data);
-                return data;
-            } catch (error) {
-                console.error(`❌ Ошибка отправки ошибки:`, error);
-                return null;
-            }
-        }
-
-        // === КРИТИЧЕСКИ ВАЖНО: Скрипт "Анти-сон" ===
-        const KEEP_ALIVE_SCRIPT = `
-            console.log("%c[Lababot] Анти-сон активирован", "color: green; font-weight: bold");
-            Object.defineProperty(document, 'hidden', { value: false, writable: false });
-            Object.defineProperty(document, 'visibilityState', { value: 'visible', writable: false });
-
-            setInterval(() => {
-                const x = Math.floor(Math.random() * window.innerWidth);
-                const y = Math.floor(Math.random() * window.innerHeight);
-                const moveEvent = new MouseEvent('mousemove', {
-                    view: window, bubbles: true, cancelable: true, clientX: x, clientY: y
-                });
-                document.dispatchEvent(moveEvent);
-                if (Math.random() > 0.8) {
-                    window.scrollBy(0, (Math.random() < 0.5 ? -10 : 10));
-                }
-            }, 10000 + Math.random() * 5000); 
-
-            setInterval(() => {
-                document.querySelectorAll('button, a').forEach(el => {
-                    if(el.innerText && (el.innerText.includes('Keep me logged in') || el.innerText.includes('Online'))) {
-                        el.click();
-                        console.log("[Lababot] Нажата кнопка подтверждения активности");
-                    }
-                });
-            }, 5000);
-        `;
-        
-        // --- ОБНОВЛЕНИЕ 1: Функция для переключения группы кнопок ---
-        function toggleStatusGroup() {
-            const container = document.getElementById('status-buttons-container');
-            const toggleBtn = document.getElementById('btn-group-toggle');
-            container.classList.toggle('show');
-            toggleBtn.classList.toggle('open');
-            // Меняем иконку для красоты (опционально, можно оставить только поворот)
-            const icon = toggleBtn.querySelector('i');
-            if (toggleBtn.classList.contains('open')) {
-                icon.classList.remove('fa-caret-right');
-                icon.classList.add('fa-caret-down');
-            } else {
-                icon.classList.remove('fa-caret-down');
-                icon.classList.add('fa-caret-right');
-            }
-        }
-        const Logger = {
-            logs: [],
-            add: function(text, type, botId, data = null) {
-                const now = Date.now();
-                const logItem = { id: now, text, type, botId, data, time: new Date() };
-                
-                this.logs.unshift(logItem); 
-                
-                if (this.logs.length > 300) {
-                    this.logs = this.logs.slice(0, 300);
-                }
-
-                this.render();
-                
-                const win = document.getElementById('logger-window');
-                if(!win.classList.contains('show')) {
-                    document.getElementById('btn-logger-main').classList.add('blinking');
-                }
-
-                if (type === 'chat') playSound('chat');
-                else if (type === 'mail') playSound('message');
-                else if (type === 'bday') playSound('online');
-                else if (type === 'vip-online') playSound('online'); 
-            },
-            render: function() {
-                const container = document.getElementById('logger-content');
-                if(!this.logs.length) { container.innerHTML = '<div class="text-center text-muted small mt-5">Событий пока нет...</div>'; return; }
-                
-                let html = '';
-                const now = Date.now();
-                
-                this.logs.forEach(l => {
-                    const isFresh = (now - l.id) < 60000; 
-                    const timeStr = l.time.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    const colorClass = isFresh ? 'fresh' : 'old';
-                    
-                    let content = ``;
-                    const partnerId = l.data && l.data.partnerId ? l.data.partnerId : '???';
-                    const partnerName = l.data && l.data.partnerName ? l.data.partnerName : `ID ${partnerId}`;
-                    const targetBotDisplayId = bots[l.botId] ? bots[l.botId].displayId : '???';
-                    
-                    let linkAction = '';
-                    let logClass = '';
-                    
-                    if (l.type === 'chat' || l.type === 'mail') {
-                         linkAction = `openMiniChat('${l.botId}', '${partnerId}', '${partnerName}')`; 
-                         content = `${l.type === 'chat' ? '💬' : '💌'} Новое ${l.type === 'chat' ? 'сообщение' : 'письмо'} от <b>${partnerName}</b> (ID ${partnerId})`;
-                    } else if (l.type === 'vip-online') {
-                         logClass = 'vip';
-                         linkAction = `selectTab('${l.botId}')`; 
-                         content = `👑 VIP <b>${partnerName}</b> (ID ${partnerId}) теперь ONLINE!`;
-                    } else if (l.type === 'bday') {
-                         linkAction = `selectTab('${l.botId}')`; 
-                         content = l.text; 
-                    } else if (l.type === 'log') {
-                        content = l.text;
-                    }
-                    
-                    if(l.type !== 'log') {
-                        html += `<div class="log-entry ${colorClass} ${logClass}">
-                            <span class="log-time">${timeStr} | Анкета ${targetBotDisplayId}</span><br>
-                            <span class="log-link" onclick="${linkAction}">${content}</span>
-                        </div>`;
-                    } else {
-                         html += `<div class="log-entry ${colorClass}">${l.text}</div>`;
-                    }
-                });
-                container.innerHTML = html;
-            },
-            cleanOld: function() { this.render(); }
-        };
-        setInterval(() => Logger.cleanOld(), 5000);
-        
-        async function openMiniChat(botId, partnerId, partnerName) {
-            minichatBotId = botId;
-            minichatPartnerId = partnerId;
-            minichatLastMessageId = 0; 
-            
-            selectTab(botId); 
-
-            document.getElementById('minichat-partner-id').innerText = partnerId;
-            document.getElementById('minichat-partner-name').innerText = partnerName;
-            document.getElementById('minichat-bot-display-id').innerText = bots[botId].displayId;
-            document.getElementById('minichat-history').innerHTML = '<div class="text-center text-muted small mt-5"><i class="fa fa-spinner fa-spin"></i> Загрузка истории...</div>';
-            document.getElementById('minichat-input').value = '';
-            
-            openModal('minichat-modal');
-            await loadMiniChatHistory();
-        }
-
-        async function loadMiniChatHistory() {
-            if (!minichatBotId || !minichatPartnerId) return;
-
-            const bot = bots[minichatBotId];
-            if (!bot) return;
-
-            const chatHistoryEl = document.getElementById('minichat-history');
-            
-            try {
-                const res = await makeApiRequest(bot, 'GET', `/api/messages?fromAccountId=${minichatPartnerId}`);
-                const msgs = res.data.Messages || [];
-                
-                chatHistoryEl.innerHTML = '';
-                
-                msgs.sort((a, b) => new Date(a.DatePost) - new Date(b.DatePost));
-                
-                let lastId = 0;
-
-                for (const msg of msgs) {
-                    const detailRes = await makeApiRequest(bot, 'GET', `/api/messages/${msg.MessageId}`);
-                    const detailedMsg = detailRes.data;
-                    
-                    if (!detailedMsg.Body) continue;
-                    
-                    const isMyMessage = detailedMsg.User.AccountId !== minichatPartnerId; 
-                    const msgDiv = document.createElement('div');
-                    msgDiv.className = `chat-msg ${isMyMessage ? 'me' : 'partner'}`;
-
-                    const timeStr = new Date(detailedMsg.DatePost).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                    
-                    msgDiv.innerHTML = `<div class="msg-bubble">${detailedMsg.Body}</div><div class="msg-time">${timeStr}</div>`;
-                    
-                    chatHistoryEl.appendChild(msgDiv);
-                    lastId = detailedMsg.MessageId;
-                }
-                
-                if (msgs.length === 0) chatHistoryEl.innerHTML = '<div class="text-center text-muted small mt-5">История пуста.</div>';
-
-                minichatLastMessageId = lastId;
-                chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight; 
-                
-            } catch (e) {
-                 chatHistoryEl.innerHTML = '<div class="text-center text-danger small mt-5">Ошибка загрузки истории.</div>';
-                 console.error("MiniChat history error:", e);
-            }
-        }
-
-        async function sendMiniChatMessage() {
-            if (!minichatBotId || !minichatPartnerId) return;
-
-            const bot = bots[minichatBotId];
-            const inputEl = document.getElementById('minichat-input');
-            const message = inputEl.value.trim();
-
-            if (!message || !bot) return;
-
-            inputEl.value = 'Отправка...';
-            inputEl.disabled = true;
-
-            try {
-                const checkRes = await makeApiRequest(bot, 'GET', `/api/messages/check-send/${minichatPartnerId}`);
-                if (!checkRes.data.CheckId) throw new Error("Check send failed");
-
-                const payload = { 
-                    CheckId: checkRes.data.CheckId, 
-                    RecipientAccountId: minichatPartnerId, 
-                    Body: message, 
-                    ReplyForMessageId: minichatLastMessageId || null, 
-                    AttachmentName: null, AttachmentHash: null, AttachmentFile: null 
-                };
-                
-                await makeApiRequest(bot, 'POST', '/api/messages/send', payload);
-                
-                const chatHistoryEl = document.getElementById('minichat-history');
-                const msgDiv = document.createElement('div');
-                msgDiv.className = `chat-msg me`;
-                const timeStr = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-                msgDiv.innerHTML = `<div class="msg-bubble">${message}</div><div class="msg-time">${timeStr}</div>`;
-                chatHistoryEl.appendChild(msgDiv);
-                chatHistoryEl.scrollTop = chatHistoryEl.scrollHeight;
-
-                inputEl.value = '';
-                
-            } catch (e) {
-                alert("Ошибка отправки сообщения. См. консоль.");
-                console.error("MiniChat send error:", e);
-                inputEl.value = message;
-            } finally {
-                inputEl.disabled = false;
-            }
-        }
-
-        const loggerWin = document.getElementById('logger-window');
-        const loggerHead = document.getElementById('logger-header');
-        const resizeHandle = document.getElementById('logger-resize-handle');
-        
-        let isDragging = false, dragOffset = {x:0, y:0};
-        loggerHead.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            dragOffset.x = e.clientX - loggerWin.offsetLeft;
-            dragOffset.y = e.clientY - loggerWin.offsetTop;
-            e.preventDefault();
-        });
-        
-        let isResizing = false;
-        let startW = 0, startH = 0, startX = 0, startY = 0;
-        
-        resizeHandle.addEventListener('mousedown', (e) => {
-            isResizing = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            startW = parseInt(document.defaultView.getComputedStyle(loggerWin).width, 10);
-            startH = parseInt(document.defaultView.getComputedStyle(loggerWin).height, 10);
-            e.stopPropagation();
-            e.preventDefault();
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if(isDragging) {
-                loggerWin.style.left = (e.clientX - dragOffset.x) + 'px';
-                loggerWin.style.top = (e.clientY - dragOffset.y) + 'px';
-            }
-            if(isResizing) {
-                const newWidth = startW + (startX - e.clientX);
-                const newHeight = startH + (e.clientY - startY);
-                if(newWidth > 200 && newWidth < 1200) {
-                    loggerWin.style.width = newWidth + 'px';
-                    loggerWin.style.left = (e.clientX - newWidth) + 'px'; 
-                }
-                if(newHeight > 200 && newHeight < 1000) {
-                    loggerWin.style.height = newHeight + 'px';
-                }
-            }
-        });
-        document.addEventListener('mouseup', () => { isDragging = false; isResizing = false; });
-
-        function toggleLogger() {
-            loggerWin.classList.toggle('show');
-            if(loggerWin.classList.contains('show')) {
-                document.getElementById('btn-logger-main').classList.remove('blinking');
-            }
-        }
-
-        const forbiddenWords = [
-            "Fuck", "Shit", "Ass", "Bitch", "Damn", "Hell", "Dick", "Cunt", "Pussy", 
-            "Cock", "Tits", "Bastard", "Motherfucker", "Asshole", "Son of a bitch", 
-            "Goddammit", "Piss", "Crap", "Fart", "Wanker"
-        ];
-
-        function parseProxyUrl(proxyUrlString) {
-            if (!proxyUrlString) return null;
-            try {
-                const url = new URL(proxyUrlString);
-                const proxyConfig = {
-                    host: url.hostname,
-                    port: url.port,
-                    protocol: url.protocol.replace(':', '') 
-                };
-                if (url.username && url.password) {
-                    proxyConfig.auth = { username: url.username, password: url.password };
-                }
-                return proxyConfig;
-            } catch (e) { return null; }
-        }
-        
-        const LADADATE_BASE_URL = 'https://ladadate.com';
-        const OPENAI_API_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
-        
-        // --- ОБНОВЛЕНИЕ 2: НОВАЯ ЛОГИКА Drag and Drop (Сортировка вместо плавания) ---
-        let draggingTabEl = null;
-
-        function startTabDrag(e, tabEl) {
-            if (e.target.closest('.tab-close')) return; // Не перетаскивать, если клик на крестик
-            
-            draggingTabEl = tabEl;
-            draggingTabEl.classList.add('dragging');
-            
-            document.addEventListener('mousemove', handleTabMove);
-            document.addEventListener('mouseup', stopTabDrag);
-        }
-
-        function handleTabMove(e) {
-            if (!draggingTabEl) return;
-            e.preventDefault();
-
-            const tabsContainer = document.getElementById('tabs-bar');
-            const allTabs = Array.from(tabsContainer.children);
-            
-            // Находим элемент, над которым сейчас курсор
-            const targetTab = allTabs.find(tab => {
-                if (tab === draggingTabEl) return false;
-                const rect = tab.getBoundingClientRect();
-                return (e.clientX > rect.left && e.clientX < rect.right &&
-                        e.clientY > rect.top && e.clientY < rect.bottom);
-            });
-
-            if (targetTab) {
-                // Определяем индекс текущего и целевого элемента
-                const currentIndex = allTabs.indexOf(draggingTabEl);
-                const targetIndex = allTabs.indexOf(targetTab);
-
-                // Меняем местами в DOM (браузер сам анимирует сдвиг)
-                if (currentIndex < targetIndex) {
-                    tabsContainer.insertBefore(draggingTabEl, targetTab.nextSibling);
-                } else {
-                    tabsContainer.insertBefore(draggingTabEl, targetTab);
-                }
-            }
-        }
-
-        function stopTabDrag() {
-            if (draggingTabEl) {
-                draggingTabEl.classList.remove('dragging');
-                draggingTabEl = null;
-                
-                // Пересохраняем порядок ботов
-                const newOrderIds = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
-                const newBots = {};
-                newOrderIds.forEach(id => {
-                    if(bots[id]) newBots[id] = bots[id];
-                });
-                bots = newBots; 
-                saveSession();
-            }
-            document.removeEventListener('mousemove', handleTabMove);
-            document.removeEventListener('mouseup', stopTabDrag);
-        }
-
-        window.onload = async function() { 
-            restoreSession(); 
-            loadGlobalSettingsUI(); 
-            toggleExtendedFeatures();
-            initHotkeys();
-            initTooltips();
-            
-            document.addEventListener('click', (e) => {
-                if(!e.target.closest('.ai-container')) {
-                    document.querySelectorAll('.ai-options').forEach(el => el.classList.remove('show'));
-                }
-            });
-
-            window.onclick = function(e) {
-                if (e.target.classList.contains('modal-overlay')) closeModal(e.target.id);
-                if(!e.target.classList.contains('vars-item') && !e.target.classList.contains('form-control')) {
-                    document.querySelectorAll('.vars-dropdown').forEach(d=>d.style.display='none');
-                }
-            };
-        };
-
-        function setGlobalTarget(targetType) {
-            Object.values(bots).forEach(bot => {
-                if(globalMode === 'mail') bot.mailSettings.target = targetType;
-                else bot.chatSettings.target = targetType;
-                if(activeTabId === bot.id) {
-                    const sel = document.getElementById(`target-select-${bot.id}`);
-                    if(sel) sel.value = targetType;
-                }
-            });
-            saveSession();
-            alert(`Всем анкетам установлен статус: ${targetType.toUpperCase()}`);
-        }
-
-        async function makeApiRequest(bot, method, path, data = null, isRetry = false) {
-            let endpoint = `${LADADATE_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
-            let config = { 
-                method: method, 
-                url: endpoint,
-                headers: { 'Content-Type': 'application/json' },
-                data: data 
-            };
-            if (bot && bot.token) config.headers.Authorization = `Bearer ${bot.token}`;
-            if (globalSettings.proxyURL) {
-                const proxyConfig = parseProxyUrl(globalSettings.proxyURL);
-                if (proxyConfig) config.proxy = proxyConfig;
-            }
-
-            try {
-                return await axios(config);
-            } catch (error) {
-                if (error.response && error.response.status === 401 && bot && !isRetry) {
-                    console.log(`[Auto-Relogin] Token expired for ${bot.displayId}. Attempting silent relogin...`);
-                    try {
-                        const loginRes = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: bot.login, Password: bot.pass });
-                        
-                        if (loginRes.data.Token) {
-                            console.log(`[Auto-Relogin] Success for ${bot.displayId}! Retrying original request...`);
-                            bot.token = loginRes.data.Token;
-                            return await makeApiRequest(bot, method, path, data, true);
-                        }
-                    } catch (loginErr) {
-                        console.error(`[Auto-Relogin] Failed for ${bot.displayId}`, loginErr);
-                    }
-                }
-                throw error;
-            }
-        }
-        
-        function toggleAI(botId) {
-            const opts = document.getElementById(`ai-options-${botId}`);
-            const wasShown = opts.classList.contains('show');
-            document.querySelectorAll('.ai-options').forEach(el => el.classList.remove('show'));
-            if(!wasShown) opts.classList.add('show');
-        }
-
-        async function handleAIAction(botId, action) {
-            document.getElementById(`ai-options-${botId}`).classList.remove('show');
-            const btn = document.querySelector(`#ai-options-${botId}`).parentElement.querySelector('.btn-ai-main');
-            const originalHtml = btn.innerHTML;
-            
-            if(!globalSettings.apiKey) return alert("Пожалуйста, введите OpenAI API Key в настройках!");
-
-            const txtArea = document.getElementById(`msg-${botId}`);
-            const currentText = txtArea.value;
-
-            let prompt = "";
-            let systemRole = "You are a helpful dating assistant. Write engaging, short, and natural texts for dating sites.";
-
-            if(action === 'myprompt') {
-                if(!globalSettings.myPrompt) return alert("Заполните 'My Prompt' в настройках!");
-                prompt = `${globalSettings.myPrompt}. \n\nOriginal text: "${currentText}"`;
-            } else if (action === 'improve') {
-                if(!currentText) return alert("Напишите хоть что-то, чтобы я мог улучшить!");
-                prompt = `Rewrite the following text to be more engaging, grammatically correct, and flirtatious. Keep it natural. Text: "${currentText}"`;
-            } else if (action === 'generate') {
-                prompt = "Write a creative and engaging opening message for a dating site to start a conversation with a man. Keep it short and intriguing.";
-            }
-
-            btn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Loading...`;
-            let config = { headers: { 'Authorization': `Bearer ${globalSettings.apiKey}`, 'Content-Type': 'application/json' } };
-            if (globalSettings.proxyAI) {
-                 const proxyConfig = parseProxyUrl(globalSettings.proxyAI);
-                 if (proxyConfig) config.proxy = proxyConfig;
-            }
-
-            try {
-                const response = await axios.post(OPENAI_API_ENDPOINT, {
-                    model: "gpt-3.5-turbo",
-                    messages: [ { role: "system", content: systemRole }, { role: "user", content: prompt } ]
-                }, config);
-
-                if(response.data && response.data.choices && response.data.choices.length > 0) {
-                    const result = response.data.choices[0].message.content.replace(/^"|"$/g, '');
-                    txtArea.value = result;
-                    validateInput(txtArea);
-                }
-            } catch (e) {
-                console.error(e);
-                alert("Ошибка AI. Проверьте ключ или прокси.");
-            } finally {
-                btn.innerHTML = originalHtml;
-            }
-        }
-
-        function validateInput(textarea) {
-            let val = textarea.value;
-            let original = val;
-            let errorMsg = null;
-            for (let word of forbiddenWords) {
-                const regex = new RegExp(`\\b${word}\\b`, 'gi');
-                if (regex.test(val)) { val = val.replace(regex, ''); errorMsg = "Запрещено использовать ругательство"; }
-            }
-            if (/\d{6,}/.test(val)) { val = val.replace(/\d{6,}/g, ''); errorMsg = "Запрещено вставлять ID"; }
-            const linkRegex = /(https?:\/\/[^\s]+)|(www\.[^\s]+)|([a-zA-Z0-9-]+\.(com|net|org|ru|ua|io)\b)/gi;
-            if (linkRegex.test(val)) { val = val.replace(linkRegex, ''); errorMsg = "Запрещено вставлять ссылки"; }
-            if (val !== original) { textarea.value = val; if (errorMsg) showToast(errorMsg); }
-        }
-
-        function showToast(text) {
-            const t = document.getElementById('error-toast');
-            document.getElementById('error-toast-text').innerText = text;
-            t.classList.add('show');
-            if(t.hideTimer) clearTimeout(t.hideTimer);
-            t.hideTimer = setTimeout(() => { t.classList.remove('show'); }, 3000);
-        }
-
-        function initTooltips() {
-            let tooltipTimeout;
-            const popup = document.getElementById('tooltip-popup');
-            document.addEventListener('mouseover', function(e) {
-                const target = e.target.closest('[data-tip]');
-                if (!target) return;
-                const text = target.getAttribute('data-tip');
-                tooltipTimeout = setTimeout(() => {
-                    popup.innerText = text;
-                    const rect = target.getBoundingClientRect();
-                    popup.style.top = (rect.bottom + 5) + 'px';
-                    popup.style.left = (rect.left + (rect.width/2) - (popup.offsetWidth/2)) + 'px';
-                    if(parseInt(popup.style.left) < 5) popup.style.left = '5px';
-                    popup.classList.add('show');
-                }, 500);
-            });
-            document.addEventListener('mouseout', function(e) {
-                if (e.target.closest('[data-tip]')) { clearTimeout(tooltipTimeout); popup.classList.remove('show'); }
-            });
-            document.addEventListener('mousedown', function() { clearTimeout(tooltipTimeout); popup.classList.remove('show'); });
-        }
-
-        function loadGlobalSettingsUI() {
-            document.getElementById('set-lang').value = globalSettings.lang;
-            document.getElementById('set-theme').value = globalSettings.theme;
-            document.getElementById('set-proxy').value = globalSettings.proxy;
-            document.getElementById('set-proxy-url').value = globalSettings.proxyURL || '';
-            document.getElementById('set-proxy-ai').value = globalSettings.proxyAI || '';
-            document.getElementById('set-hotkeys').checked = globalSettings.hotkeys;
-            document.getElementById('set-apikey').value = globalSettings.apiKey || '';
-            document.getElementById('set-prompt').value = globalSettings.myPrompt || '';
-            document.getElementById('set-sounds').checked = globalSettings.soundsEnabled;
-            document.getElementById('set-confirm-close').checked = globalSettings.confirmTabClose;
-            document.getElementById('set-extended').checked = globalSettings.extendedFeatures;
-            document.getElementById('set-translator-id').value = globalSettings.translatorId || '';
-        }
-
-        function saveGlobalSettings() {
-            globalSettings.lang = document.getElementById('set-lang').value;
-            globalSettings.theme = document.getElementById('set-theme').value;
-            globalSettings.proxy = document.getElementById('set-proxy').value;
-            globalSettings.proxyURL = document.getElementById('set-proxy-url').value.trim();
-            globalSettings.proxyAI = document.getElementById('set-proxy-ai').value.trim();
-            globalSettings.hotkeys = document.getElementById('set-hotkeys').checked;
-            globalSettings.apiKey = document.getElementById('set-apikey').value;
-            globalSettings.myPrompt = document.getElementById('set-prompt').value;
-            globalSettings.soundsEnabled = document.getElementById('set-sounds').checked;
-            globalSettings.confirmTabClose = document.getElementById('set-confirm-close').checked;
-            globalSettings.extendedFeatures = document.getElementById('set-extended').checked;
-
-            // НОВОЕ: Сохраняем Translator ID
-            const translatorIdValue = document.getElementById('set-translator-id').value.trim();
-            globalSettings.translatorId = translatorIdValue ? parseInt(translatorIdValue) : null;
-
-            localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
-
-            // Обновляем translatorId для всех существующих ботов
-            Object.values(bots).forEach(bot => {
-                bot.translatorId = globalSettings.translatorId;
-            });
-        }
-        
-        function openGlobalSettings() { 
-            document.getElementById('settings-main-view').style.display = 'block';
-            document.getElementById('settings-instruction-view').style.display = 'none';
-            document.getElementById('settings-header-title').innerText = "Глобальные настройки";
-            document.getElementById('btn-instr-text').innerText = "Инструкция";
-            openModal('settings-modal'); 
-        }
-
-        function toggleInstructionView() {
-            const main = document.getElementById('settings-main-view');
-            const instr = document.getElementById('settings-instruction-view');
-            const title = document.getElementById('settings-header-title');
-            
-            if (main.style.display === 'none') {
-                main.style.display = 'block'; instr.style.display = 'none'; title.innerText = "Глобальные настройки";
-            } else {
-                main.style.display = 'none'; instr.style.display = 'block'; title.innerText = "Инструкция";
-            }
-        }
-
-        function toggleExtendedFeatures() {
-            const isEnabled = globalSettings.extendedFeatures;
-            document.querySelectorAll('.ai-container').forEach(el => {
-                if(isEnabled) el.classList.remove('ai-hidden'); else el.classList.add('ai-hidden');
-            });
-            const promptContainer = document.getElementById('set-prompt-container');
-            if(isEnabled) promptContainer.classList.remove('ai-hidden'); else promptContainer.classList.add('ai-hidden');
-        }
-
-        function initHotkeys() {
-            document.addEventListener('keydown', function(e) {
-                if(!globalSettings.hotkeys) return;
-                if(e.ctrlKey && e.key === 'Tab') { e.preventDefault(); switchTabRelative(1); }
-                else if(e.shiftKey && e.key === 'F5') { e.preventDefault(); reloginAllBots(); }
-                else if(e.key === 'F5') { e.preventDefault(); if(activeTabId && bots[activeTabId]) bots[activeTabId].doActivity(); } 
-            });
-        }
-        
-        function switchTabRelative(step) {
-            const keys = Object.keys(bots);
-            if(keys.length < 2) return;
-            const currentIdx = keys.indexOf(activeTabId);
-            if(currentIdx === -1) return;
-            let nextIdx = currentIdx + step;
-            if(nextIdx >= keys.length) nextIdx = 0;
-            if(nextIdx < 0) nextIdx = keys.length - 1;
-            selectTab(keys[nextIdx]);
-        }
-
-        function toggleGlobalMode() {
-            const btn = document.getElementById('btn-mode-toggle');
-            if (globalMode === 'mail') {
-                globalMode = 'chat';
-                document.body.classList.remove('mode-mail'); document.body.classList.add('mode-chat');
-                btn.innerHTML = '<i class="fa fa-comments"></i>'; btn.className = 'btn btn-circle btn-mode-switch active-chat';
-            } else {
-                globalMode = 'mail';
-                document.body.classList.remove('mode-chat'); document.body.classList.add('mode-mail');
-                btn.innerHTML = '<i class="fa fa-envelope"></i>'; btn.className = 'btn btn-circle btn-mode-switch active-mail';
-            }
-            if(activeTabId && bots[activeTabId]) updateInterfaceForMode(activeTabId);
-        }
-
-        function updateBotCount() { document.getElementById('global-bot-count').innerText = `Анкет: ${Object.keys(bots).length}`; }
-        function openModal(id) { const el=document.getElementById(id); el.style.display='flex'; setTimeout(()=>{el.classList.add('show');},10); }
-        function closeModal(id) { const el=document.getElementById(id); el.classList.remove('show'); setTimeout(()=>{el.style.display='none';},300); }
-
-        function checkVarTrigger(textarea, dropdownId) { if(textarea.value.endsWith('{')) document.getElementById(dropdownId).style.display='block'; }
-        function applyVar(textareaId, text, dropdownId) {
-            const ta = document.getElementById(textareaId);
-            ta.value = ta.value.endsWith('{') ? ta.value.slice(0, -1) + text : ta.value + text;
-            document.getElementById(dropdownId).style.display='none'; ta.focus();
-        }
-
-        class AccountBot {
-            constructor(id, login, pass, displayId, token) {
-                this.id = id; 
-                this.login = login; 
-                this.pass = pass; 
-                this.displayId = displayId; 
-                this.token = token;
-                
-                this.lastTplMail = null; 
-                this.lastTplChat = null;
-                this.isMailRunning = false; 
-                this.mailTimeout = null;
-                this.mailStats = { sent: 0, errors: 0, waiting: 0 };
-                this.mailHistory = { sent: [], errors: [], waiting: [] };
-                this.mailSettings = { target: 'online', speed: 'smart', blacklist: [], photoOnly: false, auto: false }; 
-                this.photoName = null;
-
-                this.isChatRunning = false; 
-                this.chatTimeout = null;
-                this.chatStats = { sent: 0, errors: 0, waiting: 0 };
-                this.chatHistory = { sent: [], errors: [], waiting: [] };
-                this.chatSettings = { target: 'payers', speed: 'smart', blacklist: [], rotationHours: 3, cyclic: false, currentInviteIndex: 0, rotationStartTime: 0 }; 
-                
-                this.vipList = []; 
-                this.vipStatus = {}; 
-                
-                this.unreadChatSessions = []; 
-                this.keepAliveTimer = null; 
-                this.lababotHeartbeatTimer = null; // Таймер для heartbeat на Lababot сервер
-                this.tabColorState = 0;
-                this.selectedBlacklistId = null;
-                
-                this.isMonitoring = false;
-                this.lastChatSessions = [];
-                this.lastMailId = 0;
-                this.myBirthday = null;
-
-                // === ДОБАВЛЕНО: Отслеживание диалогов для полной спецификации ===
-                this.conversations = {}; // Структура: { recipientId: { firstMessageTime, lastMessageTime, messageCount } }
-                this.translatorId = globalSettings.translatorId || null; // ID переводчика из глобальных настроек
-
-                // === ВАЖНОЕ ДОБАВЛЕНИЕ: Создаем WebView для поддержания онлайн ===
-                if (this.token) {
-                    this.startKeepAlive();
-                    this.startMonitoring();
-                    this.getProfileData();
-                    this.createWebview();
-                    
-                    // Запускаем heartbeat на сервер Lababot
-                    this.startLababotHeartbeat();
-                }
-            }
-
-            // === МЕТОДЫ ДЛЯ ОТСЛЕЖИВАНИЯ ДИАЛОГОВ (полная спецификация) ===
-
-            // Инициализация или обновление диалога с получателем
-            trackConversation(recipientId) {
-                if (!this.conversations[recipientId]) {
-                    // Первое сообщение в диалоге
-                    this.conversations[recipientId] = {
-                        firstMessageTime: Date.now(),
-                        lastMessageTime: Date.now(),
-                        messageCount: 1
-                    };
-                    return { isFirst: true, responseTime: null };
-                } else {
-                    // Последующее сообщение
-                    const conv = this.conversations[recipientId];
-                    const responseTimeMs = Date.now() - conv.lastMessageTime;
-                    conv.lastMessageTime = Date.now();
-                    conv.messageCount++;
-
-                    return {
-                        isFirst: false,
-                        responseTime: millisecondsToInterval(responseTimeMs)
-                    };
-                }
-            }
-
-            // Получить conversation ID для получателя
-            getConvId(recipientId) {
-                return generateConvId(this.id, recipientId);
-            }
-
-            // Проверить, является ли это последним сообщением (для rotationHours в chat режиме)
-            isLastMessageInRotation() {
-                if (globalMode !== 'chat') return false;
-
-                const { rotationHours, currentInviteIndex, rotationStartTime } = this.chatSettings;
-                if (!rotationStartTime) return false;
-
-                const elapsedMs = Date.now() - rotationStartTime;
-                const rotationMs = rotationHours * 60 * 60 * 1000;
-
-                // Если прошло время ротации, это может быть последнее сообщение
-                return elapsedMs >= rotationMs;
-            }
-
-            // === ВАЖНОЕ ДОБАВЛЕНИЕ: Метод для создания скрытого WebView ===
-            createWebview() {
-                const webview = document.createElement('webview');
-                webview.id = `webview-${this.id}`;
-                webview.src = "https://ladadate.com/login"; 
-                webview.partition = `persist:${this.id}`; 
-                webview.useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-
-                webview.addEventListener('dom-ready', () => {
-                    // 1. Внедрение скрипта "Анти-сон" (Keep-Alive)
-                    webview.executeJavaScript(KEEP_ALIVE_SCRIPT);
-                    
-                    // 2. Скрипт авто-входа (если токен есть, все равно создаем сессию)
-                    const script = `
-                        setTimeout(() => {
-                            const emailInput = document.querySelector('input[name="login"]');
-                            const passInput = document.querySelector('input[name="password"]');
-                            const btn = document.querySelector('button[type="submit"]');
-
-                            if(emailInput && passInput) {
-                                const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                                
-                                nativeInputValueSetter.call(emailInput, "${this.login}");
-                                emailInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                emailInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-                                nativeInputValueSetter.call(passInput, "${this.pass}");
-                                passInput.dispatchEvent(new Event('input', { bubbles: true }));
-                                passInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-                                console.log("Bot: Данные введены. Попытка нажать войти...");
-                                if(btn) setTimeout(() => btn.click(), 500);
-                            }
-                        }, 2000);
-                    `;
-                    webview.executeJavaScript(script);
-                });
-
-                // ВАЖНО: Добавляем webview в скрытый контейнер
-                document.getElementById('browsers-container').appendChild(webview);
-                this.webview = webview;
-            }
-
-            // Heartbeat на сервер Lababot
-            startLababotHeartbeat() {
-                // Отправляем первый heartbeat
-                setTimeout(() => sendHeartbeatToLababot(this.id, this.displayId, this.token ? 'online' : 'offline'), 1000);
-                
-                // Потом каждые 30 секунд
-                this.lababotHeartbeatTimer = setInterval(() => {
-                    sendHeartbeatToLababot(this.id, this.displayId, this.token ? 'online' : 'offline');
-                }, 30000);
-            }
-
-            log(text) {
-                const box = document.getElementById(`log-${this.id}`);
-                const modePrefix = globalMode === 'chat' ? '[CHAT]' : '[MAIL]';
-                if(box) box.innerHTML = `<div><span style="opacity:0.6">${new Date().toLocaleTimeString()}</span> <b>${modePrefix}</b> ${text}</div>` + box.innerHTML;
-            }
-
-            startMonitoring() {
-                this.isMonitoring = true;
-                this.checkChatSync(); 
-                this.checkNewMails(); 
-                this.checkVipStatus(); 
-            }
-            
-            stopMonitoring() {
-                this.isMonitoring = false;
-                // Останавливаем все таймеры
-                if (this.lababotHeartbeatTimer) {
-                    clearInterval(this.lababotHeartbeatTimer);
-                    this.lababotHeartbeatTimer = null;
-                }
-                // Отправляем последний heartbeat оффлайн
-                sendHeartbeatToLababot(this.id, this.displayId, 'offline');
-            }
-
-            async checkVipStatus() {
-                if (!this.token || !this.isMonitoring) return;
-                
-                const vipsToCheck = this.vipList;
-                
-                for (const vipId of vipsToCheck) {
-                    try {
-                        const res = await makeApiRequest(this, 'GET', `/api/messages/check-send/${vipId}`);
-                        const isOnline = !!res.data.CheckId;
-                        
-                        const oldStatus = this.vipStatus[vipId] || 'offline'; 
-                        const status = isOnline ? 'online' : 'offline';
-                        let userName = `ID ${vipId}`;
-                        
-                        if (status === 'online' && oldStatus !== 'online') {
-                            Logger.add(`👑 VIP Клиент ID ${vipId} теперь ONLINE!`, 'vip-online', this.id, { partnerId: vipId, partnerName: userName });
-                        }
-                        this.vipStatus[vipId] = status;
-                    } catch(e) { 
-                        this.vipStatus[vipId] = 'offline';
-                    }
-                    await new Promise(r => setTimeout(r, 1000));
-                }
-                
-                const nextRun = Math.floor(Math.random() * (75000 - 45000 + 1)) + 45000;
-                if (this.isMonitoring) setTimeout(() => this.checkVipStatus(), nextRun);
-            }
-
-            async getProfileData() {
-                try {
-                    const res = await makeApiRequest(this, 'GET', '/my-profile-preview');
-                    const html = res.data;
-                    const regex = /Birthday<\/div>[\s\S]*?<div[^>]*>\s*([0-9]{1,2}\s+[A-Za-z]+\s+[0-9]{4})\s*<\/div>/i;
-                    const match = html.match(regex);
-                    if(match && match[1]) {
-                        this.myBirthday = match[1];
-                        this.checkBirthdayComing();
-                    }
-                } catch(e) { }
-            }
-            
-            checkBirthdayComing() {
-                if(!this.myBirthday) return;
-                const bDate = new Date(this.myBirthday);
-                const today = new Date();
-                const bDayThisYear = new Date(today.getFullYear(), bDate.getMonth(), bDate.getDate());
-                const diff = (bDayThisYear - today) / (1000 * 60 * 60 * 24);
-                if (diff > 0 && diff <= 3) Logger.add(`День рождения через ${Math.ceil(diff)}д!`, 'bday', this.id);
-            }
-
-            async checkChatSync() {
-                if (!this.token || !this.isMonitoring) return;
-                try {
-                    const res = await makeApiRequest(this, 'POST', '/chat-sync', {}); 
-                    const data = res.data;
-                    if(data) {
-                        const currentSessions = data.ChatSessions || [];
-                        const unreadSessionsNow = [];
-                        
-                        for(const session of currentSessions) {
-                            const sessionId = session.Id || session.ChatId;
-                            const unreadCount = session.UnreadMessageCount || 0; 
-                            const partnerId = session.TargetUserId || session.PartnerId || "Unknown";
-                            const partnerName = session.Name || "Неизвестный";
-                            
-                            if (unreadCount > 0) {
-                                unreadSessionsNow.push(sessionId);
-                                
-                                if (!this.unreadChatSessions.includes(sessionId)) {
-                                    Logger.add(`💬 Новое сообщение в чате с <b>${partnerName}</b>`, 'chat', this.id, { partnerId, partnerName });
-                                }
-                            }
-                        }
-                        
-                        this.unreadChatSessions = unreadSessionsNow;
-                    }
-                } catch(e) {}
-                finally {
-                     const nextRun = Math.floor(Math.random() * (7000 - 3000 + 1)) + 3000;
-                     if(this.isMonitoring) setTimeout(() => this.checkChatSync(), nextRun);
-                }
-            }
-
-            async checkNewMails() {
-                if (!this.token || !this.isMonitoring) return;
-                try {
-                    const res = await makeApiRequest(this, 'GET', '/api/messages');
-                    const msgs = res.data.Messages || [];
-                    
-                    if (msgs.length > 0) {
-                        const newestMsg = msgs[0];
-                        const newMessages = msgs.filter(m => m.MessageId > this.lastMailId);
-                        
-                        newMessages.reverse().forEach(msg => {
-                            if (!msg.IsReplied) {
-                                Logger.add(
-                                    `💌 Входящее письмо от <b>${msg.User.Name || `ID ${msg.User.AccountId}`}</b> (Ждет ответа)`,
-                                    'mail',
-                                    this.id,
-                                    { partnerId: msg.User.AccountId, partnerName: msg.User.Name, messageId: msg.MessageId }
-                                );
-                                playSound('message');
-                            }
-                        });
-
-                        if (newestMsg.MessageId > this.lastMailId) {
-                            this.lastMailId = newestMsg.MessageId;
-                        }
-                    }
-                } catch(e) {}
-                finally {
-                    const nextRun = Math.floor(Math.random() * (75000 - 45000 + 1)) + 45000;
-                    if(this.isMonitoring) setTimeout(() => this.checkNewMails(), nextRun);
-                }
-            }
-
-            startKeepAlive() {
-                this.doActivity();
-                if(this.keepAliveTimer) clearInterval(this.keepAliveTimer);
-                this.keepAliveTimer = setInterval(() => { this.doActivity(); }, 60000); 
-            }
-            
-            async doActivity() { 
-                if(!this.token) return;
-                try {
-                    await makeApiRequest(this, 'POST', '/chat-sync', {});
-                    const res = await makeApiRequest(this, 'GET', '/api/users/online');
-                    if(res.data.Users) document.getElementById(`online-${this.id}`).innerText = res.data.Users.length;
-                } catch (e) {}
-            }
-
-            startMail(text) {
-                if(!this.token) return;
-                this.isMailRunning = true;
-                this.updateUI();
-                this.log(`🚀 MAIL Started`);
-                this.scheduleNextMail(text, 0);
-            }
-
-            stopMail() {
-                this.isMailRunning = false;
-                clearTimeout(this.mailTimeout);
-                this.log("⏹ MAIL Stopped");
-                this.updateUI();
-            }
-
-            scheduleNextMail(text, delay) {
-                if (!this.isMailRunning) return;
-                this.mailTimeout = setTimeout(async () => {
-                    if (!this.isMailRunning) return;
-                    await this.processMailUser(text);
-                    let nextDelay = 15000;
-                    if (this.mailSettings.speed === 'smart') nextDelay = Math.floor(Math.random() * (120000 - 15000 + 1)) + 15000;
-                    else nextDelay = parseInt(this.mailSettings.speed) * 1000;
-                    this.mailStats.waiting = Math.floor(300000 / nextDelay);
-                    this.updateUI();
-                    this.scheduleNextMail(text, nextDelay);
-                }, delay);
-            }
-
-            async processMailUser(msgTemplate) {
-                try {
-                    const target = this.mailSettings.target;
-                    let users = [];
-
-                    if (target === 'inbox') {
-                        const messagesRes = await makeApiRequest(this, 'GET', '/api/messages');
-                        const unrepliedMsgs = (messagesRes.data.Messages || []).filter(m => !m.IsReplied);
-                        
-                        if (unrepliedMsgs.length > 0) {
-                            const msg = unrepliedMsgs[Math.floor(Math.random() * unrepliedMsgs.length)];
-                            users.push({
-                                AccountId: msg.User.AccountId,
-                                Name: msg.User.Name,
-                                City: msg.User.City,
-                                Age: msg.User.Age,
-                                Country: msg.User.Country,
-                                ProfilePhoto: msg.User.ProfilePhoto,
-                                messageToReply: msg.MessageId 
-                            });
-                        }
-                    } else {
-                        let apiPath = `/api/users/${target}`; 
-                        const usersRes = await makeApiRequest(this, 'GET', apiPath);
-                        users = usersRes.data.Users || [];
-                    }
-
-                    if(users.length === 0) {
-                        if(this.mailSettings.auto && target !== 'online') {
-                            let newTarget = 'online';
-                            if(target === 'payers') newTarget = 'my-favorites';
-                            else if(target === 'my-favorites') newTarget = 'favorites';
-                            else if(target === 'favorites') newTarget = 'inbox';
-                            else if(target === 'inbox') newTarget = 'online';
-                            this.log(`⚠️ Нет пользователей (${target}). Переход на ${newTarget}`);
-                            this.mailSettings.target = newTarget;
-                            if(activeTabId === this.id) document.getElementById(`target-select-${this.id}`).value = newTarget;
-                            return this.processMailUser(msgTemplate);
-                        } else return;
-                    }
-                    
-                    const user = users[Math.floor(Math.random() * users.length)];
-                    if (this.mailSettings.blacklist.includes(user.AccountId.toString())) return;
-                    if (this.mailSettings.photoOnly && !user.ProfilePhoto) return;
-
-                    let msgBody = this.replaceMacros(msgTemplate, user);
-                    const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
-
-                    if (checkRes.data.CheckId) {
-                        const payload = { 
-                            CheckId: checkRes.data.CheckId, 
-                            RecipientAccountId: user.AccountId, 
-                            Body: msgBody, 
-                            ReplyForMessageId: user.messageToReply || null, 
-                            AttachmentName: this.photoName, AttachmentHash: null, AttachmentFile: null 
-                        };
-                        
-                        // 1. Отправляем на Ladadate
-                        await makeApiRequest(this, 'POST', '/api/messages/send', payload);
-
-                        // 2. Отслеживаем диалог и получаем метаданные
-                        const convData = this.trackConversation(user.AccountId);
-                        const convId = this.getConvId(user.AccountId);
-
-                        // 3. Отправляем полную статистику на НАШ сервер Lababot
-                        const lababotResult = await sendMessageToLababot({
-                            botId: this.id,
-                            accountDisplayId: this.displayId,
-                            recipientId: user.AccountId,
-                            type: 'outgoing', // Письмо = $1.5
-                            textContent: msgBody,
-                            status: 'success',
-                            responseTime: convData.responseTime,
-                            isFirst: convData.isFirst,
-                            isLast: false, // Письма обычно не имеют явного "последнего"
-                            convId: convId,
-                            mediaUrl: this.photoName ? `attached_photo_${this.photoName}` : null,
-                            fileName: this.photoName || null,
-                            translatorId: this.translatorId,
-                            errorReason: null
-                        });
-
-                        if (!lababotResult.success) {
-                            console.warn(`⚠️ Не удалось отправить статистику на Lababot: ${lababotResult.error}`);
-                        }
-                        
-                        this.mailStats.sent++; 
-                        this.mailHistory.sent.push(`${user.AccountId} (${user.Name})`);
-                        this.log(`✅ Письмо отправлено: ${user.Name}`);
-                    }
-                } catch (e) {
-                    if(e.message === "Network Error" || !e.response) {
-                        this.log(`📡 Ошибка сети. Повторная попытка...`);
-                    } else {
-                        this.mailStats.errors++;
-                        this.mailHistory.errors.push(e.message);
-
-                        // Отправляем ошибку на наш сервер через старый API
-                        await sendErrorToLababot(
-                            this.id,
-                            this.displayId,
-                            'mail_send_error',
-                            e.response?.data?.Error || e.message
-                        );
-
-                        // НОВОЕ: Отправляем также через message_sent API с status='failed'
-                        // (если есть информация о получателе)
-                        if (user && user.AccountId) {
-                            const convData = this.trackConversation(user.AccountId);
-                            const convId = this.getConvId(user.AccountId);
-
-                            await sendMessageToLababot({
-                                botId: this.id,
-                                accountDisplayId: this.displayId,
-                                recipientId: user.AccountId,
-                                type: 'outgoing',
-                                textContent: msgBody || '',
-                                status: 'failed',
-                                responseTime: convData.responseTime,
-                                isFirst: convData.isFirst,
-                                isLast: false,
-                                convId: convId,
-                                mediaUrl: this.photoName ? `attached_photo_${this.photoName}` : null,
-                                fileName: this.photoName || null,
-                                translatorId: this.translatorId,
-                                errorReason: e.response?.data?.Error || e.message
-                            });
-                        }
-                    }
-                }
-                this.updateUI();
-            }
-
-            startChat(fullText) {
-                if(!this.token) return;
-                if (this.chatSettings.rotationStartTime === 0) this.chatSettings.rotationStartTime = Date.now();
-                this.isChatRunning = true;
-                this.updateUI();
-                this.log(`🚀 CHAT Started`);
-                this.scheduleNextChat(fullText, 0);
-                saveSession();
-            }
-            stopChat() {
-                this.isChatRunning = false;
-                clearTimeout(this.chatTimeout);
-                this.log("⏹ CHAT Stopped");
-                this.updateUI();
-            }
-            scheduleNextChat(fullText, delay) {
-                if (!this.isChatRunning) return;
-                this.chatTimeout = setTimeout(async () => {
-                    if (!this.isChatRunning) return;
-                    await this.processChatUser(fullText);
-                    let nextDelay = 15000;
-                    if (this.chatSettings.speed === 'smart') nextDelay = Math.floor(Math.random() * (120000 - 15000 + 1)) + 15000;
-                    else nextDelay = parseInt(this.chatSettings.speed) * 1000;
-                    this.chatStats.waiting = Math.floor(300000 / nextDelay);
-                    this.updateUI();
-                    this.scheduleNextChat(fullText, nextDelay);
-                }, delay);
-            }
-            async processChatUser(fullText) {
-                const invites = fullText.split(/\n\s*__\s*\n/);
-                if (invites.length === 0) return;
-                
-                const durationMs = this.chatSettings.rotationHours * 3600 * 1000;
-                const elapsed = Date.now() - this.chatSettings.rotationStartTime;
-                
-                if (elapsed > durationMs) {
-                    this.chatSettings.currentInviteIndex++;
-                    this.chatSettings.rotationStartTime = Date.now();
-                    if (this.chatSettings.currentInviteIndex >= invites.length) {
-                        if (this.chatSettings.cyclic) { 
-                            this.chatSettings.currentInviteIndex = 0; 
-                            this.log("🔄 Цикл перезапущен"); 
-                        } else { 
-                            this.log("⏹ Все инвайты отправлены. Остановка."); 
-                            this.stopChat(); 
-                            return; 
-                        }
-                    } else {
-                        this.log(`⏩ Переключено на инвайт #${this.chatSettings.currentInviteIndex + 1}`);
-                    }
-                    saveSession(); 
-                    this.updateUI();
-                }
-                
-                if (this.chatSettings.currentInviteIndex >= invites.length) {
-                    this.chatSettings.currentInviteIndex = 0;
-                }
-                
-                const currentMsgTemplate = invites[this.chatSettings.currentInviteIndex];
-                
-                try {
-                    const target = this.chatSettings.target;
-                    let apiPath = '/api/users/online';
-                    if (target === 'payers') apiPath = '/api/users/payers';
-                    
-                    const usersRes = await makeApiRequest(this, 'GET', apiPath);
-                    const users = usersRes.data.Users || [];
-                    
-                    if(users.length === 0) { 
-                        this.log(`💬 Нет пользователей в категории ${target}.`); 
-                        return; 
-                    }
-                    
-                    const user = users[Math.floor(Math.random() * users.length)];
-                    if (this.chatSettings.blacklist.includes(user.AccountId.toString())) return;
-                    
-                    let msgBody = this.replaceMacros(currentMsgTemplate, user);
-                    
-                    try {
-                        // 1. Пытаемся отправить через чат API
-                        const payload = { recipientId: user.AccountId, body: msgBody };
-                        await makeApiRequest(this, 'POST', '/chat-send', payload);
-
-                        // 2. Отслеживаем диалог и получаем метаданные
-                        const convData = this.trackConversation(user.AccountId);
-                        const convId = this.getConvId(user.AccountId);
-                        const isLast = this.isLastMessageInRotation();
-
-                        // 3. Отправляем полную статистику на НАШ сервер Lababot
-                        const lababotResult = await sendMessageToLababot({
-                            botId: this.id,
-                            accountDisplayId: this.displayId,
-                            recipientId: user.AccountId,
-                            type: 'chat_msg', // Чат сообщение = $0.15
-                            textContent: msgBody,
-                            status: 'success',
-                            responseTime: convData.responseTime,
-                            isFirst: convData.isFirst,
-                            isLast: isLast,
-                            convId: convId,
-                            mediaUrl: null,
-                            fileName: null,
-                            translatorId: this.translatorId,
-                            errorReason: null
-                        });
-
-                        if (!lababotResult.success) {
-                            console.warn(`⚠️ Не удалось отправить статистику чата на Lababot: ${lababotResult.error}`);
-                        }
-                        
-                        this.chatStats.sent++; 
-                        this.chatHistory.sent.push(`${user.AccountId} (${user.Name})`);
-                        this.log(`💬 Сообщение чата отправлено: ${user.Name}`);
-                        
-                    } catch (chatErr) {
-                        // Fallback: пытаемся отправить как письмо
-                        try {
-                            const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
-                            if (checkRes.data.CheckId) {
-                                const mailPayload = { 
-                                    CheckId: checkRes.data.CheckId, 
-                                    RecipientAccountId: user.AccountId, 
-                                    Body: msgBody, 
-                                    ReplyForMessageId: null, 
-                                    AttachmentName: null, 
-                                    AttachmentHash: null, 
-                                    AttachmentFile: null 
-                                };
-                                await makeApiRequest(this, 'POST', '/api/messages/send', mailPayload);
-
-                                // Отслеживаем диалог и получаем метаданные (fallback)
-                                const convData = this.trackConversation(user.AccountId);
-                                const convId = this.getConvId(user.AccountId);
-
-                                // Отправляем полную статистику на НАШ сервер Lababot (как письмо fallback)
-                                const lababotResult = await sendMessageToLababot({
-                                    botId: this.id,
-                                    accountDisplayId: this.displayId,
-                                    recipientId: user.AccountId,
-                                    type: 'outgoing', // Fallback как письмо = $1.5
-                                    textContent: msgBody,
-                                    status: 'success',
-                                    responseTime: convData.responseTime,
-                                    isFirst: convData.isFirst,
-                                    isLast: false,
-                                    convId: convId,
-                                    mediaUrl: null,
-                                    fileName: null,
-                                    translatorId: this.translatorId,
-                                    errorReason: null
-                                });
-
-                                if (!lababotResult.success) {
-                                    console.warn(`⚠️ Не удалось отправить статистику на Lababot (fallback): ${lababotResult.error}`);
-                                }
-                                
-                                this.chatStats.sent++; 
-                                this.chatHistory.sent.push(`${user.AccountId} (${user.Name})`);
-                                this.log(`💬 Сообщение отправлено через письмо (fallback): ${user.Name}`);
-                            }
-                        } catch(fallbackErr) {
-                            if(fallbackErr.message === "Network Error" || !fallbackErr.response) {
-                                this.log(`📡 Ошибка сети при отправке чата. Повтор...`);
-                            } else {
-                                this.log(`⚠️ Ошибка API чата: ${fallbackErr.response ? fallbackErr.response.data.Error : fallbackErr.message}`);
-
-                                // Отправляем ошибку на наш сервер через старый API
-                                await sendErrorToLababot(
-                                    this.id,
-                                    this.displayId,
-                                    'chat_send_error',
-                                    fallbackErr.response?.data?.Error || fallbackErr.message
-                                );
-
-                                // НОВОЕ: Отправляем также через message_sent API с status='failed'
-                                if (user && user.AccountId) {
-                                    const convData = this.trackConversation(user.AccountId);
-                                    const convId = this.getConvId(user.AccountId);
-
-                                    await sendMessageToLababot({
-                                        botId: this.id,
-                                        accountDisplayId: this.displayId,
-                                        recipientId: user.AccountId,
-                                        type: 'chat_msg',
-                                        textContent: msgBody || '',
-                                        status: 'failed',
-                                        responseTime: convData.responseTime,
-                                        isFirst: convData.isFirst,
-                                        isLast: false,
-                                        convId: convId,
-                                        mediaUrl: null,
-                                        fileName: null,
-                                        translatorId: this.translatorId,
-                                        errorReason: fallbackErr.response?.data?.Error || fallbackErr.message
-                                    });
-                                }
-                            }
-                        }
-                    }
-                } catch (e) { 
-                    if(e.message === "Network Error" || !e.response) {
-                        this.log(`📡 Ошибка сети. Повтор...`);
-                    } else { 
-                        this.chatStats.errors++; 
-                        this.chatHistory.errors.push(e.message);
-                        
-                        // Отправляем ошибку на наш сервер
-                        await sendErrorToLababot(
-                            this.id,
-                            this.displayId,
-                            'chat_process_error',
-                            e.response?.data?.Error || e.message
-                        );
-                    }
-                }
-                this.updateUI();
-            }
-
-            replaceMacros(text, user) {
-                if(!text) return "";
-                let res = text;
-                res = res.replace(/{city}/gi, user.City || "your city").replace(/{name}/gi, user.Name || "dear").replace(/{age}/gi, user.Age || "").replace(/{country}/gi, user.Country || "your country");
-                return res;
-            }
-
-            updateUI() {
-                const isChat = globalMode === 'chat';
-                const running = isChat ? this.isChatRunning : this.isMailRunning;
-                const stats = isChat ? this.chatStats : this.mailStats;
-                const btn = document.getElementById(`btn-start-${this.id}`);
-                const dot = document.querySelector(`#tab-${this.id} .status-dot`);
-                if(btn) {
-                    if(running) {
-                        btn.innerHTML = `<i class="fa fa-stop"></i> Стоп`;
-                        btn.classList.replace('btn-primary', 'btn-danger');
-                        if(dot) dot.style.boxShadow = "0 0 8px #28a745";
-                    } else {
-                        btn.innerHTML = `<i class="fa fa-paper-plane"></i> Старт`;
-                        btn.classList.replace('btn-danger', 'btn-primary');
-                        if(dot) dot.style.boxShadow = "none";
-                    }
-                }
-                const s = document.getElementById(`stat-sent-${this.id}`);
-                const e = document.getElementById(`stat-err-${this.id}`);
-                const w = document.getElementById(`stat-wait-${this.id}`);
-                if(s) s.innerText = stats.sent;
-                if(e) e.innerText = stats.errors;
-                if(w) w.innerText = "Ожидают: " + stats.waiting;
-                const activeBox = document.getElementById(`active-invite-${this.id}`);
-                if(activeBox) {
-                    if (isChat) {
-                        activeBox.classList.add('show');
-                        const fullText = document.getElementById(`msg-${this.id}`).value;
-                        const invites = fullText.split(/\n\s*__\s*\n/);
-                        const idx = this.chatSettings.currentInviteIndex;
-                        const safeIdx = (idx < invites.length) ? idx : 0;
-                        const txt = invites[safeIdx] || "(Нет текста)";
-                        activeBox.innerHTML = `<div class="invite-status-label">Сейчас отправляется (Инвайт ${safeIdx+1}/${invites.length})</div>${txt.replace(/\n/g, '<br>')}`;
-                    } else activeBox.classList.remove('show');
-                }
-            }
-        }
-        
-        function createInterface(bot) {
-            const tab = document.createElement('div');
-            tab.className = 'tab-item';
-            tab.id = `tab-${bot.id}`;
-            tab.onclick = () => selectTab(bot.id);
-            tab.oncontextmenu = (e) => onTabRightClick(e, bot.id);
-            
-            // ОБНОВЛЕНИЕ 2: Привязка нового события DragNDrop
-            tab.onmousedown = (e) => startTabDrag(e, tab);
-
-            tab.innerHTML = `<div class="status-dot online"></div> ${bot.displayId} <span class="tab-close" onclick="closeTab(event, '${bot.id}')"><i class="fa fa-times"></i></span>`;
-            document.getElementById('tabs-bar').appendChild(tab);
-
-            const ws = document.createElement('div');
-            ws.className = 'workspace';
-            ws.id = `ws-${bot.id}`;
-            const row = document.createElement('div'); row.className = 'row h-100 g-2';
-            
-            // Col 1
-            const col1 = document.createElement('div'); col1.className='col-3';
-            col1.innerHTML = `
-                <div class="panel-col">
-                    <div class="col-title" id="title-tpl-${bot.id}">Шаблоны Писем</div>
-                    <select id="tpl-select-${bot.id}" class="form-select mb-2" onchange="onTemplateSelect('${bot.id}')"><option value="">-- Выберите --</option></select>
-                    <div class="d-flex gap-1 mb-2">
-                        <button class="btn btn-sm btn-success btn-xs flex-fill" onclick="openTemplateModal('${bot.id}', false)" data-tip="Новый шаблон"><i class="fa fa-plus"></i></button>
-                        <button class="btn btn-sm btn-secondary btn-xs flex-fill" onclick="openTemplateModal('${bot.id}', true)" data-tip="Редактировать"><i class="fa fa-edit"></i></button>
-                        <button class="btn btn-sm btn-danger btn-xs flex-fill" onclick="deleteTemplate('${bot.id}')" data-tip="Удалить"><i class="fa fa-trash"></i></button>
-                        <button class="btn btn-sm btn-outline-danger btn-xs flex-fill hide-in-chat" id="btn-fav-${bot.id}" onclick="toggleTemplateFavorite('${bot.id}')" data-tip="В избранное"><i class="fa fa-heart"></i></button>
-                    </div>
-                    <div class="mt-2 text-center text-primary border-top pt-2"><small>Онлайн: <b id="online-${bot.id}" class="fs-6">...</b></small></div>
-                </div>`;
-            row.appendChild(col1);
-
-            // Col 2
-            const col2 = document.createElement('div'); col2.className='col-4';
-            col2.innerHTML = `
-                <div class="panel-col">
-                    <div class="col-title">
-                        <span id="title-text-${bot.id}">Письмо</span>
-                        <div class="ai-container ${globalSettings.extendedFeatures ? '' : 'ai-hidden'}">
-                            <button class="btn-ai-main" onclick="toggleAI('${bot.id}')"><i class="fa fa-magic"></i> AI</button>
-                            <div class="ai-options" id="ai-options-${bot.id}">
-                                <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'improve')"><i class="fa fa-check"></i> Improve</button>
-                                <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'generate')"><i class="fa fa-pencil"></i> Generate</button>
-                                <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'myprompt')"><i class="fa fa-user"></i> My Prompt</button>
-                            </div>
-                    </div>
-                    </div>
-                    <div class="relative-box d-flex flex-column flex-grow-1">
-                        <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." oninput="checkVarTrigger(this, 'vars-dropdown-${bot.id}'); bots['${bot.id}'].updateUI(); validateInput(this)"></textarea>
-                        <div id="vars-dropdown-${bot.id}" class="vars-dropdown">
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{City}', 'vars-dropdown-${bot.id}')"><b>{City}</b></div>
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{Name}', 'vars-dropdown-${bot.id}')"><b>{Name}</b></div>
-                            <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{Age}', 'vars-dropdown-${bot.id}')"><b>{Age}</b></div>
-                        </div>
-                    </div>
-                    <div id="active-invite-${bot.id}" class="active-invite-box hide-in-mail"></div>
-                    <div class="photo-block hide-in-chat">
-                        <div id="preview-box-${bot.id}" class="photo-preview-float"><img id="preview-img-${bot.id}"></div>
-                        <label id="photo-label-${bot.id}" class="photo-select-area">
-                            <i class="fa fa-camera"></i> <span id="photo-name-${bot.id}" class="photo-name">Прикрепить фото</span>
-                            <input type="file" id="photo-input-${bot.id}" hidden onchange="onPhotoSelect('${bot.id}')">
-                        </label>
-                        <button class="btn-remove-photo" onclick="removePhoto('${bot.id}')"><i class="fa fa-times"></i></button>
-                    </div>
-                </div>`;
-            row.appendChild(col2);
-
-            // Col 3
-            const col3 = document.createElement('div'); col3.className='col-3';
-            col3.innerHTML = `
-                <div class="panel-col">
-                    <div class="col-title">Настройки</div>
-                    <select id="target-select-${bot.id}" class="form-select form-select-sm mb-1" onchange="updateSettings('${bot.id}')">
-                        <option value="online">Online</option>
-                        <option value="favorites">I am a favorite of</option>
-                        <option value="my-favorites">My favorite</option>
-                        <option value="inbox">Inbox (Unreplied)</option>
-                        <option value="payers">Payers</option>
-                    </select>
-                    
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <select class="form-select form-select-sm" style="width: 100px;" onchange="updateSettings('${bot.id}', 'speed', this.value)" title="Скорость отправки">
-                            <option value="smart" selected>Smart</option>
-                            <option value="15">15s</option>
-                            <option value="30">30s</option>
-                        </select>
-                        <div class="form-check small m-0 hide-in-chat" title="Auto: Payers -> My Favorite -> Favorites -> Inbox -> Online">
-                            <input class="form-check-input" type="checkbox" id="auto-check-${bot.id}" onchange="updateSettings('${bot.id}')">
-                            <label class="form-check-label text-muted" for="auto-check-${bot.id}">Auto</label>
-                        </div>
-                        <div class="form-check small m-0 hide-in-chat" title="Отправлять только пользователям с фото">
-                            <input class="form-check-input" type="checkbox" id="check-photo-${bot.id}" onchange="updateSettings('${bot.id}')">
-                            <label class="form-check-label text-muted" for="check-photo-${bot.id}">Photo</label>
-                        </div>
-                    </div>
-
-                    <div class="mb-2 hide-in-mail p-2 bg-light border rounded">
-                        <label class="form-label small mb-0 text-muted">Следующий инвайт через</label>
-                        <select class="form-select form-select-sm mb-1" id="rot-time-${bot.id}" onchange="updateChatRotation('${bot.id}')">
-                            <option value="3">3 часа</option>
-                            <option value="6">6 часов</option>
-                            <option value="12">12 часа</option>
-                            <option value="24">24 часа</option>
-                        </select>
-                        <div class="form-check small">
-                            <input class="form-check-input" type="checkbox" id="rot-cyclic-${bot.id}" onchange="updateChatRotation('${bot.id}')">
-                            <label class="form-check-label" for="rot-cyclic-${bot.id}">Циклично</label>
-                        </div>
-                    </div>
-
-                    <button id="btn-start-${bot.id}" class="btn btn-primary w-100 mb-2" onclick="toggleBot('${bot.id}')"><i class="fa fa-paper-plane"></i> Старт</button>
-                    
-                    <div class="border-top pt-2">
-                        <div class="stat-line text-success"><span>Отправлено:</span> <b id="stat-sent-${bot.id}" class="stat-val" onclick="openStatsModal('${bot.id}', 'sent')">0</b></div>
-                        <div class="stat-line text-danger"><span>Ошибки:</span> <b id="stat-err-${bot.id}" class="stat-val" onclick="openStatsModal('${bot.id}', 'errors')">0</b></div>
-                        <div id="stat-wait-${bot.id}" class="stat-waiting-text">Ожидают: 0</div>
-                    </div>
-                    <div id="log-${bot.id}" class="action-log mt-2" style="flex-grow: 1;"></div>
-                </div>`;
-            row.appendChild(col3);
-
-            // Col 4
-            const col4 = document.createElement('div'); col4.className='col-2';
-            col4.innerHTML = `
-                <div class="panel-col">
-                    <div class="col-title">Blacklist</div>
-                    <div id="bl-list-${bot.id}" class="scroll-list"></div>
-                    <button class="btn btn-success w-100 btn-sm" onclick="openBlacklistModal('${bot.id}')" data-tip="Добавить ID">+ Добавить ID</button>
-                    <div class="bl-actions">
-                        <button class="btn btn-outline-danger btn-sm flex-fill" onclick="removeSelectedBlacklist('${bot.id}')" data-tip="Удалить выбранный"><i class="fa fa-trash"></i></button>
-                        <button class="btn btn-vip btn-sm flex-fill" onclick="toggleVipStatus('${bot.id}')" data-tip="VIP Клиент (Отслеживать онлайн)"><i class="fa fa-star"></i></button>
-                    </div>
-                </div>`;
-            row.appendChild(col4);
-            ws.appendChild(row);
-            document.getElementById('panels-container').appendChild(ws);
-            updateInterfaceForMode(bot.id);
-            updateBotCount();
-            
-            toggleExtendedFeatures();
-        }
-
-        function getBotTemplates(login) {
-             if(!botTemplates[login]) botTemplates[login] = { mail: [], chat: [] };
-             return botTemplates[login];
-        }
-
-        function updateInterfaceForMode(botId) {
-            const isChat = globalMode === 'chat';
-            const bot = bots[botId];
-            document.getElementById(`title-tpl-${botId}`).innerText = isChat ? "Шаблоны ЧАТА" : "Шаблоны ПИСЕМ";
-            document.getElementById(`title-text-${botId}`).innerText = isChat ? "Сообщения (разд. __)" : "Текст письма";
-            document.getElementById(`chat-hint`).style.display = isChat ? 'block' : 'none';
-            const ws = document.getElementById(`ws-${botId}`);
-            const targetSelect = document.getElementById(`target-select-${botId}`);
-
-            if(isChat) {
-                ws.querySelectorAll('.hide-in-chat').forEach(el => el.style.display = 'none');
-                ws.querySelectorAll('.hide-in-mail').forEach(el => el.style.display = 'block');
-                
-                Array.from(targetSelect.options).forEach(opt => {
-                    if (['favorites', 'my-favorites', 'inbox'].includes(opt.value)) { opt.style.display = 'none'; }
-                    else { opt.style.display = 'block'; }
-                });
-                targetSelect.value = bot.chatSettings.target;
-                
-                document.getElementById(`rot-time-${botId}`).value = bot.chatSettings.rotationHours;
-                document.getElementById(`rot-cyclic-${botId}`).checked = bot.chatSettings.cyclic;
-            } else {
-                ws.querySelectorAll('.hide-in-chat').forEach(el => { if(el.classList.contains('photo-block')) el.style.display = 'flex'; else el.style.display = 'block'; });
-                ws.querySelectorAll('.hide-in-chat.d-none').forEach(el => el.style.display = 'none');
-                ws.querySelectorAll('.hide-in-mail').forEach(el => el.style.display = 'none');
-                
-                Array.from(targetSelect.options).forEach(opt => opt.style.display = 'block');
-                targetSelect.value = bot.mailSettings.target;
-                
-                document.getElementById(`auto-check-${botId}`).checked = bot.mailSettings.auto;
-            }
-            
-            let lastIdx = isChat ? bot.lastTplChat : bot.lastTplMail;
-            if (lastIdx === null || lastIdx === undefined || lastIdx === "") {
-                if(accountPreferences[bot.login]) {
-                    lastIdx = isChat ? accountPreferences[bot.login].chatTpl : accountPreferences[bot.login].mailTpl;
-                    if(lastIdx !== undefined) {
-                         if(isChat) bot.lastTplChat = lastIdx; else bot.lastTplMail = lastIdx;
-                    }
-                }
-            }
-
-            updateTemplateDropdown(botId, lastIdx);
-            renderBlacklist(botId);
-            bot.updateUI();
-        }
-
-        function updateSettings(botId, type, val) {
-            const isChat = globalMode === 'chat';
-            const bot = bots[botId];
-            const set = isChat ? bot.chatSettings : bot.mailSettings;
-            if (type === 'speed') set.speed = val;
-            else {
-                set.target = document.getElementById(`target-select-${botId}`).value;
-                if(!isChat) {
-                    set.photoOnly = document.getElementById(`check-photo-${botId}`).checked;
-                    bot.mailSettings.auto = document.getElementById(`auto-check-${botId}`).checked;
-                }
-            }
-            saveSession(); 
-        }
-        function updateChatRotation(botId) {
-            const bot = bots[botId];
-            bot.chatSettings.rotationHours = parseInt(document.getElementById(`rot-time-${botId}`).value);
-            bot.chatSettings.cyclic = document.getElementById(`rot-cyclic-${botId}`).checked;
-            saveSession();
-        }
-        function onTabRightClick(e, botId) {
-            e.preventDefault();
-            const tab = document.getElementById(`tab-${botId}`);
-            const bot = bots[botId];
-            bot.tabColorState = (bot.tabColorState + 1) % 4;
-            tab.classList.remove('tab-green', 'tab-yellow', 'tab-red');
-            if (bot.tabColorState === 1) tab.classList.add('tab-green');
-            else if (bot.tabColorState === 2) tab.classList.add('tab-yellow');
-            else if (bot.tabColorState === 3) tab.classList.add('tab-red');
-        }
-        function checkDuplicate(login, displayId) {
-            return !!Object.values(bots).find(b => b.login.toLowerCase() === login.toLowerCase() || b.displayId.toLowerCase() === displayId.toLowerCase());
-        }
-        function openManager() { renderManagerList(); openModal('manager-modal'); }
-        function renderManagerList() {
-            const list = document.getElementById('manager-list'); list.innerHTML = '';
-            Object.values(bots).forEach(b => {
-                const row = document.createElement('div'); row.className = 'acc-row';
-                row.innerHTML = `<div><b>${b.displayId}</b> (${b.login})</div>
-                    <div class="btn-group btn-group-sm">
-                        <button class="btn btn-outline-secondary" onclick="editAccount('${b.id}')"><i class="fa fa-pencil"></i></button>
-                        <button class="btn btn-outline-danger" onclick="closeTab(event, '${b.id}'); renderManagerList()"><i class="fa fa-trash"></i></button>
-                    </div>`;
-                list.appendChild(row);
-            });
-        }
-        function exportAccounts() {
-            const blob = new Blob([localStorage.getItem('savedBots') || '[]'], {type: 'application/json'});
-            const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'lababot_accounts.json'; a.click(); URL.revokeObjectURL(url);
-        }
-        function runFileImport() {
-            const input = document.getElementById('importFile');
-            if (!input.files.length) return alert("Выберите файл!");
-            const reader = new FileReader();
-            reader.onload = async function(e) {
-                const lines = e.target.result.split('\n');
-                let count = 0, skipped = 0, errors = 0;
-                const btn = document.querySelector('button[onclick="runFileImport()"]');
-                const orig = btn.innerText; btn.innerText = "Загрузка..."; btn.disabled = true;
-                for (let line of lines) {
-                    const parts = line.trim().split(/\s+/);
-                    if (parts.length >= 3) {
-                        if (checkDuplicate(parts[1], parts[0])) { skipped++; continue; }
-                        if (await performLogin(parts[1], parts[2], parts[0])) count++; else errors++;
-                        await new Promise(r => setTimeout(r, 100));
-                    }
-                }
-                alert(`Импорт: Успешно ${count}, Дубли ${skipped}, Ошибки ${errors}`);
-                btn.innerText = orig; btn.disabled = false; closeModal('manager-modal'); input.value = ''; renderManagerList();
-            };
-            reader.readAsText(input.files[0]);
-        }
-        function editAccount(id) {
-            closeModal('manager-modal');
-            const bot = bots[id];
-            if(!bot) return;
-            editingBotId = id;
-            document.getElementById('add-modal-title').innerText = "Изменить анкету";
-            document.getElementById('newLogin').value = bot.login; document.getElementById('newPass').value = bot.pass; document.getElementById('newId').value = bot.displayId;
-            document.getElementById('btnLoginText').innerText = "Сохранить"; document.getElementById('loginError').innerText = "";
-            openModal('add-modal');
-        }
-        function openAddModal() { 
-            editingBotId = null;
-            document.getElementById('add-modal-title').innerText = "Новая анкета";
-            document.getElementById('newLogin').value = ""; document.getElementById('newPass').value = ""; document.getElementById('newId').value = "";
-            document.getElementById('btnLoginText').innerText = "Войти"; document.getElementById('loginError').innerText = "";
-            openModal('add-modal'); 
-        }
-        function openStatsModal(botId, type) {
-            currentModalBotId = botId; currentStatsType = type;
-            document.getElementById('stats-title').innerText = (type === 'sent') ? "Отправленные" : "Ошибки";
-            renderStatsList(); openModal('stats-modal');
-        }
-        function renderStatsList() {
-            const list = document.getElementById('stats-list-content'); list.innerHTML = '';
-            const isChat = globalMode === 'chat';
-            const data = isChat ? bots[currentModalBotId].chatHistory[currentStatsType] : bots[currentModalBotId].mailHistory[currentStatsType];
-            if(!data.length) list.innerHTML = '<div class="text-center text-muted p-2">Пусто</div>';
-            else data.forEach(item => { const d = document.createElement('div'); d.className = 'list-item'; d.innerText = item; list.appendChild(d); });
-        }
-        function copyStats() { navigator.clipboard.writeText((globalMode==='chat' ? bots[currentModalBotId].chatHistory[currentStatsType] : bots[currentModalBotId].mailHistory[currentStatsType]).join('\n')); }
-        function clearStats() { if(confirm("Очистить?")){ const b = bots[currentModalBotId]; if(globalMode==='chat') { b.chatHistory[currentStatsType]=[]; b.chatStats[currentStatsType]=0; } else { b.mailHistory[currentStatsType]=[]; b.mailStats[currentStatsType]=0; } b.updateUI(); renderStatsList(); } }
-        
-        function openTemplateModal(botId, isEdit) {
-            currentModalBotId = botId;
-            const bot = bots[botId];
-            const isChat = globalMode === 'chat';
-            const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
-            
-            document.getElementById('tpl-modal-title').innerText = isChat ? "Шаблон Чата" : "Шаблон Письма";
-            if(isEdit) {
-                const idx = document.getElementById(`tpl-select-${botId}`).value;
-                if(idx==="") return alert("Выберите шаблон");
-                editingTemplateIndex = idx;
-                document.getElementById('tpl-modal-name').value = tpls[idx].name; document.getElementById('tpl-modal-text').value = tpls[idx].text;
-            } else { editingTemplateIndex = null; document.getElementById('tpl-modal-name').value=""; document.getElementById('tpl-modal-text').value=""; }
-            openModal('tpl-modal');
-        }
-        
-        async function saveTemplateFromModal() {
-            const name = document.getElementById('tpl-modal-name').value;
-            const text = document.getElementById('tpl-modal-text').value;
-            if (!name) return;
-            
-            const bot = bots[currentModalBotId];
-            const isChat = globalMode === 'chat';
-            const type = isChat ? 'chat' : 'mail';
-            
-            try {
-                // 1. Сохраняем в localStorage
-                let tpls = getBotTemplates(bot.login)[type];
-                
-                if (editingTemplateIndex !== null) {
-                    const fav = tpls[editingTemplateIndex]?.favorite || false;
-                    tpls[editingTemplateIndex] = { name, text, favorite: fav };
-                } else {
-                    tpls.push({ name, text, favorite: false });
-                    editingTemplateIndex = tpls.length - 1;
-                }
-                
-                // 2. Сохраняем в localStorage
-                localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
-                
-                updateTemplateDropdown(bot.id, editingTemplateIndex);
-                closeModal('tpl-modal');
-                
-            } catch (error) {
-                console.error('Error saving template:', error);
-                alert('Ошибка сохранения шаблона');
-            }
-        }
-
-        function updateTemplateDropdown(botId, forceSelectIndex = null) {
-            const sel=document.getElementById(`tpl-select-${botId}`); if(!sel) return;
-            const bot = bots[botId];
-            const isChat = globalMode === 'chat';
-            const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
-            
-            let val = (forceSelectIndex !== null) ? forceSelectIndex : sel.value;
-            sel.innerHTML='<option value="">-- Выберите --</option>';
-            tpls.forEach((t,i)=> sel.innerHTML+=`<option value="${i}">${t.favorite?'❤ ':''}${t.name}</option>`);
-            
-            const btnFav = document.getElementById(`btn-fav-${botId}`);
-            if(val !== null && val !== "" && val !== undefined && tpls[val]) {
-                 sel.value = val;
-                 const area=document.getElementById(`msg-${botId}`); 
-                 area.disabled=false; 
-                 area.value=tpls[val].text; 
-                 if(isChat) bots[botId].lastTplChat = val; else bots[botId].lastTplMail = val;
-                 if(btnFav) { if(tpls[val].favorite) { btnFav.classList.add('btn-heart-active','btn-danger'); btnFav.classList.remove('btn-outline-danger'); } else { btnFav.classList.remove('btn-heart-active','btn-danger'); btnFav.classList.add('btn-outline-danger'); } }
-                 validateInput(area);
-            } else { 
-                 sel.value=""; 
-                 const area = document.getElementById(`msg-${botId}`);
-                 area.disabled=true; area.value=""; 
-                 if(btnFav) btnFav.classList.remove('btn-heart-active'); 
-                 bots[botId].updateUI(); 
-            }
-        }
-
-        function onTemplateSelect(botId) {
-            const idx = document.getElementById(`tpl-select-${botId}`).value;
-            const bot = bots[botId];
-            const isChat = globalMode === 'chat';
-
-            if(!accountPreferences[bot.login]) accountPreferences[bot.login] = {};
-            if(isChat) accountPreferences[bot.login].chatTpl = idx;
-            else accountPreferences[bot.login].mailTpl = idx;
-            localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
-            
-            saveSession();
-            updateTemplateDropdown(botId, idx);
-        }
-
-        function toggleTemplateFavorite(botId) {
-            const idx = document.getElementById(`tpl-select-${botId}`).value;
-            if(idx === "") return;
-            const bot = bots[botId];
-            const tpls = getBotTemplates(bot.login)['mail'];
-            if(tpls[idx]) { tpls[idx].favorite = !tpls[idx].favorite; localStorage.setItem('botTemplates', JSON.stringify(botTemplates)); updateTemplateDropdown(botId, idx); }
-        }
-
-        function deleteTemplate(botId) {
-            const isChat = globalMode === 'chat';
-            const bot = bots[botId];
-            let tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
-            const idx=document.getElementById(`tpl-select-${botId}`).value;
-            if(idx!=="" && confirm("Удалить?")) { tpls.splice(idx,1); localStorage.setItem('botTemplates', JSON.stringify(botTemplates)); updateTemplateDropdown(botId); onTemplateSelect(botId); }
-        }
-
-        function openBlacklistModal(botId) { currentModalBotId=botId; document.getElementById('bl-modal-input').value=''; openModal('bl-modal'); }
-        function saveBlacklistID() {
-            const val = document.getElementById('bl-modal-input').value.trim();
-            if(val && currentModalBotId) {
-                const bot = bots[currentModalBotId];
-                const list = globalMode === 'chat' ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
-                if(!list.includes(val)) { list.push(val); renderBlacklist(currentModalBotId); }
-            }
-            closeModal('bl-modal');
-        }
-
-        function renderBlacklist(botId) {
-            const listEl=document.getElementById(`bl-list-${botId}`); listEl.innerHTML="";
-            const bot = bots[botId];
-            const data = globalMode === 'chat' ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
-            
-            data.forEach(id => {
-                const d=document.createElement('div'); 
-                d.className='list-item'; 
-                d.innerText=id;
-                
-                if (bot.vipList.includes(id)) {
-                    d.classList.add('is-vip');
-                    d.innerHTML = `<i class="fa fa-star text-warning me-2"></i> ${id}`;
-                }
-                
-                d.onclick=()=>{
-                    listEl.querySelectorAll('.list-item').forEach(i=>i.classList.remove('selected')); 
-                    d.classList.add('selected'); 
-                    bots[botId].selectedBlacklistId=id;
-                };
-                listEl.appendChild(d);
-            });
-        }
-        
-        function removeSelectedBlacklist(botId) {
-            const bot = bots[botId]; const s = bot.selectedBlacklistId;
-            if(s) { 
-                if(globalMode==='chat') bot.chatSettings.blacklist=bot.chatSettings.blacklist.filter(x=>x!==s); 
-                else bot.mailSettings.blacklist=bot.mailSettings.blacklist.filter(x=>x!==s); 
-                bot.vipList = bot.vipList.filter(x=>x!==s);
-                bot.selectedBlacklistId=null; 
-                renderBlacklist(botId); 
-            }
-        }
-
-        function toggleVipStatus(botId) {
-            const bot = bots[botId]; const s = bot.selectedBlacklistId;
-            if(!s) return alert("Выберите ID из списка");
-            
-            if(bot.vipList.includes(s)) {
-                bot.vipList = bot.vipList.filter(x=>x!==s);
-            } else {
-                bot.vipList.push(s);
-                alert(`ID ${s} отмечен как VIP.\nБот будет уведомлять о его Online/Offline статусе.`);
-            }
-            saveSession(); 
-            renderBlacklist(botId);
-        }
-
-        function onPhotoSelect(botId) {
-            const fi=document.getElementById(`photo-input-${botId}`);
-            if(fi.files.length) {
-                bots[botId].photoName=fi.files[0].name; document.getElementById(`photo-name-${botId}`).innerText=fi.files[0].name; document.getElementById(`photo-label-${botId}`).classList.add('file-selected');
-                const r=new FileReader(); r.onload=e=>{ document.getElementById(`preview-img-${botId}`).src=e.target.result; document.getElementById(`preview-box-${botId}`).classList.add('has-img'); }; r.readAsDataURL(fi.files[0]);
-            }
-        }
-        function removePhoto(botId) {
-            document.getElementById(`photo-input-${botId}`).value=""; document.getElementById(`photo-name-${botId}`).innerText="Прикрепить фото"; document.getElementById(`preview-box-${botId}`).classList.remove('has-img'); document.getElementById(`photo-label-${botId}`).classList.remove('file-selected'); bots[botId].photoName=null;
-        }
-
-        async function handleLoginOrUpdate() {
-            const l=document.getElementById('newLogin').value.trim(); const p=document.getElementById('newPass').value.trim(); const i=document.getElementById('newId').value.trim()||'ID';
-            document.getElementById('loginError').innerText = "";
-            if(editingBotId) {
-                const bot = bots[editingBotId];
-                if(bot) { bot.login = l; bot.pass = p; bot.displayId = i; document.getElementById(`tab-${bot.id}`).innerHTML = `<div class="status-dot online"></div> ${i} <span class="tab-close" onclick="closeTab(event, '${bot.id}')"><i class="fa fa-times"></i></span>`; saveSession(); }
-                closeModal('add-modal'); return;
-            }
-            if(checkDuplicate(l, i)) { document.getElementById('loginError').innerText = "Этот аккаунт уже добавлен"; return; }
-            if(await performLogin(l,p,i)) { document.getElementById('newLogin').value=''; document.getElementById('newPass').value=''; closeModal('add-modal'); }
-        }
-
-        async function performLogin(login, pass, displayId) {
-            const e=document.getElementById('loginError'); const s=document.getElementById('loginSpinner'); if(s) s.style.display='inline-block';
-            try {
-                const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: login, Password: pass });
-                
-                if(res.data.Token) {
-                    const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
-                    const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
-                    bots[bid] = bot; createInterface(bot); selectTab(bid); saveSession(); 
-                    
-                    // Отправляем первый heartbeat после создания бота
-                    setTimeout(() => sendHeartbeatToLababot(bid, displayId, 'online'), 2000);
-                    return true;
-                }
-            } catch(err) { 
-                if(e) e.innerText = err.response ? (err.response.data.Error || `Ошибка входа: ${err.response.status}`) : "Ошибка входа. Проверьте Proxy для Ladadate."; 
-            }
-            finally { if(s) s.style.display='none'; }
-            return false;
-        }
-
-        async function saveSession() { 
-            try {
-                // Сохраняем порядок вкладок в localStorage
-                const currentTabOrder = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
-                const localStorageData = currentTabOrder.map(id => {
-                    const b = bots[id];
-                    if (!b) return null;
-                    return {
-                        login: b.login,
-                        pass: b.pass,
-                        displayId: b.displayId,
-                        lastTplMail: b.lastTplMail,
-                        lastTplChat: b.lastTplChat,
-                        chatRotationHours: b.chatSettings.rotationHours,
-                        chatCyclic: b.chatSettings.cyclic,
-                        chatCurrentIndex: b.chatSettings.currentInviteIndex,
-                        chatStartTime: b.chatSettings.rotationStartTime,
-                        mailAuto: b.mailSettings.auto,
-                        mailTarget: b.mailSettings.target,
-                        vipList: b.vipList
-                    };
-                }).filter(item => item !== null);
-                
-                localStorage.setItem('savedBots', JSON.stringify(localStorageData));
-
-            } catch (error) {
-                console.error('Error saving session:', error);
-                // Падаем обратно на localStorage при ошибке
-                const fallbackData = Array.from(document.querySelectorAll('.tab-item')).map(t => {
-                    const b = bots[t.id.replace('tab-', '')];
-                    return b ? {
-                        login: b.login,
-                        pass: b.pass,
-                        displayId: b.displayId
-                    } : null;
-                }).filter(Boolean);
-                localStorage.setItem('savedBots', JSON.stringify(fallbackData));
-            }
-        }
-        
-        async function restoreSession() {
-            try {
-                // Загружаем из localStorage
-                const s = JSON.parse(localStorage.getItem('savedBots') || '[]');
-                document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} из кэша...` : "";
-                
-                for (const a of s) {
-                    const ok = await performLogin(a.login, a.pass, a.displayId);
-                    if (ok && bots[Object.keys(bots).pop()]) {
-                        const botId = Object.keys(bots).pop();
-                        const bot = bots[botId];
-                        
-                        // Восстанавливаем остальные настройки из localStorage
-                        bot.lastTplMail = a.lastTplMail;
-                        bot.lastTplChat = a.lastTplChat;
-                        
-                        if (a.chatRotationHours) bot.chatSettings.rotationHours = a.chatRotationHours;
-                        if (a.chatCyclic !== undefined) bot.chatSettings.cyclic = a.chatCyclic;
-                        if (a.chatCurrentIndex) bot.chatSettings.currentInviteIndex = a.chatCurrentIndex;
-                        if (a.chatStartTime) bot.chatSettings.rotationStartTime = a.chatStartTime;
-                        if (a.mailAuto !== undefined) bot.mailSettings.auto = a.mailAuto;
-                        if (a.mailTarget) bot.mailSettings.target = a.mailTarget;
-                        if (a.vipList) bot.vipList = a.vipList;
-                        
-                        updateInterfaceForMode(bot.id);
-                    }
-                    await new Promise(r => setTimeout(r, 500));
-                }
-                
-                document.getElementById('restore-status').innerText = "";
-                document.getElementById('restore-status').innerText = "";
-                document.getElementById('welcome-screen').style.display = Object.keys(bots).length > 0 ? 'none' : 'flex';
-                
-                // Сохраняем порядок вкладок
-                const tempBots = { ...bots };
-                bots = {};
-                const keys = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
-                keys.forEach(id => {
-                    if (tempBots[id]) bots[id] = tempBots[id];
-                });
-                
-            } catch (error) {
-                console.error('Error restoring session:', error);
-                document.getElementById('restore-status').innerText = "Ошибка загрузки. Используется кэш.";
-                document.getElementById('welcome-screen').style.display = Object.keys(bots).length > 0 ? 'none' : 'flex';
-            }
-        }
-
-        function selectTab(id) {
-            document.querySelectorAll('.tab-item').forEach(t=>t.classList.remove('active'));
-            document.querySelectorAll('.workspace').forEach(w=>w.classList.remove('active'));
-            // ВАЖНО: Деактивируем/Активируем webview, но они остаются за экраном
-            document.querySelectorAll('webview').forEach(wv => wv.classList.remove('active'));
-
-            const t=document.getElementById(`tab-${id}`); const w=document.getElementById(`ws-${id}`);
-            const wv=document.getElementById(`webview-${id}`);
-
-            if(t&&w) { 
-                t.classList.add('active'); 
-                w.classList.add('active'); 
-                activeTabId=id; 
-                updateInterfaceForMode(id); 
-            }
-            
-            if(wv) wv.classList.add('active'); // Активируем процесс (попадает под стили position: fixed)
-            
-            document.getElementById('welcome-screen').style.display = 'none';
-        }
-        
-        function closeTab(e, id) {
-            e.stopPropagation();
-            if(globalSettings.confirmTabClose && !confirm(`Закрыть вкладку ${bots[id].displayId}?`)) return;
-            
-            if(bots[id]) { 
-                bots[id].stopMail(); bots[id].stopChat(); 
-                bots[id].stopMonitoring();
-                clearInterval(bots[id].keepAliveTimer); 
-                clearInterval(bots[id].heartbeatInterval); // Останавливаем heartbeat
-                
-                // === ВАЖНОЕ ДОБАВЛЕНИЕ: Удаляем webview ===
-                const wv = document.getElementById(`webview-${id}`);
-                if(wv) wv.remove();
-                
-                delete bots[id]; 
-            }
-            document.getElementById(`tab-${id}`).remove(); document.getElementById(`ws-${id}`).remove();
-
-            if(activeTabId === id) {
-                const remainingIds = Object.keys(bots);
-                if(remainingIds.length > 0) {
-                    const firstTab = document.querySelector('.tab-item');
-                    if (firstTab) selectTab(firstTab.id.replace('tab-', ''));
-                    else { activeTabId = null; document.getElementById('welcome-screen').style.display = 'flex'; }
-                } else {
-                    activeTabId = null;
-                    document.getElementById('welcome-screen').style.display = 'flex';
-                }
-            }
-
-            saveSession(); updateBotCount();
-        }
-
-        function toggleBot(id) {
-            const bot = bots[id];
-            const text = document.getElementById(`msg-${id}`).value;
-            if (globalMode === 'chat') { if(bot.isChatRunning) bot.stopChat(); else bot.startChat(text); } 
-            else { if(bot.isMailRunning) bot.stopMail(); else bot.startMail(text); }
-        }
-        function startAll() {
-            Object.values(bots).forEach(b => {
-                const text = document.getElementById(`msg-${b.id}`).value;
-                if (globalMode === 'chat') { if(!b.isChatRunning) b.startChat(text); } else { if(!b.isMailRunning) b.startMail(text); }
-            });
-        }
-        function stopAll() { Object.values(bots).forEach(b => { if (globalMode === 'chat') b.stopChat(); else b.stopMail(); }); }
-        function clearAllStats() {
-            if(!confirm("Очистить статистику на ВСЕХ анкетах?")) return;
-            Object.values(bots).forEach(b => {
-                if (globalMode === 'chat') { b.chatStats={sent:0,errors:0,waiting:0}; b.chatHistory={sent:[],errors:[],waiting:[]}; }
-                else { b.mailStats={sent:0,errors:0,waiting:0}; b.mailHistory={sent:[],errors:[],waiting:[]}; }
-                b.updateUI();
-            });
-        }
-        async function reloginAllBots() {
-            if(!confirm("Перезайти во все анкеты?")) return;
-            const botIds = Object.keys(bots);
-            if(botIds.length === 0) return;
-            const btn = document.querySelector('.btn-refresh'); const orig = btn.innerHTML; btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>'; btn.disabled = true;
-            for(const id of botIds) {
-                const bot = bots[id];
-                try {
-                    const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: bot.login, Password: bot.pass });
-                    if(res.data.Token) { 
-                        bot.token = res.data.Token; 
-                        bot.getProfileData(); 
-                    }
-                } catch(e) {}
-                await new Promise(r => setTimeout(r, 500));
-            }
-            btn.innerHTML = orig; btn.disabled = false;
-        }
-        
-        // ОБНОВЛЕННАЯ ФУНКЦИЯ exportAllData
-        async function exportAllData() {
-            try {
-                const data = {
-                    bots: [],
-                    templates: botTemplates,
-                    accountPreferences: accountPreferences,
-                    globalSettings: globalSettings,
-                    exportDate: new Date().toISOString()
-                };
-                
-                // Сохраняем данные ботов
-                Object.values(bots).forEach(bot => {
-                    data.bots.push({
-                        id: bot.id,
-                        login: bot.login,
-                        displayId: bot.displayId,
-                        token: bot.token ? '[HIDDEN]' : null,
-                        mailSettings: bot.mailSettings,
-                        chatSettings: bot.chatSettings,
-                        vipList: bot.vipList
-                    });
-                });
-                
-                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `lababot_backup_${new Date().toISOString().split('T')[0]}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-                
-                return true;
-            } catch (error) {
-                console.error('Error exporting data:', error);
-                return false;
-            }
-        }
-        
-        // ОБНОВЛЕННАЯ ФУНКЦИЯ handleFullImport
-        async function handleFullImport(input) {
-            if (!input.files.length) return;
-            
-            if (!confirm('Внимание! Импорт перезапишет существующие данные. Продолжить?')) {
-                input.value = '';
-                return;
-            }
-            
-            const btn = input.parentElement.querySelector('button');
-            const origText = btn.innerHTML;
-            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Импорт...';
-            btn.disabled = true;
-            
-            try {
-                const reader = new FileReader();
-                
-                reader.onload = async function(e) {
-                    try {
-                        const data = JSON.parse(e.target.result);
-                        
-                        // Импортируем ботов
-                        if (data.bots && Array.isArray(data.bots)) {
-                            for (const botData of data.bots) {
-                                if (botData.login && botData.displayId) {
-                                    await performLogin(botData.login, botData.pass || 'password', botData.displayId);
-                                }
-                            }
-                        }
-                        
-                        // Импортируем шаблоны
-                        if (data.templates) {
-                            botTemplates = data.templates;
-                            localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
-                        }
-                        
-                        // Импортируем настройки
-                        if (data.accountPreferences) {
-                            accountPreferences = data.accountPreferences;
-                            localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
-                        }
-                        
-                        if (data.globalSettings) {
-                            globalSettings = { ...globalSettings, ...data.globalSettings };
-                            localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
-                        }
-                        
-                        alert('Данные успешно импортированы! Перезагрузите приложение.');
-                        setTimeout(() => location.reload(), 1000);
-                        
-                    } catch (error) {
-                        console.error('Import error:', error);
-                        alert('Ошибка импорта: ' + error.message);
-                    } finally {
-                        btn.innerHTML = origText;
-                        btn.disabled = false;
-                        input.value = '';
-                    }
-                };
-                
-                reader.onerror = function(error) {
-                    alert('Ошибка чтения файла');
-                    btn.innerHTML = origText;
-                    btn.disabled = false;
-                    input.value = '';
-                };
-                
-                reader.readAsText(input.files[0]);
-                
-            } catch (error) {
-                console.error('Import error:', error);
-                alert('Ошибка импорта: ' + error.message);
-                btn.innerHTML = origText;
-                btn.disabled = false;
-                input.value = '';
-            }
-        }
-    </script>
+    <!-- Модальное окно для ввода имени шаблона промпта -->
+    <div id="prompt-name-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h5><i class="fa fa-plus"></i> Новый шаблон промпта</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeModal('prompt-name-modal')"><i class="fa fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label">Название шаблона:</label>
+                <input id="prompt-name-input" class="form-control" type="text" placeholder="Например: Романтичный стиль" onkeydown="if(event.key==='Enter') confirmAddPromptTemplate()">
+            </div>
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-success flex-fill" onclick="confirmAddPromptTemplate()"><i class="fa fa-check"></i> Создать</button>
+                <button class="btn btn-outline-secondary flex-fill" onclick="closeModal('prompt-name-modal')">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно результатов импорта -->
+    <div id="import-result-modal" class="modal-overlay">
+        <div class="modal-card import-result-card">
+            <div class="modal-header">
+                <h5><i class="fa fa-download"></i> Результат импорта</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeModal('import-result-modal')"><i class="fa fa-times"></i></button>
+            </div>
+            <div class="modal-body import-result-body">
+                <div id="import-result-content"></div>
+            </div>
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-primary flex-fill" onclick="closeModal('import-result-modal')"><i class="fa fa-check"></i> Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модули (разделённый bot.js) - порядок загрузки критичен! -->
+    <script src="js/modules/config.js"></script>      <!-- 1. Глобальные переменные и константы -->
+    <script src="js/modules/utils.js"></script>       <!-- 2. Утилиты, parseProxy, validateInput -->
+    <script src="js/modules/api.js"></script>         <!-- 3. API функции для Lababot сервера -->
+    <script src="js/modules/logger.js"></script>      <!-- 4. Logger, KEEP_ALIVE_SCRIPT -->
+    <script src="js/modules/minichat.js"></script>    <!-- 5. MiniChat функции -->
+    <script src="js/modules/ai.js"></script>          <!-- 6. AI функции -->
+    <script src="js/modules/settings.js"></script>    <!-- 7. Настройки -->
+    <script src="js/modules/AccountBot.js"></script>  <!-- 8. Класс AccountBot -->
+    <script src="js/modules/main.js"></script>        <!-- 9. UI функции и основная логика -->
+    <script src="js/modules/init.js"></script>        <!-- 10. Инициализация (window.onload) -->
 </body>
 </html>
