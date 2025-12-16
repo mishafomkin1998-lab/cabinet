@@ -1304,20 +1304,22 @@ function openIgnoredModal(botId) {
         </div>
     `;
 
-    // Проверяем, есть ли уже модалка, иначе создаём
+    // Удаляем старую модалку и создаём заново (чтобы обработчики работали)
     let modal = document.getElementById('ignored-modal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'ignored-modal';
-        modal.className = 'custom-modal';
-        modal.innerHTML = `<div class="modal-backdrop" onclick="closeModal('ignored-modal')"></div><div class="modal-content" onclick="event.stopPropagation()">${modalContent}</div>`;
-        document.body.appendChild(modal);
-    } else {
-        modal.querySelector('.modal-content').innerHTML = modalContent;
+    if (modal) {
+        modal.remove();
     }
 
-    // Сбрасываем inline-стиль (closeModal устанавливает display:none)
-    modal.style.display = '';
+    modal = document.createElement('div');
+    modal.id = 'ignored-modal';
+    modal.className = 'custom-modal';
+    modal.innerHTML = `<div class="modal-backdrop"></div><div class="modal-content">${modalContent}</div>`;
+    document.body.appendChild(modal);
+
+    // Закрытие только по клику на backdrop (не на content)
+    modal.querySelector('.modal-backdrop').onclick = () => closeModal('ignored-modal');
+    modal.querySelector('.modal-content').onclick = (e) => e.stopPropagation();
+
     modal.classList.add('show');
 }
 
