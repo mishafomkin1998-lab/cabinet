@@ -1613,7 +1613,7 @@ ipcMain.handle('open-video-chat-window', async (event, data) => {
         }
     }
 
-    // Используем partition для сессии
+    // Используем partition для сессии (чтобы использовать cookies бота)
     const ses = session.fromPartition(`persist:${botId}`);
 
     const win = new BrowserWindow({
@@ -1623,7 +1623,7 @@ ipcMain.handle('open-video-chat-window', async (event, data) => {
         minHeight: 600,
         title: `Видеочат - ${displayId}`,
         webPreferences: {
-            partition: `persist:${botId}`,
+            session: ses, // ИСПРАВЛЕНО: использовать session вместо partition
             nodeIntegration: false,
             contextIsolation: true,
             zoomFactor: 1.0 // Фиксированный масштаб 100%
@@ -1651,10 +1651,13 @@ ipcMain.handle('open-video-chat-window', async (event, data) => {
 
     // Загружаем страницу чата
     try {
+        console.log(`[VideoChat] Загружаем страницу для ${displayId}...`);
         await win.loadURL('https://ladadate.com/chat#');
+        console.log(`[VideoChat] Страница загружена для ${displayId}`);
 
         // Проверяем на редирект на логин
         const currentUrl = win.webContents.getURL();
+        console.log(`[VideoChat] Текущий URL: ${currentUrl}`);
         if (currentUrl.includes('/login') && login && pass) {
             // Авто-логин
             await win.webContents.executeJavaScript(`
