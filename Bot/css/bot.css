@@ -1266,6 +1266,25 @@
         .prompt-submenu-item.disabled { color: #aaa; cursor: default; font-style: italic; }
         .prompt-submenu-item.disabled:hover { background: transparent; color: #aaa; }
 
+        /* Подменю шаблонов Improve (наследует стили от prompt-submenu) */
+        .improve-submenu {
+            position: absolute;
+            left: 100%;
+            top: 0;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            display: none;
+            flex-direction: column;
+            padding: 4px;
+            z-index: 101;
+            min-width: 140px;
+            max-width: 200px;
+            margin-left: 3px;
+        }
+        .improve-submenu.show { display: flex; }
+
         .textarea-msg { resize: none; flex: 1; font-size: 14px; border-color: #dee2e6; border-radius: 6px; background: #fafafa; }
         .textarea-msg:focus { border-color: var(--mode-color); background: #fff; box-shadow: none; }
         

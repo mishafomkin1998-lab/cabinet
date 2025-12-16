@@ -50,12 +50,56 @@ function cancelHidePromptSubmenu(botId) {
     }
 }
 
+// =====================================================
+// === ПОДМЕНЮ ШАБЛОНОВ IMPROVE ===
+// =====================================================
+
+let improveSubmenuTimeout = {};
+
+function showImproveSubmenu(botId) {
+    cancelHideImproveSubmenu(botId);
+    const submenu = document.getElementById(`improve-submenu-${botId}`);
+    if (!submenu) return;
+
+    const templates = promptTemplates.improvePrompt || [];
+
+    // Генерируем HTML подменю
+    let html = `<div class="prompt-submenu-item" onclick="handleAIActionWithTemplate('${botId}', 'improve', null, event)" title="Shift=всем">По умолчанию</div>`;
+
+    if (templates.length > 0) {
+        templates.forEach(tpl => {
+            html += `<div class="prompt-submenu-item" onclick="handleAIActionWithTemplate('${botId}', 'improve', '${tpl.id}', event)" title="Shift=всем">${tpl.name}</div>`;
+        });
+    } else {
+        html += `<div class="prompt-submenu-item disabled">Нет шаблонов</div>`;
+    }
+
+    submenu.innerHTML = html;
+    submenu.classList.add('show');
+}
+
+function hideImproveSubmenuDelayed(botId) {
+    improveSubmenuTimeout[botId] = setTimeout(() => {
+        const submenu = document.getElementById(`improve-submenu-${botId}`);
+        if (submenu) submenu.classList.remove('show');
+    }, 200);
+}
+
+function cancelHideImproveSubmenu(botId) {
+    if (improveSubmenuTimeout[botId]) {
+        clearTimeout(improveSubmenuTimeout[botId]);
+        improveSubmenuTimeout[botId] = null;
+    }
+}
+
 // Обработка AI действия с конкретным шаблоном
 async function handleAIActionWithTemplate(botId, action, templateId, event) {
     // Закрываем меню
     document.getElementById(`ai-options-${botId}`).classList.remove('show');
     const submenu = document.getElementById(`prompt-submenu-${botId}`);
     if (submenu) submenu.classList.remove('show');
+    const improveSubmenu = document.getElementById(`improve-submenu-${botId}`);
+    if (improveSubmenu) improveSubmenu.classList.remove('show');
 
     // Shift + клик = генерация для всех анкет
     if (event && event.shiftKey) {
@@ -115,6 +159,28 @@ async function handleAIActionWithTemplate(botId, action, templateId, event) {
                 ? `Write a short, engaging chat message for a dating site. Keep it natural and flirty. Original text: "${currentText}"`
                 : `Write an engaging letter for a dating site. Keep it warm and personal. Original text: "${currentText}"`;
         }
+    } else if (action === 'improve') {
+        if(!currentText) { showToast("Напишите что-то, чтобы улучшить!"); return; }
+
+        // Получаем промпт из шаблона или настроек
+        let improvePromptValue = '';
+        if (templateId) {
+            const template = (promptTemplates.improvePrompt || []).find(t => t.id == templateId);
+            if (template) {
+                improvePromptValue = template.text;
+            }
+        } else {
+            improvePromptValue = globalSettings.improvePrompt || '';
+        }
+
+        // Стандартный промпт если пусто
+        const defaultImprovePrompt = `Исправь грамматику, сделай текст более человечным и женским. Оставь текст на русском, сохрани естественность и не используй "Приветствие" или подпись. Текст: "{text}"`;
+        const improvePromptTemplate = improvePromptValue || defaultImprovePrompt;
+
+        // Заменяем {text} на текущий текст
+        prompt = improvePromptTemplate.includes('{text}')
+            ? improvePromptTemplate.replace('{text}', currentText)
+            : `${improvePromptTemplate}\n\nТекст: "${currentText}"`;
     }
 
     btn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Loading...`;
@@ -154,7 +220,8 @@ async function generateAIForAllWithTemplate(action, templateId) {
     const botIds = Object.keys(bots);
     if (botIds.length === 0) return;
 
-    showBulkNotification(`AI My Prompt запущен для всех...`, botIds.length);
+    const actionLabel = action === 'improve' ? 'Improve' : 'My Prompt';
+    showBulkNotification(`AI ${actionLabel} запущен для всех...`, botIds.length);
 
     let config = { headers: { 'Authorization': `Bearer ${globalSettings.apiKey}`, 'Content-Type': 'application/json' } };
     if (globalSettings.proxyAI) {
@@ -165,14 +232,21 @@ async function generateAIForAllWithTemplate(action, templateId) {
     const systemRole = "You are a helpful dating assistant. Write engaging, short, and natural texts for dating sites.";
     let successCount = 0;
 
-    const isChat = globalMode === 'chat';
-    const promptType = isChat ? 'myPromptChat' : 'myPrompt';
-
-    let myPromptValue = '';
-    if (templateId) {
-        const template = (promptTemplates[promptType] || []).find(t => t.id == templateId);
-        if (template) {
-            myPromptValue = template.text;
+    // Получаем шаблон в зависимости от action
+    let templateValue = '';
+    if (action === 'myprompt') {
+        const isChat = globalMode === 'chat';
+        const promptType = isChat ? 'myPromptChat' : 'myPrompt';
+        if (templateId) {
+            const template = (promptTemplates[promptType] || []).find(t => t.id == templateId);
+            if (template) templateValue = template.text;
+        }
+    } else if (action === 'improve') {
+        if (templateId) {
+            const template = (promptTemplates.improvePrompt || []).find(t => t.id == templateId);
+            if (template) templateValue = template.text;
+        } else {
+            templateValue = globalSettings.improvePrompt || '';
         }
     }
 
@@ -184,13 +258,25 @@ async function generateAIForAllWithTemplate(action, templateId) {
         const currentText = txtArea.value;
         let prompt = "";
 
-        if (myPromptValue) {
-            prompt = `${myPromptValue}. \n\nOriginal text: "${currentText}"`;
-        } else {
-            prompt = isChat
-                ? `Write a short, engaging chat message for a dating site. Keep it natural and flirty. Original text: "${currentText}"`
-                : `Write an engaging letter for a dating site. Keep it warm and personal. Original text: "${currentText}"`;
+        if (action === 'myprompt') {
+            if (templateValue) {
+                prompt = `${templateValue}. \n\nOriginal text: "${currentText}"`;
+            } else {
+                const isChat = globalMode === 'chat';
+                prompt = isChat
+                    ? `Write a short, engaging chat message for a dating site. Keep it natural and flirty. Original text: "${currentText}"`
+                    : `Write an engaging letter for a dating site. Keep it warm and personal. Original text: "${currentText}"`;
+            }
+        } else if (action === 'improve') {
+            if (!currentText) continue;
+            const defaultImprovePrompt = `Исправь грамматику, сделай текст более человечным и женским. Оставь текст на русском, сохрани естественность и не используй "Приветствие" или подпись. Текст: "{text}"`;
+            const improvePromptTemplate = templateValue || defaultImprovePrompt;
+            prompt = improvePromptTemplate.includes('{text}')
+                ? improvePromptTemplate.replace('{text}', currentText)
+                : `${improvePromptTemplate}\n\nТекст: "${currentText}"`;
         }
+
+        if (!prompt) continue;
 
         try {
             const response = await axios.post(OPENAI_API_ENDPOINT, {
@@ -215,7 +301,7 @@ async function generateAIForAllWithTemplate(action, templateId) {
         await new Promise(r => setTimeout(r, 300));
     }
 
-    showBulkNotification(`AI My Prompt выполнен`, successCount);
+    showBulkNotification(`AI ${actionLabel} выполнен`, successCount);
 }
 
 // Проверка AI статуса для анкеты (по флагу ai_enabled у переводчика)

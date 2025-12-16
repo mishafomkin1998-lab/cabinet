@@ -68,7 +68,10 @@ function createInterface(bot) {
                 <div class="ai-container ${globalSettings.extendedFeatures ? '' : 'ai-hidden'}">
                     <button class="btn-ai-main" onclick="toggleAI('${bot.id}')"><i class="fa fa-magic"></i> AI</button>
                     <div class="ai-options" id="ai-options-${bot.id}">
-                        <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'improve', event)" title="Shift=всем"><i class="fa fa-check"></i> Improve</button>
+                        <div class="btn-ai-sub-with-submenu" id="btn-improve-${bot.id}" onmouseenter="showImproveSubmenu('${bot.id}')" onmouseleave="hideImproveSubmenuDelayed('${bot.id}')">
+                            <span class="btn-ai-sub-trigger"><i class="fa fa-check"></i> Improve <i class="fa fa-caret-right submenu-arrow"></i></span>
+                            <div class="improve-submenu" id="improve-submenu-${bot.id}" onmouseenter="cancelHideImproveSubmenu('${bot.id}')" onmouseleave="hideImproveSubmenuDelayed('${bot.id}')"></div>
+                        </div>
                         <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'generate', event)" title="Shift=всем"><i class="fa fa-pencil"></i> Generate</button>
                         <div class="btn-ai-sub-with-submenu" id="btn-myprompt-${bot.id}" onmouseenter="showPromptSubmenu('${bot.id}')" onmouseleave="hidePromptSubmenuDelayed('${bot.id}')">
                             <span class="btn-ai-sub-trigger"><i class="fa fa-user"></i> <span class="myprompt-label">My Prompt</span> <i class="fa fa-caret-right submenu-arrow"></i></span>
