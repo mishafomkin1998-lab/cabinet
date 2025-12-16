@@ -1398,18 +1398,26 @@ async function restoreSession() {
     try {
         // Загружаем из localStorage
         const s = JSON.parse(localStorage.getItem('savedBots') || '[]');
-        document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} из кэша...` : "";
-        
-        for (const a of s) {
+        document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} анкет...` : "";
+
+        // Задержка между логинами зависит от количества анкет
+        // Чем больше анкет - тем больше задержка чтобы не перегружать сервер
+        const delayMs = s.length > 50 ? 2000 : s.length > 20 ? 1500 : 1000;
+        console.log(`[RestoreSession] Восстановление ${s.length} анкет с задержкой ${delayMs}ms`);
+
+        for (let i = 0; i < s.length; i++) {
+            const a = s[i];
+            document.getElementById('restore-status').innerText = `Загрузка ${i + 1}/${s.length}...`;
+
             const ok = await performLogin(a.login, a.pass, a.displayId);
             if (ok && bots[Object.keys(bots).pop()]) {
                 const botId = Object.keys(bots).pop();
                 const bot = bots[botId];
-                
+
                 // Восстанавливаем остальные настройки из localStorage
                 bot.lastTplMail = a.lastTplMail;
                 bot.lastTplChat = a.lastTplChat;
-                
+
                 if (a.chatRotationHours) bot.chatSettings.rotationHours = a.chatRotationHours;
                 if (a.chatCyclic !== undefined) bot.chatSettings.cyclic = a.chatCyclic;
                 if (a.chatCurrentIndex) bot.chatSettings.currentInviteIndex = a.chatCurrentIndex;
@@ -1429,7 +1437,9 @@ async function restoreSession() {
                     toggleCustomIdsField(bot.id);
                 }
             }
-            await new Promise(r => setTimeout(r, 500));
+
+            // Задержка между логинами чтобы не перегружать сервер
+            await new Promise(r => setTimeout(r, delayMs));
         }
         
         document.getElementById('restore-status').innerText = "";
