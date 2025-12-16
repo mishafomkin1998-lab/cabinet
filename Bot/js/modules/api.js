@@ -809,24 +809,33 @@ async function fetchUserProfile(bot, userId) {
     try {
         console.log(`🔍 Загрузка профиля ${userId}...`);
 
-        // Пробуем получить через JSON API
-        const res = await makeApiRequest(bot, 'GET', `/api/users/${userId}`);
-        const data = res.data;
+        // Получаем HTML страницу профиля
+        const res = await makeApiRequest(bot, 'GET', `/profile/${userId}`);
+        const html = res.data;
 
-        console.log(`[Profile API] Тип ответа:`, typeof data, data ? Object.keys(data).slice(0, 10) : 'null');
+        console.log(`[Profile HTML] Получено ${html ? html.length : 0} символов, тип: ${typeof html}`);
 
-        let profile;
+        // Если вернулся объект вместо строки - возможно это JSON ответ
+        if (html && typeof html === 'object') {
+            console.log(`[Profile] Получен JSON объект, парсим как JSON`);
+            const profile = parseProfileJson(html, userId);
+            userProfileCache.set(cacheKey, { data: profile, timestamp: Date.now() });
+            console.log(`✅ Профиль ${userId} загружен из JSON:`, {
+                Name: profile.Name, Occupation: profile.Occupation, MaritalStatus: profile.MaritalStatus
+            });
+            return profile;
+        }
 
-        if (data && typeof data === 'object' && !Array.isArray(data)) {
-            // JSON ответ - парсим напрямую
-            profile = parseProfileJson(data, userId);
-        } else if (data && typeof data === 'string') {
-            // HTML ответ - парсим HTML
-            profile = parseProfileHtml(data, userId);
-        } else {
-            console.warn(`⚠️ Неизвестный формат профиля ${userId}`);
+        if (!html || typeof html !== 'string' || html.length < 100) {
+            console.warn(`⚠️ Пустой или короткий ответ для профиля ${userId}`);
             return null;
         }
+
+        // Логируем первые 500 символов для отладки
+        console.log(`[Profile HTML] Первые 500 символов: ${html.substring(0, 500)}`);
+
+        // Парсим HTML страницу профиля
+        const profile = parseProfileHtml(html, userId);
 
         // Сохраняем в кэш
         userProfileCache.set(cacheKey, {
@@ -922,6 +931,9 @@ function parseProfileHtml(html, userId) {
         if (nameAgeMatch) {
             profile.Name = nameAgeMatch[1].trim();
             profile.Age = nameAgeMatch[2].trim();
+            console.log(`[Parse] Найдено имя: ${profile.Name}, возраст: ${profile.Age}`);
+        } else {
+            console.log(`[Parse] Имя/возраст не найдены в стандартном формате`);
         }
 
         // Парсим поля из user_row-inner блоков
@@ -969,6 +981,8 @@ function parseProfileHtml(html, userId) {
         profile.Drink = extractField('Drink');
         profile.EnglishLevel = extractField('Level of English');
         profile.Languages = extractField('Languages') || extractField('Language');
+
+        console.log(`[Parse] Извлечённые поля: Occupation=${profile.Occupation}, Marital=${profile.MaritalStatus}, Children=${profile.Children}, Height=${profile.Height}`);
 
         // Birthday и Zodiac
         const birthdayMatch = html.match(/<div[^>]*class="name_row[^"]*"[^>]*>\s*Birthday\s*<\/div>[\s\S]*?<div[^>]*class="value_row[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
