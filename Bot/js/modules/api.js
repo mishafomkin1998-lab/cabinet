@@ -827,7 +827,16 @@ async function fetchUserProfile(bot, userId) {
             timestamp: Date.now()
         });
 
-        console.log(`✅ Профиль ${userId} загружен:`, profile.Name, profile.Age, profile.City);
+        console.log(`✅ Профиль ${userId} загружен:`, {
+            Name: profile.Name,
+            Age: profile.Age,
+            City: profile.City,
+            Occupation: profile.Occupation,
+            MaritalStatus: profile.MaritalStatus,
+            Children: profile.Children,
+            Zodiac: profile.Zodiac,
+            Height: profile.Height
+        });
         return profile;
 
     } catch (error) {
