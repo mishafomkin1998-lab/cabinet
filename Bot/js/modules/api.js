@@ -796,7 +796,7 @@ function cleanProfileCache() {
 }
 setInterval(cleanProfileCache, 5 * 60 * 1000); // Очищаем каждые 5 минут
 
-// Получение полного профиля пользователя с парсингом HTML
+// Получение полного профиля пользователя
 async function fetchUserProfile(bot, userId) {
     // Проверяем кэш
     const cacheKey = `${userId}`;
@@ -809,17 +809,24 @@ async function fetchUserProfile(bot, userId) {
     try {
         console.log(`🔍 Загрузка профиля ${userId}...`);
 
-        // Запрашиваем страницу профиля
-        const res = await makeApiRequest(bot, 'GET', `/profile/${userId}`);
-        const html = res.data;
+        // Пробуем получить через JSON API
+        const res = await makeApiRequest(bot, 'GET', `/api/users/${userId}`);
+        const data = res.data;
 
-        if (!html || typeof html !== 'string') {
-            console.warn(`⚠️ Не удалось загрузить профиль ${userId}`);
+        console.log(`[Profile API] Тип ответа:`, typeof data, data ? Object.keys(data).slice(0, 10) : 'null');
+
+        let profile;
+
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+            // JSON ответ - парсим напрямую
+            profile = parseProfileJson(data, userId);
+        } else if (data && typeof data === 'string') {
+            // HTML ответ - парсим HTML
+            profile = parseProfileHtml(data, userId);
+        } else {
+            console.warn(`⚠️ Неизвестный формат профиля ${userId}`);
             return null;
         }
-
-        // Парсим данные из HTML
-        const profile = parseProfileHtml(html, userId);
 
         // Сохраняем в кэш
         userProfileCache.set(cacheKey, {
@@ -843,6 +850,38 @@ async function fetchUserProfile(bot, userId) {
         console.error(`❌ Ошибка загрузки профиля ${userId}:`, error);
         return null;
     }
+}
+
+// Парсинг JSON ответа профиля
+function parseProfileJson(data, userId) {
+    return {
+        AccountId: userId,
+        Name: data.Name || data.FirstName || '',
+        Age: data.Age || '',
+        City: data.City || data.CityName || '',
+        Country: data.Country || data.CountryName || '',
+        Occupation: data.Occupation || data.Job || '',
+        MaritalStatus: data.MaritalStatus || data.FamilyStatus || '',
+        Children: data.Children || data.Kids || '',
+        WantChildren: data.WantChildren || data.WantKids || '',
+        Height: data.Height || '',
+        Weight: data.Weight || '',
+        HairColor: data.HairColor || data.Hair || '',
+        EyesColor: data.EyesColor || data.Eyes || data.EyeColor || '',
+        BodyType: data.BodyType || data.Body || '',
+        Zodiac: data.Zodiac || data.ZodiacSign || '',
+        Birthday: data.Birthday || data.BirthDate || '',
+        Religion: data.Religion || '',
+        Ethnicity: data.Ethnicity || '',
+        Education: data.Education || '',
+        Smoke: data.Smoke || data.Smoking || '',
+        Drink: data.Drink || data.Drinking || data.Alcohol || '',
+        EnglishLevel: data.EnglishLevel || data.English || '',
+        Languages: data.Languages || '',
+        Hobby: data.Hobby || data.Hobbies || data.Interests || '',
+        AboutMe: data.AboutMe || data.About || data.Description || '',
+        AboutPartner: data.AboutPartner || data.LookingFor || ''
+    };
 }
 
 // Парсинг HTML страницы профиля
