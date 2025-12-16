@@ -553,6 +553,27 @@
             border-color: #333;
         }
 
+        /* Модалка игнор-листа для тёмной темы */
+        body.theme-dark .custom-modal .modal-content {
+            background: #1e1e1e;
+            color: #f0f0f0;
+        }
+        body.theme-dark .custom-modal .modal-header {
+            border-bottom-color: #333;
+        }
+        body.theme-dark .custom-modal .modal-header h5 {
+            color: #f0f0f0;
+        }
+        body.theme-dark .custom-modal .modal-footer {
+            border-top-color: #333;
+        }
+        body.theme-dark .custom-modal .ignored-item {
+            border-bottom-color: #333;
+        }
+        body.theme-dark .custom-modal .btn-close {
+            filter: invert(1);
+        }
+
         /* AI блок в MiniChat и шаблонах */
         body.theme-dark #minichat-modal .mb-2.p-2.rounded,
         body.theme-dark #tpl-modal .mb-2.p-2.rounded {
