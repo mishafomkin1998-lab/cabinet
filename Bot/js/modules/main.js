@@ -1669,12 +1669,36 @@ async function handleFullImport(input) {
     btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Импорт...';
     btn.disabled = true;
 
+    // КРИТИЧНО: Останавливаем ВСЕ запросы от текущих ботов перед импортом
+    // чтобы JSON.parse не блокировал heartbeat и не вызывал таймауты
+    console.log('[Import] ⏸️ Останавливаю все боты перед импортом...');
+    for (const botId of Object.keys(bots)) {
+        const bot = bots[botId];
+        if (bot) {
+            // Останавливаем heartbeat
+            if (bot.lababotHeartbeatTimer) {
+                clearInterval(bot.lababotHeartbeatTimer);
+                bot.lababotHeartbeatTimer = null;
+            }
+            // Останавливаем мониторинг
+            bot.stopMonitoring();
+            // Останавливаем keepAlive
+            if (bot.keepAliveTimer) {
+                clearInterval(bot.keepAliveTimer);
+                bot.keepAliveTimer = null;
+            }
+        }
+    }
+    // Даём время завершиться текущим запросам
+    await new Promise(r => setTimeout(r, 500));
+    console.log('[Import] ✅ Все боты остановлены, начинаю импорт...');
+
     const reader = new FileReader();
 
     reader.onload = async function(e) {
         try {
-            // Пауза перед парсингом - даём event loop обработать другие запросы
-            await new Promise(r => setTimeout(r, 50));
+            // Пауза перед парсингом
+            await new Promise(r => setTimeout(r, 100));
 
             const data = JSON.parse(e.target.result);
             console.log('[Import] 📥 Загружен файл, версия:', data.version || '1.0');
