@@ -98,8 +98,13 @@ function initFocusProtection() {
 
     // Блокируем кнопки и webview от получения фокуса
     document.addEventListener('focusin', (e) => {
+        // Исключаем важные кнопки которым нужен фокус для работы
+        const allowedButtonPrefixes = ['btn-share-cam', 'btn-video', 'btn-open-'];
+        const buttonId = e.target.id || '';
+        const isAllowedButton = allowedButtonPrefixes.some(prefix => buttonId.startsWith(prefix));
+
         // Если фокус ушёл на кнопку, webview или другой не-input элемент
-        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'WEBVIEW') {
+        if ((e.target.tagName === 'BUTTON' && !isAllowedButton) || e.target.tagName === 'WEBVIEW') {
             console.warn('[Focus Protection] ⚠️ ФОКУС УКРАДЕН элементом:', {
                 tag: e.target.tagName,
                 id: e.target.id || 'БЕЗ ID',

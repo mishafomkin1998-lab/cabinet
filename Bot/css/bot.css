@@ -464,19 +464,30 @@
         body.theme-dark input[type="password"],
         body.theme-dark input[type="number"],
         body.theme-dark .form-control {
-            background: #1a1a1a;
-            color: #f0f0f0;
+            background: #1a1a1a !important;
+            color: #ffffff !important;
             border: 1px solid #333;
+            -webkit-text-fill-color: #ffffff !important;
         }
 
         body.theme-dark input[type="text"]:focus,
         body.theme-dark input[type="password"]:focus,
         body.theme-dark input[type="number"]:focus,
         body.theme-dark .form-control:focus {
-            background: #1a1a1a;
-            color: #f0f0f0;
+            background: #1a1a1a !important;
+            color: #ffffff !important;
             border-color: #00ff88;
             box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+            -webkit-text-fill-color: #ffffff !important;
+        }
+
+        /* Placeholder текст в тёмной теме */
+        body.theme-dark input::placeholder,
+        body.theme-dark textarea::placeholder,
+        body.theme-dark .form-control::placeholder {
+            color: #888 !important;
+            -webkit-text-fill-color: #888 !important;
+            opacity: 1;
         }
 
         /* Выпадающий список переменных */
