@@ -77,7 +77,7 @@ async function migrate() {
             sql: 'CREATE INDEX IF NOT EXISTS idx_incoming_messages_admin_id ON incoming_messages(admin_id)'
         },
 
-        // messages indexes
+        // messages indexes (КРИТИЧНО для translators/admins статистики)
         {
             name: 'idx_messages_account_id',
             sql: 'CREATE INDEX IF NOT EXISTS idx_messages_account_id ON messages(account_id)'
@@ -89,6 +89,16 @@ async function migrate() {
         {
             name: 'idx_messages_type',
             sql: 'CREATE INDEX IF NOT EXISTS idx_messages_type ON messages(type)'
+        },
+        {
+            // КРИТИЧЕСКИЙ: для JOIN messages с фильтром по времени
+            name: 'idx_messages_account_timestamp',
+            sql: 'CREATE INDEX IF NOT EXISTS idx_messages_account_timestamp ON messages(account_id, timestamp DESC)'
+        },
+        {
+            // Для фильтрации по типу и времени
+            name: 'idx_messages_timestamp_type',
+            sql: 'CREATE INDEX IF NOT EXISTS idx_messages_timestamp_type ON messages(timestamp, type)'
         },
 
         // heartbeats indexes - для онлайн статуса (КРИТИЧНО для /api/bots/status)

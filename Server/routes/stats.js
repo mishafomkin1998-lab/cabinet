@@ -188,62 +188,85 @@ router.get('/top-profiles', asyncHandler(async (req, res) => {
     res.json({ success: true, profiles: result.rows });
 }));
 
-// Статистика по переводчикам
+// Статистика по переводчикам (ОПТИМИЗИРОВАНО)
 router.get('/translators', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
 
     let filter = "";
-        let params = [];
+    let params = [];
 
-        if (role === 'admin') {
-            filter = `WHERE u.owner_id = $1 AND u.role = 'translator'`;
-            params.push(userId);
-        } else if (role === 'director') {
-            filter = `WHERE u.role = 'translator'`;
-        } else {
-            return res.json({ success: true, translators: [] });
-        }
+    if (role === 'admin') {
+        filter = `WHERE u.owner_id = $1 AND u.role = 'translator'`;
+        params.push(userId);
+    } else if (role === 'director') {
+        filter = `WHERE u.role = 'translator'`;
+    } else {
+        return res.json({ success: true, translators: [] });
+    }
 
-        const query = `
+    // ОПТИМИЗАЦИЯ: CTE для предагрегации messages вместо JOIN по всей таблице
+    // Было: JOIN messages для каждого переводчика = O(N × M)
+    // Стало: один проход по messages с GROUP BY = O(M)
+    const query = `
+        WITH translator_profiles AS (
             SELECT
-                u.id,
+                u.id as translator_id,
                 u.username,
-                COUNT(DISTINCT p.id) as profiles_count,
-                COUNT(DISTINCT CASE WHEN m.type = 'outgoing' THEN m.id END) as letters,
-                COUNT(DISTINCT CASE WHEN m.type = 'chat_msg' THEN m.id END) as chats,
-                COUNT(DISTINCT m.sender_id) as unique_men,
-                COALESCE(AVG(m.response_time), 0) as avg_response_seconds,
-                (COUNT(DISTINCT CASE WHEN m.type = 'outgoing' THEN m.id END) +
-                 COUNT(DISTINCT CASE WHEN m.type = 'chat_msg' THEN m.id END)) as total_messages,
-                MAX(m.timestamp) as last_activity
+                array_agg(p.profile_id) as profile_ids,
+                COUNT(p.id) as profiles_count
             FROM users u
             LEFT JOIN allowed_profiles p ON u.id = p.assigned_translator_id
-            LEFT JOIN messages m ON p.profile_id = m.account_id
-                AND m.timestamp >= CURRENT_DATE - INTERVAL '30 days'
             ${filter}
             GROUP BY u.id, u.username
-            ORDER BY total_messages DESC NULLS LAST
-        `;
+        ),
+        message_stats AS (
+            SELECT
+                p.assigned_translator_id as translator_id,
+                COUNT(*) FILTER (WHERE m.type = 'outgoing') as letters,
+                COUNT(*) FILTER (WHERE m.type = 'chat_msg') as chats,
+                COUNT(DISTINCT m.sender_id) as unique_men,
+                COALESCE(AVG(m.response_time), 0) as avg_response_seconds,
+                MAX(m.timestamp) as last_activity
+            FROM allowed_profiles p
+            JOIN messages m ON p.profile_id = m.account_id
+            WHERE m.timestamp >= CURRENT_DATE - INTERVAL '30 days'
+                AND p.assigned_translator_id IS NOT NULL
+            GROUP BY p.assigned_translator_id
+        )
+        SELECT
+            tp.translator_id as id,
+            tp.username,
+            tp.profiles_count,
+            COALESCE(ms.letters, 0) as letters,
+            COALESCE(ms.chats, 0) as chats,
+            COALESCE(ms.unique_men, 0) as unique_men,
+            COALESCE(ms.avg_response_seconds, 0) as avg_response_seconds,
+            COALESCE(ms.letters, 0) + COALESCE(ms.chats, 0) as total_messages,
+            ms.last_activity
+        FROM translator_profiles tp
+        LEFT JOIN message_stats ms ON tp.translator_id = ms.translator_id
+        ORDER BY total_messages DESC NULLS LAST
+    `;
 
-        const result = await pool.query(query, params);
+    const result = await pool.query(query, params);
 
-        const translators = result.rows.map(t => ({
-            id: t.id,
-            username: t.username,
-            profilesCount: t.profiles_count,
-            letters: t.letters || 0,
-            chats: t.chats || 0,
-            uniqueMen: t.unique_men || 0,
-            avgResponseTime: Math.round(t.avg_response_seconds / 60) || 0,
-            totalMessages: parseInt(t.total_messages || 0),
-            lastActivity: t.last_activity,
-            efficiency: t.profiles_count > 0 ? ((parseInt(t.total_messages || 0) / t.profiles_count)).toFixed(1) : 0
-        }));
+    const translators = result.rows.map(t => ({
+        id: t.id,
+        username: t.username,
+        profilesCount: parseInt(t.profiles_count) || 0,
+        letters: parseInt(t.letters) || 0,
+        chats: parseInt(t.chats) || 0,
+        uniqueMen: parseInt(t.unique_men) || 0,
+        avgResponseTime: Math.round((parseFloat(t.avg_response_seconds) || 0) / 60),
+        totalMessages: parseInt(t.total_messages) || 0,
+        lastActivity: t.last_activity,
+        efficiency: t.profiles_count > 0 ? ((parseInt(t.total_messages) || 0) / parseInt(t.profiles_count)).toFixed(1) : 0
+    }));
 
     res.json({ success: true, translators });
 }));
 
-// Статистика по админам
+// Статистика по админам (ОПТИМИЗИРОВАНО)
 router.get('/admins', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
 
@@ -251,49 +274,68 @@ router.get('/admins', asyncHandler(async (req, res) => {
         return res.json({ success: true, admins: [] });
     }
 
+    // ОПТИМИЗАЦИЯ: CTE вместо LATERAL JOIN
     const query = `
+        WITH admin_info AS (
             SELECT
-                u.id,
+                u.id as admin_id,
                 u.username,
-                COUNT(DISTINCT t.id) as translators_count,
-                COUNT(DISTINCT p.id) as total_profiles,
-                SUM(stats.letters) as total_letters,
-                SUM(stats.chats) as total_chats,
-                SUM(stats.total_messages) as team_messages,
-                COALESCE(AVG(stats.avg_response), 0) as avg_team_response
+                COUNT(DISTINCT t.id) as translators_count
             FROM users u
             LEFT JOIN users t ON u.id = t.owner_id AND t.role = 'translator'
-            LEFT JOIN allowed_profiles p ON u.id = p.assigned_admin_id
-            LEFT JOIN LATERAL (
-                SELECT
-                    COUNT(*) FILTER (WHERE m.type = 'outgoing') as letters,
-                    COUNT(*) FILTER (WHERE m.type = 'chat_msg') as chats,
-                    COUNT(*) as total_messages,
-                    COALESCE(AVG(m.response_time), 0) as avg_response
-                FROM messages m
-                WHERE m.account_id = p.profile_id
-                    AND m.timestamp >= CURRENT_DATE - INTERVAL '30 days'
-            ) stats ON true
             WHERE u.role = 'admin'
             GROUP BY u.id, u.username
-            ORDER BY team_messages DESC NULLS LAST
-        `;
+        ),
+        admin_profiles AS (
+            SELECT
+                assigned_admin_id as admin_id,
+                COUNT(*) as total_profiles
+            FROM allowed_profiles
+            WHERE assigned_admin_id IS NOT NULL
+            GROUP BY assigned_admin_id
+        ),
+        admin_messages AS (
+            SELECT
+                p.assigned_admin_id as admin_id,
+                COUNT(*) FILTER (WHERE m.type = 'outgoing') as total_letters,
+                COUNT(*) FILTER (WHERE m.type = 'chat_msg') as total_chats,
+                COALESCE(AVG(m.response_time), 0) as avg_response
+            FROM allowed_profiles p
+            JOIN messages m ON p.profile_id = m.account_id
+            WHERE m.timestamp >= CURRENT_DATE - INTERVAL '30 days'
+                AND p.assigned_admin_id IS NOT NULL
+            GROUP BY p.assigned_admin_id
+        )
+        SELECT
+            ai.admin_id as id,
+            ai.username,
+            ai.translators_count,
+            COALESCE(ap.total_profiles, 0) as total_profiles,
+            COALESCE(am.total_letters, 0) as total_letters,
+            COALESCE(am.total_chats, 0) as total_chats,
+            COALESCE(am.total_letters, 0) + COALESCE(am.total_chats, 0) as team_messages,
+            COALESCE(am.avg_response, 0) as avg_team_response
+        FROM admin_info ai
+        LEFT JOIN admin_profiles ap ON ai.admin_id = ap.admin_id
+        LEFT JOIN admin_messages am ON ai.admin_id = am.admin_id
+        ORDER BY team_messages DESC NULLS LAST
+    `;
 
-        const result = await pool.query(query);
+    const result = await pool.query(query);
 
-        const admins = result.rows.map(a => ({
-            id: a.id,
-            username: a.username,
-            translatorsCount: a.translators_count || 0,
-            totalProfiles: a.total_profiles || 0,
-            totalLetters: a.total_letters || 0,
-            totalChats: a.total_chats || 0,
-            teamMessages: parseInt(a.team_messages || 0),
-            avgTeamResponse: Math.round(a.avg_team_response / 60) || 0,
-            efficiencyPerTranslator: a.translators_count > 0
-                ? (parseInt(a.team_messages || 0) / a.translators_count).toFixed(2)
-                : 0
-        }));
+    const admins = result.rows.map(a => ({
+        id: a.id,
+        username: a.username,
+        translatorsCount: parseInt(a.translators_count) || 0,
+        totalProfiles: parseInt(a.total_profiles) || 0,
+        totalLetters: parseInt(a.total_letters) || 0,
+        totalChats: parseInt(a.total_chats) || 0,
+        teamMessages: parseInt(a.team_messages) || 0,
+        avgTeamResponse: Math.round((parseFloat(a.avg_team_response) || 0) / 60),
+        efficiencyPerTranslator: a.translators_count > 0
+            ? (parseInt(a.team_messages) || 0) / parseInt(a.translators_count)
+            : 0
+    }));
 
     res.json({ success: true, admins });
 }));
