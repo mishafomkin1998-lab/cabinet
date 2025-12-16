@@ -809,8 +809,36 @@ async function fetchUserProfile(bot, userId) {
     try {
         console.log(`🔍 Загрузка профиля ${userId}...`);
 
-        // Получаем HTML страницу профиля
-        const res = await makeApiRequest(bot, 'GET', `/profile/${userId}`);
+        // Пробуем разные эндпоинты для получения профиля
+        const endpoints = [
+            `/men/${userId}`,           // Основной путь к профилю мужчины
+            `/api/users/${userId}`,     // API путь
+            `/profile/${userId}`,       // Альтернативный путь
+            `/man/${userId}`            // Ещё один вариант
+        ];
+
+        let res = null;
+        let lastError = null;
+
+        for (const endpoint of endpoints) {
+            try {
+                console.log(`[Profile] Пробуем: ${endpoint}`);
+                res = await makeApiRequest(bot, 'GET', endpoint);
+                if (res.data) {
+                    console.log(`[Profile] ✅ Успешно: ${endpoint}`);
+                    break;
+                }
+            } catch (e) {
+                console.log(`[Profile] ❌ ${endpoint}: ${e.message}`);
+                lastError = e;
+                res = null;
+            }
+        }
+
+        if (!res || !res.data) {
+            throw lastError || new Error('Все эндпоинты профиля вернули ошибку');
+        }
+
         const html = res.data;
 
         console.log(`[Profile HTML] Получено ${html ? html.length : 0} символов, тип: ${typeof html}`);

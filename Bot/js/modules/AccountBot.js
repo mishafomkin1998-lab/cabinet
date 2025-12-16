@@ -941,12 +941,20 @@ class AccountBot {
 
             user = users[Math.floor(Math.random() * users.length)];
 
+            // DEBUG: Логируем какие поля приходят из API users
+            console.log(`[User API] Данные пользователя ${user.AccountId}:`, JSON.stringify(user, null, 2));
+
             // Загружаем полный профиль пользователя для расширенных макросов
             try {
                 const fullProfile = await fetchUserProfile(this, user.AccountId);
                 if (fullProfile) {
                     // Объединяем базовые данные с полным профилем
                     user = { ...user, ...fullProfile };
+                    console.log(`[Profile] После объединения:`, {
+                        Occupation: user.Occupation,
+                        MaritalStatus: user.MaritalStatus,
+                        Children: user.Children
+                    });
                 }
             } catch (profileErr) {
                 console.warn(`⚠️ Не удалось загрузить профиль ${user.AccountId}:`, profileErr.message);
