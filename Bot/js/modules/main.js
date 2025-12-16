@@ -1398,17 +1398,9 @@ async function restoreSession() {
     try {
         // Загружаем из localStorage
         const s = JSON.parse(localStorage.getItem('savedBots') || '[]');
-        document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} анкет...` : "";
+        document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} из кэша...` : "";
 
-        // Задержка между логинами зависит от количества анкет
-        // Чем больше анкет - тем больше задержка чтобы не перегружать сервер
-        const delayMs = s.length > 50 ? 2000 : s.length > 20 ? 1500 : 1000;
-        console.log(`[RestoreSession] Восстановление ${s.length} анкет с задержкой ${delayMs}ms`);
-
-        for (let i = 0; i < s.length; i++) {
-            const a = s[i];
-            document.getElementById('restore-status').innerText = `Загрузка ${i + 1}/${s.length}...`;
-
+        for (const a of s) {
             const ok = await performLogin(a.login, a.pass, a.displayId);
             if (ok && bots[Object.keys(bots).pop()]) {
                 const botId = Object.keys(bots).pop();
@@ -1437,9 +1429,7 @@ async function restoreSession() {
                     toggleCustomIdsField(bot.id);
                 }
             }
-
-            // Задержка между логинами чтобы не перегружать сервер
-            await new Promise(r => setTimeout(r, delayMs));
+            await new Promise(r => setTimeout(r, 500));
         }
         
         document.getElementById('restore-status').innerText = "";
@@ -1658,11 +1648,11 @@ function exportAllData() {
     }
 }
 
-// ПОЛНЫЙ ИМПОРТ ВСЕХ ДАННЫХ (100% локально в localStorage)
-function handleFullImport(input) {
+// ПОЛНЫЙ ИМПОРТ ВСЕХ ДАННЫХ (последовательный логин без перезагрузки)
+async function handleFullImport(input) {
     if (!input.files.length) return;
 
-    if (!confirm('Внимание! Импорт перезапишет существующие данные.\nПосле импорта приложение перезагрузится.\n\nПродолжить?')) {
+    if (!confirm('Внимание! Импорт добавит анкеты из файла.\n\nПродолжить?')) {
         input.value = '';
         return;
     }
@@ -1674,100 +1664,130 @@ function handleFullImport(input) {
 
     const reader = new FileReader();
 
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
         try {
             const data = JSON.parse(e.target.result);
             console.log('[Import] 📥 Загружен файл, версия:', data.version || '1.0');
 
-            // Новый формат v2.1 - прямая запись в localStorage
-            if (data.version === '2.1' && data.savedBots) {
-                console.log('[Import] 📦 Формат v2.1 - прямая запись в localStorage');
+            let importedCount = 0;
+            let errorCount = 0;
 
-                // Записываем все данные напрямую в localStorage
-                if (data.savedBots) {
-                    localStorage.setItem('savedBots', JSON.stringify(data.savedBots));
-                    console.log('[Import] ✅ savedBots:', data.savedBots.length, 'анкет');
-                }
-                if (data.botTemplates) {
-                    localStorage.setItem('botTemplates', JSON.stringify(data.botTemplates));
-                    console.log('[Import] ✅ botTemplates');
-                }
-                if (data.accountPreferences) {
-                    localStorage.setItem('accountPreferences', JSON.stringify(data.accountPreferences));
-                    console.log('[Import] ✅ accountPreferences');
-                }
-                if (data.globalSettings) {
-                    localStorage.setItem('globalSettings', JSON.stringify(data.globalSettings));
-                    console.log('[Import] ✅ globalSettings');
-                }
-                if (data.promptTemplates) {
-                    localStorage.setItem('promptTemplates', JSON.stringify(data.promptTemplates));
-                    console.log('[Import] ✅ promptTemplates');
-                }
-                if (data.savedCameras) {
-                    localStorage.setItem('savedCameras', JSON.stringify(data.savedCameras));
-                    console.log('[Import] ✅ savedCameras');
-                }
-                if (data.favoriteTemplates) {
-                    localStorage.setItem('favoriteTemplates', JSON.stringify(data.favoriteTemplates));
-                    console.log('[Import] ✅ favoriteTemplates');
-                }
-
-                alert(`✅ Импорт завершён!\n\nВосстановлено ${data.savedBots?.length || 0} анкет.\nПриложение будет перезагружено.`);
-                setTimeout(() => location.reload(), 500);
-
-            } else {
-                // Старый формат - конвертируем в новый
-                console.log('[Import] 📦 Старый формат - конвертация');
-
-                // Шаблоны (старый ключ templates или botTemplates)
-                const templates = data.botTemplates || data.templates;
-                if (templates) {
-                    localStorage.setItem('botTemplates', JSON.stringify(templates));
-                }
-
-                // Глобальные настройки
-                if (data.globalSettings) {
-                    localStorage.setItem('globalSettings', JSON.stringify(data.globalSettings));
-                }
-
-                // Настройки аккаунтов
-                if (data.accountPreferences) {
-                    localStorage.setItem('accountPreferences', JSON.stringify(data.accountPreferences));
-                }
-
-                // Камеры
-                if (data.savedCameras) {
-                    localStorage.setItem('savedCameras', JSON.stringify(data.savedCameras));
-                }
-
-                // Боты - конвертируем старый формат в savedBots
-                if (data.bots && Array.isArray(data.bots)) {
-                    const savedBots = data.bots.map(bot => ({
-                        login: bot.login,
-                        pass: bot.pass,
-                        displayId: bot.displayId,
-                        vipList: bot.vipList || [],
-                        autoReplies: bot.chatSettings?.autoReplies || [],
-                        autoReplyEnabled: bot.chatSettings?.autoReplyEnabled || false,
-                        mailAuto: bot.mailSettings?.auto || false,
-                        mailTarget: bot.mailSettings?.target || 'online'
-                    }));
-                    localStorage.setItem('savedBots', JSON.stringify(savedBots));
-                    console.log('[Import] ✅ Конвертировано', savedBots.length, 'анкет');
-                }
-
-                alert(`✅ Импорт завершён!\nПриложение будет перезагружено.`);
-                setTimeout(() => location.reload(), 500);
+            // 1. Импортируем настройки (без перезагрузки)
+            if (data.globalSettings) {
+                globalSettings = { ...globalSettings, ...data.globalSettings };
+                localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+                console.log('[Import] ✅ globalSettings');
             }
+
+            // Шаблоны
+            const templates = data.botTemplates || data.templates;
+            if (templates) {
+                botTemplates = { ...botTemplates, ...templates };
+                localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+                console.log('[Import] ✅ botTemplates');
+            }
+
+            if (data.accountPreferences) {
+                accountPreferences = { ...accountPreferences, ...data.accountPreferences };
+                localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
+                console.log('[Import] ✅ accountPreferences');
+            }
+
+            if (data.promptTemplates) {
+                localStorage.setItem('promptTemplates', JSON.stringify(data.promptTemplates));
+                console.log('[Import] ✅ promptTemplates');
+            }
+
+            if (data.savedCameras) {
+                localStorage.setItem('savedCameras', JSON.stringify(data.savedCameras));
+                console.log('[Import] ✅ savedCameras');
+            }
+
+            if (data.favoriteTemplates) {
+                localStorage.setItem('favoriteTemplates', JSON.stringify(data.favoriteTemplates));
+                console.log('[Import] ✅ favoriteTemplates');
+            }
+
+            // 2. Определяем список ботов для импорта
+            let botsToImport = [];
+
+            // Новый формат v2.1
+            if (data.savedBots && Array.isArray(data.savedBots)) {
+                botsToImport = data.savedBots;
+            }
+            // Старый формат
+            else if (data.bots && Array.isArray(data.bots)) {
+                botsToImport = data.bots;
+            }
+
+            // 3. Последовательно логиним каждую анкету
+            const total = botsToImport.length;
+            for (let i = 0; i < total; i++) {
+                const botData = botsToImport[i];
+                const login = botData.login;
+                const pass = botData.pass;
+                const displayId = botData.displayId;
+
+                if (!login || !pass) {
+                    console.warn('[Import] ⚠️ Пропущен бот без логина/пароля');
+                    errorCount++;
+                    continue;
+                }
+
+                // Проверяем, не добавлен ли уже этот бот
+                const existingBot = Object.values(bots).find(b => b.login === login);
+                if (existingBot) {
+                    console.log(`[Import] ⏭️ Бот ${login} уже добавлен, пропускаем`);
+                    continue;
+                }
+
+                btn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> ${i + 1}/${total}...`;
+
+                try {
+                    const ok = await performLogin(login, pass, displayId);
+                    if (ok) {
+                        // Восстанавливаем настройки бота
+                        const bot = Object.values(bots).find(b => b.login === login);
+                        if (bot) {
+                            if (botData.vipList) bot.vipList = botData.vipList;
+                            if (botData.autoReplies) bot.chatSettings.autoReplies = botData.autoReplies;
+                            if (botData.autoReplyEnabled !== undefined) bot.chatSettings.autoReplyEnabled = botData.autoReplyEnabled;
+                            if (botData.mailAuto !== undefined) bot.mailSettings.auto = botData.mailAuto;
+                            if (botData.mailTarget) bot.mailSettings.target = botData.mailTarget;
+                            if (botData.mailSettings) bot.mailSettings = { ...bot.mailSettings, ...botData.mailSettings };
+                            if (botData.chatSettings) bot.chatSettings = { ...bot.chatSettings, ...botData.chatSettings };
+                        }
+                        importedCount++;
+                        console.log(`[Import] ✅ ${i + 1}/${total} ${login}`);
+                    } else {
+                        errorCount++;
+                        console.log(`[Import] ❌ ${i + 1}/${total} ${login} - ошибка логина`);
+                    }
+                } catch (err) {
+                    errorCount++;
+                    console.error(`[Import] ❌ ${login}:`, err.message);
+                }
+
+                // Задержка между логинами
+                await new Promise(r => setTimeout(r, 500));
+            }
+
+            // Сохраняем сессию
+            saveSession();
+
+            btn.innerHTML = origText;
+            btn.disabled = false;
+            input.value = '';
+
+            alert(`✅ Импорт завершён!\n\nДобавлено: ${importedCount} анкет${errorCount > 0 ? `\nОшибок: ${errorCount}` : ''}`);
 
         } catch (error) {
             console.error('[Import] ❌ Ошибка:', error);
             alert('Ошибка импорта: ' + error.message);
             btn.innerHTML = origText;
             btn.disabled = false;
+            input.value = '';
         }
-        input.value = '';
     };
 
     reader.onerror = function() {
