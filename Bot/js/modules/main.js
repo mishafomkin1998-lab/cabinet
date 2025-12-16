@@ -83,9 +83,27 @@ function createInterface(bot) {
             <div class="relative-box d-flex flex-column flex-grow-1">
                 <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." onclick="this.focus()" oninput="checkVarTrigger(this, 'vars-dropdown-${bot.id}'); bots['${bot.id}'].updateUI(); validateInput(this); autoSaveTemplateText('${bot.id}')" onblur="saveTemplateTextNow('${bot.id}')"></textarea>
                 <div id="vars-dropdown-${bot.id}" class="vars-dropdown">
-                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{City}', 'vars-dropdown-${bot.id}')"><b>{City}</b></div>
-                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{Name}', 'vars-dropdown-${bot.id}')"><b>{Name}</b></div>
-                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{Age}', 'vars-dropdown-${bot.id}')"><b>{Age}</b></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{name}', 'vars-dropdown-${bot.id}')"><b>{name}</b> <small>Имя</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{age}', 'vars-dropdown-${bot.id}')"><b>{age}</b> <small>Возраст</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{city}', 'vars-dropdown-${bot.id}')"><b>{city}</b> <small>Город</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{country}', 'vars-dropdown-${bot.id}')"><b>{country}</b> <small>Страна</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{occupation}', 'vars-dropdown-${bot.id}')"><b>{occupation}</b> <small>Профессия</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{marital}', 'vars-dropdown-${bot.id}')"><b>{marital}</b> <small>Сем. положение</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{zodiac}', 'vars-dropdown-${bot.id}')"><b>{zodiac}</b> <small>Знак зодиака</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{height}', 'vars-dropdown-${bot.id}')"><b>{height}</b> <small>Рост</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{weight}', 'vars-dropdown-${bot.id}')"><b>{weight}</b> <small>Вес</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{eye}', 'vars-dropdown-${bot.id}')"><b>{eye}</b> <small>Цвет глаз</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{hair}', 'vars-dropdown-${bot.id}')"><b>{hair}</b> <small>Цвет волос</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{education}', 'vars-dropdown-${bot.id}')"><b>{education}</b> <small>Образование</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{religion}', 'vars-dropdown-${bot.id}')"><b>{religion}</b> <small>Религия</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{smoking}', 'vars-dropdown-${bot.id}')"><b>{smoking}</b> <small>Курение</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{alcohol}', 'vars-dropdown-${bot.id}')"><b>{alcohol}</b> <small>Алкоголь</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{children}', 'vars-dropdown-${bot.id}')"><b>{children}</b> <small>Дети</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{wantchildren}', 'vars-dropdown-${bot.id}')"><b>{wantchildren}</b> <small>Хочет детей</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{languages}', 'vars-dropdown-${bot.id}')"><b>{languages}</b> <small>Языки</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{about}', 'vars-dropdown-${bot.id}')"><b>{about}</b> <small>О себе</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{lookingfor}', 'vars-dropdown-${bot.id}')"><b>{lookingfor}</b> <small>Ищу</small></div>
+                    <div class="vars-item" onclick="applyVar('msg-${bot.id}', '{interests}', 'vars-dropdown-${bot.id}')"><b>{interests}</b> <small>Интересы</small></div>
                 </div>
             </div>
             <div id="active-invite-${bot.id}" class="active-invite-box hide-in-mail"></div>

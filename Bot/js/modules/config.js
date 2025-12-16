@@ -97,6 +97,36 @@ let minichatPartnerId = null;
 let minichatLastMessageId = 0;
 let minichatType = 'mail'; // 'mail' или 'chat'
 
+// ============= ПЕРЕМЕННЫЕ ТРАНСКРИПЦИИ (макросы для подстановки) =============
+const TRANSCRIPTION_VARIABLES = [
+    // Базовые данные
+    { name: '{name}', desc: 'Имя', example: 'John' },
+    { name: '{age}', desc: 'Возраст', example: '38' },
+    { name: '{city}', desc: 'Город', example: 'Paris' },
+    { name: '{country}', desc: 'Страна', example: 'France' },
+    // Расширенные данные профиля
+    { name: '{occupation}', desc: 'Профессия', example: 'Engineer' },
+    { name: '{marital}', desc: 'Семейное положение', example: 'Single' },
+    { name: '{zodiac}', desc: 'Знак зодиака', example: 'Aries' },
+    { name: '{height}', desc: 'Рост (см)', example: '180' },
+    { name: '{weight}', desc: 'Вес (кг)', example: '75' },
+    { name: '{eye}', desc: 'Цвет глаз', example: 'Blue' },
+    { name: '{hair}', desc: 'Цвет волос', example: 'Brown' },
+    { name: '{education}', desc: 'Образование', example: 'University' },
+    { name: '{religion}', desc: 'Религия', example: 'Christian' },
+    { name: '{smoking}', desc: 'Курение', example: 'No' },
+    { name: '{alcohol}', desc: 'Алкоголь', example: 'Occasionally' },
+    { name: '{children}', desc: 'Дети', example: 'No' },
+    { name: '{wantchildren}', desc: 'Хочет детей', example: 'Yes' },
+    { name: '{languages}', desc: 'Языки', example: 'English, Spanish' },
+    { name: '{about}', desc: 'О себе', example: 'I love traveling...' },
+    { name: '{lookingfor}', desc: 'Ищу', example: 'Serious relationship' },
+    { name: '{interests}', desc: 'Интересы', example: 'Music, Sports' }
+];
+
+// Текущий textarea для контекстного меню транскрипции
+let currentContextMenuTextarea = null;
+
 // ============= API ДЛЯ ОТПРАВКИ ДАННЫХ НА LABABOT SERVER =============
 const LABABOT_SERVER = 'http://188.137.253.169:3000';
 
