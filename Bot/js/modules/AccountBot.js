@@ -941,24 +941,8 @@ class AccountBot {
 
             user = users[Math.floor(Math.random() * users.length)];
 
-            // DEBUG: Логируем какие поля приходят из API users
-            console.log(`[User API] Данные пользователя ${user.AccountId}:`, JSON.stringify(user, null, 2));
-
-            // Загружаем полный профиль пользователя для расширенных макросов
-            try {
-                const fullProfile = await fetchUserProfile(this, user.AccountId);
-                if (fullProfile) {
-                    // Объединяем базовые данные с полным профилем
-                    user = { ...user, ...fullProfile };
-                    console.log(`[Profile] После объединения:`, {
-                        Occupation: user.Occupation,
-                        MaritalStatus: user.MaritalStatus,
-                        Children: user.Children
-                    });
-                }
-            } catch (profileErr) {
-                console.warn(`⚠️ Не удалось загрузить профиль ${user.AccountId}:`, profileErr.message);
-            }
+            // Логируем доступные поля из API users (для отладки макросов)
+            console.log(`[User] ${user.AccountId} - доступные поля:`, Object.keys(user).join(', '));
 
             msgBody = this.replaceMacros(msgTemplate, user);
             const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
@@ -1332,16 +1316,8 @@ class AccountBot {
 
             user = users[Math.floor(Math.random() * users.length)];
 
-            // Загружаем полный профиль пользователя для расширенных макросов
-            try {
-                const fullProfile = await fetchUserProfile(this, user.AccountId);
-                if (fullProfile) {
-                    // Объединяем базовые данные с полным профилем
-                    user = { ...user, ...fullProfile };
-                }
-            } catch (profileErr) {
-                console.warn(`⚠️ Не удалось загрузить профиль ${user.AccountId}:`, profileErr.message);
-            }
+            // Логируем доступные поля из API users (для отладки макросов)
+            console.log(`[User Chat] ${user.AccountId} - доступные поля:`, Object.keys(user).join(', '));
 
             let msgBody = this.replaceMacros(currentMsgTemplate, user);
 
@@ -1586,39 +1562,62 @@ class AccountBot {
         if(!text) return "";
         let res = text;
 
-        // Базовые макросы (всегда доступны)
-        res = res.replace(/{name}/gi, user.Name || "dear");
-        res = res.replace(/{age}/gi, user.Age || "");
-        res = res.replace(/{city}/gi, user.City || "your city");
-        res = res.replace(/{country}/gi, user.Country || "your country");
+        // Хелпер для получения значения из нескольких возможных полей
+        const getField = (...keys) => {
+            for (const key of keys) {
+                if (user[key] !== undefined && user[key] !== null && user[key] !== '') {
+                    return user[key];
+                }
+            }
+            return '';
+        };
 
-        // Расширенные макросы (из полного профиля)
-        res = res.replace(/{occupation}/gi, user.Occupation || "");
-        res = res.replace(/{job}/gi, user.Occupation || ""); // Алиас
-        res = res.replace(/{marital}/gi, user.MaritalStatus || "");
-        res = res.replace(/{children}/gi, user.Children || "");
-        res = res.replace(/{wantchildren}/gi, user.WantChildren || "");
-        res = res.replace(/{height}/gi, user.Height || "");
-        res = res.replace(/{weight}/gi, user.Weight || "");
-        res = res.replace(/{hair}/gi, user.HairColor || "");
-        res = res.replace(/{eye}/gi, user.EyesColor || "");
-        res = res.replace(/{eyes}/gi, user.EyesColor || ""); // Алиас
-        res = res.replace(/{body}/gi, user.BodyType || "");
-        res = res.replace(/{zodiac}/gi, user.Zodiac || "");
-        res = res.replace(/{birthday}/gi, user.Birthday || "");
-        res = res.replace(/{religion}/gi, user.Religion || "");
-        res = res.replace(/{ethnicity}/gi, user.Ethnicity || "");
-        res = res.replace(/{education}/gi, user.Education || "");
-        res = res.replace(/{smoking}/gi, user.Smoke || "");
-        res = res.replace(/{smoke}/gi, user.Smoke || ""); // Алиас
-        res = res.replace(/{alcohol}/gi, user.Drink || "");
-        res = res.replace(/{drink}/gi, user.Drink || ""); // Алиас
-        res = res.replace(/{english}/gi, user.EnglishLevel || "");
-        res = res.replace(/{languages}/gi, user.Languages || "");
-        res = res.replace(/{hobby}/gi, user.Hobby || "");
-        res = res.replace(/{interests}/gi, user.Hobby || ""); // Алиас для hobby
-        res = res.replace(/{about}/gi, user.AboutMe || "");
-        res = res.replace(/{lookingfor}/gi, user.AboutPartner || "");
+        // Форматирование даты из ISO в читаемый формат
+        const formatDate = (dateStr) => {
+            if (!dateStr) return '';
+            try {
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return dateStr;
+                const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+            } catch {
+                return dateStr;
+            }
+        };
+
+        // Базовые макросы
+        res = res.replace(/{name}/gi, getField('Name', 'FirstName', 'name') || "dear");
+        res = res.replace(/{age}/gi, getField('Age', 'age') || "");
+        res = res.replace(/{city}/gi, getField('City', 'CityName', 'city') || "your city");
+        res = res.replace(/{country}/gi, getField('Country', 'CountryName', 'country') || "your country");
+
+        // Расширенные макросы - пробуем разные варианты имён полей из API
+        res = res.replace(/{occupation}/gi, getField('Occupation', 'Job', 'occupation', 'job'));
+        res = res.replace(/{job}/gi, getField('Occupation', 'Job', 'occupation', 'job'));
+        res = res.replace(/{marital}/gi, getField('MaritalStatus', 'FamilyStatus', 'Marital', 'maritalStatus'));
+        res = res.replace(/{children}/gi, getField('Children', 'Kids', 'children', 'kids'));
+        res = res.replace(/{wantchildren}/gi, getField('WantChildren', 'WantKids', 'wantChildren'));
+        res = res.replace(/{height}/gi, getField('Height', 'height'));
+        res = res.replace(/{weight}/gi, getField('Weight', 'weight'));
+        res = res.replace(/{hair}/gi, getField('HairColor', 'Hair', 'hairColor', 'hair'));
+        res = res.replace(/{eye}/gi, getField('EyesColor', 'EyeColor', 'Eyes', 'eyes', 'eyeColor'));
+        res = res.replace(/{eyes}/gi, getField('EyesColor', 'EyeColor', 'Eyes', 'eyes', 'eyeColor'));
+        res = res.replace(/{body}/gi, getField('BodyType', 'Body', 'bodyType'));
+        res = res.replace(/{zodiac}/gi, getField('Zodiac', 'ZodiacSign', 'zodiac'));
+        res = res.replace(/{birthday}/gi, formatDate(getField('Birthday', 'BirthDate', 'DateOfBirth', 'birthDate')));
+        res = res.replace(/{religion}/gi, getField('Religion', 'religion'));
+        res = res.replace(/{ethnicity}/gi, getField('Ethnicity', 'ethnicity'));
+        res = res.replace(/{education}/gi, getField('Education', 'education'));
+        res = res.replace(/{smoking}/gi, getField('Smoke', 'Smoking', 'smoke', 'smoking'));
+        res = res.replace(/{smoke}/gi, getField('Smoke', 'Smoking', 'smoke', 'smoking'));
+        res = res.replace(/{alcohol}/gi, getField('Drink', 'Drinking', 'Alcohol', 'drink', 'alcohol'));
+        res = res.replace(/{drink}/gi, getField('Drink', 'Drinking', 'Alcohol', 'drink', 'alcohol'));
+        res = res.replace(/{english}/gi, getField('EnglishLevel', 'English', 'englishLevel'));
+        res = res.replace(/{languages}/gi, getField('Languages', 'Language', 'languages'));
+        res = res.replace(/{hobby}/gi, getField('Hobby', 'Hobbies', 'Interests', 'hobby', 'interests'));
+        res = res.replace(/{interests}/gi, getField('Hobby', 'Hobbies', 'Interests', 'hobby', 'interests'));
+        res = res.replace(/{about}/gi, getField('AboutMe', 'About', 'Description', 'aboutMe'));
+        res = res.replace(/{lookingfor}/gi, getField('AboutPartner', 'LookingFor', 'lookingFor'));
 
         return res;
     }
