@@ -13,7 +13,6 @@ class AccountBot {
         this.mailStats = { sent: 0, errors: 0, waiting: 0 };
         this.mailHistory = { sent: [], errors: [], waiting: [] };
         this.mailSettings = { target: 'online', speed: 'smart', blacklist: [], photoOnly: false, auto: false };
-        this.isInRetryMode = false; // Флаг режима повторов (циклический)
         this.photoName = null;
         this.mailStartTime = null; // Время начала работы Mail
         this.mailTimerInterval = null; // Интервал обновления таймера Mail
@@ -22,7 +21,6 @@ class AccountBot {
         this.chatTimeout = null;
         this.chatStats = { sent: 0, errors: 0, waiting: 0 };
         this.chatHistory = { sent: [], errors: [], waiting: [] };
-        this.isInRetryModeChat = false; // Флаг режима повторов для чата (циклический)
         this.chatSettings = {
             target: 'online',
             speed: 'smart',
@@ -56,17 +54,13 @@ class AccountBot {
         this.lastMailId = 0;
         this.myBirthday = null;
 
-        // === Очередь повторов для неотправленных сообщений ===
-        this.mailRetryQueue = []; // { user, retryCount, failedAt }
-        this.chatRetryQueue = [];
+        // === Отслеживание отправленных пользователей ===
         this.mailContactedUsers = new Set(); // ID пользователей которым уже отправили в этой сессии
 
         // === Списки игнорирующих пользователей (сохраняются навсегда, раздельно для Mail и Chat) ===
         this.ignoredUsersMail = []; // ID пользователей, которые заигнорили в письмах
         this.ignoredUsersChat = []; // ID пользователей, которые заигнорили в чатах
         this.chatContactedUsers = new Set();
-        this.maxRetries = 3; // Максимум попыток
-        this.retryCooldownMs = 60000; // 1 минута между попытками
 
         // === ДОБАВЛЕНО: Отслеживание диалогов для полной спецификации ===
         this.conversations = {}; // Структура: { recipientId: { firstMessageTime, lastMessageTime, messageCount } }
@@ -833,11 +827,9 @@ class AccountBot {
             if (!this.isMailRunning) return;
             await this.processMailUser(text);
 
-            // Определяем задержку: обычная скорость или 60 сек для повторов
+            // Определяем задержку
             let nextDelay;
-            if (this.isInRetryMode) {
-                nextDelay = 60000; // 60 секунд для повторов
-            } else if (this.mailSettings.speed === 'smart') {
+            if (this.mailSettings.speed === 'smart') {
                 nextDelay = Math.floor(Math.random() * (120000 - 15000 + 1)) + 15000;
             } else {
                 nextDelay = parseInt(this.mailSettings.speed) * 1000;
@@ -852,8 +844,6 @@ class AccountBot {
     async processMailUser(msgTemplate) {
         let user = null;
         let msgBody = '';
-        let isRetryAttempt = false;
-        let currentRetryItem = null;
         try {
             const target = this.mailSettings.target;
             let users = [];
@@ -924,41 +914,16 @@ class AccountBot {
 
             // Если новых пользователей нет
             if (users.length === 0) {
-                // Retry queue обрабатывается ТОЛЬКО при target = 'online'
                 if (target === 'online') {
-                    // Фильтруем очередь - оставляем только тех, у кого меньше 3 попыток
-                    const pendingRetries = this.mailRetryQueue.filter(item => item.retryCount < this.maxRetries);
-
-                    if (pendingRetries.length > 0) {
-                        // Входим в режим повторов
-                        if (!this.isInRetryMode) {
-                            this.isInRetryMode = true;
-                            this.log(`🔄 Начинаем цикл повторов (${pendingRetries.length} пользователей)`);
-                        }
-
-                        // Берём первого из очереди (по порядку, не случайно)
-                        currentRetryItem = pendingRetries[0];
-                        user = currentRetryItem.user;
-                        currentRetryItem.retryCount++;
-                        isRetryAttempt = true;
-                        this.log(`🔄 Повтор: ${user.Name} (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
-                    } else {
-                        // Все повторы исчерпаны или очередь пуста
-                        if (this.isInRetryMode) {
-                            this.isInRetryMode = false;
-                            this.log(`✅ Цикл повторов завершён`);
-                        }
-                        this.log(`⏳ Нет онлайн пользователей. Ожидание...`);
-                        return;
-                    }
+                    // На online остаёмся ВСЕГДА и ждём новых пользователей
+                    this.log(`⏳ Нет онлайн пользователей. Ожидание...`);
+                    return;
                 } else {
-                    // Для других статусов (не online) - переключаемся на следующий статус
+                    // Для других статусов - переключаемся на следующий (если auto)
                     if (this.mailSettings.auto) {
-                        // Используем getNextActiveStatus для пропуска отключенных статусов
                         const newTarget = getNextActiveStatus(target);
                         this.log(`⚠️ Нет пользователей (${target}). Переход на ${newTarget}`);
                         this.mailSettings.target = newTarget;
-                        // Очищаем contacted при смене категории, но НЕ очищаем retry queue
                         this.mailContactedUsers.clear();
                         if(activeTabId === this.id) document.getElementById(`target-select-${this.id}`).value = newTarget;
                         return this.processMailUser(msgTemplate);
@@ -967,14 +932,9 @@ class AccountBot {
                         return;
                     }
                 }
-            } else {
-                // Есть новые пользователи - выходим из режима повторов если были в нём
-                if (this.isInRetryMode) {
-                    this.isInRetryMode = false;
-                    this.log(`📥 Новые онлайн пользователи - прерываем повторы`);
-                }
-                user = users[Math.floor(Math.random() * users.length)];
             }
+
+            user = users[Math.floor(Math.random() * users.length)];
 
             msgBody = this.replaceMacros(msgTemplate, user);
             const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
@@ -1035,24 +995,12 @@ class AccountBot {
                 if (this.mailSettings.target === 'custom-ids') {
                     markCustomIdSent(this.id, user.AccountId.toString());
                 }
-
-                if (isRetryAttempt) {
-                    this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                }
             } else {
                 // Нет CheckId - считаем как ошибку
                 const errorReason = extractApiError({ data: checkRes.data, status: 200 }, 'нет CheckId');
                 this.incrementStat('mail', 'errors');
                 this.mailHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                 this.log(`❌ Ошибка: не могу отправить письмо ${user.Name} (${user.AccountId}): ${errorReason}`);
-
-                // Добавляем в очередь повторов (если не retry или retry ещё не исчерпан)
-                if (!isRetryAttempt) {
-                    this.mailRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
-                } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
-                    this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                    this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
-                }
 
                 // Отправляем ошибку на сервер (с защитой от падения)
                 try {
@@ -1097,28 +1045,18 @@ class AccountBot {
                 this.mailHistory.errors.push(`${user?.AccountId || 'unknown'}: ${errorReason}`);
                 this.log(`❌ Ошибка: ${user?.Name || user?.AccountId || 'unknown'} - ${errorReason}`);
 
-                // Проверяем, стоит ли пытаться повторно (игнор-лист = бессмысленно повторять)
-                const skipRetry = errorReason.toLowerCase().includes('ignore') ||
+                // Проверяем игнор-лист или блокировку
+                const isIgnored = errorReason.toLowerCase().includes('ignore') ||
                                   errorReason.toLowerCase().includes('игнор') ||
                                   errorReason.toLowerCase().includes('block') ||
                                   errorReason.toLowerCase().includes('заблокир');
 
-                // Добавляем в очередь повторов (если есть смысл)
-                if (user && user.AccountId) {
-                    if (skipRetry) {
-                        // Игнор-лист или блокировка - добавляем в постоянный список игнора ПИСЕМ
-                        if (!this.ignoredUsersMail.includes(user.AccountId)) {
-                            this.ignoredUsersMail.push(user.AccountId);
-                            this.log(`⛔ ${user.Name} добавлен в игнор-лист писем (навсегда)`);
-                            saveIgnoredUsersToStorage(this.displayId, 'mail', this.ignoredUsersMail);
-                        }
-                        // Удаляем из очереди если уже был там
-                        this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                    } else if (!isRetryAttempt) {
-                        this.mailRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
-                    } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
-                        this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                        this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                // Добавляем в игнор-лист если это блокировка/игнор
+                if (user && user.AccountId && isIgnored) {
+                    if (!this.ignoredUsersMail.includes(user.AccountId)) {
+                        this.ignoredUsersMail.push(user.AccountId);
+                        this.log(`⛔ ${user.Name} добавлен в игнор-лист писем (навсегда)`);
+                        saveIgnoredUsersToStorage(this.displayId, 'mail', this.ignoredUsersMail);
                     }
                 }
 
@@ -1159,16 +1097,6 @@ class AccountBot {
             } else {
                 this.incrementStat('mail', 'errors');
                 this.mailHistory.errors.push(e.message);
-
-                // Добавляем в очередь повторов
-                if (user && user.AccountId) {
-                    if (!isRetryAttempt) {
-                        this.mailRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
-                    } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
-                        this.mailRetryQueue = this.mailRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                        this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
-                    }
-                }
 
                 // Отправляем ошибку на наш сервер через старый API (с защитой от падения)
                 try {
@@ -1305,11 +1233,9 @@ class AccountBot {
             if (!this.isChatRunning) return;
             await this.processChatUser(fullText);
 
-            // Определяем задержку: обычная скорость или 60 сек для повторов
+            // Определяем задержку
             let nextDelay;
-            if (this.isInRetryModeChat) {
-                nextDelay = 60000; // 60 секунд для повторов
-            } else if (this.chatSettings.speed === 'smart') {
+            if (this.chatSettings.speed === 'smart') {
                 nextDelay = Math.floor(Math.random() * (120000 - 15000 + 1)) + 15000;
             } else {
                 nextDelay = parseInt(this.chatSettings.speed) * 1000;
@@ -1351,10 +1277,8 @@ class AccountBot {
         }
         
         const currentMsgTemplate = invites[this.chatSettings.currentInviteIndex];
-        
+
         let user = null;
-        let isRetryAttempt = false;
-        let currentRetryItem = null;
 
         try {
             const target = this.chatSettings.target;
@@ -1371,48 +1295,13 @@ class AccountBot {
                 !this.ignoredUsersChat.includes(u.AccountId.toString())
             );
 
-            // Если новых пользователей нет
+            // Если новых пользователей нет - просто ждём
             if (users.length === 0) {
-                // Retry queue обрабатывается ТОЛЬКО при target = 'online'
-                if (target === 'online') {
-                    // Фильтруем очередь - оставляем только тех, у кого меньше 3 попыток
-                    const pendingRetries = this.chatRetryQueue.filter(item => item.retryCount < this.maxRetries);
-
-                    if (pendingRetries.length > 0) {
-                        // Входим в режим повторов
-                        if (!this.isInRetryModeChat) {
-                            this.isInRetryModeChat = true;
-                            this.log(`🔄 Начинаем цикл повторов чата (${pendingRetries.length} пользователей)`);
-                        }
-
-                        // Берём первого из очереди (по порядку, не случайно)
-                        currentRetryItem = pendingRetries[0];
-                        user = currentRetryItem.user;
-                        currentRetryItem.retryCount++;
-                        isRetryAttempt = true;
-                        this.log(`🔄 Повтор чата: ${user.Name} (попытка ${currentRetryItem.retryCount}/${this.maxRetries})`);
-                    } else {
-                        // Все повторы исчерпаны или очередь пуста
-                        if (this.isInRetryModeChat) {
-                            this.isInRetryModeChat = false;
-                            this.log(`✅ Цикл повторов чата завершён`);
-                        }
-                        this.log(`⏳ Нет онлайн пользователей для чата. Ожидание...`);
-                        return;
-                    }
-                } else {
-                    // Для payers - просто ждём (в чате нет auto-switch)
-                    this.log(`💬 Нет пользователей в категории ${target}. Ожидание...`);
-                    return;
-                }
-            } else {
-                // Есть новые пользователи - выходим из режима повторов если были в нём
-                if (this.isInRetryModeChat) {
-                    this.isInRetryModeChat = false;
-                    this.log(`📥 Новые онлайн пользователи - прерываем повторы чата`);
-                }
-                user = users[Math.floor(Math.random() * users.length)];
+                this.log(`⏳ Нет пользователей для чата (${target}). Ожидание...`);
+                return;
             }
+
+            user = users[Math.floor(Math.random() * users.length)];
 
             let msgBody = this.replaceMacros(currentMsgTemplate, user);
             
@@ -1459,11 +1348,8 @@ class AccountBot {
                 this.chatHistory.sent.push(`${user.AccountId} (${user.Name})`);
                 this.log(`💬 Сообщение чата отправлено: ${user.Name}`);
 
-                // Добавляем в "отправленные" и убираем из очереди повторов
+                // Добавляем в "отправленные"
                 this.chatContactedUsers.add(user.AccountId.toString());
-                if (isRetryAttempt) {
-                    this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                }
 
             } catch (chatErr) {
                 // Fallback: пытаемся отправить как письмо
@@ -1512,11 +1398,8 @@ class AccountBot {
                         this.chatHistory.sent.push(`${user.AccountId} (${user.Name})`);
                         this.log(`💬 Сообщение отправлено через письмо (fallback): ${user.Name}`);
 
-                        // Добавляем в "отправленные" и убираем из очереди повторов
+                        // Добавляем в "отправленные"
                         this.chatContactedUsers.add(user.AccountId.toString());
-                        if (isRetryAttempt) {
-                            this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                        }
                     } else {
                         // Нет CheckId в fallback - СЧИТАЕМ КАК ОШИБКУ
                         const errorReason = extractApiError({ data: checkRes.data, status: 200 }, 'нет CheckId (fallback)');
@@ -1524,26 +1407,17 @@ class AccountBot {
                         this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                         this.log(`❌ Ошибка: не могу отправить чат ${user.Name} (${user.AccountId}): ${errorReason}`);
 
-                        // Проверяем, стоит ли пытаться повторно
-                        const skipRetry = errorReason.toLowerCase().includes('ignore') ||
+                        // Проверяем игнор-лист или блокировку
+                        const isIgnored = errorReason.toLowerCase().includes('ignore') ||
                                           errorReason.toLowerCase().includes('игнор') ||
                                           errorReason.toLowerCase().includes('block') ||
                                           errorReason.toLowerCase().includes('заблокир');
 
-                        // Добавляем в очередь повторов (если есть смысл)
-                        if (skipRetry) {
-                            // Игнор-лист или блокировка - добавляем в постоянный список игнора ЧАТОВ
-                            if (!this.ignoredUsersChat.includes(user.AccountId)) {
-                                this.ignoredUsersChat.push(user.AccountId);
-                                this.log(`⛔ ${user.Name} добавлен в игнор-лист чатов (навсегда)`);
-                                saveIgnoredUsersToStorage(this.displayId, 'chat', this.ignoredUsersChat);
-                            }
-                            this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                        } else if (!isRetryAttempt) {
-                            this.chatRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
-                        } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
-                            this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                            this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                        // Добавляем в игнор-лист если это блокировка/игнор
+                        if (isIgnored && !this.ignoredUsersChat.includes(user.AccountId)) {
+                            this.ignoredUsersChat.push(user.AccountId);
+                            this.log(`⛔ ${user.Name} добавлен в игнор-лист чатов (навсегда)`);
+                            saveIgnoredUsersToStorage(this.displayId, 'chat', this.ignoredUsersChat);
                         }
 
                         // Отправляем ошибку на сервер
@@ -1585,27 +1459,18 @@ class AccountBot {
                         this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                         this.log(`❌ Ошибка API чата: ${errorReason}`);
 
-                        // Проверяем, стоит ли пытаться повторно
-                        const skipRetry = errorReason.toLowerCase().includes('ignore') ||
+                        // Проверяем игнор-лист или блокировку
+                        const isIgnored = errorReason.toLowerCase().includes('ignore') ||
                                           errorReason.toLowerCase().includes('игнор') ||
                                           errorReason.toLowerCase().includes('block') ||
                                           errorReason.toLowerCase().includes('заблокир');
 
-                        // Добавляем в очередь повторов (если есть смысл)
-                        if (user && user.AccountId) {
-                            if (skipRetry) {
-                                // Игнор-лист или блокировка - добавляем в постоянный список игнора ЧАТОВ
-                                if (!this.ignoredUsersChat.includes(user.AccountId)) {
-                                    this.ignoredUsersChat.push(user.AccountId);
-                                    this.log(`⛔ ${user.Name} добавлен в игнор-лист чатов (навсегда)`);
-                                    saveIgnoredUsersToStorage(this.displayId, 'chat', this.ignoredUsersChat);
-                                }
-                                this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                            } else if (!isRetryAttempt) {
-                                this.chatRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
-                            } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
-                                this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                                this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                        // Добавляем в игнор-лист если это блокировка/игнор
+                        if (user && user.AccountId && isIgnored) {
+                            if (!this.ignoredUsersChat.includes(user.AccountId)) {
+                                this.ignoredUsersChat.push(user.AccountId);
+                                this.log(`⛔ ${user.Name} добавлен в игнор-лист чатов (навсегда)`);
+                                saveIgnoredUsersToStorage(this.displayId, 'chat', this.ignoredUsersChat);
                             }
                         }
 
@@ -1650,27 +1515,18 @@ class AccountBot {
                 this.incrementStat('chat', 'errors');
                 this.chatHistory.errors.push(errorReason);
 
-                // Проверяем, стоит ли пытаться повторно
-                const skipRetry = errorReason.toLowerCase().includes('ignore') ||
+                // Проверяем игнор-лист или блокировку
+                const isIgnored = errorReason.toLowerCase().includes('ignore') ||
                                   errorReason.toLowerCase().includes('игнор') ||
                                   errorReason.toLowerCase().includes('block') ||
                                   errorReason.toLowerCase().includes('заблокир');
 
-                // Добавляем в очередь повторов (если есть смысл)
-                if (user && user.AccountId) {
-                    if (skipRetry) {
-                        // Игнор-лист или блокировка - добавляем в постоянный список игнора ЧАТОВ
-                        if (!this.ignoredUsersChat.includes(user.AccountId)) {
-                            this.ignoredUsersChat.push(user.AccountId);
-                            this.log(`⛔ ${user.Name} добавлен в игнор-лист чатов (навсегда)`);
-                            saveIgnoredUsersToStorage(this.displayId, 'chat', this.ignoredUsersChat);
-                        }
-                        this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                    } else if (!isRetryAttempt) {
-                        this.chatRetryQueue.push({ user, retryCount: 0, failedAt: Date.now() });
-                    } else if (currentRetryItem && currentRetryItem.retryCount >= this.maxRetries) {
-                        this.chatRetryQueue = this.chatRetryQueue.filter(item => item.user.AccountId !== user.AccountId);
-                        this.log(`🚫 Отказ от ${user.Name} после ${this.maxRetries} попыток`);
+                // Добавляем в игнор-лист если это блокировка/игнор
+                if (user && user.AccountId && isIgnored) {
+                    if (!this.ignoredUsersChat.includes(user.AccountId)) {
+                        this.ignoredUsersChat.push(user.AccountId);
+                        this.log(`⛔ ${user.Name} добавлен в игнор-лист чатов (навсегда)`);
+                        saveIgnoredUsersToStorage(this.displayId, 'chat', this.ignoredUsersChat);
                     }
                 }
 
