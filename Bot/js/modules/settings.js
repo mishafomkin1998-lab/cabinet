@@ -501,7 +501,7 @@ function addPromptTemplate(promptType) {
 
     const text = textarea.value.trim();
     if (!text) {
-        showToast('Сначала введите текст промпта в поле ниже');
+        showToast('Сначала введите текст промпта в поле ниже', 'warning');
         return;
     }
 
@@ -520,7 +520,7 @@ function addPromptTemplate(promptType) {
 async function confirmAddPromptTemplate() {
     const name = document.getElementById('prompt-name-input').value.trim();
     if (!name) {
-        showToast('Введите название шаблона');
+        showToast('Введите название шаблона', 'warning');
         return;
     }
 
@@ -586,7 +586,7 @@ async function confirmAddPromptTemplate() {
             }
         }
 
-        showToast('Шаблон сохранён!');
+        showToast('Шаблон сохранён!', 'success');
     } catch (err) {
         console.error('[confirmAddPromptTemplate] Ошибка:', err);
         showToast('Ошибка при добавлении шаблона: ' + err.message);
@@ -599,7 +599,7 @@ async function deletePromptTemplate(promptType) {
     const templateId = select.value;
 
     if (!templateId) {
-        showToast('Сначала выберите шаблон для удаления');
+        showToast('Сначала выберите шаблон для удаления', 'warning');
         return;
     }
 
@@ -640,7 +640,7 @@ async function deletePromptTemplate(promptType) {
         }
     }
 
-    showToast('Шаблон удалён');
+    showToast('Шаблон удалён', 'success');
 }
 
 // Сохранить текст промпта (при редактировании)

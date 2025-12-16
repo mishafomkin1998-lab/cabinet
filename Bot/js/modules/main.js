@@ -570,7 +570,7 @@ function clearStatsAll() {
     }
 
     renderStatsList();
-    showToast(`${typeName} ${modeName} очищены на ${count} анкетах`);
+    showToast(`${typeName} ${modeName} очищены на ${count} анкетах`, 'success');
 }
 
 // Генерация имени шаблона на основе даты
@@ -1363,13 +1363,13 @@ function copyIgnoredList(botId) {
     const list = isChat ? (bot.ignoredUsersChat || []) : (bot.ignoredUsersMail || []);
 
     if (list.length === 0) {
-        showToast('Список пуст');
+        showToast('Список пуст', 'warning');
         return;
     }
 
     const text = list.join('\n');
     navigator.clipboard.writeText(text).then(() => {
-        showToast(`Скопировано ${list.length} ID`);
+        showToast(`Скопировано ${list.length} ID`, 'success');
     }).catch(err => {
         console.error('Ошибка копирования:', err);
         showToast('Ошибка копирования');
@@ -1387,7 +1387,7 @@ function confirmClearIgnored(botId, type, event) {
     if (confirm(`Очистить игнор-лист ${typeName}? Это действие нельзя отменить.`)) {
         clearIgnoredUsers(botId, type);
         closeModal('ignored-modal');
-        showToast(`Игнор-лист ${typeName} очищен`);
+        showToast(`Игнор-лист ${typeName} очищен`, 'success');
     }
 }
 
@@ -1411,7 +1411,7 @@ function clearIgnoredAll(type) {
     }
 
     closeModal('ignored-modal');
-    showToast(`Игнор-лист ${typeName} очищен на ${count} анкетах`);
+    showToast(`Игнор-лист ${typeName} очищен на ${count} анкетах`, 'success');
 }
 
 async function saveSession() {

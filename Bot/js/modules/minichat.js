@@ -214,7 +214,7 @@ async function generateMiniChatAIReply() {
                 : aiStatus.reason === 'no_translator'
                 ? 'Анкете не назначен переводчик'
                 : 'AI недоступен для этой анкеты';
-            showToast(`⚠️ ${reason}`);
+            showToast(`⚠️ ${reason}`, 'warning');
             return;
         }
     }
@@ -224,7 +224,7 @@ async function generateMiniChatAIReply() {
     const myMessages = chatHistoryEl.querySelectorAll('.chat-msg.me .msg-bubble');
 
     if (partnerMessages.length === 0) {
-        showToast('Нет входящих сообщений для ответа');
+        showToast('Нет входящих сообщений для ответа', 'warning');
         btn.innerHTML = originalBtnHtml;
         btn.disabled = false;
         return;

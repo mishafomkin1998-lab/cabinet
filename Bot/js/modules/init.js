@@ -142,7 +142,7 @@ function setGlobalTarget(targetType) {
         }
     });
     saveSession();
-    showToast(`Всем установлен: ${targetType.toUpperCase()}`);
+    showToast(`Всем установлен: ${targetType.toUpperCase()}`, 'success');
 }
 
 // ============= ОТКЛЮЧЕНИЕ СТАТУСОВ (ПКМ) =============
@@ -255,7 +255,7 @@ function applyGlobalCustomIds() {
 
     const ids = parseCustomIds(input.value);
     if (ids.length === 0) {
-        showToast('Введите хотя бы один ID');
+        showToast('Введите хотя бы один ID', 'warning');
         return;
     }
 

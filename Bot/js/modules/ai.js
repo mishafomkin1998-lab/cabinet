@@ -78,7 +78,7 @@ async function handleAIActionWithTemplate(botId, action, templateId, event) {
                 : aiStatus.reason === 'no_translator'
                 ? 'Анкете не назначен переводчик'
                 : 'AI недоступен для этой анкеты';
-            showToast(`⚠️ ${reason}`);
+            showToast(`⚠️ ${reason}`, 'warning');
             return;
         }
     }
@@ -259,7 +259,7 @@ async function handleAIAction(botId, action, event) {
                 : aiStatus.reason === 'no_translator'
                 ? 'Анкете не назначен переводчик'
                 : 'AI недоступен для этой анкеты';
-            showToast(`⚠️ ${reason}`);
+            showToast(`⚠️ ${reason}`, 'warning');
             return;
         }
     }

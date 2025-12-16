@@ -211,9 +211,26 @@ function validateInput(textarea) {
     if (val !== original) { textarea.value = val; if (errorMsg) showToast(errorMsg); }
 }
 
-function showToast(text) {
+function showToast(text, type = 'error') {
     const t = document.getElementById('error-toast');
+    const icon = t.querySelector('i');
     document.getElementById('error-toast-text').innerText = text;
+
+    // Убираем все классы типов
+    t.classList.remove('toast-error', 'toast-success', 'toast-warning');
+
+    // Добавляем нужный класс и иконку
+    if (type === 'success') {
+        t.classList.add('toast-success');
+        icon.className = 'fa fa-check-circle';
+    } else if (type === 'warning') {
+        t.classList.add('toast-warning');
+        icon.className = 'fa fa-exclamation-triangle';
+    } else {
+        t.classList.add('toast-error');
+        icon.className = 'fa fa-exclamation-circle';
+    }
+
     t.classList.add('show');
     if(t.hideTimer) clearTimeout(t.hideTimer);
     t.hideTimer = setTimeout(() => { t.classList.remove('show'); }, 3000);
