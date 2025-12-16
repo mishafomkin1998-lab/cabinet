@@ -64,7 +64,7 @@
                     });
                 },
 
-                activeMenu: 'stats',
+                activeMenu: 'accounts', // По умолчанию открываем Анкеты (быстрая загрузка)
                 activeSubmenu: 'general',
                 showCalendar: false,
                 showAddAccountModal: false,
@@ -96,6 +96,9 @@
                 errorLogsOffset: 0, // Смещение для пагинации ошибок
                 loading: true,
                 error: null,
+
+                // Lazy loading: отслеживание загруженных вкладок
+                loadedTabs: {},
 
                 // Settings modal
                 showSettingsModal: false,
@@ -375,37 +378,94 @@
                 async loadAllData() {
                     this.loading = true;
                     try {
-                        const loadPromises = [
-                            this.loadDashboardStats(),
-                            this.loadAccounts(),
-                            this.loadBotsStatus(),
-                            this.loadTeam(),
-                            this.loadRecentActivity(),
-                            this.loadSentLettersGrouped(),
-                            this.loadFavoriteTemplates(),
-                            this.loadLastResponses(),
-                            this.loadAiUsage(),
-                            this.loadHourlyActivity(),
-                            this.loadTranslatorStats(),
-                            this.loadHistoryActions(),
-                            this.loadProfileHistory(),
-                            this.loadSavedPrompt(),
-                            this.loadUserBalance(),
-                            this.loadPricing(),
-                            this.loadControlSettings()
+                        // LAZY LOADING: Загружаем только критичные данные при старте
+                        // Остальное грузится при переключении на вкладку
+                        const essentialPromises = [
+                            this.loadDashboardStats(),  // Базовая статистика (быстро)
+                            this.loadAccounts(),        // Список анкет (нужен сразу)
+                            this.loadBotsStatus(),      // Статус ботов (нужен сразу)
+                            this.loadUserBalance(),     // Баланс пользователя
+                            this.loadPricing(),         // Тарифы (быстро)
+                            this.loadControlSettings()  // Настройки управления
                         ];
 
-                        // Загружаем финансовые данные только для директора
-                        if (this.currentUser.role === 'director') {
-                            loadPromises.push(this.loadFinanceData());
-                        }
+                        await Promise.all(essentialPromises);
 
-                        await Promise.all(loadPromises);
+                        // Помечаем accounts как загруженную вкладку
+                        this.loadedTabs.accounts = true;
+
+                        // Загружаем данные для текущей активной вкладки
+                        await this.loadTabData(this.activeMenu);
                     } catch (e) {
                         console.error('Error loading data:', e);
                         this.error = 'Ошибка загрузки данных';
                     }
                     this.loading = false;
+                },
+
+                // Lazy loading: загрузка данных для конкретной вкладки
+                async loadTabData(menu) {
+                    // Если вкладка уже загружена - пропускаем
+                    if (this.loadedTabs[menu]) {
+                        console.log(`📌 Tab '${menu}' already loaded, skipping`);
+                        return;
+                    }
+
+                    console.log(`📥 Lazy loading data for tab: ${menu}`);
+
+                    try {
+                        switch (menu) {
+                            case 'stats':
+                                // Статистика - тяжёлые запросы
+                                await Promise.all([
+                                    this.loadSentLettersGrouped(),
+                                    this.loadLastResponses(),
+                                    this.loadHourlyActivity(),
+                                    this.loadAiUsage(),
+                                    this.loadTranslatorStats(),
+                                    this.loadRecentActivity()
+                                ]);
+                                break;
+
+                            case 'team':
+                                await this.loadTeam();
+                                break;
+
+                            case 'history':
+                                await Promise.all([
+                                    this.loadHistoryActions(),
+                                    this.loadProfileHistory()
+                                ]);
+                                break;
+
+                            case 'finance':
+                                if (this.currentUser.role === 'director') {
+                                    await this.loadFinanceData();
+                                }
+                                break;
+
+                            case 'control':
+                                await Promise.all([
+                                    this.loadBotsStatus(),
+                                    this.refreshAllLogs()
+                                ]);
+                                break;
+
+                            case 'accounts':
+                                // Уже загружено в loadAllData
+                                await this.loadFavoriteTemplates();
+                                break;
+
+                            case 'training':
+                                await this.loadSavedPrompt();
+                                break;
+                        }
+
+                        this.loadedTabs[menu] = true;
+                        console.log(`✅ Tab '${menu}' loaded successfully`);
+                    } catch (e) {
+                        console.error(`Error loading tab ${menu}:`, e);
+                    }
                 },
 
                 async loadDashboardStats(preserveOnline = false) {
@@ -444,9 +504,11 @@
                     } catch (e) { console.error('loadDashboardStats error:', e); }
                 },
 
-                // Полное обновление всей статистики
+                // Полное обновление всей статистики (при смене фильтров)
                 async refreshAllStats() {
                     this.loading = true;
+                    // Сбрасываем кэш вкладки статистики для перезагрузки
+                    this.loadedTabs.stats = false;
                     try {
                         await Promise.all([
                             this.loadDashboardStats(),
@@ -457,6 +519,7 @@
                             this.loadAccounts(),
                             this.loadBotsStatus()
                         ]);
+                        this.loadedTabs.stats = true;
                         console.log('✅ Статистика обновлена');
                     } catch (e) {
                         console.error('refreshAllStats error:', e);
@@ -915,12 +978,8 @@
                     // Сохраняем активную вкладку в localStorage
                     localStorage.setItem('dashboard_activeMenu', menu);
 
-                    // При переключении на "Управление" загружаем статус ботов и логи
-                    if (menu === 'control') {
-                        console.log('🔄 Переключение на вкладку Управление - загружаем ботов и логи...');
-                        this.loadBotsStatus();
-                        this.refreshAllLogs();
-                    }
+                    // LAZY LOADING: загружаем данные для вкладки при переключении
+                    this.loadTabData(menu);
                 },
 
                 setActiveSubmenu(submenu) {
