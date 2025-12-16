@@ -780,4 +780,185 @@ function showPaymentDialog(profileId, canTrial) {
     });
 }
 
+// ============= ПОЛУЧЕНИЕ ПОЛНОГО ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ =============
+// Кэш профилей (чтобы не запрашивать повторно)
+const userProfileCache = new Map();
+const PROFILE_CACHE_TTL = 30 * 60 * 1000; // 30 минут
+
+// Очистка устаревших записей кэша
+function cleanProfileCache() {
+    const now = Date.now();
+    for (const [key, value] of userProfileCache.entries()) {
+        if (now - value.timestamp > PROFILE_CACHE_TTL) {
+            userProfileCache.delete(key);
+        }
+    }
+}
+setInterval(cleanProfileCache, 5 * 60 * 1000); // Очищаем каждые 5 минут
+
+// Получение полного профиля пользователя с парсингом HTML
+async function fetchUserProfile(bot, userId) {
+    // Проверяем кэш
+    const cacheKey = `${userId}`;
+    const cached = userProfileCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < PROFILE_CACHE_TTL)) {
+        console.log(`📋 Профиль ${userId} из кэша`);
+        return cached.data;
+    }
+
+    try {
+        console.log(`🔍 Загрузка профиля ${userId}...`);
+
+        // Запрашиваем страницу профиля
+        const res = await makeApiRequest(bot, 'GET', `/profile/${userId}`);
+        const html = res.data;
+
+        if (!html || typeof html !== 'string') {
+            console.warn(`⚠️ Не удалось загрузить профиль ${userId}`);
+            return null;
+        }
+
+        // Парсим данные из HTML
+        const profile = parseProfileHtml(html, userId);
+
+        // Сохраняем в кэш
+        userProfileCache.set(cacheKey, {
+            data: profile,
+            timestamp: Date.now()
+        });
+
+        console.log(`✅ Профиль ${userId} загружен:`, profile.Name, profile.Age, profile.City);
+        return profile;
+
+    } catch (error) {
+        console.error(`❌ Ошибка загрузки профиля ${userId}:`, error);
+        return null;
+    }
+}
+
+// Парсинг HTML страницы профиля
+function parseProfileHtml(html, userId) {
+    const profile = {
+        AccountId: userId,
+        Name: '',
+        Age: '',
+        City: '',
+        Country: '',
+        Occupation: '',
+        MaritalStatus: '',
+        Children: '',
+        Height: '',
+        Weight: '',
+        HairColor: '',
+        HairStyle: '',
+        EyesColor: '',
+        BodyType: '',
+        Zodiac: '',
+        Birthday: '',
+        Religion: '',
+        Ethnicity: '',
+        Education: '',
+        Smoke: '',
+        Drink: '',
+        EnglishLevel: '',
+        Hobby: '',
+        AboutMe: '',
+        AboutPartner: ''
+    };
+
+    try {
+        // Имя и возраст из хлебных крошек или заголовка
+        const nameAgeMatch = html.match(/<b>([^<]+)<\/b>,\s*<span>(\d+)<\/span>/);
+        if (nameAgeMatch) {
+            profile.Name = nameAgeMatch[1].trim();
+            profile.Age = nameAgeMatch[2].trim();
+        }
+
+        // Парсим поля из user_row-inner блоков
+        const extractField = (label) => {
+            // Ищем паттерн: <div class="name_row...">Label</div> ... <div class="value_row...">Value</div>
+            const regex = new RegExp(
+                `<div[^>]*class="name_row[^"]*"[^>]*>\\s*${label}\\s*</div>[\\s\\S]*?<div[^>]*class="value_row[^"]*"[^>]*>([\\s\\S]*?)</div>`,
+                'i'
+            );
+            const match = html.match(regex);
+            if (match && match[1]) {
+                // Очищаем от HTML тегов и лишних пробелов
+                let value = match[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+                return value;
+            }
+            return '';
+        };
+
+        // Location (город и страна)
+        const locationMatch = html.match(/<div[^>]*class="name_row[^"]*"[^>]*>\s*Location\s*<\/div>[\s\S]*?<div[^>]*class="value_row[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+        if (locationMatch) {
+            const locHtml = locationMatch[1];
+            const cityMatch = locHtml.match(/<span>([^<,]+)/);
+            if (cityMatch) profile.City = cityMatch[1].trim().replace(',', '');
+
+            const countryMatch = locHtml.match(/<a[^>]*>([^<]+)/);
+            if (countryMatch) profile.Country = countryMatch[1].trim();
+        }
+
+        // Остальные поля
+        profile.Occupation = extractField('Occupation');
+        profile.MaritalStatus = extractField('Marital Status');
+        profile.Children = extractField('Children');
+        profile.Height = extractField('Height');
+        profile.Weight = extractField('Weight');
+        profile.HairColor = extractField('Hair Color');
+        profile.HairStyle = extractField('Hair Style');
+        profile.EyesColor = extractField('Eyes Color');
+        profile.BodyType = extractField('Body Type');
+        profile.Religion = extractField('Religion');
+        profile.Ethnicity = extractField('Ethnicity');
+        profile.Education = extractField('Education');
+        profile.Smoke = extractField('Smoke');
+        profile.Drink = extractField('Drink');
+        profile.EnglishLevel = extractField('Level of English');
+
+        // Birthday и Zodiac
+        const birthdayMatch = html.match(/<div[^>]*class="name_row[^"]*"[^>]*>\s*Birthday\s*<\/div>[\s\S]*?<div[^>]*class="value_row[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+        if (birthdayMatch) {
+            const bdHtml = birthdayMatch[1];
+            // Зодиак
+            const zodiacMatch = bdHtml.match(/<a[^>]*>([^<]+)<\/a>/);
+            if (zodiacMatch) profile.Zodiac = zodiacMatch[1].trim();
+            // Дата рождения
+            const dateMatch = bdHtml.match(/(\d{1,2}\s+[A-Za-z]+\s+\d{4})/);
+            if (dateMatch) profile.Birthday = dateMatch[1].trim();
+        }
+
+        // Hobby
+        const hobbyMatch = html.match(/<h2[^>]*>Hobby<\/h2>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i);
+        if (hobbyMatch) {
+            profile.Hobby = hobbyMatch[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+        }
+
+        // About Myself
+        const aboutMatch = html.match(/<h2[^>]*>About Myself<\/h2>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i);
+        if (aboutMatch) {
+            profile.AboutMe = aboutMatch[1].replace(/<[^>]+>/g, '').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+        }
+
+        // About Partner
+        const partnerMatch = html.match(/<h2[^>]*>About Partner[^<]*<\/h2>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i);
+        if (partnerMatch) {
+            profile.AboutPartner = partnerMatch[1].replace(/<[^>]+>/g, '').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+        }
+
+    } catch (e) {
+        console.error('Ошибка парсинга профиля:', e);
+    }
+
+    return profile;
+}
+
+// Очистка кэша профилей (для использования извне)
+function clearProfileCache() {
+    userProfileCache.clear();
+    console.log('🗑️ Кэш профилей очищен');
+}
+
 // === КРИТИЧЕСКИ ВАЖНО: Скрипт "Анти-сон" ===

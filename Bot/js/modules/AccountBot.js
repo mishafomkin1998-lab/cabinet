@@ -941,6 +941,17 @@ class AccountBot {
 
             user = users[Math.floor(Math.random() * users.length)];
 
+            // Загружаем полный профиль пользователя для расширенных макросов
+            try {
+                const fullProfile = await fetchUserProfile(this, user.AccountId);
+                if (fullProfile) {
+                    // Объединяем базовые данные с полным профилем
+                    user = { ...user, ...fullProfile };
+                }
+            } catch (profileErr) {
+                console.warn(`⚠️ Не удалось загрузить профиль ${user.AccountId}:`, profileErr.message);
+            }
+
             msgBody = this.replaceMacros(msgTemplate, user);
             const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
 
@@ -1313,8 +1324,19 @@ class AccountBot {
 
             user = users[Math.floor(Math.random() * users.length)];
 
+            // Загружаем полный профиль пользователя для расширенных макросов
+            try {
+                const fullProfile = await fetchUserProfile(this, user.AccountId);
+                if (fullProfile) {
+                    // Объединяем базовые данные с полным профилем
+                    user = { ...user, ...fullProfile };
+                }
+            } catch (profileErr) {
+                console.warn(`⚠️ Не удалось загрузить профиль ${user.AccountId}:`, profileErr.message);
+            }
+
             let msgBody = this.replaceMacros(currentMsgTemplate, user);
-            
+
             try {
                 // 1. Пытаемся отправить через чат API
                 const payload = { recipientId: user.AccountId, body: msgBody };
@@ -1555,7 +1577,34 @@ class AccountBot {
     replaceMacros(text, user) {
         if(!text) return "";
         let res = text;
-        res = res.replace(/{city}/gi, user.City || "your city").replace(/{name}/gi, user.Name || "dear").replace(/{age}/gi, user.Age || "").replace(/{country}/gi, user.Country || "your country");
+
+        // Базовые макросы (всегда доступны)
+        res = res.replace(/{name}/gi, user.Name || "dear");
+        res = res.replace(/{age}/gi, user.Age || "");
+        res = res.replace(/{city}/gi, user.City || "your city");
+        res = res.replace(/{country}/gi, user.Country || "your country");
+
+        // Расширенные макросы (из полного профиля)
+        res = res.replace(/{occupation}/gi, user.Occupation || "");
+        res = res.replace(/{job}/gi, user.Occupation || ""); // Алиас для occupation
+        res = res.replace(/{marital}/gi, user.MaritalStatus || "");
+        res = res.replace(/{children}/gi, user.Children || "");
+        res = res.replace(/{height}/gi, user.Height || "");
+        res = res.replace(/{weight}/gi, user.Weight || "");
+        res = res.replace(/{hair}/gi, user.HairColor || "");
+        res = res.replace(/{eyes}/gi, user.EyesColor || "");
+        res = res.replace(/{body}/gi, user.BodyType || "");
+        res = res.replace(/{zodiac}/gi, user.Zodiac || "");
+        res = res.replace(/{birthday}/gi, user.Birthday || "");
+        res = res.replace(/{religion}/gi, user.Religion || "");
+        res = res.replace(/{ethnicity}/gi, user.Ethnicity || "");
+        res = res.replace(/{education}/gi, user.Education || "");
+        res = res.replace(/{smoke}/gi, user.Smoke || "");
+        res = res.replace(/{drink}/gi, user.Drink || "");
+        res = res.replace(/{english}/gi, user.EnglishLevel || "");
+        res = res.replace(/{hobby}/gi, user.Hobby || "");
+        res = res.replace(/{about}/gi, user.AboutMe || "");
+
         return res;
     }
 

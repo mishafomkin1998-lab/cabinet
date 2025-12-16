@@ -2864,10 +2864,34 @@
 
         // === ПЕРЕМЕННЫЕ ТРАНСКРИПЦИИ ===
         const TRANSCRIPTION_VARIABLES = [
-            { name: '{name}', desc: 'Имя', example: 'John Doe' },
+            // Базовые (всегда доступны)
+            { name: '{name}', desc: 'Имя', example: 'John' },
             { name: '{age}', desc: 'Возраст', example: '38' },
-            { name: '{city}', desc: 'Город', example: 'Paris' },
-            { name: '{country}', desc: 'Страна', example: 'France' }
+            { name: '{city}', desc: 'Город', example: 'Boulder' },
+            { name: '{country}', desc: 'Страна', example: 'United States' },
+            // Работа и статус
+            { name: '{occupation}', desc: 'Профессия', example: 'Engineer' },
+            { name: '{marital}', desc: 'Семейный статус', example: 'Divorced' },
+            { name: '{children}', desc: 'Дети', example: 'None' },
+            { name: '{education}', desc: 'Образование', example: 'University' },
+            // Внешность
+            { name: '{height}', desc: 'Рост', example: '178 cm' },
+            { name: '{weight}', desc: 'Вес', example: '117 kg' },
+            { name: '{hair}', desc: 'Цвет волос', example: 'Light Brown' },
+            { name: '{eyes}', desc: 'Цвет глаз', example: 'Brown' },
+            { name: '{body}', desc: 'Телосложение', example: 'Athletic' },
+            { name: '{ethnicity}', desc: 'Этническая группа', example: 'Caucasian' },
+            // Личное
+            { name: '{zodiac}', desc: 'Знак зодиака', example: 'Scorpio' },
+            { name: '{birthday}', desc: 'Дата рождения', example: '30 Oct 1982' },
+            { name: '{religion}', desc: 'Религия', example: 'Christian' },
+            // Привычки
+            { name: '{smoke}', desc: 'Курение', example: 'No' },
+            { name: '{drink}', desc: 'Алкоголь', example: 'On Occasions' },
+            { name: '{english}', desc: 'Уровень английского', example: 'Fluent' },
+            // Интересы
+            { name: '{hobby}', desc: 'Хобби', example: 'Kayaking' },
+            { name: '{about}', desc: 'О себе (текст)', example: '...' }
         ];
 
         // Текущий textarea для контекстного меню
