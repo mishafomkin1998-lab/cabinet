@@ -677,13 +677,13 @@ ipcMain.handle('open-response-window', async (event, data) => {
             session: ses,
             backgroundThrottling: false,
             preload: path.join(__dirname, 'preload-response.js'),
-            zoomFactor: 1.0 // Фиксированный масштаб 100%
+            zoomFactor: 0.8 // Масштаб 80% для большего контента
         }
     });
 
     // Устанавливаем масштаб после загрузки
     win.webContents.on('did-finish-load', () => {
-        win.webContents.setZoomFactor(1.0);
+        win.webContents.setZoomFactor(0.8);
     });
 
     // Сохраняем тип окна для AI

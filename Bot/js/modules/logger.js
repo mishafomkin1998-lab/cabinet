@@ -295,7 +295,7 @@ const Logger = {
             let content = ``;
             const partnerId = l.data && l.data.partnerId ? l.data.partnerId : '???';
             const partnerName = l.data && l.data.partnerName ? l.data.partnerName : `ID ${partnerId}`;
-            const targetBotDisplayId = bots[l.botId] ? bots[l.botId].displayId : '???';
+            const targetBotDisplayId = bots[l.botId] ? bots[l.botId].displayId : (closedBotsCache[l.botId] ? closedBotsCache[l.botId].displayId : '???');
 
             let linkAction = '';
             let logClass = '';
@@ -369,11 +369,16 @@ async function openResponseWindow(botId, partnerId, partnerName, type) {
         // Продолжаем выполнение - main process сфокусирует если существует, или создаст новое
     }
 
-    const bot = bots[botId];
-    if (!bot) {
-        console.error(`[ResponseWindow] Бот ${botId} не найден!`);
-        // Показываем сообщение пользователю
-        showToast('Сессия устарела. Перезагрузите бота или закройте это уведомление.');
+    // Пробуем найти бота в активных, затем в кэше закрытых
+    let botData = bots[botId];
+    if (!botData && closedBotsCache[botId]) {
+        botData = closedBotsCache[botId];
+        console.log(`[ResponseWindow] Бот ${botId} найден в кэше закрытых`);
+    }
+
+    if (!botData) {
+        console.error(`[ResponseWindow] Бот ${botId} не найден ни в активных, ни в кэше!`);
+        showToast('Анкета не найдена. Уведомление устарело.');
         return;
     }
 
@@ -394,8 +399,8 @@ async function openResponseWindow(botId, partnerId, partnerName, type) {
             partnerName,
             type,
             url: siteUrl,
-            login: bot.login,
-            pass: bot.pass
+            login: botData.login,
+            pass: botData.pass
         });
 
         if (result.success) {

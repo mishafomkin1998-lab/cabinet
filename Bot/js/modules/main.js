@@ -1557,17 +1557,24 @@ function closeTab(e, id) {
     e.stopPropagation();
     if(globalSettings.confirmTabClose && !confirm(`Закрыть вкладку ${bots[id].displayId}?`)) return;
     
-    if(bots[id]) { 
-        bots[id].stopMail(); bots[id].stopChat(); 
+    if(bots[id]) {
+        // Сохраняем данные бота в кэш для уведомлений
+        closedBotsCache[id] = {
+            login: bots[id].login,
+            pass: bots[id].pass,
+            displayId: bots[id].displayId
+        };
+
+        bots[id].stopMail(); bots[id].stopChat();
         bots[id].stopMonitoring();
-        clearInterval(bots[id].keepAliveTimer); 
+        clearInterval(bots[id].keepAliveTimer);
         clearInterval(bots[id].heartbeatInterval); // Останавливаем heartbeat
-        
+
         // === ВАЖНОЕ ДОБАВЛЕНИЕ: Удаляем webview ===
         const wv = document.getElementById(`webview-${id}`);
         if(wv) wv.remove();
-        
-        delete bots[id]; 
+
+        delete bots[id];
     }
     document.getElementById(`tab-${id}`).remove(); document.getElementById(`ws-${id}`).remove();
 

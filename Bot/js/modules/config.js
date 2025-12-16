@@ -21,6 +21,7 @@ function playSound(type) {
 }
 
 let bots = {};
+let closedBotsCache = {}; // Кэш данных закрытых ботов для уведомлений
 let botTemplates = JSON.parse(localStorage.getItem('botTemplates')) || {};
 let accountPreferences = JSON.parse(localStorage.getItem('accountPreferences')) || {};
 
