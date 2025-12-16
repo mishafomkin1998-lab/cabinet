@@ -327,9 +327,33 @@ router.get('/status', asyncHandler(async (req, res) => {
     const { filter: profileFilter, params } = buildRoleFilter(role, userId, { table: 'profiles', prefix: 'WHERE' });
 
     // 1. Получаем статус анкет (для обновления таблицы анкет)
-    // Включаем статистику по письмам, чатам и ошибкам за сегодня
+    // Оптимизированный запрос: используем CTE для агрегации вместо DISTINCT ON с большим JOIN
     const profilesQuery = `
-        SELECT DISTINCT ON (p.profile_id)
+        WITH latest_heartbeats AS (
+            SELECT DISTINCT ON (account_display_id)
+                account_display_id as profile_id,
+                bot_id,
+                status as heartbeat_status,
+                ip,
+                version,
+                platform,
+                timestamp as last_heartbeat
+            FROM heartbeats
+            ORDER BY account_display_id, timestamp DESC
+        ),
+        profile_stats AS (
+            SELECT
+                profile_id,
+                COUNT(*) FILTER (WHERE action_type = 'message_sent') as mail_today,
+                COUNT(*) FILTER (WHERE action_type = 'message_sent' AND created_at >= NOW() - INTERVAL '1 hour') as mail_hour,
+                COUNT(*) FILTER (WHERE action_type = 'chat_sent') as chat_today,
+                COUNT(*) FILTER (WHERE action_type = 'chat_sent' AND created_at >= NOW() - INTERVAL '1 hour') as chat_hour,
+                COUNT(*) FILTER (WHERE action_type = 'error') as errors_today
+            FROM activity_log
+            WHERE created_at >= CURRENT_DATE
+            GROUP BY profile_id
+        )
+        SELECT
             p.profile_id,
             p.note,
             p.paused,
@@ -337,37 +361,26 @@ router.get('/status', asyncHandler(async (req, res) => {
             p.assigned_admin_id as admin_id,
             p.assigned_translator_id as translator_id,
             h.bot_id,
-            h.status as heartbeat_status,
+            h.heartbeat_status,
             h.ip,
             h.version,
             h.platform,
-            h.timestamp as last_heartbeat,
+            h.last_heartbeat,
             CASE
-                WHEN h.timestamp > NOW() - INTERVAL '2 minutes' THEN 'online'
-                WHEN h.timestamp > NOW() - INTERVAL '10 minutes' THEN 'idle'
+                WHEN h.last_heartbeat > NOW() - INTERVAL '2 minutes' THEN 'online'
+                WHEN h.last_heartbeat > NOW() - INTERVAL '10 minutes' THEN 'idle'
                 ELSE 'offline'
             END as connection_status,
-            COALESCE(stats.mail_today, 0) as mail_today,
-            COALESCE(stats.mail_hour, 0) as mail_hour,
-            COALESCE(stats.chat_today, 0) as chat_today,
-            COALESCE(stats.chat_hour, 0) as chat_hour,
-            COALESCE(stats.errors_today, 0) as errors_today
+            COALESCE(s.mail_today, 0) as mail_today,
+            COALESCE(s.mail_hour, 0) as mail_hour,
+            COALESCE(s.chat_today, 0) as chat_today,
+            COALESCE(s.chat_hour, 0) as chat_hour,
+            COALESCE(s.errors_today, 0) as errors_today
         FROM allowed_profiles p
-        LEFT JOIN heartbeats h ON p.profile_id = h.account_display_id
-        LEFT JOIN (
-            SELECT
-                profile_id,
-                COUNT(*) FILTER (WHERE action_type = 'message_sent' AND created_at >= CURRENT_DATE) as mail_today,
-                COUNT(*) FILTER (WHERE action_type = 'message_sent' AND created_at >= NOW() - INTERVAL '1 hour') as mail_hour,
-                COUNT(*) FILTER (WHERE action_type = 'chat_sent' AND created_at >= CURRENT_DATE) as chat_today,
-                COUNT(*) FILTER (WHERE action_type = 'chat_sent' AND created_at >= NOW() - INTERVAL '1 hour') as chat_hour,
-                COUNT(*) FILTER (WHERE action_type = 'error' AND created_at >= CURRENT_DATE) as errors_today
-            FROM activity_log
-            WHERE created_at >= CURRENT_DATE
-            GROUP BY profile_id
-        ) stats ON p.profile_id = stats.profile_id
+        LEFT JOIN latest_heartbeats h ON p.profile_id = h.profile_id
+        LEFT JOIN profile_stats s ON p.profile_id = s.profile_id
         ${profileFilter}
-        ORDER BY p.profile_id, h.timestamp DESC NULLS LAST
+        ORDER BY p.profile_id
     `;
     const profilesResult = await pool.query(profilesQuery, params);
 

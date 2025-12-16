@@ -25,7 +25,47 @@ router.get('/', async (req, res) => {
             return res.json({ success: true, list: [] });
         }
 
+        // Оптимизированный запрос: используем CTE вместо LEFT JOIN LATERAL
+        // Это позволяет сканировать большие таблицы один раз вместо N раз
         const query = `
+            WITH admin_profiles AS (
+                SELECT
+                    assigned_admin_id as user_id,
+                    COUNT(*) as accounts_count,
+                    ARRAY_AGG(profile_id) as accounts
+                FROM allowed_profiles
+                WHERE assigned_admin_id IS NOT NULL
+                GROUP BY assigned_admin_id
+            ),
+            translator_profiles AS (
+                SELECT
+                    assigned_translator_id as user_id,
+                    COUNT(*) as accounts_count,
+                    ARRAY_AGG(profile_id) as accounts
+                FROM allowed_profiles
+                WHERE assigned_translator_id IS NOT NULL
+                GROUP BY assigned_translator_id
+            ),
+            admin_stats AS (
+                SELECT
+                    admin_id as user_id,
+                    COUNT(*) FILTER (WHERE action_type = 'letter') as letters_today,
+                    COUNT(*) FILTER (WHERE action_type = 'chat') as chats_today,
+                    COUNT(DISTINCT man_id) as unique_men_today
+                FROM activity_log
+                WHERE admin_id IS NOT NULL AND created_at >= CURRENT_DATE
+                GROUP BY admin_id
+            ),
+            translator_stats AS (
+                SELECT
+                    translator_id as user_id,
+                    COUNT(*) FILTER (WHERE action_type = 'letter') as letters_today,
+                    COUNT(*) FILTER (WHERE action_type = 'chat') as chats_today,
+                    COUNT(DISTINCT man_id) as unique_men_today
+                FROM activity_log
+                WHERE translator_id IS NOT NULL AND created_at >= CURRENT_DATE
+                GROUP BY translator_id
+            )
             SELECT
                 u.id,
                 u.username,
@@ -38,36 +78,39 @@ router.get('/', async (req, res) => {
                 u.ai_enabled,
                 u.is_own_translator,
                 u.created_at,
-                COALESCE(profiles.accounts_count, 0) as accounts_count,
-                COALESCE(stats.letters_today, 0) as letters_today,
-                COALESCE(stats.chats_today, 0) as chats_today,
                 CASE
-                    WHEN COALESCE(stats.letters_today, 0) > 0
-                    THEN ROUND((COALESCE(stats.unique_men_today, 0)::numeric / stats.letters_today) * 100, 1)
+                    WHEN u.role = 'admin' THEN COALESCE(ap.accounts_count, 0)
+                    ELSE COALESCE(tp.accounts_count, 0)
+                END as accounts_count,
+                CASE
+                    WHEN u.role = 'admin' THEN COALESCE(ast.letters_today, 0)
+                    ELSE COALESCE(tst.letters_today, 0)
+                END as letters_today,
+                CASE
+                    WHEN u.role = 'admin' THEN COALESCE(ast.chats_today, 0)
+                    ELSE COALESCE(tst.chats_today, 0)
+                END as chats_today,
+                CASE
+                    WHEN u.role = 'admin' THEN COALESCE(ast.unique_men_today, 0)
+                    ELSE COALESCE(tst.unique_men_today, 0)
+                END as unique_men_today,
+                CASE
+                    WHEN u.role = 'admin' AND COALESCE(ast.letters_today, 0) > 0
+                    THEN ROUND((COALESCE(ast.unique_men_today, 0)::numeric / ast.letters_today) * 100, 1)
+                    WHEN u.role = 'translator' AND COALESCE(tst.letters_today, 0) > 0
+                    THEN ROUND((COALESCE(tst.unique_men_today, 0)::numeric / tst.letters_today) * 100, 1)
                     ELSE 0
                 END as conversion,
                 CASE WHEN u.owner_id = $${params.length > 0 ? params.length : 1} THEN true ELSE false END as is_my_admin,
-                COALESCE(profiles.accounts, ARRAY[]::varchar[]) as accounts
+                CASE
+                    WHEN u.role = 'admin' THEN COALESCE(ap.accounts, ARRAY[]::varchar[])
+                    ELSE COALESCE(tp.accounts, ARRAY[]::varchar[])
+                END as accounts
             FROM users u
-            LEFT JOIN LATERAL (
-                SELECT
-                    COUNT(*) as accounts_count,
-                    ARRAY_AGG(p.profile_id) as accounts
-                FROM allowed_profiles p
-                WHERE
-                    (u.role = 'admin' AND p.assigned_admin_id = u.id)
-                    OR (u.role = 'translator' AND p.assigned_translator_id = u.id)
-            ) profiles ON true
-            LEFT JOIN LATERAL (
-                SELECT
-                    COUNT(*) FILTER (WHERE a.action_type = 'letter' AND DATE(a.created_at) = CURRENT_DATE) as letters_today,
-                    COUNT(*) FILTER (WHERE a.action_type = 'chat' AND DATE(a.created_at) = CURRENT_DATE) as chats_today,
-                    COUNT(DISTINCT CASE WHEN DATE(a.created_at) = CURRENT_DATE THEN a.man_id END) as unique_men_today
-                FROM activity_log a
-                WHERE
-                    (u.role = 'admin' AND a.admin_id = u.id)
-                    OR (u.role = 'translator' AND a.translator_id = u.id)
-            ) stats ON true
+            LEFT JOIN admin_profiles ap ON u.role = 'admin' AND ap.user_id = u.id
+            LEFT JOIN translator_profiles tp ON u.role = 'translator' AND tp.user_id = u.id
+            LEFT JOIN admin_stats ast ON u.role = 'admin' AND ast.user_id = u.id
+            LEFT JOIN translator_stats tst ON u.role = 'translator' AND tst.user_id = u.id
             ${filter}
             ORDER BY u.role, u.username
         `;
