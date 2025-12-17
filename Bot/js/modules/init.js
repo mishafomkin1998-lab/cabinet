@@ -489,25 +489,36 @@ function openAutoClearSettings(event) {
 
     // Определяем текущий режим (Mail/Chat)
     const isChat = globalMode === 'chat';
-    const settings = isChat ? globalSettings.autoClearChat : globalSettings.autoClearMail;
 
-    // Инициализируем настройки если их нет
-    if (!settings) {
-        if (isChat) {
-            globalSettings.autoClearChat = { byTimeEnabled: true, byTimeMinutes: 120, byErrorsEnabled: false, byErrorsCount: 100 };
-        } else {
-            globalSettings.autoClearMail = { byTimeEnabled: true, byTimeMinutes: 120, byErrorsEnabled: false, byErrorsCount: 100 };
-        }
+    // Инициализируем настройки ошибок если их нет
+    if (isChat && !globalSettings.autoClearChat) {
+        globalSettings.autoClearChat = { byTimeEnabled: false, byTimeMinutes: '', byErrorsEnabled: false, byErrorsCount: '' };
+    } else if (!isChat && !globalSettings.autoClearMail) {
+        globalSettings.autoClearMail = { byTimeEnabled: false, byTimeMinutes: '', byErrorsEnabled: false, byErrorsCount: '' };
+    }
+
+    // Инициализируем настройки отправленных если их нет
+    if (isChat && !globalSettings.autoClearSentChat) {
+        globalSettings.autoClearSentChat = { byTimeEnabled: false, byTimeMinutes: '', bySentEnabled: false, bySentCount: '' };
+    } else if (!isChat && !globalSettings.autoClearSentMail) {
+        globalSettings.autoClearSentMail = { byTimeEnabled: false, byTimeMinutes: '', bySentEnabled: false, bySentCount: '' };
     }
 
     const currentSettings = isChat ? globalSettings.autoClearChat : globalSettings.autoClearMail;
+    const currentSentSettings = isChat ? globalSettings.autoClearSentChat : globalSettings.autoClearSentMail;
 
-    // Обновляем UI модалки
+    // Обновляем UI модалки - секция Ошибки
     document.getElementById('auto-clear-mode-label').textContent = isChat ? 'Chat' : 'Mail';
     document.getElementById('auto-clear-by-time-enabled').checked = currentSettings.byTimeEnabled;
-    document.getElementById('auto-clear-time-value').value = currentSettings.byTimeMinutes;
+    document.getElementById('auto-clear-time-value').value = currentSettings.byTimeMinutes || '';
     document.getElementById('auto-clear-by-errors-enabled').checked = currentSettings.byErrorsEnabled;
-    document.getElementById('auto-clear-errors-value').value = currentSettings.byErrorsCount;
+    document.getElementById('auto-clear-errors-value').value = currentSettings.byErrorsCount || '';
+
+    // Обновляем UI модалки - секция Отправленные
+    document.getElementById('auto-clear-sent-by-time-enabled').checked = currentSentSettings?.byTimeEnabled || false;
+    document.getElementById('auto-clear-sent-time-value').value = currentSentSettings?.byTimeMinutes || '';
+    document.getElementById('auto-clear-sent-by-count-enabled').checked = currentSentSettings?.bySentEnabled || false;
+    document.getElementById('auto-clear-sent-count-value').value = currentSentSettings?.bySentCount || '';
 
     openModal('auto-clear-modal');
 }
@@ -516,21 +527,32 @@ function openAutoClearSettings(event) {
 function saveAutoClearSettings() {
     const isChat = globalMode === 'chat';
 
-    const settings = {
+    // Настройки ошибок
+    const errorSettings = {
         byTimeEnabled: document.getElementById('auto-clear-by-time-enabled').checked,
-        byTimeMinutes: parseInt(document.getElementById('auto-clear-time-value').value) || 120,
+        byTimeMinutes: document.getElementById('auto-clear-time-value').value ? parseInt(document.getElementById('auto-clear-time-value').value) : '',
         byErrorsEnabled: document.getElementById('auto-clear-by-errors-enabled').checked,
-        byErrorsCount: parseInt(document.getElementById('auto-clear-errors-value').value) || 100
+        byErrorsCount: document.getElementById('auto-clear-errors-value').value ? parseInt(document.getElementById('auto-clear-errors-value').value) : ''
+    };
+
+    // Настройки отправленных
+    const sentSettings = {
+        byTimeEnabled: document.getElementById('auto-clear-sent-by-time-enabled').checked,
+        byTimeMinutes: document.getElementById('auto-clear-sent-time-value').value ? parseInt(document.getElementById('auto-clear-sent-time-value').value) : '',
+        bySentEnabled: document.getElementById('auto-clear-sent-by-count-enabled').checked,
+        bySentCount: document.getElementById('auto-clear-sent-count-value').value ? parseInt(document.getElementById('auto-clear-sent-count-value').value) : ''
     };
 
     if (isChat) {
-        globalSettings.autoClearChat = settings;
+        globalSettings.autoClearChat = errorSettings;
+        globalSettings.autoClearSentChat = sentSettings;
     } else {
-        globalSettings.autoClearMail = settings;
+        globalSettings.autoClearMail = errorSettings;
+        globalSettings.autoClearSentMail = sentSettings;
     }
 
     localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
-    console.log(`[AutoClear] Настройки ${isChat ? 'Chat' : 'Mail'} сохранены:`, settings);
+    console.log(`[AutoClear] Настройки ${isChat ? 'Chat' : 'Mail'} сохранены:`, { errors: errorSettings, sent: sentSettings });
 }
 
 // Проверка условий автоочистки для бота (вызывается в scheduleNextMail/scheduleNextChat)
@@ -588,6 +610,72 @@ function performAutoClear(mode) {
 
     if (totalCleared > 0) {
         console.log(`[AutoClear] ${mode}: Очищено ${totalCleared} ошибок по всем анкетам`);
+    }
+}
+
+// Проверка условий автоочистки отправленных для бота
+function checkAutoClearSentConditions(bot, mode) {
+    const isChat = mode === 'chat';
+    const settings = isChat ? globalSettings.autoClearSentChat : globalSettings.autoClearSentMail;
+    if (!settings) return false;
+
+    const stats = isChat ? bot.chatStats : bot.mailStats;
+    const startTime = isChat ? bot.chatStartTime : bot.mailStartTime;
+
+    let shouldClear = false;
+
+    // Условие 1: По времени
+    if (settings.byTimeEnabled && settings.byTimeMinutes && startTime) {
+        const elapsedMinutes = (Date.now() - startTime) / 60000;
+        if (elapsedMinutes >= settings.byTimeMinutes) {
+            shouldClear = true;
+            console.log(`[AutoClearSent] ${bot.displayId} - условие времени (${Math.floor(elapsedMinutes)} мин >= ${settings.byTimeMinutes} мин)`);
+        }
+    }
+
+    // Условие 2: По количеству отправленных
+    if (settings.bySentEnabled && settings.bySentCount && stats.sent >= settings.bySentCount) {
+        shouldClear = true;
+        console.log(`[AutoClearSent] ${bot.displayId} - условие отправленных (${stats.sent} >= ${settings.bySentCount})`);
+    }
+
+    return shouldClear;
+}
+
+// Выполнить автоочистку отправленных для всех ботов
+function performAutoClearSent(mode) {
+    const isChat = mode === 'chat';
+    let totalCleared = 0;
+
+    Object.values(bots).forEach(bot => {
+        const stats = isChat ? bot.chatStats : bot.mailStats;
+        const history = isChat ? bot.chatHistory : bot.mailHistory;
+
+        if (stats.sent > 0) {
+            totalCleared += stats.sent;
+            stats.sent = 0;
+            if (history) history.sent = [];
+
+            // Очищаем список контактов (contactedUsers)
+            if (isChat) {
+                if (bot.chatContactedUsers) bot.chatContactedUsers.clear();
+            } else {
+                if (bot.mailContactedUsers) bot.mailContactedUsers.clear();
+            }
+
+            bot.updateUI();
+        }
+
+        // Сбрасываем время старта для отсчёта следующего интервала
+        if (isChat) {
+            bot.chatStartTime = Date.now();
+        } else {
+            bot.mailStartTime = Date.now();
+        }
+    });
+
+    if (totalCleared > 0) {
+        console.log(`[AutoClearSent] ${mode}: Очищено ${totalCleared} отправленных по всем анкетам, списки контактов сброшены`);
     }
 }
 

@@ -972,6 +972,11 @@ class AccountBot {
                 performAutoClear('mail');
             }
 
+            // Проверяем условия автоочистки отправленных
+            if (checkAutoClearSentConditions(this, 'mail')) {
+                performAutoClearSent('mail');
+            }
+
             // Определяем задержку
             let nextDelay;
             if (this.mailSettings.speed === 'smart') {
@@ -1390,6 +1395,11 @@ class AccountBot {
             // Проверяем условия автоочистки ошибок
             if (checkAutoClearConditions(this, 'chat')) {
                 performAutoClear('chat');
+            }
+
+            // Проверяем условия автоочистки отправленных
+            if (checkAutoClearSentConditions(this, 'chat')) {
+                performAutoClearSent('chat');
             }
 
             // Определяем задержку

@@ -501,30 +501,54 @@
         </div>
     </div>
 
-    <!-- Модальное окно: Автоочистка ошибок -->
+    <!-- Модальное окно: Автоочистка -->
     <div id="auto-clear-modal" class="modal-overlay">
-        <div class="modal-card" style="width: 380px;">
-            <h5><i class="fa fa-eraser text-warning"></i> Автоочистка ошибок</h5>
+        <div class="modal-card" style="width: 400px;">
+            <h5><i class="fa fa-eraser text-warning"></i> Автоочистка</h5>
             <p class="text-muted small mb-3">Режим: <b id="auto-clear-mode-label">Mail</b></p>
 
-            <div class="mb-3">
+            <!-- Секция: Автоочистка отправленных -->
+            <div class="mb-3 p-2 border rounded bg-light">
+                <div class="fw-bold small text-success mb-2"><i class="fa fa-paper-plane"></i> Автоочистка отправленных</div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="auto-clear-sent-by-time-enabled" onchange="saveAutoClearSettings()">
+                    <label class="form-check-label" for="auto-clear-sent-by-time-enabled">
+                        Автоочистка через
+                        <input type="number" id="auto-clear-sent-time-value" class="form-control form-control-sm d-inline-block" style="width: 70px;" placeholder="" min="1" onchange="saveAutoClearSettings()">
+                        минут
+                    </label>
+                </div>
+                <small class="text-muted d-block ms-4 mb-2">От момента нажатия "Старт"</small>
+
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="auto-clear-sent-by-count-enabled" onchange="saveAutoClearSettings()">
+                    <label class="form-check-label" for="auto-clear-sent-by-count-enabled">
+                        Автоочистка через
+                        <input type="number" id="auto-clear-sent-count-value" class="form-control form-control-sm d-inline-block" style="width: 70px;" placeholder="" min="1" onchange="saveAutoClearSettings()">
+                        отправленных
+                    </label>
+                </div>
+                <small class="text-muted d-block ms-4">Когда накопится указанное количество</small>
+            </div>
+
+            <!-- Секция: Автоочистка ошибок -->
+            <div class="mb-3 p-2 border rounded bg-light">
+                <div class="fw-bold small text-danger mb-2"><i class="fa fa-exclamation-triangle"></i> Автоочистка ошибок</div>
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="checkbox" id="auto-clear-by-time-enabled" onchange="saveAutoClearSettings()">
                     <label class="form-check-label" for="auto-clear-by-time-enabled">
                         Автоочистка через
-                        <input type="number" id="auto-clear-time-value" class="form-control form-control-sm d-inline-block" style="width: 70px;" value="120" min="1" onchange="saveAutoClearSettings()">
+                        <input type="number" id="auto-clear-time-value" class="form-control form-control-sm d-inline-block" style="width: 70px;" placeholder="" min="1" onchange="saveAutoClearSettings()">
                         минут
                     </label>
                 </div>
-                <small class="text-muted d-block ms-4">От момента нажатия "Старт"</small>
-            </div>
+                <small class="text-muted d-block ms-4 mb-2">От момента нажатия "Старт"</small>
 
-            <div class="mb-3">
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="checkbox" id="auto-clear-by-errors-enabled" onchange="saveAutoClearSettings()">
                     <label class="form-check-label" for="auto-clear-by-errors-enabled">
                         Автоочистка через
-                        <input type="number" id="auto-clear-errors-value" class="form-control form-control-sm d-inline-block" style="width: 70px;" value="100" min="1" onchange="saveAutoClearSettings()">
+                        <input type="number" id="auto-clear-errors-value" class="form-control form-control-sm d-inline-block" style="width: 70px;" placeholder="" min="1" onchange="saveAutoClearSettings()">
                         ошибок
                     </label>
                 </div>
