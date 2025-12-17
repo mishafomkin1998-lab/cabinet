@@ -880,6 +880,13 @@ class AccountBot {
     async startMail(text) {
         if(!this.token) return;
 
+        // КРИТИЧНО: Защита от запуска Mail в режиме Chat
+        if (globalMode === 'chat') {
+            console.error(`[SECURITY] Попытка запустить Mail в режиме Chat! Заблокировано.`);
+            this.log(`⛔ Ошибка: нельзя запустить письма в режиме чата`);
+            return;
+        }
+
         // Проверяем panic mode с сервера
         if (controlStatus.panicMode) {
             this.log(`🚨 Запуск заблокирован - активен Panic Mode`);
@@ -1299,6 +1306,13 @@ class AccountBot {
 
     async startChat(fullText) {
         if(!this.token) return;
+
+        // КРИТИЧНО: Защита от запуска Chat в режиме Mail
+        if (globalMode === 'mail') {
+            console.error(`[SECURITY] Попытка запустить Chat в режиме Mail! Заблокировано.`);
+            this.log(`⛔ Ошибка: нельзя запустить чат в режиме писем`);
+            return;
+        }
 
         // Проверяем panic mode с сервера
         if (controlStatus.panicMode) {

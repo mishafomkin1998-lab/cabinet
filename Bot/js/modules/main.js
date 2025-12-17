@@ -1002,14 +1002,10 @@ function updateTemplateDropdown(botId, forceSelectIndex = null) {
          validateInput(area);
     } else {
          sel.value="";
-         // НЕ блокируем textarea если в ней есть текст
-         if (currentText && currentText.trim() !== '') {
-             area.disabled = false;
-             area.value = currentText;
-         } else {
-             area.disabled = true;
-             area.value = "";
-         }
+         // КРИТИЧНО: При переключении режима ВСЕГДА очищаем textarea!
+         // Текст из Mail НИКОГДА не должен попасть в Chat и наоборот!
+         area.disabled = true;
+         area.value = "";
          if(btnFav) btnFav.classList.remove('btn-heart-active');
          bots[botId].updateUI();
     }
