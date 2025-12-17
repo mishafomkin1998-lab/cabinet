@@ -336,7 +336,22 @@ function toggleGlobalMode() {
         activeTabId
     });
 
+    // DEBUG: Показать состояние ВСЕХ textarea ДО обновления
+    console.log(`%c[DEBUG-TPL] 📋 ВСЕ TEXTAREA ДО обновления:`, 'background: #3498db; color: white; padding: 2px 5px;');
+    Object.values(bots).forEach(b => {
+        const textarea = document.getElementById(`msg-${b.id}`);
+        console.log(`  ${b.displayId}: "${textarea?.value?.substring(0, 50)}..."`);
+    });
+
     if(activeTabId && bots[activeTabId]) updateInterfaceForMode(activeTabId);
+
+    // DEBUG: Показать состояние ВСЕХ textarea ПОСЛЕ обновления
+    console.log(`%c[DEBUG-TPL] 📋 ВСЕ TEXTAREA ПОСЛЕ обновления:`, 'background: #27ae60; color: white; padding: 2px 5px;');
+    Object.values(bots).forEach(b => {
+        const textarea = document.getElementById(`msg-${b.id}`);
+        const isActive = b.id === activeTabId ? '✅ АКТИВНАЯ' : '⬜ неактивная';
+        console.log(`  ${isActive} ${b.displayId}: "${textarea?.value?.substring(0, 50)}..."`);
+    });
 }
 
 function updateBotCount() { document.getElementById('global-bot-count').innerText = `Анкет: ${Object.keys(bots).length}`; }
