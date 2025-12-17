@@ -654,14 +654,9 @@ function performAutoClearSent(mode) {
         if (stats.sent > 0) {
             totalCleared += stats.sent;
             stats.sent = 0;
-            if (history) history.sent = [];
 
-            // Очищаем список контактов (contactedUsers)
-            if (isChat) {
-                if (bot.chatContactedUsers) bot.chatContactedUsers.clear();
-            } else {
-                if (bot.mailContactedUsers) bot.mailContactedUsers.clear();
-            }
+            // Очищаем историю отправок (это и есть список контактов для фильтрации)
+            if (history) history.sent = [];
 
             bot.updateUI();
         }
@@ -675,7 +670,7 @@ function performAutoClearSent(mode) {
     });
 
     if (totalCleared > 0) {
-        console.log(`[AutoClearSent] ${mode}: Очищено ${totalCleared} отправленных по всем анкетам, списки контактов сброшены`);
+        console.log(`[AutoClearSent] ${mode}: Очищено ${totalCleared} отправленных, история сброшена - бот сможет писать тем же людям`);
     }
 }
 
