@@ -154,13 +154,10 @@ function createInterface(bot) {
                 </div>
             </div>
             <div class="action-log-wrapper mt-2">
-                <div class="action-log-header">
-                    <span class="action-log-title">Лог действий</span>
-                    <button class="btn-expand-log" onclick="openLogModal('${bot.id}')" title="Развернуть лог">
-                        <i class="fa fa-expand"></i> Развернуть
-                    </button>
-                </div>
                 <div id="log-${bot.id}" class="action-log"></div>
+                <button class="btn-expand-log mt-1" onclick="openLogModal('${bot.id}')" title="Развернуть лог">
+                    <i class="fa fa-expand"></i> Развернуть
+                </button>
             </div>
         </div>`;
     row.appendChild(col3);

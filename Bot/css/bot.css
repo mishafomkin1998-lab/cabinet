@@ -2347,21 +2347,9 @@
             flex-direction: column;
         }
 
-        .action-log-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 4px;
-        }
-
-        .action-log-title {
-            font-size: 11px;
-            color: #888;
-            font-weight: 500;
-        }
-
         .btn-expand-log {
-            padding: 2px 6px;
+            width: 100%;
+            padding: 3px 6px;
             font-size: 10px;
             background: transparent;
             border: 1px solid #ddd;
@@ -2501,10 +2489,6 @@
             color: #fff;
         }
 
-        body.theme-dark .action-log-title {
-            color: #777;
-        }
-
         body.theme-dark .log-modal .modal-content {
             background: #1a1a1a;
             border: 1px solid #333;
@@ -2537,10 +2521,6 @@
         body.theme-ladadate .btn-expand-log:hover {
             background: rgba(244, 114, 182, 0.1);
             border-color: rgba(244, 114, 182, 0.5);
-        }
-
-        body.theme-ladadate .action-log-title {
-            color: var(--text-muted);
         }
 
         body.theme-ladadate .log-modal .modal-content {
