@@ -1,16 +1,6 @@
 window.onload = async function() {
     console.log(`%c[Novabot v${APP_VERSION}] 🚀 Запуск приложения...`, 'color: #4CAF50; font-weight: bold; font-size: 14px');
 
-    // Запрашиваем разрешение на уведомления Windows
-    if ('Notification' in window && Notification.permission !== 'granted') {
-        try {
-            const permission = await Notification.requestPermission();
-            console.log(`[Notifications] Разрешение: ${permission}`);
-        } catch (e) {
-            console.warn('[Notifications] Не удалось запросить разрешение:', e);
-        }
-    }
-
     // ВАЖНО: Сначала загружаем настройки
     loadGlobalSettingsUI();
     toggleExtendedFeatures();

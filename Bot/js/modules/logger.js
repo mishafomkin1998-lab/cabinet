@@ -53,11 +53,8 @@ const loggerTracking = {
     mailSoundTimers: {},
     // Связь логов с окнами: windowId -> logId (для удаления при закрытии)
     windowToLog: {},
-    // Desktop уведомления: ключ -> timestamp (чтобы не показывать дубликаты)
-    desktopNotified: {}
 };
 
-const DESKTOP_NOTIFICATION_COOLDOWN_MS = 60 * 1000; // 1 минута между уведомлениями для одного сообщения
 
 const VIP_COOLDOWN_MS = 60 * 60 * 1000; // 1 час
 const VIP_FADE_MS = 3 * 60 * 1000; // 3 минуты до затухания
@@ -116,9 +113,6 @@ const Logger = {
             if(!col.classList.contains('show')) {
                 document.getElementById('btn-logger-main').classList.add('blinking');
             }
-
-            // Системное уведомление Windows для чата
-            this.showElectronNotification(data, type, botId);
             return;
         }
 
@@ -185,70 +179,10 @@ const Logger = {
                 }
             }, 120000);
             loggerTracking.mailSoundTimers[logItem.id] = [timer1, timer2];
-
-            // Electron уведомление для писем
-            this.showElectronNotification(data, type, botId);
         } else if (type === 'vip-online') {
             playSound('online');
         } else if (type === 'bday') {
             playSound('online');
-        }
-    },
-
-    // Electron уведомление (поддерживает mail и chat-request)
-    showElectronNotification: function(data, type, botId) {
-        // Проверяем настройку
-        if (!globalSettings.desktopNotifications) {
-            console.log('[Logger] Desktop уведомления отключены в настройках');
-            return;
-        }
-        if (!data) return;
-
-        // Проверяем разрешение на уведомления
-        if (!('Notification' in window)) {
-            console.log('[Logger] Notification API недоступен');
-            return;
-        }
-        if (Notification.permission !== 'granted') {
-            console.log('[Logger] Нет разрешения на уведомления, permission:', Notification.permission);
-            return;
-        }
-
-        const partnerId = data.partnerId || '???';
-        const partnerName = data.partnerName || `ID ${partnerId}`;
-        const messageBody = data.messageBody || '';
-        const avatarUrl = data.avatarUrl || null;
-
-        // Проверяем на дубликат (1 уведомление на сообщение)
-        const notifyKey = `${type}-${botId}-${partnerId}-${messageBody.slice(0, 20)}`;
-        const now = Date.now();
-        const lastNotified = loggerTracking.desktopNotified[notifyKey] || 0;
-
-        if (now - lastNotified < DESKTOP_NOTIFICATION_COOLDOWN_MS) {
-            console.log(`[Logger] Desktop уведомление пропущено (cooldown): ${notifyKey}`);
-            return;
-        }
-        loggerTracking.desktopNotified[notifyKey] = now;
-
-        // Разные заголовки для писем и чатов
-        const isChat = type === 'chat-request';
-        const title = isChat ? '💬 Новый чат' : '💌 Входящее письмо';
-        const body = `От ${partnerId} ${partnerName}${messageBody ? ': "' + messageBody.slice(0, 50) + '"' : ''}`;
-
-        try {
-            const notification = new Notification(title, {
-                body: body,
-                icon: avatarUrl || undefined,
-                silent: true // Звук уже играет через playSound
-            });
-
-            notification.onclick = () => {
-                openResponseWindow(botId, partnerId, partnerName, isChat ? 'chat' : 'mail');
-            };
-
-            console.log('[Logger] ✅ Desktop уведомление показано:', title);
-        } catch (e) {
-            console.error('[Logger] Ошибка создания уведомления:', e);
         }
     },
 
@@ -400,7 +334,8 @@ async function openResponseWindow(botId, partnerId, partnerName, type) {
             type,
             url: siteUrl,
             login: botData.login,
-            pass: botData.pass
+            pass: botData.pass,
+            allowNotifications: globalSettings.desktopNotifications // Разрешить уведомления от сайта
         });
 
         if (result.success) {

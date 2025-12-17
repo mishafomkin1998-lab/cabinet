@@ -617,7 +617,7 @@ const responseWindows = new Map();
 
 ipcMain.handle('open-response-window', async (event, data) => {
     try {
-    const { windowId, botId, partnerId, partnerName, type, url, login, pass } = data;
+    const { windowId, botId, partnerId, partnerName, type, url, login, pass, allowNotifications } = data;
 
     // Если окно уже открыто - фокусируем
     if (responseWindows.has(windowId)) {
@@ -681,9 +681,28 @@ ipcMain.handle('open-response-window', async (event, data) => {
         }
     });
 
-    // Устанавливаем масштаб после загрузки
+    // Устанавливаем масштаб после загрузки + блокировка уведомлений
     win.webContents.on('did-finish-load', () => {
         win.webContents.setZoomFactor(0.8);
+
+        // Блокируем уведомления от сайта если настройка выключена
+        if (!allowNotifications) {
+            win.webContents.executeJavaScript(`
+                // Блокируем Notification API
+                if (!window.__notificationsBlocked) {
+                    window.__notificationsBlocked = true;
+                    window.Notification = function() {
+                        console.log('[Lababot] Notification заблокирован настройками');
+                        return { close: function() {} };
+                    };
+                    window.Notification.permission = 'denied';
+                    window.Notification.requestPermission = function() {
+                        return Promise.resolve('denied');
+                    };
+                    console.log('[Lababot] 🔕 Уведомления от сайта заблокированы');
+                }
+            `).catch(() => {});
+        }
     });
 
     // Сохраняем тип окна для AI
