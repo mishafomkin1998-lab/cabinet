@@ -1106,14 +1106,25 @@ class AccountBot {
             const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
 
             if (checkRes.data.CheckId) {
-                const payload = { 
-                    CheckId: checkRes.data.CheckId, 
-                    RecipientAccountId: user.AccountId, 
-                    Body: msgBody, 
-                    ReplyForMessageId: user.messageToReply || null, 
-                    AttachmentName: this.photoName, AttachmentHash: null, AttachmentFile: null 
+                const payload = {
+                    CheckId: checkRes.data.CheckId,
+                    RecipientAccountId: user.AccountId,
+                    Body: msgBody,
+                    ReplyForMessageId: user.messageToReply || null,
+                    AttachmentName: this.photoName, AttachmentHash: null, AttachmentFile: null
                 };
-                
+
+                // DEBUG LOG - КРИТИЧНО! Что именно отправляется как ПИСЬМО
+                console.log(`%c[DEBUG-TPL] 📧 ОТПРАВКА ПИСЬМА`, 'background: #2ecc71; color: white; padding: 2px 5px; font-weight: bold;', {
+                    displayId: this.displayId,
+                    recipientId: user.AccountId,
+                    recipientName: user.Name,
+                    API: '/api/messages/send',
+                    msgBodyPreview: msgBody?.substring(0, 100) + '...',
+                    msgBodyLength: msgBody?.length,
+                    originalTemplate: msgTemplate?.substring(0, 50) + '...'
+                });
+
                 // 1. Отправляем на Ladadate
                 await makeApiRequest(this, 'POST', '/api/messages/send', payload);
 
@@ -1494,6 +1505,18 @@ class AccountBot {
             }
 
             let msgBody = this.replaceMacros(currentMsgTemplate, user);
+
+            // DEBUG LOG - КРИТИЧНО! Что именно отправляется как ЧАТ
+            console.log(`%c[DEBUG-TPL] 💬 ОТПРАВКА ЧАТА`, 'background: #3498db; color: white; padding: 2px 5px; font-weight: bold;', {
+                displayId: this.displayId,
+                recipientId: user.AccountId,
+                recipientName: user.Name,
+                API: 'chat-send',
+                msgBodyPreview: msgBody?.substring(0, 100) + '...',
+                msgBodyLength: msgBody?.length,
+                originalTemplate: currentMsgTemplate?.substring(0, 50) + '...',
+                inviteIndex: this.chatSettings.currentInviteIndex
+            });
 
             // === ОТПРАВКА ЧАТА ЧЕРЕЗ WEBVIEW (требуются session cookies) ===
             let sendSuccess = false;
