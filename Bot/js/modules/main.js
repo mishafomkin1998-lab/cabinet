@@ -1772,16 +1772,20 @@ async function exportAllData() {
             exportDate: new Date().toISOString()
         };
 
-        // Сохраняем данные ботов
+        // Сохраняем данные ботов (включая пароли и автоответы)
         Object.values(bots).forEach(bot => {
             data.bots.push({
                 id: bot.id,
                 login: bot.login,
+                pass: bot.pass, // Пароль для импорта
                 displayId: bot.displayId,
-                token: bot.token ? '[HIDDEN]' : null,
                 mailSettings: bot.mailSettings,
-                chatSettings: bot.chatSettings,
-                vipList: bot.vipList
+                chatSettings: bot.chatSettings, // Включает autoReplies и autoReplyEnabled
+                vipList: bot.vipList,
+                customIdsList: bot.customIdsList || [],
+                customIdsSent: bot.customIdsSent || [],
+                ignoredUsersMail: bot.ignoredUsersMail || [],
+                ignoredUsersChat: bot.ignoredUsersChat || []
             });
         });
 
@@ -1793,9 +1797,11 @@ async function exportAllData() {
         a.click();
         URL.revokeObjectURL(url);
 
+        showToast('Данные экспортированы', 'success');
         return true;
     } catch (error) {
         console.error('Error exporting data:', error);
+        showToast('Ошибка экспорта', 'error');
         return false;
     }
 }
@@ -1825,7 +1831,33 @@ async function handleFullImport(input) {
                 if (data.bots && Array.isArray(data.bots)) {
                     for (const botData of data.bots) {
                         if (botData.login && botData.displayId) {
-                            await performLogin(botData.login, botData.pass || 'password', botData.displayId);
+                            const success = await performLogin(botData.login, botData.pass || 'password', botData.displayId);
+
+                            // Восстанавливаем дополнительные данные после успешного логина
+                            if (success) {
+                                const botId = Object.keys(bots).pop();
+                                const bot = bots[botId];
+                                if (bot) {
+                                    // Восстанавливаем настройки Mail
+                                    if (botData.mailSettings) {
+                                        bot.mailSettings = { ...bot.mailSettings, ...botData.mailSettings };
+                                    }
+                                    // Восстанавливаем настройки Chat (включая autoReplies)
+                                    if (botData.chatSettings) {
+                                        bot.chatSettings = { ...bot.chatSettings, ...botData.chatSettings };
+                                    }
+                                    // Восстанавливаем VIP список
+                                    if (botData.vipList) bot.vipList = botData.vipList;
+                                    // Восстанавливаем Custom IDs
+                                    if (botData.customIdsList) bot.customIdsList = botData.customIdsList;
+                                    if (botData.customIdsSent) bot.customIdsSent = botData.customIdsSent;
+                                    // Восстанавливаем игнор-листы
+                                    if (botData.ignoredUsersMail) bot.ignoredUsersMail = botData.ignoredUsersMail;
+                                    if (botData.ignoredUsersChat) bot.ignoredUsersChat = botData.ignoredUsersChat;
+
+                                    console.log(`[Import] Восстановлены данные для ${botData.displayId}`);
+                                }
+                            }
                         }
                     }
                 }
