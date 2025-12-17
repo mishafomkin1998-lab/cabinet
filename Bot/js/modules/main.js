@@ -1745,8 +1745,24 @@ function toggleBot(id) {
     else { if(bot.isMailRunning) bot.stopMail(); else bot.startMail(text); }
 }
 function startAll() {
+    console.log(`%c[DEBUG-TPL] 🚀🚀 START ALL`, 'background: #e74c3c; color: white; padding: 2px 5px; font-weight: bold;', {
+        globalMode,
+        botsCount: Object.keys(bots).length
+    });
+
     Object.values(bots).forEach(b => {
         const text = document.getElementById(`msg-${b.id}`).value;
+
+        // DEBUG LOG для каждой анкеты
+        console.log(`%c[DEBUG-TPL] 🚀 START ALL - анкета`, 'background: #9b59b6; color: white; padding: 2px 5px;', {
+            botId: b.id,
+            displayId: b.displayId,
+            globalMode,
+            action: globalMode === 'chat' ? 'START chat' : 'START mail',
+            textPreview: text?.substring(0, 80) + '...',
+            textLength: text?.length
+        });
+
         if (globalMode === 'chat') { if(!b.isChatRunning) b.startChat(text); } else { if(!b.isMailRunning) b.startMail(text); }
     });
 }
