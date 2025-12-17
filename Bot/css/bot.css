@@ -2100,7 +2100,7 @@
            === КНОПКА INBOX (ВХОДЯЩИЕ ПИСЬМА) ===
            ===================================================== */
         .btn-inbox {
-            background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+            background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
             color: white;
             border: none;
             font-weight: 600;
@@ -2114,10 +2114,10 @@
             gap: 8px;
         }
         .btn-inbox:hover {
-            background: linear-gradient(135deg, #5a32a3 0%, #4a2886 100%);
+            background: linear-gradient(135deg, #0b5ed7 0%, #0a58ca 100%);
             color: white;
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(111, 66, 193, 0.3);
+            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
         }
         .btn-inbox:active {
             transform: translateY(0);
@@ -2128,18 +2128,18 @@
 
         /* Темная тема для кнопки Inbox */
         body.theme-dark .btn-inbox {
-            background: linear-gradient(135deg, #7c4dff 0%, #651fff 100%);
+            background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
         }
         body.theme-dark .btn-inbox:hover {
-            background: linear-gradient(135deg, #651fff 0%, #5a1ee6 100%);
+            background: linear-gradient(135deg, #0b5ed7 0%, #0a58ca 100%);
         }
 
         /* LadaDate тема для кнопки Inbox */
         body.theme-ladadate .btn-inbox {
-            background: linear-gradient(135deg, #9c27b0 0%, #7b1fa2 100%);
+            background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
         }
         body.theme-ladadate .btn-inbox:hover {
-            background: linear-gradient(135deg, #7b1fa2 0%, #6a1b9a 100%);
+            background: linear-gradient(135deg, #0b5ed7 0%, #0a58ca 100%);
         }
 
         /* =====================================================
