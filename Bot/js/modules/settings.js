@@ -317,6 +317,8 @@ function switchTabRelative(step) {
 
 function toggleGlobalMode() {
     const btn = document.getElementById('btn-mode-toggle');
+    const oldMode = globalMode;
+
     if (globalMode === 'mail') {
         globalMode = 'chat';
         document.body.classList.remove('mode-mail'); document.body.classList.add('mode-chat');
@@ -326,6 +328,14 @@ function toggleGlobalMode() {
         document.body.classList.remove('mode-chat'); document.body.classList.add('mode-mail');
         btn.innerHTML = '<i class="fa fa-envelope"></i>'; btn.className = 'btn btn-circle btn-mode-switch active-mail';
     }
+
+    // DEBUG LOG
+    console.log(`%c[DEBUG-TPL] 🔄 MODE SWITCH`, 'background: #f39c12; color: white; padding: 2px 5px; font-weight: bold;', {
+        from: oldMode,
+        to: globalMode,
+        activeTabId
+    });
+
     if(activeTabId && bots[activeTabId]) updateInterfaceForMode(activeTabId);
 }
 

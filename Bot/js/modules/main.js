@@ -904,12 +904,30 @@ async function saveTemplateTextNow(botId) {
     const sel = document.getElementById(`tpl-select-${botId}`);
     const textarea = document.getElementById(`msg-${botId}`);
 
+    // DEBUG LOG
+    console.log(`%c[DEBUG-TPL] SAVE вызван`, 'background: #ff6b6b; color: white; padding: 2px 5px;', {
+        botId,
+        globalMode,
+        type,
+        selValue: sel?.value,
+        textPreview: textarea?.value?.substring(0, 50) + '...'
+    });
+
     if (!sel || !textarea || sel.value === '') return;
 
     const idx = parseInt(sel.value);
     const tpls = getBotTemplates(bot.login)[type];
 
     if (tpls[idx]) {
+        // DEBUG LOG
+        console.log(`%c[DEBUG-TPL] SAVE выполняю`, 'background: #ff6b6b; color: white; padding: 2px 5px;', {
+            type,
+            templateIndex: idx,
+            templateName: tpls[idx].name,
+            oldText: tpls[idx].text?.substring(0, 30) + '...',
+            newText: textarea.value?.substring(0, 30) + '...'
+        });
+
         // Обновляем текст в шаблоне
         tpls[idx].text = textarea.value;
 
@@ -968,6 +986,16 @@ function updateTemplateDropdown(botId, forceSelectIndex = null) {
     const area = document.getElementById(`msg-${botId}`);
     const currentText = area ? area.value : '';
 
+    // DEBUG LOG
+    console.log(`%c[DEBUG-TPL] LOAD dropdown`, 'background: #4ecdc4; color: white; padding: 2px 5px;', {
+        botId,
+        globalMode,
+        type: isChat ? 'chat' : 'mail',
+        forceSelectIndex,
+        templatesCount: tpls.length,
+        currentTextPreview: currentText?.substring(0, 50) + '...'
+    });
+
     // Исправлено: проверяем и на null, и на undefined
     let val = (forceSelectIndex !== null && forceSelectIndex !== undefined) ? forceSelectIndex : sel.value;
 
@@ -989,6 +1017,15 @@ function updateTemplateDropdown(botId, forceSelectIndex = null) {
          sel.value = val;
          area.disabled=false;
          area.value=tpls[val].text;
+
+         // DEBUG LOG
+         console.log(`%c[DEBUG-TPL] LOAD установлен текст`, 'background: #4ecdc4; color: white; padding: 2px 5px;', {
+             type: isChat ? 'chat' : 'mail',
+             templateIndex: val,
+             templateName: tpls[val].name,
+             textPreview: tpls[val].text?.substring(0, 50) + '...'
+         });
+
          if(isChat) bots[botId].lastTplChat = val; else bots[botId].lastTplMail = val;
 
          // Сохраняем выбор шаблона
@@ -1693,7 +1730,18 @@ async function closeTab(e, id) {
 function toggleBot(id) {
     const bot = bots[id];
     const text = document.getElementById(`msg-${id}`).value;
-    if (globalMode === 'chat') { if(bot.isChatRunning) bot.stopChat(); else bot.startChat(text); } 
+
+    // DEBUG LOG - КРИТИЧЕСКИ ВАЖНО! С каким текстом запускается рассылка
+    console.log(`%c[DEBUG-TPL] 🚀 START/STOP`, 'background: #9b59b6; color: white; padding: 2px 5px; font-weight: bold;', {
+        botId: id,
+        displayId: bot.displayId,
+        globalMode,
+        action: globalMode === 'chat' ? (bot.isChatRunning ? 'STOP chat' : 'START chat') : (bot.isMailRunning ? 'STOP mail' : 'START mail'),
+        textPreview: text?.substring(0, 80) + '...',
+        textLength: text?.length
+    });
+
+    if (globalMode === 'chat') { if(bot.isChatRunning) bot.stopChat(); else bot.startChat(text); }
     else { if(bot.isMailRunning) bot.stopMail(); else bot.startMail(text); }
 }
 function startAll() {
