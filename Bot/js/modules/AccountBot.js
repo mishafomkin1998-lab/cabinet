@@ -1049,7 +1049,6 @@ class AccountBot {
                 const usersRes = await makeApiRequest(this, 'GET', apiPath);
                 users = usersRes.data.Users || [];
                 if (target === 'online') {
-                    this.log(`📊 Online users: ${users.length}`);
                     this.lastOnlineCount = users.length; // Сохраняем для глобального счётчика
                 }
             }
@@ -1202,7 +1201,7 @@ class AccountBot {
                 const errorReason = extractApiError(e.response, 'Доступ запрещён');
                 this.incrementStat('mail', 'errors');
                 this.mailHistory.errors.push(`${user?.AccountId || 'unknown'}: ${errorReason}`);
-                this.log(`❌ Ошибка: ${user?.Name || user?.AccountId || 'unknown'} - ${errorReason}`);
+                this.log(`❌ Ошибка: ${user?.Name || 'unknown'} (${user?.AccountId || '?'}) - ${errorReason}`);
 
                 // Проверяем игнор-лист или блокировку
                 const isIgnored = errorReason.toLowerCase().includes('ignore') ||
