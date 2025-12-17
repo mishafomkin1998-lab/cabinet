@@ -231,28 +231,62 @@ class AccountBot {
     }
 
     // Метод для загрузки данных с сервера (шаблоны, blacklist, статистика)
-    loadFromServerData(serverData) {
+    // С умной синхронизацией: если локальные данные богаче - отправляем на сервер
+    async loadFromServerData(serverData) {
         if (!serverData) return;
 
-        // Загружаем шаблоны
-        if (serverData.templatesMail && serverData.templatesMail.length > 0) {
+        const localTemplates = botTemplates[this.login] || { mail: [], chat: [] };
+        const serverMailTplCount = serverData.templatesMail?.length || 0;
+        const serverChatTplCount = serverData.templatesChat?.length || 0;
+        const localMailTplCount = localTemplates.mail?.length || 0;
+        const localChatTplCount = localTemplates.chat?.length || 0;
+
+        // === ШАБЛОНЫ: Умная синхронизация ===
+        // Если сервер пуст, а локально есть данные - отправляем на сервер
+        if (serverMailTplCount === 0 && localMailTplCount > 0) {
+            console.log(`🔄 [Sync] Сервер пуст, отправляем ${localMailTplCount} Mail шаблонов на сервер...`);
+            const success = await saveTemplatesToServer(this.displayId, 'mail', localTemplates.mail);
+            if (success) {
+                showToast(`Шаблоны Mail (${localMailTplCount}) синхронизированы с сервером`, 'success');
+            }
+        } else if (serverMailTplCount > 0) {
+            // Сервер имеет данные - загружаем их
             if (!botTemplates[this.login]) botTemplates[this.login] = { mail: [], chat: [] };
             botTemplates[this.login].mail = serverData.templatesMail;
         }
-        if (serverData.templatesChat && serverData.templatesChat.length > 0) {
+
+        if (serverChatTplCount === 0 && localChatTplCount > 0) {
+            console.log(`🔄 [Sync] Сервер пуст, отправляем ${localChatTplCount} Chat шаблонов на сервер...`);
+            const success = await saveTemplatesToServer(this.displayId, 'chat', localTemplates.chat);
+            if (success) {
+                showToast(`Шаблоны Chat (${localChatTplCount}) синхронизированы с сервером`, 'success');
+            }
+        } else if (serverChatTplCount > 0) {
             if (!botTemplates[this.login]) botTemplates[this.login] = { mail: [], chat: [] };
             botTemplates[this.login].chat = serverData.templatesChat;
         }
 
-        // Загружаем blacklist
-        if (serverData.blacklistMail && serverData.blacklistMail.length > 0) {
+        // === BLACKLIST: Умная синхронизация ===
+        const serverMailBlCount = serverData.blacklistMail?.length || 0;
+        const serverChatBlCount = serverData.blacklistChat?.length || 0;
+        const localMailBlCount = this.mailSettings.blacklist?.length || 0;
+        const localChatBlCount = this.chatSettings.blacklist?.length || 0;
+
+        if (serverMailBlCount === 0 && localMailBlCount > 0) {
+            console.log(`🔄 [Sync] Сервер пуст, отправляем ${localMailBlCount} ЧС Mail на сервер...`);
+            await saveBlacklistToServer(this.displayId, 'mail', this.mailSettings.blacklist);
+        } else if (serverMailBlCount > 0) {
             this.mailSettings.blacklist = serverData.blacklistMail;
         }
-        if (serverData.blacklistChat && serverData.blacklistChat.length > 0) {
+
+        if (serverChatBlCount === 0 && localChatBlCount > 0) {
+            console.log(`🔄 [Sync] Сервер пуст, отправляем ${localChatBlCount} ЧС Chat на сервер...`);
+            await saveBlacklistToServer(this.displayId, 'chat', this.chatSettings.blacklist);
+        } else if (serverChatBlCount > 0) {
             this.chatSettings.blacklist = serverData.blacklistChat;
         }
 
-        // Загружаем статистику
+        // Загружаем статистику (сервер всегда приоритет)
         this.mailStats.sent = serverData.statsMailSent || 0;
         this.mailStats.errors = serverData.statsMailErrors || 0;
         this.chatStats.sent = serverData.statsChatSent || 0;
@@ -266,7 +300,7 @@ class AccountBot {
             this.chatSettings.autoReplyEnabled = serverData.autoReplyEnabled;
         }
 
-        console.log(`📥 Данные загружены для ${this.displayId}:`, {
+        console.log(`📥 Данные синхронизированы для ${this.displayId}:`, {
             mailTemplates: botTemplates[this.login]?.mail?.length || 0,
             chatTemplates: botTemplates[this.login]?.chat?.length || 0,
             mailBlacklist: this.mailSettings.blacklist.length,

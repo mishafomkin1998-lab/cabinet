@@ -580,6 +580,10 @@ async function loadBotDataFromServer(profileId) {
     }
 }
 
+// Счётчик ошибок сохранения (для предупреждений пользователю)
+let saveErrorCount = 0;
+const SAVE_ERROR_THRESHOLD = 3; // После 3 ошибок показываем предупреждение
+
 // Сохранение шаблонов на сервер
 async function saveTemplatesToServer(profileId, type, templates) {
     try {
@@ -592,11 +596,28 @@ async function saveTemplatesToServer(profileId, type, templates) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
         const result = await response.json();
-        console.log(`💾 Шаблоны ${type} сохранены для ${profileId}`);
-        return result.success;
+        if (result.success) {
+            console.log(`💾 Шаблоны ${type} сохранены для ${profileId} (${templates.length} шт.)`);
+            saveErrorCount = 0; // Сброс счётчика при успехе
+            return true;
+        } else {
+            throw new Error(result.error || 'Сервер вернул success=false');
+        }
     } catch (error) {
-        console.error(`❌ Ошибка сохранения шаблонов:`, error);
+        saveErrorCount++;
+        console.error(`❌ [Ошибка #${saveErrorCount}] Сохранение шаблонов ${type} для ${profileId}:`, error.message);
+
+        // Показываем предупреждение пользователю после нескольких ошибок
+        if (saveErrorCount >= SAVE_ERROR_THRESHOLD) {
+            showToast(`⚠️ Проблема с сервером! Шаблоны сохраняются только локально`, 'warning');
+            saveErrorCount = 0; // Сброс чтобы не спамить
+        }
         return false;
     }
 }
@@ -613,11 +634,20 @@ async function saveBlacklistToServer(profileId, type, blacklist) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
         const result = await response.json();
-        console.log(`📝 Blacklist ${type} сохранён для ${profileId}, ответ:`, result);
-        return result.success;
+        if (result.success) {
+            console.log(`📝 Blacklist ${type} сохранён для ${profileId} (${blacklist.length} записей)`);
+            return true;
+        } else {
+            throw new Error(result.error || 'Сервер вернул success=false');
+        }
     } catch (error) {
-        console.error(`❌ Ошибка сохранения blacklist:`, error);
+        console.error(`❌ Ошибка сохранения blacklist ${type} для ${profileId}:`, error.message);
         return false;
     }
 }

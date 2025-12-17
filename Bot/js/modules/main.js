@@ -581,7 +581,7 @@ async function loadServerDataForAllBots() {
             try {
                 const serverData = await loadBotDataFromServer(bot.displayId);
                 if (serverData) {
-                    bot.loadFromServerData(serverData);
+                    await bot.loadFromServerData(serverData);
                     bot.updateUI();
                     updateTemplateDropdown(bot.id);
                     renderBlacklist(bot.id);
@@ -1333,11 +1333,11 @@ async function performLogin(login, pass, displayId) {
             // Загружаем данные с сервера (шаблоны, blacklist, статистику)
             const serverData = await loadBotDataFromServer(displayId);
             if (serverData) {
-                bot.loadFromServerData(serverData);
+                await bot.loadFromServerData(serverData);
                 bot.updateUI();
                 updateTemplateDropdown(bid);
                 renderBlacklist(bid);
-                console.log(`✅ Данные загружены с сервера для ${displayId}`);
+                console.log(`✅ Данные синхронизированы для ${displayId}`);
             }
 
             // Отправляем первый heartbeat после создания бота
