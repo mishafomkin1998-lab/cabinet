@@ -743,6 +743,25 @@
             color: #00ff88 !important;
         }
 
+        /* AI Menu - Dark theme */
+        body.theme-dark .ai-options,
+        body.theme-dark .prompt-submenu,
+        body.theme-dark .improve-submenu {
+            border-color: rgba(166, 110, 250, 0.25);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 20px rgba(166, 110, 250, 0.15);
+        }
+        body.theme-dark .btn-ai-sub,
+        body.theme-dark .prompt-submenu-item,
+        body.theme-dark .btn-ai-sub-with-submenu {
+            color: #ccc;
+        }
+        body.theme-dark .btn-ai-sub:hover,
+        body.theme-dark .prompt-submenu-item:hover,
+        body.theme-dark .btn-ai-sub-with-submenu:hover {
+            background: linear-gradient(135deg, rgba(166, 110, 250, 0.15), rgba(111, 66, 193, 0.2));
+            color: #a66efa;
+        }
+
         /* === ТЕМА LADADATE (красивая и разнообразная) === */
         body.theme-ladadate {
             --bg-color: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -1208,83 +1227,167 @@
         .btn-ai-main:hover { transform: scale(1.05); box-shadow: 0 2px 5px rgba(111, 66, 193, 0.3); }
         .btn-ai-main i.fa-spin { animation: fa-spin 1s infinite linear; }
 
+        /* AI Menu - Main dropdown */
         .ai-options {
-            position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd;
-            border-radius: 6px; padding: 5px; display: none; flex-direction: column; gap: 3px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.15); z-index: 100; min-width: 110px;
-            margin-top: 5px; opacity: 0; transform: translateY(-5px); transition: all 0.2s ease;
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            background: var(--panel-bg, white);
+            border: 1px solid rgba(111, 66, 193, 0.15);
+            border-radius: 10px;
+            padding: 6px;
+            display: none;
+            flex-direction: column;
+            gap: 4px;
+            box-shadow: 0 8px 32px rgba(111, 66, 193, 0.18), 0 2px 8px rgba(0,0,0,0.08);
+            z-index: 100;
+            min-width: 130px;
+            opacity: 0;
+            transform: translateY(-10px) scale(0.95);
+            transform-origin: top left;
+            transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .ai-options.show { display: flex; opacity: 1; transform: translateY(0); }
-        .btn-ai-sub {
-            font-size: 11px; padding: 4px 8px; border: none; background: #f8f9fa; border-radius: 4px;
-            text-align: left; cursor: pointer; color: #555; transition: 0.2s;
+        .ai-options.show {
+            display: flex;
+            opacity: 1;
+            transform: translateY(0) scale(1);
         }
-        .btn-ai-sub:hover { background: #e9ecef; color: #6f42c1; }
 
-        /* Кнопка с подменю шаблонов */
+        /* AI Menu items */
+        .btn-ai-sub {
+            font-size: 11px;
+            padding: 8px 12px;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            text-align: left;
+            cursor: pointer;
+            color: #555;
+            transition: all 0.15s ease;
+            font-weight: 500;
+        }
+        .btn-ai-sub:hover {
+            background: linear-gradient(135deg, rgba(111, 66, 193, 0.08), rgba(166, 110, 250, 0.12));
+            color: #6f42c1;
+            transform: translateX(3px);
+        }
+
+        /* Button with submenu */
         .btn-ai-sub-with-submenu {
             position: relative;
-            font-size: 11px; padding: 0; border: none; background: #f8f9fa; border-radius: 4px;
-            text-align: left; cursor: pointer; color: #555; transition: 0.2s;
+            font-size: 11px;
+            padding: 0;
+            border: none;
+            background: transparent;
+            border-radius: 6px;
+            text-align: left;
+            cursor: pointer;
+            color: #555;
+            transition: all 0.15s ease;
         }
-        .btn-ai-sub-with-submenu:hover { background: #e9ecef; color: #6f42c1; }
+        .btn-ai-sub-with-submenu:hover {
+            background: linear-gradient(135deg, rgba(111, 66, 193, 0.08), rgba(166, 110, 250, 0.12));
+            color: #6f42c1;
+        }
         .btn-ai-sub-trigger {
-            display: flex; align-items: center; gap: 4px; padding: 4px 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 12px;
+            font-weight: 500;
         }
-        .submenu-arrow { font-size: 9px; margin-left: auto; }
+        .submenu-arrow {
+            font-size: 8px;
+            margin-left: auto;
+            opacity: 0.5;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+        }
+        .btn-ai-sub-with-submenu:hover .submenu-arrow {
+            transform: translateX(2px);
+            opacity: 1;
+        }
 
-        /* Подменю шаблонов */
+        /* Submenu for prompts */
         .prompt-submenu {
             position: absolute;
-            left: 100%;
-            top: 0;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            padding: 5px;
+            left: calc(100% + 6px);
+            top: -6px;
+            background: var(--panel-bg, white);
+            border: 1px solid rgba(111, 66, 193, 0.15);
+            border-radius: 10px;
+            padding: 6px;
             display: none;
             flex-direction: column;
             gap: 2px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            box-shadow: 0 8px 32px rgba(111, 66, 193, 0.18), 0 2px 8px rgba(0,0,0,0.08);
             z-index: 101;
-            min-width: 140px;
-            max-width: 200px;
-            margin-left: 3px;
+            min-width: 160px;
+            max-width: 220px;
+            opacity: 0;
+            transform: translateX(-10px) scale(0.95);
+            transform-origin: left center;
+            transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .prompt-submenu.show { display: flex; }
+        .prompt-submenu.show {
+            display: flex;
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
         .prompt-submenu-item {
             font-size: 11px;
-            padding: 5px 10px;
-            border-radius: 4px;
+            padding: 8px 12px;
+            border-radius: 6px;
             cursor: pointer;
             color: #555;
-            transition: 0.15s;
+            transition: all 0.15s ease;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            font-weight: 500;
         }
-        .prompt-submenu-item:hover { background: #e9ecef; color: #6f42c1; }
-        .prompt-submenu-item.disabled { color: #aaa; cursor: default; font-style: italic; }
-        .prompt-submenu-item.disabled:hover { background: transparent; color: #aaa; }
+        .prompt-submenu-item:hover {
+            background: linear-gradient(135deg, rgba(111, 66, 193, 0.08), rgba(166, 110, 250, 0.12));
+            color: #6f42c1;
+            transform: translateX(3px);
+        }
+        .prompt-submenu-item.disabled {
+            color: #aaa;
+            cursor: default;
+            font-style: italic;
+            font-weight: 400;
+        }
+        .prompt-submenu-item.disabled:hover {
+            background: transparent;
+            color: #aaa;
+            transform: none;
+        }
 
-        /* Подменю шаблонов Improve (наследует стили от prompt-submenu) */
+        /* Submenu for Improve templates */
         .improve-submenu {
             position: absolute;
-            left: 100%;
-            top: 0;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            left: calc(100% + 6px);
+            top: -6px;
+            background: var(--panel-bg, white);
+            border: 1px solid rgba(111, 66, 193, 0.15);
+            border-radius: 10px;
+            padding: 6px;
             display: none;
             flex-direction: column;
-            padding: 4px;
+            gap: 2px;
+            box-shadow: 0 8px 32px rgba(111, 66, 193, 0.18), 0 2px 8px rgba(0,0,0,0.08);
             z-index: 101;
-            min-width: 140px;
-            max-width: 200px;
-            margin-left: 3px;
+            min-width: 160px;
+            max-width: 220px;
+            opacity: 0;
+            transform: translateX(-10px) scale(0.95);
+            transform-origin: left center;
+            transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .improve-submenu.show { display: flex; }
+        .improve-submenu.show {
+            display: flex;
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
 
         .textarea-msg { resize: none; flex: 1; font-size: 14px; border-color: #dee2e6; border-radius: 6px; background: #fafafa; }
         .textarea-msg:focus { border-color: var(--mode-color); background: #fff; box-shadow: none; }
