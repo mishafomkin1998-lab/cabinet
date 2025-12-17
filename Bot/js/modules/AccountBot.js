@@ -54,13 +54,13 @@ class AccountBot {
         this.lastMailId = 0;
         this.myBirthday = null;
 
-        // === Отслеживание отправленных пользователей ===
-        this.mailContactedUsers = new Set(); // ID пользователей которым уже отправили в этой сессии
-
         // === Списки игнорирующих пользователей (сохраняются навсегда, раздельно для Mail и Chat) ===
         this.ignoredUsersMail = []; // ID пользователей, которые заигнорили в письмах
         this.ignoredUsersChat = []; // ID пользователей, которые заигнорили в чатах
-        this.chatContactedUsers = new Set();
+
+        // ПРИМЕЧАНИЕ: Фильтрация теперь проверяет mailHistory.sent, mailHistory.errors,
+        // chatHistory.sent, chatHistory.errors, blacklist и ignoredUsers напрямую.
+        // Это защищает от спама - если пользователь есть в ЛЮБОМ списке, ему не отправляется.
 
         // === ДОБАВЛЕНО: Отслеживание диалогов для полной спецификации ===
         this.conversations = {}; // Структура: { recipientId: { firstMessageTime, lastMessageTime, messageCount } }
@@ -81,6 +81,112 @@ class AccountBot {
             // Запускаем heartbeat на сервер Lababot
             this.startLababotHeartbeat();
         }
+    }
+
+    // === ПРОВЕРКА ИСТОРИИ (защита от спама) ===
+
+    /**
+     * Извлекает ID пользователя из строки истории
+     * Форматы: "12345 (Frank)" или "12345: error message"
+     * @param {string} entry - строка из истории
+     * @returns {string|null} - ID или null если не найден
+     */
+    extractIdFromHistoryEntry(entry) {
+        if (!entry || typeof entry !== 'string') return null;
+
+        // Формат "12345 (Name)" - ID до пробела
+        const matchParens = entry.match(/^(\d+)\s*\(/);
+        if (matchParens) return matchParens[1];
+
+        // Формат "12345: error" - ID до двоеточия
+        const matchColon = entry.match(/^(\d+):/);
+        if (matchColon) return matchColon[1];
+
+        // Формат просто "12345" - только цифры
+        const matchDigits = entry.match(/^(\d+)$/);
+        if (matchDigits) return matchDigits[1];
+
+        return null;
+    }
+
+    /**
+     * Проверяет, есть ли пользователь в массиве истории
+     * @param {string|number} userId - ID пользователя
+     * @param {Array} historyArray - массив истории (sent или errors)
+     * @returns {boolean}
+     */
+    isUserInHistory(userId, historyArray) {
+        if (!historyArray || !Array.isArray(historyArray)) return false;
+        const userIdStr = userId.toString();
+
+        return historyArray.some(entry => {
+            const entryId = this.extractIdFromHistoryEntry(entry);
+            return entryId === userIdStr;
+        });
+    }
+
+    /**
+     * Проверяет, можно ли отправить сообщение пользователю (Mail)
+     * Проверяет ВСЕ списки: sent, errors, blacklist, ignored
+     * @param {string|number} userId - ID пользователя
+     * @returns {boolean} - true если можно отправить
+     */
+    canSendMailTo(userId) {
+        const userIdStr = userId.toString();
+
+        // Проверяем "Отправленные"
+        if (this.isUserInHistory(userIdStr, this.mailHistory.sent)) {
+            return false;
+        }
+
+        // Проверяем "Ошибки"
+        if (this.isUserInHistory(userIdStr, this.mailHistory.errors)) {
+            return false;
+        }
+
+        // Проверяем "Чёрный список"
+        if (this.mailSettings.blacklist.includes(userIdStr)) {
+            return false;
+        }
+
+        // Проверяем "Игнор"
+        if (this.ignoredUsersMail.includes(userIdStr)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Проверяет, можно ли отправить сообщение пользователю (Chat)
+     * Проверяет ВСЕ списки: sent, errors, blacklist, ignored
+     * @param {string|number} userId - ID пользователя
+     * @returns {boolean} - true если можно отправить
+     */
+    canSendChatTo(userId) {
+        const userIdStr = userId.toString();
+
+        // Проверяем "Отправленные"
+        if (this.isUserInHistory(userIdStr, this.chatHistory.sent)) {
+            return false;
+        }
+
+        // Проверяем "Ошибки"
+        if (this.isUserInHistory(userIdStr, this.chatHistory.errors)) {
+            return false;
+        }
+
+        // Проверяем "Чёрный список"
+        if (this.chatSettings.blacklist.includes(userIdStr)) {
+            return false;
+        }
+
+        // Проверяем "Игнор"
+        if (this.ignoredUsersChat.includes(userIdStr)) {
+            return false;
+        }
+
+        return true;
     }
 
     // === ЗАГРУЗКА ДАННЫХ С СЕРВЕРА ===
@@ -871,7 +977,7 @@ class AccountBot {
                         const newTarget = getNextActiveStatus('payers');
                         this.log(`⚠️ Переход на ${newTarget}`);
                         this.mailSettings.target = newTarget;
-                        this.mailContactedUsers.clear();
+                        // Списки НЕ очищаем - пользователь сам решает когда очистить
                         if(activeTabId === this.id) {
                             document.getElementById(`target-select-${this.id}`).value = newTarget;
                             toggleCustomIdsField(this.id);
@@ -909,11 +1015,10 @@ class AccountBot {
                 }
             }
 
-            // Фильтруем: убираем тех кому уже отправили, кто в ЧС и кто в игноре (только для писем)
+            // Фильтруем: убираем тех кто в Отправленных, Ошибках, ЧС или Игноре
+            // Используем canSendMailTo() для проверки ВСЕХ списков
             users = users.filter(u =>
-                !this.mailContactedUsers.has(u.AccountId.toString()) &&
-                !this.mailSettings.blacklist.includes(u.AccountId.toString()) &&
-                !this.ignoredUsersMail.includes(u.AccountId.toString()) &&
+                this.canSendMailTo(u.AccountId) &&
                 (!this.mailSettings.photoOnly || u.ProfilePhoto)
             );
 
@@ -929,7 +1034,7 @@ class AccountBot {
                         const newTarget = getNextActiveStatus(target);
                         this.log(`⚠️ Нет пользователей (${target}). Переход на ${newTarget}`);
                         this.mailSettings.target = newTarget;
-                        this.mailContactedUsers.clear();
+                        // Списки НЕ очищаем - пользователь сам решает когда очистить
                         if(activeTabId === this.id) document.getElementById(`target-select-${this.id}`).value = newTarget;
                         return this.processMailUser(msgTemplate);
                     } else {
@@ -1004,8 +1109,7 @@ class AccountBot {
                 this.mailHistory.sent.push(`${user.AccountId} (${user.Name})`);
                 this.log(`✅ Письмо отправлено: ${user.Name}`);
 
-                // Добавляем в "отправленные" и убираем из очереди повторов
-                this.mailContactedUsers.add(user.AccountId.toString());
+                // Данные уже добавлены в mailHistory.sent - фильтрация проверяет этот список
 
                 // Отмечаем Custom ID как отправленный (если это custom-ids режим)
                 if (this.mailSettings.target === 'custom-ids') {
@@ -1309,12 +1413,9 @@ class AccountBot {
             const usersRes = await makeApiRequest(this, 'GET', apiPath);
             let users = usersRes.data.Users || [];
 
-            // Фильтруем: убираем тех кому уже отправили, кто в ЧС и кто в игноре (только для чатов)
-            users = users.filter(u =>
-                !this.chatContactedUsers.has(u.AccountId.toString()) &&
-                !this.chatSettings.blacklist.includes(u.AccountId.toString()) &&
-                !this.ignoredUsersChat.includes(u.AccountId.toString())
-            );
+            // Фильтруем: убираем тех кто в Отправленных, Ошибках, ЧС или Игноре
+            // Используем canSendChatTo() для проверки ВСЕХ списков
+            users = users.filter(u => this.canSendChatTo(u.AccountId));
 
             // Если новых пользователей нет - просто ждём
             if (users.length === 0) {
@@ -1456,11 +1557,10 @@ class AccountBot {
                 this.chatHistory.sent.push(`${user.AccountId} (${user.Name})`);
                 this.log(`💬 Сообщение чата отправлено: ${user.Name}`);
 
-                // Добавляем в "отправленные"
-                this.chatContactedUsers.add(user.AccountId.toString());
+                // Данные уже добавлены в chatHistory.sent - фильтрация проверяет этот список
 
             } else {
-                // ОШИБКА - НЕ отправляем как письмо, только фиксируем ошибку!
+                // ОШИБКА - только фиксируем ошибку, НЕ отправляем как письмо!
                 const errorReason = sendError || 'Неизвестная ошибка чата';
 
                 this.incrementStat('chat', 'errors');
