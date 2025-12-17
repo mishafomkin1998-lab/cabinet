@@ -1288,7 +1288,7 @@
         .textarea-msg { resize: none; flex: 1; font-size: 14px; border-color: #dee2e6; border-radius: 6px; background: #fafafa; }
         .textarea-msg:focus { border-color: var(--mode-color); background: #fff; box-shadow: none; }
         
-        .action-log { font-size: 11px; color: #555; height: 120px; overflow-y: auto; background: #fafafa; border: 1px solid #eee; padding: 5px; font-family: monospace; border-radius: 4px; }
+        .action-log { font-size: 11px; color: #555; flex: 1; min-height: 80px; overflow-y: auto; background: #fafafa; border: 1px solid #eee; padding: 5px; font-family: monospace; border-radius: 4px; }
         
         .stat-line { font-size: 13px; margin-top: 6px; display: flex; justify-content: space-between; border-bottom: 1px dashed #eee; padding-bottom: 2px; }
         .stat-val { cursor: pointer; text-decoration: none; font-weight: 600; }
@@ -2344,6 +2344,7 @@
             position: relative;
             display: flex;
             flex-direction: column;
+            flex: 1;
         }
 
         .btn-expand-log {
