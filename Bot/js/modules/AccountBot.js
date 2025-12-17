@@ -1145,7 +1145,7 @@ class AccountBot {
 
                 this.incrementStat('mail', 'sent');
                 this.mailHistory.sent.push(`${user.AccountId} (${user.Name})`);
-                this.log(`✅ Письмо отправлено: ${user.Name}`);
+                this.log(`✅ Письмо отправлено: ${user.Name} (${user.AccountId})`);
 
                 // Данные уже добавлены в mailHistory.sent - фильтрация проверяет этот список
 
@@ -1598,7 +1598,7 @@ class AccountBot {
 
                 this.incrementStat('chat', 'sent');
                 this.chatHistory.sent.push(`${user.AccountId} (${user.Name})`);
-                this.log(`💬 Сообщение чата отправлено: ${user.Name}`);
+                this.log(`💬 Сообщение чата отправлено: ${user.Name} (${user.AccountId})`);
 
                 // Данные уже добавлены в chatHistory.sent - фильтрация проверяет этот список
 
