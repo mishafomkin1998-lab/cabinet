@@ -505,9 +505,21 @@ class AccountBot {
         }, 30000);
     }
 
-    log(text) {
+    log(text, forceMode = null) {
         const box = document.getElementById(`log-${this.id}`);
-        const modePrefix = globalMode === 'chat' ? '[CHAT]' : '[MAIL]';
+        // ИСПРАВЛЕНО: показываем реальный режим работы, а не globalMode
+        let modePrefix;
+        if (forceMode) {
+            modePrefix = forceMode === 'chat' ? '[CHAT]' : '[MAIL]';
+        } else if (this.isMailRunning && this.isChatRunning) {
+            modePrefix = '[MAIL+CHAT]'; // Оба режима запущены!
+        } else if (this.isChatRunning) {
+            modePrefix = '[CHAT]';
+        } else if (this.isMailRunning) {
+            modePrefix = '[MAIL]';
+        } else {
+            modePrefix = globalMode === 'chat' ? '[chat]' : '[mail]'; // маленькие буквы = режим не запущен
+        }
         if(box) box.innerHTML = `<div><span style="opacity:0.6">${new Date().toLocaleTimeString()}</span> <b>${modePrefix}</b> ${text}</div>` + box.innerHTML;
     }
 
@@ -878,6 +890,9 @@ class AccountBot {
     }
 
     async startMail(text) {
+        // DEBUG: Логирование для диагностики пересечения режимов
+        console.log(`[DEBUG startMail] botId=${this.id}, displayId=${this.displayId}, globalMode=${globalMode}, isMailRunning=${this.isMailRunning}, isChatRunning=${this.isChatRunning}, textPreview="${text.substring(0, 50).replace(/\n/g, '\\n')}..."`);
+
         if(!this.token) return;
 
         // КРИТИЧНО: Защита от запуска Mail в режиме Chat
@@ -999,6 +1014,9 @@ class AccountBot {
     }
 
     async processMailUser(msgTemplate) {
+        // DEBUG: Логирование для диагностики
+        console.log(`[DEBUG processMailUser] botId=${this.id}, displayId=${this.displayId}, isMailRunning=${this.isMailRunning}, isChatRunning=${this.isChatRunning}, templatePreview="${msgTemplate.substring(0, 50).replace(/\n/g, '\\n')}..."`);
+
         let user = null;
         let msgBody = '';
         try {
@@ -1305,6 +1323,9 @@ class AccountBot {
     }
 
     async startChat(fullText) {
+        // DEBUG: Логирование для диагностики пересечения режимов
+        console.log(`[DEBUG startChat] botId=${this.id}, displayId=${this.displayId}, globalMode=${globalMode}, isMailRunning=${this.isMailRunning}, isChatRunning=${this.isChatRunning}, textPreview="${fullText.substring(0, 50).replace(/\n/g, '\\n')}..."`);
+
         if(!this.token) return;
 
         // КРИТИЧНО: Защита от запуска Chat в режиме Mail
@@ -1429,6 +1450,9 @@ class AccountBot {
         }, delay);
     }
     async processChatUser(fullText) {
+        // DEBUG: Логирование для диагностики
+        console.log(`[DEBUG processChatUser] botId=${this.id}, displayId=${this.displayId}, isMailRunning=${this.isMailRunning}, isChatRunning=${this.isChatRunning}, fullTextPreview="${fullText.substring(0, 50).replace(/\n/g, '\\n')}..."`);
+
         const invites = fullText.split(/\n\s*__\s*\n/);
         if (invites.length === 0) return;
         

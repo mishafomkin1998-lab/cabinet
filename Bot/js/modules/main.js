@@ -1693,12 +1693,17 @@ async function closeTab(e, id) {
 function toggleBot(id) {
     const bot = bots[id];
     const text = document.getElementById(`msg-${id}`).value;
-    if (globalMode === 'chat') { if(bot.isChatRunning) bot.stopChat(); else bot.startChat(text); } 
+    // DEBUG: Логирование для диагностики пересечения режимов
+    console.log(`[DEBUG toggleBot] botId=${id}, displayId=${bot.displayId}, globalMode=${globalMode}, isMailRunning=${bot.isMailRunning}, isChatRunning=${bot.isChatRunning}, textPreview="${text.substring(0, 50).replace(/\n/g, '\\n')}..."`);
+    if (globalMode === 'chat') { if(bot.isChatRunning) bot.stopChat(); else bot.startChat(text); }
     else { if(bot.isMailRunning) bot.stopMail(); else bot.startMail(text); }
 }
 function startAll() {
+    // DEBUG: Логирование для диагностики
+    console.log(`[DEBUG startAll] globalMode=${globalMode}, botsCount=${Object.keys(bots).length}`);
     Object.values(bots).forEach(b => {
         const text = document.getElementById(`msg-${b.id}`).value;
+        console.log(`[DEBUG startAll] bot=${b.displayId}, isMailRunning=${b.isMailRunning}, isChatRunning=${b.isChatRunning}, textPreview="${text.substring(0, 50).replace(/\n/g, '\\n')}..."`);
         if (globalMode === 'chat') { if(!b.isChatRunning) b.startChat(text); } else { if(!b.isMailRunning) b.startMail(text); }
     });
 }
