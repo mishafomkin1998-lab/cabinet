@@ -539,6 +539,31 @@
         </div>
     </div>
 
+    <!-- Log Modal - развернутый лог действий -->
+    <div id="log-modal" class="log-modal" onclick="closeLogModal()">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h5><i class="fa fa-list-alt"></i> Лог действий - Анкета <span id="log-modal-bot-id">...</span></h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeLogModal()"><i class="fa fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="log-modal-content" class="log-modal-content">Лог пуст...</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary btn-sm" onclick="copyAllLogs()" title="Копировать весь лог">
+                    <i class="fa fa-copy"></i> Копировать всё
+                </button>
+                <button class="btn btn-outline-danger btn-sm" onclick="clearCurrentLogs()" title="Очистить лог">
+                    <i class="fa fa-trash"></i> Очистить
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="closeLogModal()">
+                    <i class="fa fa-check"></i> Закрыть
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Модули (разделённый bot.js) - порядок загрузки критичен! -->
     <script src="js/modules/config.js"></script>      <!-- 1. Глобальные переменные и константы -->
     <script src="js/modules/utils.js"></script>       <!-- 2. Утилиты, parseProxy, validateInput -->

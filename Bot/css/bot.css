@@ -2333,3 +2333,234 @@
             color: #f87171;
             border-color: #f87171;
         }
+
+        /* === ACTION LOG IMPROVEMENTS === */
+        .action-log {
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
+
+        .action-log-wrapper {
+            position: relative;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .action-log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+
+        .action-log-title {
+            font-size: 11px;
+            color: #888;
+            font-weight: 500;
+        }
+
+        .btn-expand-log {
+            padding: 2px 6px;
+            font-size: 10px;
+            background: transparent;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            cursor: pointer;
+            color: #666;
+            transition: all 0.2s;
+        }
+
+        .btn-expand-log:hover {
+            background: #f0f0f0;
+            border-color: #ccc;
+            color: #333;
+        }
+
+        /* Log Modal */
+        .log-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 3000;
+            display: none;
+        }
+
+        .log-modal.show {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .log-modal .modal-backdrop {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            z-index: 0;
+        }
+
+        .log-modal .modal-content {
+            position: relative;
+            z-index: 2;
+            background: white;
+            border-radius: 10px;
+            width: 700px;
+            max-width: 90vw;
+            max-height: 80vh;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .log-modal .modal-header {
+            padding: 15px 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .log-modal .modal-header h5 {
+            margin: 0;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .log-modal .modal-body {
+            flex: 1;
+            padding: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .log-modal-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px 20px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: #fafafa;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        .log-modal .modal-footer {
+            padding: 12px 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+
+        .log-entry-modal {
+            padding: 4px 0;
+            border-bottom: 1px dashed #eee;
+        }
+
+        .log-entry-modal:last-child {
+            border-bottom: none;
+        }
+
+        .log-entry-modal.error {
+            color: #dc3545;
+        }
+
+        .log-entry-modal.success {
+            color: #198754;
+        }
+
+        .log-entry-modal.warning {
+            color: #fd7e14;
+        }
+
+        /* Dark theme for log modal */
+        body.theme-dark .btn-expand-log {
+            background: transparent;
+            border-color: #444;
+            color: #aaa;
+        }
+
+        body.theme-dark .btn-expand-log:hover {
+            background: #333;
+            border-color: #555;
+            color: #fff;
+        }
+
+        body.theme-dark .action-log-title {
+            color: #777;
+        }
+
+        body.theme-dark .log-modal .modal-content {
+            background: #1a1a1a;
+            border: 1px solid #333;
+        }
+
+        body.theme-dark .log-modal .modal-header {
+            border-bottom-color: #333;
+        }
+
+        body.theme-dark .log-modal .modal-footer {
+            border-top-color: #333;
+        }
+
+        body.theme-dark .log-modal-content {
+            background: #0d0d0d;
+            color: #ccc;
+        }
+
+        body.theme-dark .log-entry-modal {
+            border-bottom-color: #252525;
+        }
+
+        /* LadaDate theme for log modal */
+        body.theme-ladadate .btn-expand-log {
+            background: transparent;
+            border-color: rgba(244, 114, 182, 0.3);
+            color: var(--text-color);
+        }
+
+        body.theme-ladadate .btn-expand-log:hover {
+            background: rgba(244, 114, 182, 0.1);
+            border-color: rgba(244, 114, 182, 0.5);
+        }
+
+        body.theme-ladadate .action-log-title {
+            color: var(--text-muted);
+        }
+
+        body.theme-ladadate .log-modal .modal-content {
+            background: var(--bg-color);
+            border: 1px solid rgba(244, 114, 182, 0.2);
+        }
+
+        body.theme-ladadate .log-modal .modal-header {
+            border-bottom-color: rgba(244, 114, 182, 0.1);
+        }
+
+        body.theme-ladadate .log-modal .modal-footer {
+            border-top-color: rgba(244, 114, 182, 0.1);
+        }
+
+        body.theme-ladadate .log-modal-content {
+            background: rgba(0,0,0,0.2);
+            color: var(--text-color);
+        }
+
+        body.theme-ladadate .log-entry-modal {
+            border-bottom-color: rgba(244, 114, 182, 0.1);
+        }

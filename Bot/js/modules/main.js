@@ -153,7 +153,15 @@ function createInterface(bot) {
                     <span id="stat-wait-${bot.id}" class="stat-waiting-text">Ожидают: 0</span>
                 </div>
             </div>
-            <div id="log-${bot.id}" class="action-log mt-2" style="flex-grow: 1;"></div>
+            <div class="action-log-wrapper mt-2">
+                <div class="action-log-header">
+                    <span class="action-log-title">Лог действий</span>
+                    <button class="btn-expand-log" onclick="openLogModal('${bot.id}')" title="Развернуть лог">
+                        <i class="fa fa-expand"></i> Развернуть
+                    </button>
+                </div>
+                <div id="log-${bot.id}" class="action-log"></div>
+            </div>
         </div>`;
     row.appendChild(col3);
 
@@ -2319,4 +2327,119 @@ function flashTab(botId) {
             tab.style.backgroundColor = '';
         }
     }, 300);
+}
+
+// ========================================
+// === LOG MODAL FUNCTIONS ===
+// ========================================
+
+let currentLogModalBotId = null;
+
+/**
+ * Открыть модальное окно с полным логом
+ */
+function openLogModal(botId) {
+    const bot = bots[botId];
+    if (!bot) {
+        showToast('Анкета не найдена', 'error');
+        return;
+    }
+
+    currentLogModalBotId = botId;
+
+    // Устанавливаем ID анкеты в заголовок
+    document.getElementById('log-modal-bot-id').textContent = bot.displayId;
+
+    // Получаем содержимое лога
+    const logElement = document.getElementById(`log-${botId}`);
+    const logContent = document.getElementById('log-modal-content');
+
+    if (logElement && logElement.innerHTML.trim()) {
+        // Копируем HTML, но делаем его более читаемым для модального окна
+        const entries = logElement.querySelectorAll('.log-entry');
+        if (entries.length > 0) {
+            let html = '';
+            entries.forEach(entry => {
+                // Определяем тип записи по классам или содержимому
+                let entryClass = '';
+                const text = entry.textContent.toLowerCase();
+                if (text.includes('ошибка') || text.includes('error') || text.includes('❌')) {
+                    entryClass = 'error';
+                } else if (text.includes('✅') || text.includes('отправлено') || text.includes('успешно')) {
+                    entryClass = 'success';
+                } else if (text.includes('⚠') || text.includes('пропуск') || text.includes('cooldown')) {
+                    entryClass = 'warning';
+                }
+                html += `<div class="log-entry-modal ${entryClass}">${entry.innerHTML}</div>`;
+            });
+            logContent.innerHTML = html;
+        } else {
+            // Если нет записей с классом log-entry, копируем весь HTML
+            logContent.innerHTML = logElement.innerHTML || 'Лог пуст...';
+        }
+    } else {
+        logContent.innerHTML = 'Лог пуст...';
+    }
+
+    // Показываем модальное окно
+    document.getElementById('log-modal').classList.add('show');
+
+    // Прокручиваем к последней записи
+    logContent.scrollTop = 0;
+}
+
+/**
+ * Закрыть модальное окно лога
+ */
+function closeLogModal() {
+    document.getElementById('log-modal').classList.remove('show');
+    currentLogModalBotId = null;
+}
+
+/**
+ * Копировать весь лог в буфер обмена
+ */
+function copyAllLogs() {
+    const logContent = document.getElementById('log-modal-content');
+    if (!logContent) return;
+
+    // Получаем текстовое содержимое (без HTML тегов)
+    const textContent = logContent.innerText || logContent.textContent;
+
+    if (!textContent || textContent.trim() === 'Лог пуст...') {
+        showToast('Лог пуст, нечего копировать', 'warning');
+        return;
+    }
+
+    // Копируем в буфер обмена
+    navigator.clipboard.writeText(textContent).then(() => {
+        showToast('Лог скопирован в буфер обмена', 'success');
+    }).catch(err => {
+        console.error('Ошибка копирования:', err);
+        // Fallback для старых браузеров
+        const textarea = document.createElement('textarea');
+        textarea.value = textContent;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showToast('Лог скопирован в буфер обмена', 'success');
+    });
+}
+
+/**
+ * Очистить лог текущей анкеты
+ */
+function clearCurrentLogs() {
+    if (!currentLogModalBotId) return;
+
+    const logElement = document.getElementById(`log-${currentLogModalBotId}`);
+    if (logElement) {
+        logElement.innerHTML = '';
+    }
+
+    // Обновляем содержимое модального окна
+    document.getElementById('log-modal-content').innerHTML = 'Лог очищен';
+
+    showToast('Лог очищен', 'success');
 }
