@@ -1745,20 +1745,28 @@ function toggleBot(id) {
     else { if(bot.isMailRunning) bot.stopMail(); else bot.startMail(text); }
 }
 function startAll() {
-    console.log(`%c[DEBUG-TPL] 🚀🚀 START ALL`, 'background: #e74c3c; color: white; padding: 2px 5px; font-weight: bold;', {
+    console.log(`%c[DEBUG-TPL] 🚀🚀🚀 START ALL НАЖАТА 🚀🚀🚀`, 'background: #e74c3c; color: white; padding: 4px 10px; font-weight: bold; font-size: 14px;', {
         globalMode,
         botsCount: Object.keys(bots).length
+    });
+
+    // DEBUG: Показать ВСЕ тексты которые будут отправляться
+    console.log(`%c[DEBUG-TPL] 📋 ТЕКСТЫ ВСЕХ АНКЕТ ПРИ ЗАПУСКЕ:`, 'background: #e74c3c; color: white; padding: 2px 5px;');
+    Object.values(bots).forEach(b => {
+        const text = document.getElementById(`msg-${b.id}`).value;
+        const isActive = b.id === activeTabId ? '✅' : '⬜';
+        console.log(`  ${isActive} [${b.displayId}] (${text?.length || 0} симв.): "${text?.substring(0, 60)}..."`);
     });
 
     Object.values(bots).forEach(b => {
         const text = document.getElementById(`msg-${b.id}`).value;
 
-        // DEBUG LOG для каждой анкеты
-        console.log(`%c[DEBUG-TPL] 🚀 START ALL - анкета`, 'background: #9b59b6; color: white; padding: 2px 5px;', {
-            botId: b.id,
+        // DEBUG LOG для каждой анкеты при запуске
+        console.log(`%c[DEBUG-TPL] 🚀 ЗАПУСК ${b.displayId}`, 'background: #9b59b6; color: white; padding: 2px 5px;', {
             displayId: b.displayId,
             globalMode,
             action: globalMode === 'chat' ? 'START chat' : 'START mail',
+            isActive: b.id === activeTabId,
             textPreview: text?.substring(0, 80) + '...',
             textLength: text?.length
         });
