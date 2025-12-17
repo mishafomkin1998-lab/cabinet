@@ -1230,18 +1230,18 @@
         /* AI Menu - Main dropdown */
         .ai-options {
             position: absolute;
-            top: calc(100% + 8px);
+            top: calc(100% + 5px);
             left: 0;
             background: var(--panel-bg, white);
             border: 1px solid rgba(111, 66, 193, 0.15);
-            border-radius: 10px;
-            padding: 6px;
+            border-radius: 8px;
+            padding: 4px;
             display: none;
             flex-direction: column;
-            gap: 4px;
+            gap: 2px;
             box-shadow: 0 8px 32px rgba(111, 66, 193, 0.18), 0 2px 8px rgba(0,0,0,0.08);
             z-index: 100;
-            min-width: 130px;
+            min-width: 110px;
             opacity: 0;
             transform: translateY(-10px) scale(0.95);
             transform-origin: top left;
@@ -1256,10 +1256,10 @@
         /* AI Menu items */
         .btn-ai-sub {
             font-size: 11px;
-            padding: 8px 12px;
+            padding: 5px 10px;
             border: none;
             background: transparent;
-            border-radius: 6px;
+            border-radius: 5px;
             text-align: left;
             cursor: pointer;
             color: #555;
@@ -1293,7 +1293,7 @@
             display: flex;
             align-items: center;
             gap: 6px;
-            padding: 8px 12px;
+            padding: 5px 10px;
             font-weight: 500;
         }
         .submenu-arrow {
@@ -1310,19 +1310,19 @@
         /* Submenu for prompts */
         .prompt-submenu {
             position: absolute;
-            left: calc(100% + 6px);
-            top: -6px;
+            left: calc(100% + 4px);
+            top: -4px;
             background: var(--panel-bg, white);
             border: 1px solid rgba(111, 66, 193, 0.15);
-            border-radius: 10px;
-            padding: 6px;
+            border-radius: 8px;
+            padding: 4px;
             display: none;
             flex-direction: column;
-            gap: 2px;
+            gap: 1px;
             box-shadow: 0 8px 32px rgba(111, 66, 193, 0.18), 0 2px 8px rgba(0,0,0,0.08);
             z-index: 101;
-            min-width: 160px;
-            max-width: 220px;
+            min-width: 140px;
+            max-width: 200px;
             opacity: 0;
             transform: translateX(-10px) scale(0.95);
             transform-origin: left center;
@@ -1335,8 +1335,8 @@
         }
         .prompt-submenu-item {
             font-size: 11px;
-            padding: 8px 12px;
-            border-radius: 6px;
+            padding: 5px 10px;
+            border-radius: 5px;
             cursor: pointer;
             color: #555;
             transition: all 0.15s ease;
@@ -1365,19 +1365,19 @@
         /* Submenu for Improve templates */
         .improve-submenu {
             position: absolute;
-            left: calc(100% + 6px);
-            top: -6px;
+            left: calc(100% + 4px);
+            top: -4px;
             background: var(--panel-bg, white);
             border: 1px solid rgba(111, 66, 193, 0.15);
-            border-radius: 10px;
-            padding: 6px;
+            border-radius: 8px;
+            padding: 4px;
             display: none;
             flex-direction: column;
-            gap: 2px;
+            gap: 1px;
             box-shadow: 0 8px 32px rgba(111, 66, 193, 0.18), 0 2px 8px rgba(0,0,0,0.08);
             z-index: 101;
-            min-width: 160px;
-            max-width: 220px;
+            min-width: 140px;
+            max-width: 200px;
             opacity: 0;
             transform: translateX(-10px) scale(0.95);
             transform-origin: left center;
