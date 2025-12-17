@@ -471,7 +471,7 @@ async function handleUniversalImport(input) {
 
     if (fileName.endsWith('.json')) {
         // JSON - полный импорт
-        if (!confirm('Внимание! Импорт JSON перезапишет существующие данные. Продолжить?')) {
+        if (!await customConfirm('Внимание! Импорт JSON перезапишет существующие данные. Продолжить?', { type: 'warning' })) {
             input.value = '';
             return;
         }
@@ -634,13 +634,24 @@ function renderStatsList() {
     else data.forEach(item => { const d = document.createElement('div'); d.className = 'list-item'; d.innerText = item; list.appendChild(d); });
 }
 function copyStats() { navigator.clipboard.writeText((globalMode==='chat' ? bots[currentModalBotId].chatHistory[currentStatsType] : bots[currentModalBotId].mailHistory[currentStatsType]).join('\n')); }
-function clearStats(event) {
+async function clearStats(event) {
     // Shift + клик = очистить на ВСЕХ анкетах
     if (event && event.shiftKey) {
         clearStatsAll();
         return;
     }
-    if(confirm("Очистить?")){ const b = bots[currentModalBotId]; if(globalMode==='chat') { b.chatHistory[currentStatsType]=[]; b.chatStats[currentStatsType]=0; } else { b.mailHistory[currentStatsType]=[]; b.mailStats[currentStatsType]=0; } b.updateUI(); renderStatsList(); }
+    if (await customConfirm("Очистить?", { type: 'danger' })) {
+        const b = bots[currentModalBotId];
+        if (globalMode === 'chat') {
+            b.chatHistory[currentStatsType] = [];
+            b.chatStats[currentStatsType] = 0;
+        } else {
+            b.mailHistory[currentStatsType] = [];
+            b.mailStats[currentStatsType] = 0;
+        }
+        b.updateUI();
+        renderStatsList();
+    }
 }
 
 // Очистить статистику (sent/errors) на ВСЕХ анкетах
@@ -1075,7 +1086,7 @@ async function deleteTemplate(botId, event) {
     const bot = bots[botId];
     let tpls = getBotTemplates(bot.login)[type];
     const idx = document.getElementById(`tpl-select-${botId}`).value;
-    if (idx !== "" && (globalSettings.skipDeleteConfirm || confirm("Удалить?"))) {
+    if (idx !== "" && (globalSettings.skipDeleteConfirm || await customConfirm("Удалить?", { type: 'danger' }))) {
         const idxNum = parseInt(idx);
         tpls.splice(idxNum, 1);
         localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
@@ -1089,7 +1100,7 @@ async function deleteTemplate(botId, event) {
 
 // Удалить выбранный шаблон у ВСЕХ анкет
 async function deleteTemplateFromAll() {
-    if (!globalSettings.skipDeleteConfirm && !confirm("Удалить выбранный шаблон у ВСЕХ анкет?")) return;
+    if (!globalSettings.skipDeleteConfirm && !await customConfirm("Удалить выбранный шаблон у ВСЕХ анкет?", { type: 'danger' })) return;
 
     const isChat = globalMode === 'chat';
     const type = isChat ? 'chat' : 'mail';
@@ -1471,7 +1482,7 @@ function copyIgnoredList(botId) {
     });
 }
 
-function confirmClearIgnored(botId, type, event) {
+async function confirmClearIgnored(botId, type, event) {
     // Shift + клик = очистить на ВСЕХ анкетах
     if (event && event.shiftKey) {
         clearIgnoredAll(type);
@@ -1479,7 +1490,7 @@ function confirmClearIgnored(botId, type, event) {
     }
 
     const typeName = type === 'chat' ? 'чатов' : 'писем';
-    if (confirm(`Очистить игнор-лист ${typeName}? Это действие нельзя отменить.`)) {
+    if (await customConfirm(`Очистить игнор-лист ${typeName}? Это действие нельзя отменить.`, { type: 'danger' })) {
         clearIgnoredUsers(botId, type);
         closeModal('ignored-modal');
         showToast(`Игнор-лист ${typeName} очищен`, 'success');
@@ -1643,9 +1654,9 @@ function selectTab(id) {
     document.getElementById('welcome-screen').style.display = 'none';
 }
 
-function closeTab(e, id) {
+async function closeTab(e, id) {
     e.stopPropagation();
-    if(globalSettings.confirmTabClose && !confirm(`Закрыть вкладку ${bots[id].displayId}?`)) return;
+    if(globalSettings.confirmTabClose && !await customConfirm(`Закрыть вкладку ${bots[id].displayId}?`)) return;
     
     if(bots[id]) {
         // Сохраняем данные бота в кэш для уведомлений
@@ -1697,7 +1708,7 @@ function startAll() {
 }
 function stopAll() { Object.values(bots).forEach(b => { if (globalMode === 'chat') b.stopChat(); else b.stopMail(); }); }
 async function clearAllStats() {
-    if(!confirm("Очистить статистику на ВСЕХ анкетах?")) return;
+    if(!await customConfirm("Очистить статистику на ВСЕХ анкетах?", { type: 'danger' })) return;
     const type = globalMode === 'chat' ? 'chat' : 'mail';
     for (const b of Object.values(bots)) {
         if (globalMode === 'chat') {
@@ -1746,7 +1757,7 @@ async function reloginBot(botId) {
 }
 
 async function reloginAllBots() {
-    if(!confirm("Перезайти во все анкеты?")) return;
+    if(!await customConfirm("Перезайти во все анкеты?")) return;
     const botIds = Object.keys(bots);
     if(botIds.length === 0) return;
 
@@ -1815,7 +1826,7 @@ async function exportAllData() {
 async function handleFullImport(input) {
     if (!input.files.length) return;
 
-    if (!confirm('Внимание! Импорт перезапишет существующие данные. Продолжить?')) {
+    if (!await customConfirm('Внимание! Импорт перезапишет существующие данные. Продолжить?', { type: 'warning' })) {
         input.value = '';
         return;
     }

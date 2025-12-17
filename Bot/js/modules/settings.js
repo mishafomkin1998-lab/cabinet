@@ -610,7 +610,7 @@ async function deletePromptTemplate(promptType) {
     const template = (promptTemplates[promptType] || []).find(t => t.id == templateId);
     if (!template) return;
 
-    if (!confirm(`Удалить шаблон "${template.name}"?`)) return;
+    if (!await customConfirm(`Удалить шаблон "${template.name}"?`, { type: 'danger' })) return;
 
     // Удаляем из локального списка
     promptTemplates[promptType] = (promptTemplates[promptType] || []).filter(t => t.id != templateId);

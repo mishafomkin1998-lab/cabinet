@@ -1,8 +1,66 @@
 const forbiddenWords = [
-    "Fuck", "Shit", "Ass", "Bitch", "Damn", "Hell", "Dick", "Cunt", "Pussy", 
-    "Cock", "Tits", "Bastard", "Motherfucker", "Asshole", "Son of a bitch", 
+    "Fuck", "Shit", "Ass", "Bitch", "Damn", "Hell", "Dick", "Cunt", "Pussy",
+    "Cock", "Tits", "Bastard", "Motherfucker", "Asshole", "Son of a bitch",
     "Goddammit", "Piss", "Crap", "Fart", "Wanker"
 ];
+
+// ========== Custom Confirm Modal ==========
+// Заменяет стандартный confirm() на красивую модалку
+// Использование: if (await customConfirm('Удалить?')) { ... }
+// Опции: { type: 'warning'|'danger'|'info', okText: 'OK', cancelText: 'Отмена', okDanger: false }
+function customConfirm(message, options = {}) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('confirm-modal');
+        const messageEl = document.getElementById('confirm-modal-message');
+        const iconEl = document.getElementById('confirm-modal-icon');
+        const okBtn = document.getElementById('confirm-modal-ok');
+        const cancelBtn = document.getElementById('confirm-modal-cancel');
+
+        const { type = 'warning', okText = 'OK', cancelText = 'Отмена', okDanger = false } = options;
+
+        // Установка сообщения
+        messageEl.textContent = message;
+
+        // Установка иконки
+        iconEl.className = 'confirm-modal-icon ' + type;
+        iconEl.textContent = type === 'danger' ? '🗑️' : type === 'info' ? 'ℹ️' : '⚠️';
+
+        // Установка текста кнопок
+        okBtn.textContent = okText;
+        cancelBtn.textContent = cancelText;
+
+        // Стиль кнопки OK
+        okBtn.className = 'confirm-modal-btn ok' + (okDanger || type === 'danger' ? ' danger' : '');
+
+        // Функции закрытия
+        function closeAndResolve(result) {
+            modal.classList.remove('show');
+            okBtn.removeEventListener('click', handleOk);
+            cancelBtn.removeEventListener('click', handleCancel);
+            modal.removeEventListener('click', handleBackdrop);
+            document.removeEventListener('keydown', handleKeydown);
+            resolve(result);
+        }
+
+        function handleOk() { closeAndResolve(true); }
+        function handleCancel() { closeAndResolve(false); }
+        function handleBackdrop(e) { if (e.target === modal) closeAndResolve(false); }
+        function handleKeydown(e) {
+            if (e.key === 'Escape') closeAndResolve(false);
+            if (e.key === 'Enter') closeAndResolve(true);
+        }
+
+        // Подписка на события
+        okBtn.addEventListener('click', handleOk);
+        cancelBtn.addEventListener('click', handleCancel);
+        modal.addEventListener('click', handleBackdrop);
+        document.addEventListener('keydown', handleKeydown);
+
+        // Показ модалки
+        modal.classList.add('show');
+        okBtn.focus();
+    });
+}
 
 function parseProxyUrl(proxyUrlString) {
     if (!proxyUrlString) return null;
