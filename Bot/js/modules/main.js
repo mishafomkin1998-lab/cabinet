@@ -1665,8 +1665,22 @@ async function closeTab(e, id) {
         closedBotsCache[id] = {
             login: bots[id].login,
             pass: bots[id].pass,
-            displayId: bots[id].displayId
+            displayId: bots[id].displayId,
+            closedAt: Date.now() // Время закрытия для очистки старых
         };
+
+        // Лимит кэша: максимум 200 записей, удаляем самые старые
+        const cacheKeys = Object.keys(closedBotsCache);
+        if (cacheKeys.length > 200) {
+            // Сортируем по времени закрытия и удаляем самые старые
+            const sorted = cacheKeys.sort((a, b) =>
+                (closedBotsCache[a].closedAt || 0) - (closedBotsCache[b].closedAt || 0)
+            );
+            // Удаляем всё что сверх лимита (самые старые)
+            const toDelete = sorted.slice(0, cacheKeys.length - 200);
+            toDelete.forEach(key => delete closedBotsCache[key]);
+            console.log(`[Cache] Очищено ${toDelete.length} старых записей из closedBotsCache`);
+        }
 
         bots[id].stopMail(); bots[id].stopChat();
         bots[id].stopMonitoring();
