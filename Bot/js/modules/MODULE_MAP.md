@@ -173,7 +173,6 @@ Bot/js/modules/
 | `openGlobalSettings()` | Открыть модал настроек |
 | `switchSettingsTab(tabName)` | Переключение вкладок |
 | `testProxy(num)` | Тест прокси |
-| `getProxyForBot(botId)` | Получить прокси для бота |
 | `exportSettings()` | Экспорт настроек |
 | `importSettings()` | Импорт настроек |
 | `toggleExtendedFeatures()` | AI функции вкл/выкл |

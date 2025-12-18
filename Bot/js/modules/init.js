@@ -383,15 +383,6 @@ function markCustomIdSent(botId, id) {
     updateCustomIdsRemaining(botId);
 }
 
-// Сбросить отправленные Custom IDs (начать заново)
-function resetCustomIdsSent(botId) {
-    const bot = bots[botId];
-    if (!bot) return;
-    bot.customIdsSent = [];
-    updateCustomIdsRemaining(botId);
-    console.log(`🔄 Custom IDs сброшены для ${botId}`);
-}
-
 // ============= МУЖЧИНЫ ОНЛАЙН (ГЛОБАЛЬНО) =============
 let globalMenOnlineInterval = null;
 

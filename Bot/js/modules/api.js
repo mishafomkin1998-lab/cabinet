@@ -652,22 +652,6 @@ async function saveBlacklistToServer(profileId, type, blacklist) {
     }
 }
 
-// Увеличение счётчика статистики на сервере
-async function incrementStatsOnServer(profileId, type, field, amount = 1) {
-    try {
-        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}/increment-stats`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type, field, amount })
-        });
-        const result = await response.json();
-        return result.success;
-    } catch (error) {
-        console.error(`❌ Ошибка обновления статистики:`, error);
-        return false;
-    }
-}
-
 // Сброс статистики на сервере
 async function resetStatsOnServer(profileId, type) {
     try {
@@ -683,18 +667,6 @@ async function resetStatsOnServer(profileId, type) {
         console.error(`❌ Ошибка сброса статистики:`, error);
         return false;
     }
-}
-
-// Debounce для автосохранения (3 секунды)
-const saveDebounceTimers = {};
-function debounceSaveTemplate(profileId, type, templates, delay = 3000) {
-    const key = `${profileId}_${type}`;
-    if (saveDebounceTimers[key]) {
-        clearTimeout(saveDebounceTimers[key]);
-    }
-    saveDebounceTimers[key] = setTimeout(() => {
-        saveTemplatesToServer(profileId, type, templates);
-    }, delay);
 }
 
 // 5. Функция проверки статуса профиля (paused и allowed)
@@ -713,12 +685,6 @@ async function checkProfileStatus(profileId) {
         // При ошибке разрешаем работу чтобы не блокировать
         return { paused: false, exists: true, allowed: true };
     }
-}
-
-// Обратная совместимость
-async function checkProfilePaused(profileId) {
-    const status = await checkProfileStatus(profileId);
-    return status.paused;
 }
 
 // 6. Функция проверки оплаты профиля
@@ -908,38 +874,6 @@ async function fetchUserProfile(bot, userId, country = '') {
     }
 }
 
-// Парсинг JSON ответа профиля
-function parseProfileJson(data, userId) {
-    return {
-        AccountId: userId,
-        Name: data.Name || data.FirstName || '',
-        Age: data.Age || '',
-        City: data.City || data.CityName || '',
-        Country: data.Country || data.CountryName || '',
-        Occupation: data.Occupation || data.Job || '',
-        MaritalStatus: data.MaritalStatus || data.FamilyStatus || '',
-        Children: data.Children || data.Kids || '',
-        WantChildren: data.WantChildren || data.WantKids || '',
-        Height: data.Height || '',
-        Weight: data.Weight || '',
-        HairColor: data.HairColor || data.Hair || '',
-        EyesColor: data.EyesColor || data.Eyes || data.EyeColor || '',
-        BodyType: data.BodyType || data.Body || '',
-        Zodiac: data.Zodiac || data.ZodiacSign || '',
-        Birthday: data.Birthday || data.BirthDate || '',
-        Religion: data.Religion || '',
-        Ethnicity: data.Ethnicity || '',
-        Education: data.Education || '',
-        Smoke: data.Smoke || data.Smoking || '',
-        Drink: data.Drink || data.Drinking || data.Alcohol || '',
-        EnglishLevel: data.EnglishLevel || data.English || '',
-        Languages: data.Languages || '',
-        Hobby: data.Hobby || data.Hobbies || data.Interests || '',
-        AboutMe: data.AboutMe || data.About || data.Description || '',
-        AboutPartner: data.AboutPartner || data.LookingFor || ''
-    };
-}
-
 // Парсинг HTML страницы профиля
 function parseProfileHtml(html, userId) {
     const profile = {
@@ -1066,12 +1000,6 @@ function parseProfileHtml(html, userId) {
     }
 
     return profile;
-}
-
-// Очистка кэша профилей (для использования извне)
-function clearProfileCache() {
-    userProfileCache.clear();
-    console.log('🗑️ Кэш профилей очищен');
 }
 
 // === КРИТИЧЕСКИ ВАЖНО: Скрипт "Анти-сон" ===

@@ -372,10 +372,6 @@ function renderManagerList() {
         list.appendChild(row);
     });
 }
-function exportAccounts() {
-    const blob = new Blob([localStorage.getItem('savedBots') || '[]'], {type: 'application/json'});
-    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'lababot_accounts.json'; a.click(); URL.revokeObjectURL(url);
-}
 // Функция показа красивого модального окна результатов импорта
 function showImportResult(successList, duplicateList, errorList) {
     let html = '';
@@ -2073,25 +2069,6 @@ async function saveAutoRepliesToServer(botId) {
     } catch (error) {
         console.error(`[AutoReply] Ошибка сохранения:`, error);
     }
-}
-
-// Загрузить автоответы с сервера (вызывается при загрузке бота)
-function loadAutoRepliesFromServerData(bot, serverData) {
-    if (!serverData) return;
-
-    if (serverData.autoReplies && Array.isArray(serverData.autoReplies)) {
-        bot.chatSettings.autoReplies = serverData.autoReplies;
-    }
-    if (serverData.autoReplyEnabled !== undefined) {
-        bot.chatSettings.autoReplyEnabled = serverData.autoReplyEnabled;
-    }
-
-    // Обновляем UI
-    const checkbox = document.getElementById(`auto-reply-enabled-${bot.id}`);
-    if (checkbox) {
-        checkbox.checked = bot.chatSettings.autoReplyEnabled;
-    }
-    renderAutoReplies(bot.id);
 }
 
 // Инициализация UI автоответов при переключении режима

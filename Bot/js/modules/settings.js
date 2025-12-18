@@ -214,22 +214,6 @@ async function testProxy(num) {
     }
 }
 
-// Получить прокси для бота по его позиции
-function getProxyForBot(botId) {
-    const botIds = Object.keys(bots);
-    const position = botIds.indexOf(botId) + 1; // позиция с 1
-
-    if (position <= 0) return null;
-
-    // Определяем какой прокси использовать (25 анкет на прокси)
-    const proxyIndex = Math.ceil(position / 25); // 1-25 -> 1, 26-50 -> 2, и т.д.
-
-    if (proxyIndex > 6) return null; // У нас только 6 прокси
-
-    const proxy = globalSettings[`proxy${proxyIndex}`];
-    return proxy || null;
-}
-
 // Экспорт/Импорт настроек
 function exportSettings() {
     const data = {
@@ -338,13 +322,6 @@ function toggleGlobalMode() {
 function updateBotCount() { document.getElementById('global-bot-count').innerText = `Анкет: ${Object.keys(bots).length}`; }
 function openModal(id) { const el=document.getElementById(id); el.style.display='flex'; setTimeout(()=>{el.classList.add('show');},10); }
 function closeModal(id) { const el=document.getElementById(id); el.classList.remove('show'); setTimeout(()=>{el.style.display='none';},300); }
-
-function checkVarTrigger(textarea, dropdownId) { if(textarea.value.endsWith('{')) document.getElementById(dropdownId).style.display='block'; }
-function applyVar(textareaId, text, dropdownId) {
-    const ta = document.getElementById(textareaId);
-    ta.value = ta.value.endsWith('{') ? ta.value.slice(0, -1) + text : ta.value + text;
-    document.getElementById(dropdownId).style.display='none'; ta.focus();
-}
 
 // =====================================================
 // === ШАБЛОНЫ ПРОМПТОВ (localStorage + опционально сервер) ===

@@ -1,34 +1,3 @@
-async function openMiniChat(botId, partnerId, partnerName, type = 'mail') {
-    minichatBotId = botId;
-    minichatPartnerId = partnerId;
-    minichatLastMessageId = 0;
-    minichatType = type; // 'mail' или 'chat'
-
-    selectTab(botId);
-
-    document.getElementById('minichat-partner-id').innerText = partnerId;
-    document.getElementById('minichat-partner-name').innerText = partnerName;
-    document.getElementById('minichat-bot-display-id').innerText = bots[botId].displayId;
-    document.getElementById('minichat-history').innerHTML = '<div class="text-center text-muted small mt-5"><i class="fa fa-spinner fa-spin"></i> Загрузка истории...</div>';
-    document.getElementById('minichat-input').value = '';
-
-    // Обновляем заголовок модального окна в зависимости от типа
-    const modalTitle = document.querySelector('#minichat-modal .modal-header span');
-    if (modalTitle) {
-        modalTitle.innerHTML = type === 'chat'
-            ? '💬 Чат с <span id="minichat-partner-name">' + partnerName + '</span>'
-            : '💌 Переписка с <span id="minichat-partner-name">' + partnerName + '</span>';
-    }
-
-    openModal('minichat-modal');
-
-    if (type === 'chat') {
-        await loadMiniChatHistoryForChat();
-    } else {
-        await loadMiniChatHistory();
-    }
-}
-
 async function loadMiniChatHistory() {
     if (!minichatBotId || !minichatPartnerId) return;
 

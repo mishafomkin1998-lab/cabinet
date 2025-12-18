@@ -351,16 +351,6 @@ async function openResponseWindow(botId, partnerId, partnerName, type) {
     }
 }
 
-// Закрытие окна через IPC (вызывается при необходимости)
-async function closeResponseWindow(windowId) {
-    try {
-        await ipcRenderer.invoke('close-response-window', windowId);
-        openedResponseWindows.delete(windowId);
-    } catch (err) {
-        console.error('[ResponseWindow] Ошибка закрытия:', err);
-    }
-}
-
 // Слушаем событие закрытия окна от main process
 ipcRenderer.on('response-window-closed', (event, windowId) => {
     openedResponseWindows.delete(windowId);

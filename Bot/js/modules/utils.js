@@ -78,54 +78,6 @@ function parseProxyUrl(proxyUrlString) {
     } catch (e) { return null; }
 }
 
-// Парсинг простого формата ip:port или domain:port:user:pass
-function parseSimpleProxy(proxyString) {
-    if (!proxyString) return null;
-    const trimmed = proxyString.trim();
-    if (!trimmed) return null;
-
-    const parts = trimmed.split(':');
-
-    // Поддерживаем форматы:
-    // 1. ip:port
-    // 2. domain:port
-    // 3. ip:port:user:pass
-    // 4. domain:port:user:pass
-    if (parts.length !== 2 && parts.length !== 4) return null;
-
-    const [host, portStr, username, password] = parts;
-    const port = parseInt(portStr);
-
-    // Проверка валидности порта
-    if (isNaN(port) || port < 1 || port > 65535) {
-        return null;
-    }
-
-    // Проверка хоста (IP или домен)
-    const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
-    const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-
-    if (!ipRegex.test(host) && !domainRegex.test(host)) {
-        return null;
-    }
-
-    const proxyConfig = {
-        host: host,
-        port: port,
-        protocol: 'http'
-    };
-
-    // Если есть логин/пароль - добавляем
-    if (parts.length === 4 && username && password) {
-        proxyConfig.auth = {
-            username: username,
-            password: password
-        };
-    }
-
-    return proxyConfig;
-}
-
 // ============= ПРОКСИ ДЛЯ WEBVIEW =============
 // Получить прокси для анкеты по её номеру (порядку добавления)
 // proxy1 → анкеты 1-25, proxy2 → анкеты 26-50, и т.д.
