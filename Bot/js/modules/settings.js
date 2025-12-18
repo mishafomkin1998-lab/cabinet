@@ -316,6 +316,10 @@ function switchTabRelative(step) {
 }
 
 function toggleGlobalMode() {
+    // ВАЖНО: Сохраняем текст всех шаблонов ПЕРЕД переключением режима!
+    // Иначе несохранённые изменения потеряются при быстром переключении
+    Object.keys(bots).forEach(botId => saveTemplateTextNow(botId));
+
     const btn = document.getElementById('btn-mode-toggle');
     if (globalMode === 'mail') {
         globalMode = 'chat';
