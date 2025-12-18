@@ -326,7 +326,9 @@ function toggleGlobalMode() {
         document.body.classList.remove('mode-chat'); document.body.classList.add('mode-mail');
         btn.innerHTML = '<i class="fa fa-envelope"></i>'; btn.className = 'btn btn-circle btn-mode-switch active-mail';
     }
-    if(activeTabId && bots[activeTabId]) updateInterfaceForMode(activeTabId);
+    // КРИТИЧНО: Обновляем ВСЕ вкладки при переключении режима!
+    // Иначе при "Старт все" неактивные вкладки будут иметь текст старого режима
+    Object.keys(bots).forEach(botId => updateInterfaceForMode(botId));
 }
 
 function updateBotCount() { document.getElementById('global-bot-count').innerText = `Анкет: ${Object.keys(bots).length}`; }
