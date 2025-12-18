@@ -938,10 +938,26 @@ function parseProfileHtml(html, userId) {
         if (locationMatch) {
             const locHtml = locationMatch[1];
             const cityMatch = locHtml.match(/<span>([^<,]+)/);
-            if (cityMatch) profile.City = cityMatch[1].trim().replace(',', '');
+            if (cityMatch) {
+                profile.City = cityMatch[1]
+                    .replace(/&nbsp;/gi, ' ')
+                    .replace(/&amp;/gi, '&')
+                    .replace(/&#\d+;/g, '')
+                    .trim()
+                    .replace(',', '');
+            }
 
             const countryMatch = locHtml.match(/<a[^>]*>([^<]+)/);
-            if (countryMatch) profile.Country = countryMatch[1].trim();
+            if (countryMatch) {
+                // Очистка от HTML entities (&nbsp; и подобных)
+                profile.Country = countryMatch[1]
+                    .replace(/&nbsp;/gi, ' ')
+                    .replace(/&amp;/gi, '&')
+                    .replace(/&lt;/gi, '<')
+                    .replace(/&gt;/gi, '>')
+                    .replace(/&#\d+;/g, '')
+                    .trim();
+            }
         }
 
         // Остальные поля
