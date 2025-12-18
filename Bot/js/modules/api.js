@@ -910,7 +910,11 @@ function parseProfileHtml(html, userId) {
         // Имя и возраст из хлебных крошек или заголовка
         const nameAgeMatch = html.match(/<b>([^<]+)<\/b>,\s*<span>(\d+)<\/span>/);
         if (nameAgeMatch) {
-            profile.Name = nameAgeMatch[1].trim();
+            profile.Name = nameAgeMatch[1]
+                .replace(/&nbsp;/gi, ' ')
+                .replace(/&amp;/gi, '&')
+                .replace(/&#\d+;/g, '')
+                .trim();
             profile.Age = nameAgeMatch[2].trim();
             console.log(`[Parse] Найдено имя: ${profile.Name}, возраст: ${profile.Age}`);
         } else {
