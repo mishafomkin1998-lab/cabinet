@@ -1664,10 +1664,17 @@ async function closeTab(e, id) {
 
         bots[id].stopMail(); bots[id].stopChat();
         bots[id].stopMonitoring();
-        clearInterval(bots[id].keepAliveTimer);
-        clearInterval(bots[id].heartbeatInterval); // Останавливаем heartbeat
 
-        // === ВАЖНОЕ ДОБАВЛЕНИЕ: Удаляем webview ===
+        // === ОЧИСТКА ВСЕХ ТАЙМЕРОВ (предотвращение утечки памяти) ===
+        clearInterval(bots[id].keepAliveTimer);
+        clearInterval(bots[id].lababotHeartbeatTimer);
+        clearInterval(bots[id].mailTimerInterval);
+        clearInterval(bots[id].chatTimerInterval);
+        clearTimeout(bots[id].mailTimeout);
+        clearTimeout(bots[id].chatTimeout);
+        clearInterval(bots[id].heartbeatInterval); // legacy
+
+        // === Удаляем webview ===
         const wv = document.getElementById(`webview-${id}`);
         if(wv) wv.remove();
 

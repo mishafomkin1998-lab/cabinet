@@ -1,6 +1,9 @@
 // Версия приложения
 const APP_VERSION = '1.3.0';
 
+// Лимит записей в blacklist (предотвращение утечки памяти)
+const BLACKLIST_MAX_SIZE = 5000;
+
 let axios;
 try { axios = require('axios'); } catch(e) { axios = window.axios; }
 

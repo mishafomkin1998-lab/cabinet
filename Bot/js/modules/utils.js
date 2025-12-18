@@ -363,7 +363,7 @@ function extractApiError(response, defaultMessage = 'Неизвестная ош
         if (jsonStr && jsonStr !== '{}' && jsonStr.length < 200) {
             return `${defaultMessage}: ${jsonStr}`;
         }
-    } catch (e) {}
+    } catch (e) { /* JSON.stringify может упасть на circular refs - игнорируем */ }
 
     return `${defaultMessage} (${response.status})`;
 }

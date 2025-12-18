@@ -58,6 +58,9 @@ class AccountBot {
         this.ignoredUsersMail = []; // ID пользователей, которые заигнорили в письмах
         this.ignoredUsersChat = []; // ID пользователей, которые заигнорили в чатах
 
+        // === Счётчик сетевых ошибок для exponential backoff ===
+        this.networkErrorCount = 0;
+
         // ПРИМЕЧАНИЕ: Фильтрация теперь проверяет mailHistory.sent, mailHistory.errors,
         // chatHistory.sent, chatHistory.errors, blacklist и ignoredUsers напрямую.
         // Это защищает от спама - если пользователь есть в ЛЮБОМ списке, ему не отправляется.
@@ -439,6 +442,10 @@ class AccountBot {
             webview.executeJavaScript(KEEP_ALIVE_SCRIPT);
             
             // 2. Скрипт авто-входа (если токен есть, все равно создаем сессию)
+            // БЕЗОПАСНОСТЬ: Экранируем логин и пароль для предотвращения XSS
+            const safeLogin = JSON.stringify(this.login).slice(1, -1); // убираем кавычки JSON
+            const safePass = JSON.stringify(this.pass).slice(1, -1);
+
             const script = `
                 setTimeout(() => {
                     const emailInput = document.querySelector('input[name="login"]');
@@ -447,12 +454,12 @@ class AccountBot {
 
                     if(emailInput && passInput) {
                         const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
-                        
-                        nativeInputValueSetter.call(emailInput, "${this.login}");
+
+                        nativeInputValueSetter.call(emailInput, "${safeLogin}");
                         emailInput.dispatchEvent(new Event('input', { bubbles: true }));
                         emailInput.dispatchEvent(new Event('change', { bubbles: true }));
 
-                        nativeInputValueSetter.call(passInput, "${this.pass}");
+                        nativeInputValueSetter.call(passInput, "${safePass}");
                         passInput.dispatchEvent(new Event('input', { bubbles: true }));
                         passInput.dispatchEvent(new Event('change', { bubbles: true }));
 
@@ -567,7 +574,7 @@ class AccountBot {
                 this.myBirthday = match[1];
                 this.checkBirthdayComing();
             }
-        } catch(e) { }
+        } catch(e) { console.error(`[Bot ${this.displayId}] getProfileData error:`, e.message); }
     }
     
     checkBirthdayComing() {
@@ -677,9 +684,15 @@ class AccountBot {
                         ? messageBody.substring(0, 50) + '...'
                         : messageBody;
 
-                    // === СРАЗУ ДОБАВЛЯЕМ В ЧС ЧАТА ===
+                    // === СРАЗУ ДОБАВЛЯЕМ В ЧС ЧАТА (с лимитом) ===
                     const partnerIdStr = partnerId.toString();
                     if (!this.chatSettings.blacklist.includes(partnerIdStr)) {
+                        // Проверяем лимит blacklist
+                        if (this.chatSettings.blacklist.length >= BLACKLIST_MAX_SIZE) {
+                            // Удаляем старые записи (первые 100)
+                            this.chatSettings.blacklist.splice(0, 100);
+                            console.log(`[Lababot] ⚠️ Blacklist Chat достиг лимита ${BLACKLIST_MAX_SIZE}, удалены старые записи`);
+                        }
                         this.chatSettings.blacklist.push(partnerIdStr);
                         saveBlacklistToServer(this.displayId, 'chat', this.chatSettings.blacklist);
                         console.log(`[Lababot] ✅ ${partnerName} (${partnerId}) добавлен в ЧС чата`);
@@ -805,9 +818,15 @@ class AccountBot {
                     const partnerId = msg.User.AccountId;
                     const partnerName = msg.User.Name || `ID ${partnerId}`;
 
-                    // === СРАЗУ ДОБАВЛЯЕМ В ЧС ПИСЕМ ===
+                    // === СРАЗУ ДОБАВЛЯЕМ В ЧС ПИСЕМ (с лимитом) ===
                     const partnerIdStr = partnerId.toString();
                     if (!this.mailSettings.blacklist.includes(partnerIdStr)) {
+                        // Проверяем лимит blacklist
+                        if (this.mailSettings.blacklist.length >= BLACKLIST_MAX_SIZE) {
+                            // Удаляем старые записи (первые 100)
+                            this.mailSettings.blacklist.splice(0, 100);
+                            console.log(`[Lababot] ⚠️ Blacklist Mail достиг лимита ${BLACKLIST_MAX_SIZE}, удалены старые записи`);
+                        }
                         this.mailSettings.blacklist.push(partnerIdStr);
                         saveBlacklistToServer(this.displayId, 'mail', this.mailSettings.blacklist);
                         console.log(`[Lababot] ✅ ${partnerName} (${partnerId}) добавлен в ЧС писем`);
@@ -851,7 +870,7 @@ class AccountBot {
                     this.lastMailId = newestMsg.MessageId;
                 }
             }
-        } catch(e) {}
+        } catch(e) { console.error(`[Bot ${this.displayId}] checkNewMails error:`, e.message); }
         finally {
             // Интервал 20-35 сек (безопасно для 50+ анкет)
             const nextRun = Math.floor(Math.random() * (35000 - 20000 + 1)) + 20000;
@@ -862,9 +881,9 @@ class AccountBot {
     startKeepAlive() {
         this.doActivity();
         if(this.keepAliveTimer) clearInterval(this.keepAliveTimer);
-        this.keepAliveTimer = setInterval(() => { this.doActivity(); }, 60000); 
+        this.keepAliveTimer = setInterval(() => { this.doActivity(); }, 60000);
     }
-    
+
     async doActivity() {
         if(!this.token) return;
         try {
@@ -874,7 +893,7 @@ class AccountBot {
                 // Сохраняем для глобального счётчика
                 this.lastOnlineCount = res.data.Users.length;
             }
-        } catch (e) {}
+        } catch (e) { /* Тихая ошибка - doActivity вызывается часто, не спамим в консоль */ }
     }
 
     async startMail(text) {
@@ -1153,6 +1172,7 @@ class AccountBot {
                 this.incrementStat('mail', 'sent');
                 this.mailHistory.sent.push(`${user.AccountId} (${user.Name})`);
                 this.log(`✅ Письмо отправлено: ${user.Name} (${user.AccountId})`);
+                this.networkErrorCount = 0; // Сброс счётчика при успехе
 
                 // Данные уже добавлены в mailHistory.sent - фильтрация проверяет этот список
 
@@ -1202,7 +1222,11 @@ class AccountBot {
             }
         } catch (e) {
             if(e.message === "Network Error" || !e.response) {
-                this.log(`📡 Ошибка сети. Повторная попытка...`);
+                // Exponential backoff при сетевых ошибках
+                this.networkErrorCount++;
+                const backoffDelay = Math.min(5000 * Math.pow(2, this.networkErrorCount - 1), 60000); // max 60 сек
+                this.log(`📡 Ошибка сети (#${this.networkErrorCount}). Повтор через ${Math.round(backoffDelay/1000)}с...`);
+                await new Promise(r => setTimeout(r, backoffDelay));
             } else if (e.response && e.response.status === 403) {
                 // 403 = пользователь заблокирован или ограничение - СЧИТАЕМ КАК ОШИБКУ
                 const errorReason = extractApiError(e.response, 'Доступ запрещён');
@@ -1613,6 +1637,7 @@ class AccountBot {
                 this.incrementStat('chat', 'sent');
                 this.chatHistory.sent.push(`${user.AccountId} (${user.Name})`);
                 this.log(`💬 Сообщение чата отправлено: ${user.Name} (${user.AccountId})`);
+                this.networkErrorCount = 0; // Сброс счётчика при успехе
 
                 // Данные уже добавлены в chatHistory.sent - фильтрация проверяет этот список
 
@@ -1668,7 +1693,11 @@ class AccountBot {
             }
         } catch (e) {
             if(e.message === "Network Error" || !e.response) {
-                this.log(`📡 Ошибка сети. Повтор...`);
+                // Exponential backoff при сетевых ошибках
+                this.networkErrorCount++;
+                const backoffDelay = Math.min(5000 * Math.pow(2, this.networkErrorCount - 1), 60000); // max 60 сек
+                this.log(`📡 Ошибка сети (#${this.networkErrorCount}). Повтор через ${Math.round(backoffDelay/1000)}с...`);
+                await new Promise(r => setTimeout(r, backoffDelay));
             } else {
                 const errorReason = e.response ? extractApiError(e.response, e.message) : e.message;
                 this.incrementStat('chat', 'errors');
@@ -1943,6 +1972,7 @@ class AccountBot {
                 this.incrementStat('chat', 'sent');
                 this.log(`🤖 Автоответ #${currentIndex + 1} (чат) отправлен: ${partnerName}`);
                 console.log(`[AutoReply] Автоответ #${currentIndex + 1} отправлен для ${partnerName}`);
+                this.networkErrorCount = 0; // Сброс счётчика при успехе
 
                 // Планируем следующий автоответ
                 const nextIndex = currentIndex + 1;
