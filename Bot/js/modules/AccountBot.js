@@ -512,9 +512,24 @@ class AccountBot {
         }, 30000);
     }
 
-    log(text) {
+    log(text, type = null) {
         const box = document.getElementById(`log-${this.id}`);
-        const modePrefix = globalMode === 'chat' ? '[CHAT]' : '[MAIL]';
+        let modePrefix;
+        if (type) {
+            modePrefix = `[${type.toUpperCase()}]`;
+        } else {
+            // Авто-определение типа по содержимому сообщения
+            // Это критично для корректного отображения при параллельной работе Mail и Chat
+            const textLower = text.toLowerCase();
+            if (textLower.includes('чат') || textLower.includes('chat') || text.includes('💬')) {
+                modePrefix = '[CHAT]';
+            } else if (textLower.includes('письм') || textLower.includes('mail') || text.includes('📧') || text.includes('📬')) {
+                modePrefix = '[MAIL]';
+            } else {
+                // Для нейтральных сообщений - показываем текущий глобальный режим
+                modePrefix = globalMode === 'chat' ? '[CHAT]' : '[MAIL]';
+            }
+        }
         if(box) box.innerHTML = `<div><span style="opacity:0.6">${new Date().toLocaleTimeString()}</span> <b>${modePrefix}</b> ${text}</div>` + box.innerHTML;
     }
 
