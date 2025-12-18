@@ -55,6 +55,9 @@
       "icon": "assets/icon.icns",
       "category": "public.app-category.productivity"
     },
+    "dmg": {
+      "icon": "assets/icon.icns"
+    },
     "files": [
       "**/*",
       "!dist/**"
