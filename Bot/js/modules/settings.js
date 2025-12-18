@@ -317,11 +317,28 @@ function switchTabRelative(step) {
 
 function toggleGlobalMode() {
     const btn = document.getElementById('btn-mode-toggle');
+
+    // КРИТИЧНО: Останавливаем все процессы противоположного режима перед переключением!
+    // Это предотвращает баг, когда Chat-текст отправляется в Mail режиме и наоборот
     if (globalMode === 'mail') {
+        // Переключаемся на Chat → останавливаем все Mail процессы
+        Object.values(bots).forEach(bot => {
+            if (bot.isMailRunning) {
+                bot.stopMail();
+                console.log(`[Mode Switch] Остановлен Mail для ${bot.displayId} при переключении на Chat`);
+            }
+        });
         globalMode = 'chat';
         document.body.classList.remove('mode-mail'); document.body.classList.add('mode-chat');
         btn.innerHTML = '<i class="fa fa-comments"></i>'; btn.className = 'btn btn-circle btn-mode-switch active-chat';
     } else {
+        // Переключаемся на Mail → останавливаем все Chat процессы
+        Object.values(bots).forEach(bot => {
+            if (bot.isChatRunning) {
+                bot.stopChat();
+                console.log(`[Mode Switch] Остановлен Chat для ${bot.displayId} при переключении на Mail`);
+            }
+        });
         globalMode = 'mail';
         document.body.classList.remove('mode-chat'); document.body.classList.add('mode-mail');
         btn.innerHTML = '<i class="fa fa-envelope"></i>'; btn.className = 'btn btn-circle btn-mode-switch active-mail';
