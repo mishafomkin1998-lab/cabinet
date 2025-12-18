@@ -592,6 +592,12 @@ async function loadServerDataForAllBots() {
                     renderBlacklist(bot.id);
                 }
                 bot.serverDataLoaded = true;
+
+                // ВАЖНО: Запускаем мониторинг ПОСЛЕ загрузки данных с сервера!
+                // Иначе входящие письма добавятся в blacklist до загрузки актуальных данных
+                if (!bot.isMonitoring) {
+                    bot.startMonitoring();
+                }
             } catch (e) {
                 console.error(`[Server Data] Ошибка для ${bot.displayId}:`, e);
             }
@@ -1352,9 +1358,13 @@ async function performLogin(login, pass, displayId) {
                 console.log(`✅ Данные синхронизированы для ${displayId}`);
             }
 
+            // ВАЖНО: Запускаем мониторинг ПОСЛЕ загрузки данных с сервера!
+            // Иначе входящие письма добавятся в blacklist, который потом перезапишется
+            bot.startMonitoring();
+
             // Отправляем первый heartbeat после создания бота
             setTimeout(() => sendHeartbeatToLababot(bid, displayId, 'online'), 2000);
-            return true;
+            return bid;  // Возвращаем botId вместо true для точной идентификации
         }
     } catch(err) {
         if(e) e.innerText = err.response ? (err.response.data.Error || `Ошибка входа: ${err.response.status}`) : "Ошибка входа. Проверьте Proxy для Ladadate.";
@@ -1571,9 +1581,9 @@ async function restoreSession() {
         document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} из кэша...` : "";
 
         for (const a of s) {
-            const ok = await performLogin(a.login, a.pass, a.displayId);
-            if (ok && bots[Object.keys(bots).pop()]) {
-                const botId = Object.keys(bots).pop();
+            // performLogin теперь возвращает botId (строку) или null
+            const botId = await performLogin(a.login, a.pass, a.displayId);
+            if (botId && bots[botId]) {
                 const bot = bots[botId];
 
                 // Восстанавливаем остальные настройки из localStorage
@@ -1592,9 +1602,9 @@ async function restoreSession() {
                 // Восстанавливаем автоответы
                 if (a.autoReplies) bot.chatSettings.autoReplies = a.autoReplies;
                 if (a.autoReplyEnabled !== undefined) bot.chatSettings.autoReplyEnabled = a.autoReplyEnabled;
-                // Восстанавливаем blacklist из localStorage (будет перезаписан сервером если доступен)
-                if (a.mailBlacklist && a.mailBlacklist.length > 0) bot.mailSettings.blacklist = a.mailBlacklist;
-                if (a.chatBlacklist && a.chatBlacklist.length > 0) bot.chatSettings.blacklist = a.chatBlacklist;
+                // ВАЖНО: Blacklist НЕ восстанавливаем из localStorage!
+                // Сервер имеет актуальные данные, localStorage может быть устаревшим
+                // Blacklist уже загружен с сервера в performLogin → loadFromServerData
 
                 updateInterfaceForMode(bot.id);
                 // Показываем поле Custom IDs если выбран этот режим
@@ -1850,11 +1860,11 @@ async function handleFullImport(input) {
                 if (data.bots && Array.isArray(data.bots)) {
                     for (const botData of data.bots) {
                         if (botData.login && botData.displayId) {
-                            const success = await performLogin(botData.login, botData.pass || 'password', botData.displayId);
+                            // performLogin возвращает botId (строку) или null
+                            const botId = await performLogin(botData.login, botData.pass || 'password', botData.displayId);
 
                             // Восстанавливаем дополнительные данные после успешного логина
-                            if (success) {
-                                const botId = Object.keys(bots).pop();
+                            if (botId && bots[botId]) {
                                 const bot = bots[botId];
                                 if (bot) {
                                     // Восстанавливаем настройки Mail

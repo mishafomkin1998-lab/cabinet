@@ -77,7 +77,9 @@ class AccountBot {
         // WebView создаётся ПОСЛЕ настройки прокси в performLogin()
         if (this.token) {
             this.startKeepAlive();
-            this.startMonitoring();
+            // ВАЖНО: startMonitoring() НЕ вызывается здесь!
+            // Вызывается ПОСЛЕ загрузки данных с сервера в performLogin/loadServerDataForAllBots
+            // Иначе входящие письма добавятся в blacklist, который потом перезапишется сервером
             this.getProfileData();
             // this.createWebview() - вызывается из performLogin() после setWebviewProxy()
 
