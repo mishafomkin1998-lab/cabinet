@@ -2,357 +2,401 @@
 
 ## Обзор проекта
 
-**Novabot** - приложение для управления анкетами на платформе LadaDate.
+**Novabot** - Electron приложение для управления анкетами на платформе LadaDate.
+Позволяет автоматически отправлять письма (Mail) и сообщения в чат (Chat) от имени женских анкет.
 
 ---
 
-## ⚠️ ВАЖНО ДЛЯ AI: СТРУКТУРА ФАЙЛОВ БОТА
+## Структура проекта
 
-**БОТ ИСПОЛЬЗУЕТ МОДУЛЬНУЮ СТРУКТУРУ!**
-
-```
-Bot/js/
-├── bot.js              # ❌ СТАРЫЙ ФАЙЛ - НЕ ИСПОЛЬЗУЕТСЯ! НЕ РЕДАКТИРОВАТЬ!
-└── modules/            # ✅ АКТУАЛЬНЫЕ ФАЙЛЫ - РЕДАКТИРОВАТЬ ЗДЕСЬ!
-    ├── config.js       # Глобальные переменные и константы
-    ├── utils.js        # Утилиты, parseProxy, validateInput
-    ├── api.js          # API функции (heartbeat, sendMessage, etc.)
-    ├── logger.js       # Logger, KEEP_ALIVE_SCRIPT
-    ├── minichat.js     # MiniChat функции
-    ├── ai.js           # AI функции
-    ├── settings.js     # Настройки
-    ├── AccountBot.js   # Класс AccountBot (основная логика!)
-    ├── main.js         # UI функции и основная логика
-    └── init.js         # Инициализация (window.onload)
-```
-
-**Порядок загрузки модулей** (см. Bot/index.html строки 468-478):
-1. config.js → 2. utils.js → 3. api.js → 4. logger.js → 5. minichat.js →
-6. ai.js → 7. settings.js → 8. AccountBot.js → 9. main.js → 10. init.js
-
-**При внесении изменений:**
-- Логика отправки писем/чатов → `modules/AccountBot.js`
-- API, heartbeat, статусы → `modules/api.js`
-- UI, вкладки, интерфейс → `modules/main.js`
-- Настройки → `modules/settings.js`
-- AI генерация → `modules/ai.js`
-
----
-
-### Структура проекта
 ```
 /home/user/cabinet/
-├── Bot/                    # Electron приложение (клиент)
-│   ├── js/modules/        # ✅ АКТУАЛЬНЫЙ КОД (модули)
-│   ├── js/bot.js          # ❌ Старый монолит - НЕ ИСПОЛЬЗОВАТЬ
-│   ├── css/bot.css        # Стили + темы
-│   ├── index.html         # UI интерфейс
-│   ├── main.js            # Electron main process
-│   └── Sound/             # Звуки уведомлений
+├── Bot/                        # Electron приложение (клиент)
+│   ├── main.js                 # Electron main process (прокси, IPC, окна)
+│   ├── index.html              # UI интерфейс (HTML + inline стили)
+│   ├── package.json            # Зависимости npm
+│   ├── css/bot.css             # Стили + темы (light, dark, ladadate)
+│   ├── Sound/                  # Звуки уведомлений
+│   │   ├── Online.mp3          # VIP пользователь онлайн
+│   │   ├── Message.mp3         # Новое входящее письмо
+│   │   └── Chat.mp3            # Новый чат/сообщение
+│   └── js/modules/             # ✅ ВСЯ ЛОГИКА БОТА ЗДЕСЬ!
+│       ├── config.js           # Глобальные переменные и константы
+│       ├── utils.js            # Утилиты (parseProxy, debounce, toast)
+│       ├── api.js              # API функции для сервера статистики
+│       ├── logger.js           # Logger уведомлений + KEEP_ALIVE_SCRIPT
+│       ├── minichat.js         # MiniChat (история переписки)
+│       ├── ai.js               # AI генерация текста (OpenAI)
+│       ├── settings.js         # Глобальные настройки + промпты
+│       ├── AccountBot.js       # Класс AccountBot (ЯДРО ЛОГИКИ!)
+│       ├── main.js             # UI функции, логин, импорт/экспорт
+│       └── init.js             # Инициализация при загрузке
 │
-├── Server/                 # Express сервер + личный кабинет
-│   ├── server.js          # Точка входа
-│   ├── routes/            # API маршруты
-│   ├── config/database.js # PostgreSQL
-│   ├── public/            # Frontend статика
-│   └── dashboard.html     # Веб-интерфейс кабинета
+├── Server/                     # Express сервер + личный кабинет
+│   ├── server.js               # Точка входа
+│   ├── routes/                 # API маршруты
+│   ├── config/database.js      # PostgreSQL подключение
+│   ├── public/                 # Frontend статика
+│   └── dashboard.html          # Веб-интерфейс кабинета
 │
-└── CLAUDE.md              # Этот файл
+└── CLAUDE.md                   # Этот файл
 ```
 
 ---
 
-## БОТ (Bot/js/modules/)
+## Порядок загрузки модулей
 
-### Критически важные глобальные переменные
+Модули загружаются в `index.html` (строки 609-618) в строгом порядке:
 
-```javascript
-// ГЛАВНЫЙ ОБЪЕКТ - все боты хранятся здесь
-let bots = {};  // { 'bot_1234567890': AccountBot instance }
-
-// Шаблоны по логинам аккаунтов
-let botTemplates = {};  // { 'email@mail.com': { mail: [], chat: [] } }
-
-// Глобальные настройки (localStorage)
-let globalSettings = {
-    lang: 'ru',
-    theme: 'light',           // 'light', 'dark', 'ladadate'
-    soundsEnabled: true,
-    apiKey: '',               // OpenAI API key
-    translatorId: null,       // ID переводчика для статистики
-    proxy1-6: '',             // Прокси для анкет по позициям
-    // ...
-};
-
-// Текущий режим работы
-let globalMode = 'mail';      // 'mail' или 'chat' - ВАЖНО!
-
-// ID активной вкладки
-let activeTabId = null;       // 'bot_1234567890'
-
-// URL сервера статистики
-const LABABOT_SERVER = 'http://188.137.253.169:3000';
+```
+1. config.js      → Глобальные переменные (bots, globalSettings, globalMode)
+2. utils.js       → Утилиты (parseProxy, showToast, debounce)
+3. api.js         → API для сервера статистики Lababot
+4. logger.js      → Logger уведомлений + KEEP_ALIVE_SCRIPT
+5. minichat.js    → MiniChat функции (история, отправка)
+6. ai.js          → AI генерация через OpenAI
+7. settings.js    → Настройки, темы, модальные окна
+8. AccountBot.js  → Класс AccountBot (основная логика!)
+9. main.js        → UI, логин, шаблоны, blacklist
+10. init.js       → window.onload, инициализация
 ```
 
-### Класс AccountBot (строки 1863-3293)
+**ВАЖНО:** Порядок критичен! Каждый модуль зависит от предыдущих.
 
-**Это ядро бота!** Каждая анкета = экземпляр AccountBot.
+---
+
+## Модули: подробное описание
+
+### 1. config.js — Глобальные переменные
+
+```javascript
+// Главные объекты
+let bots = {};                    // { 'bot_1234567890': AccountBot }
+let botTemplates = {};            // { 'email@mail.com': { mail: [], chat: [] } }
+let accountPreferences = {};      // Настройки по аккаунтам
+
+// Режим работы
+let globalMode = 'mail';          // 'mail' или 'chat'
+let activeTabId = null;           // ID активной вкладки
+
+// Настройки (localStorage)
+let globalSettings = {
+    lang: 'ru',
+    theme: 'light',               // 'light', 'dark', 'ladadate'
+    soundsEnabled: true,
+    desktopNotifications: true,
+    apiKey: '',                   // OpenAI API key
+    translatorId: null,           // ID переводчика
+    proxy1-6: '',                 // Прокси для анкет
+    disabledStatuses: [],         // Отключенные статусы
+    // ... и другие
+};
+
+// Константы
+const LABABOT_SERVER = 'http://188.137.253.169:3000';
+const LADADATE_BASE_URL = 'https://ladadate.com';
+const APP_VERSION = '1.3.0';
+
+// Переменные транскрипции для шаблонов
+const TRANSCRIPTION_VARIABLES = [
+    { name: '{name}', desc: 'Имя мужчины' },
+    { name: '{age}', desc: 'Возраст' },
+    { name: '{city}', desc: 'Город' },
+    // ...
+];
+```
+
+### 2. utils.js — Утилиты
+
+| Функция | Описание |
+|---------|----------|
+| `parseProxy(str)` | Парсит строку прокси (ip:port:user:pass) |
+| `showToast(msg, type)` | Показывает уведомление (success/warning/error) |
+| `showBulkNotification(msg, count)` | Уведомление для bulk-операций |
+| `debounce(func, wait)` | Debounce функция |
+| `customConfirm(msg, options)` | Кастомный confirm диалог |
+| `validateInput(value, type)` | Валидация ввода |
+
+### 3. api.js — API для сервера статистики
+
+| Функция | Описание |
+|---------|----------|
+| `sendMessageToLababot(params)` | Отправка статистики сообщения |
+| `sendIncomingMessageToLababot(params)` | Входящее сообщение от мужчины |
+| `sendHeartbeatToLababot(botId, displayId, status)` | Heartbeat онлайн статуса |
+| `checkProfileStatus(profileId)` | Проверка статуса профиля (paused, exists, allowed) |
+| `checkProfilePaymentStatus(profileId)` | Проверка оплаты (isPaid, isTrial, daysLeft) |
+| `checkProfileAIEnabled(profileId)` | Проверка доступа к AI |
+| `loadFromServerData(bot)` | Загрузка данных бота с сервера (шаблоны, blacklist) |
+| `saveTemplatesToServer(login, templates)` | Сохранение шаблонов на сервер |
+| `saveBlacklistToServer(login, blacklist, mode)` | Сохранение blacklist на сервер |
+
+### 4. logger.js — Система уведомлений
+
+```javascript
+const Logger = {
+    logs: [],
+    maxLogs: 1000,
+    add: function(text, type, botId, data) {
+        // type: 'chat', 'chat-request', 'mail', 'vip-online', 'bday', 'log'
+        // Автоматически воспроизводит звук и показывает в UI
+    },
+    render: function() { /* отрисовка списка */ }
+};
+
+// KEEP_ALIVE_SCRIPT — скрипт для WebView, поддерживает сессию активной
+const KEEP_ALIVE_SCRIPT = `...`;
+
+// Звуки
+const audioFiles = {
+    online: new Audio('Sound/Online.mp3'),
+    message: new Audio('Sound/Message.mp3'),
+    chat: new Audio('Sound/Chat.mp3')
+};
+
+function playSound(type) { /* воспроизведение */ }
+```
+
+### 5. minichat.js — MiniChat (история переписки)
+
+| Функция | Описание |
+|---------|----------|
+| `loadMiniChatHistory(recipientId)` | Загрузка истории чата |
+| `sendMiniChatMessage()` | Отправка сообщения |
+| `generateMiniChatAIReply()` | AI ответ на последнее сообщение |
+| `closeMiniChat()` | Закрытие окна |
+| `renderMiniChatMessages(messages)` | Отрисовка сообщений |
+
+### 6. ai.js — AI генерация текста
+
+| Функция | Описание |
+|---------|----------|
+| `handleAIAction(botId, action, event)` | Обработка AI действий (improve/generate/myprompt) |
+| `generateAIForAll(action)` | AI для всех анкет (Shift+клик) |
+| `generateTemplateWithAI()` | Генерация шаблона через AI |
+| `callOpenAI(prompt, systemPrompt)` | Вызов OpenAI API |
+
+### 7. settings.js — Настройки
+
+| Функция | Описание |
+|---------|----------|
+| `loadGlobalSettingsUI()` | Загрузка настроек в UI |
+| `saveGlobalSettings()` | Сохранение настроек |
+| `openGlobalSettings()` | Открыть модалку настроек |
+| `applyTheme(theme)` | Применение темы |
+| `testProxy(num)` | Тест прокси через main процесс |
+| `toggleGlobalMode()` | Переключение Mail/Chat (+ сохранение шаблонов!) |
+| `openModal(id)` / `closeModal(id)` | Модальные окна |
+| `initHotkeys()` | Горячие клавиши |
+| `exportSettings()` / `importSettings()` | Экспорт/импорт настроек |
+| `loadPromptTemplates()` | Загрузка шаблонов промптов |
+| `addPromptTemplate(type)` | Добавление шаблона промпта |
+| `deletePromptTemplate(type)` | Удаление шаблона промпта |
+
+### 8. AccountBot.js — ЯДРО ЛОГИКИ
 
 ```javascript
 class AccountBot {
     constructor(id, login, pass, displayId, token) {
-        this.id = id;              // 'bot_1234567890'
-        this.login = login;        // email
-        this.pass = pass;          // пароль
-        this.displayId = displayId; // ID анкеты (напр. "12345")
-        this.token = token;        // Bearer token для API
+        this.id = id;                  // 'bot_1234567890'
+        this.login = login;            // email аккаунта
+        this.pass = pass;              // пароль
+        this.displayId = displayId;    // ID анкеты на платформе
+        this.token = token;            // Bearer token
 
-        // Настройки Mail режима
+        // Настройки Mail
         this.mailSettings = {
-            target: 'online',      // 'online', 'favorites', 'my-favorites', 'inbox', 'payers'
-            speed: 'smart',        // 'smart', '15', '30' (секунды)
+            target: 'online',          // online/favorites/my-favorites/inbox/payers/custom-ids
+            speed: 'smart',            // smart/15/30
             blacklist: [],
             photoOnly: false,
-            auto: false            // Автопереключение категорий
+            auto: false                // Авто-переключение категорий
         };
 
-        // Настройки Chat режима
+        // Настройки Chat
         this.chatSettings = {
             target: 'payers',
             speed: 'smart',
             blacklist: [],
-            rotationHours: 3,      // Смена инвайта каждые N часов
-            cyclic: false,         // Циклическая ротация
-            currentInviteIndex: 0
+            rotationHours: 3,
+            cyclic: false,
+            currentInviteIndex: 0,
+            autoReplies: [],
+            autoReplyEnabled: false
         };
 
         // Статистика
         this.mailStats = { sent: 0, errors: 0, waiting: 0 };
         this.chatStats = { sent: 0, errors: 0, waiting: 0 };
 
-        // WebView для сессии (cookies)
+        // WebView для cookies
         this.webview = null;
 
-        // Флаг использования AI (для статистики)
+        // Флаги
+        this.mailRunning = false;
+        this.chatRunning = false;
         this.usedAi = false;
     }
 }
 ```
 
-### Ключевые методы AccountBot
+**Ключевые методы AccountBot:**
 
-| Метод | Строки | Описание |
-|-------|--------|----------|
-| `createWebview()` | 2053-2126 | Создаёт скрытый WebView для сессии cookies |
-| `startMail(text)` | 2460-2503 | Запуск Mail режима (проверяет оплату!) |
-| `stopMail()` | 2505-2511 | Остановка Mail |
-| `processMailUser()` | 2540-2848 | Отправка одного письма |
-| `startChat(text)` | 2850-2895 | Запуск Chat режима |
-| `stopChat()` | 2897-2903 | Остановка Chat |
-| `processChatUser()` | 2931-3237 | Отправка одного чата |
-| `checkChatSync()` | 2213-2399 | Проверка новых чатов (уведомления!) |
-| `checkNewMails()` | 2402-2443 | Проверка новых писем |
-| `updateUI()` | 3255-3292 | Обновление интерфейса |
+| Метод | Описание |
+|-------|----------|
+| `createWebview()` | Создаёт скрытый WebView для cookies сессии |
+| `doActivity()` | Heartbeat + проверка новых сообщений (каждую минуту) |
+| `startMail(text)` | Запуск рассылки писем |
+| `stopMail()` | Остановка рассылки |
+| `processMailUser()` | Обработка одного получателя письма |
+| `scheduleNextMail()` | Планирование следующего письма |
+| `startChat(text)` | Запуск рассылки чатов |
+| `stopChat()` | Остановка чатов |
+| `processChatUser()` | Обработка одного получателя чата |
+| `scheduleNextChat()` | Планирование следующего чата |
+| `checkChatSync()` | Проверка новых чатов (уведомления) |
+| `checkNewMails()` | Проверка новых писем |
+| `startMonitoring()` | Запуск мониторинга (checkChatSync каждые 5 сек) |
+| `updateUI()` | Обновление интерфейса |
+| `log(text, type)` | Лог в UI (авто-определение [MAIL]/[CHAT]) |
 
-### API функции для сервера Lababot
-
-```javascript
-// Отправка статистики сообщения (строки 75-142)
-async function sendMessageToLababot(params) {
-    // params: botId, accountDisplayId, recipientId, type, textContent,
-    //         status, responseTime, isFirst, isLast, convId, usedAi
-    // type: 'outgoing' (письмо $1.5) или 'chat_msg' (чат $0.15)
-}
-
-// Входящее сообщение от мужчины (строки 144-172)
-async function sendIncomingMessageToLababot(params)
-
-// Heartbeat онлайн статуса (строки 174-204)
-async function sendHeartbeatToLababot(botId, displayId, status)
-
-// Проверка статуса профиля (строки 418-433)
-async function checkProfileStatus(profileId)
-// Возвращает: { paused, exists, allowed }
-
-// Проверка оплаты (строки 441-460)
-async function checkProfilePaymentStatus(profileId)
-// Возвращает: { isPaid, isFree, isTrial, canTrial, daysLeft }
-```
-
----
-
-## UI Функции
-
-### Основные функции интерфейса
-
-| Функция | Строки | Описание |
-|---------|--------|----------|
-| `createInterface(bot)` | 3295-3437 | Создаёт UI для бота (вкладка + панель) |
-| `selectTab(id)` | 4389-4413 | Переключение вкладки |
-| `closeTab(e, id)` | 4415-4446 | Закрытие вкладки |
-| `toggleGlobalMode()` | 1838-1850 | Переключение Mail/Chat |
-| `updateInterfaceForMode(botId)` | 3444-3489 | Обновление UI под режим |
-| `openModal(id)` / `closeModal(id)` | 1853-1854 | Модальные окна |
-
-### Шаблоны
+### 9. main.js — UI и основные функции
 
 | Функция | Описание |
 |---------|----------|
-| `addTemplateInline(botId, event)` | Создать новый шаблон (Shift = всем) |
-| `deleteTemplate(botId, event)` | Удалить шаблон (Shift = всем) |
-| `updateTemplateDropdown(botId, idx)` | Обновить выпадающий список |
-| `saveTemplateTextNow(botId)` | Сохранить текст шаблона |
+| `performLogin(login, pass, displayId)` | Логин аккаунта (возвращает botId!) |
+| `createInterface(bot)` | Создание UI для бота (вкладка + панель) |
+| `updateInterfaceForMode(botId)` | Обновление UI под текущий режим |
+| `selectTab(id)` | Переключение вкладки |
+| `closeTab(e, id)` | Закрытие вкладки |
+| `startAllBots()` / `stopAllBots()` | Старт/стоп всех ботов |
+| `reloginAllBots()` | Перелогин всех |
+| `saveSession()` | Сохранение сессии в localStorage |
+| `restoreSession()` | Восстановление сессии |
+| `exportAllData()` | Экспорт всех данных в JSON |
+| `handleUniversalImport(input)` | Импорт данных (.json/.txt) |
+| `addTemplateInline(botId, event)` | Добавить шаблон (Shift = всем) |
+| `deleteTemplate(botId, event)` | Удалить шаблон |
+| `saveTemplateTextNow(botId)` | Сохранить текст шаблона немедленно |
 | `autoSaveTemplateText(botId)` | Автосохранение (debounce 3 сек) |
+| `saveBlacklistID(event)` | Добавить в blacklist |
+| `removeSelectedBlacklist(botId)` | Удалить из blacklist |
+| `renderBlacklist(botId)` | Отрисовка blacklist |
+| `loadServerDataForAllBots()` | Загрузка данных всех ботов с сервера |
 
-### Blacklist
+### 10. init.js — Инициализация
+
+```javascript
+window.onload = async function() {
+    loadGlobalSettingsUI();           // Загрузка настроек
+    toggleExtendedFeatures();         // AI функции
+    await initDefaultProxy();         // Установка default прокси
+    restoreSession();                 // Восстановление сессии
+    initHotkeys();                    // Горячие клавиши
+    initTooltips();                   // Подсказки
+    initFocusProtection();            // Защита от потери фокуса
+    initTranscriptionContextMenu();   // ПКМ меню переменных
+    updateDisabledStatusesUI();       // Отключенные статусы
+    startGlobalMenOnlineUpdater();    // Счётчик мужчин онлайн
+};
+```
+
+**Дополнительные функции в init.js:**
 
 | Функция | Описание |
 |---------|----------|
-| `saveBlacklistID(event)` | Добавить в ЧС (Shift = всем) |
-| `removeSelectedBlacklist(botId)` | Удалить из ЧС |
-| `toggleVipStatus(botId)` | Пометить как VIP |
-| `renderBlacklist(botId)` | Отрисовать список |
-
----
-
-## AI Функции
-
-### Генерация текста
-
-```javascript
-// Обработка AI действий (строки 1374-1454)
-async function handleAIAction(botId, action, event) {
-    // action: 'improve', 'generate', 'myprompt'
-    // Shift + клик = для всех анкет
-}
-
-// AI для всех анкет (строки 1456-1522)
-async function generateAIForAll(action)
-
-// AI ответ в MiniChat (строки 839-966)
-async function generateMiniChatAIReply()
-
-// Генерация шаблона через AI (строки 3831-3915)
-async function generateTemplateWithAI()
-```
-
-### Проверка AI доступа
-
-```javascript
-// Проверка разрешения AI для анкеты (строки 1357-1372)
-async function checkProfileAIEnabled(profileId)
-// Возвращает: { enabled, reason, translatorName }
-```
-
----
-
-## Система уведомлений
-
-### Logger (строки 574-651)
-
-```javascript
-const Logger = {
-    logs: [],
-    add: function(text, type, botId, data) {
-        // type: 'chat', 'chat-request', 'mail', 'vip-online', 'bday', 'log'
-        // Автоматически воспроизводит звук!
-    }
-};
-```
-
-### Звуки
-
-```javascript
-const audioFiles = {
-    online: new Audio('Sound/Online.mp3'),   // VIP онлайн
-    message: new Audio('Sound/Message.mp3'), // Новое письмо
-    chat: new Audio('Sound/Chat.mp3')        // Новый чат
-};
-
-function playSound(type) {
-    if(!globalSettings.soundsEnabled) return;
-    // 'online', 'message', 'chat'
-}
-```
-
----
-
-## Сессия и данные
-
-### Сохранение/Восстановление
-
-```javascript
-// Сохранение сессии в localStorage (строки 4301-4339)
-async function saveSession()
-// Сохраняет: bots, шаблоны, настройки
-
-// Восстановление при запуске (строки 4341-4387)
-async function restoreSession()
-// Перелогинивает все анкеты
-
-// Экспорт всех данных (строки 4532-4569)
-async function exportAllData()
-// JSON файл с полным бекапом
-
-// Импорт данных (строки 4571-4647)
-async function handleUniversalImport(input)
-// Поддерживает .json и .txt форматы
-```
+| `initFocusProtection()` | Защита textarea от потери фокуса |
+| `setGlobalTarget(target)` | Установка target всем ботам |
+| `toggleStatusDisabled(status, e)` | ПКМ отключение статуса |
+| `getNextActiveStatus(current)` | Следующий активный статус |
+| `openGlobalCustomIdsModal()` | Модалка глобальных Custom IDs |
+| `applyGlobalCustomIds()` | Применить Custom IDs всем |
+| `saveCustomIds(botId)` | Сохранить Custom IDs бота |
+| `getNextCustomId(botId)` | Получить следующий ID из списка |
+| `markCustomIdSent(botId, id)` | Отметить ID как отправленный |
+| `makeApiRequest(bot, method, path, data)` | HTTP запросы через main процесс |
+| `checkAutoClearConditions(bot, mode)` | Проверка условий автоочистки |
+| `performAutoClear(mode)` | Выполнить автоочистку ошибок |
+| `initTranscriptionContextMenu()` | ПКМ меню для вставки переменных |
 
 ---
 
 ## Важные особенности
 
+### Два режима работы: Mail и Chat
+
+- **globalMode** определяет текущий режим ('mail' или 'chat')
+- Mail и Chat работают **ПАРАЛЛЕЛЬНО** (можно запустить оба одновременно!)
+- При переключении режима `toggleGlobalMode()`:
+  1. Сначала сохраняет текст всех шаблонов
+  2. Затем обновляет UI всех вкладок
+
 ### WebView для cookies
 
-Каждый бот создаёт скрытый WebView (строки 2053-2126):
-- Используется для `/chat-sync`, `/chat-messages`, `/chat-send`
-- Хранит session cookies LadaDate
-- **НЕ ТРОГАТЬ** логику создания/авторизации WebView!
+- Каждый бот создаёт скрытый WebView (`createWebview()`)
+- WebView хранит session cookies LadaDate
+- Используется для chat-sync, chat-messages, chat-send
+- **НЕ ТРОГАТЬ** логику WebView без крайней необходимости!
 
-### Система повторов (Retry Queue)
+### Blacklist
+
+- Хранится отдельно для Mail и Chat
+- Загружается с сервера при логине (`loadFromServerData`)
+- `startMonitoring()` вызывается ПОСЛЕ загрузки данных сервера
+- Входящие сообщения автоматически добавляются в blacklist
+
+### Шаблоны
+
+- Хранятся в `botTemplates[login]` по режимам (mail/chat)
+- Автосохранение через 3 секунды после изменения
+- При переключении режима шаблоны сохраняются немедленно
+- Синхронизируются с сервером
+
+### Система уведомлений
 
 ```javascript
-// Для Mail (строки 1905-1910)
-this.mailRetryQueue = [];      // Очередь повторов
-this.mailContactedUsers = new Set(); // Уже отправленные
-this.maxRetries = 3;
-this.retryCooldownMs = 60000;  // 1 минута
-
-// Аналогично для Chat
-```
-
-### Защита от дублирования уведомлений (строки 2267-2391)
-
-```javascript
-// checkChatSync() использует:
-this.chatNotifyTimes = {};        // Время последнего уведомления
-this.chatRequestNotified = {};    // Уведомлённые ChatRequests
-this.activeChatSoundTimes = {};   // Время последнего звука
-
-const NOTIFY_COOLDOWN = 30000;    // 30 сек между уведомлениями
-const ACTIVE_CHAT_SOUND_INTERVAL = 15000; // 15 сек повторный звук
+// Cooldown защита от дублирования
+this.chatNotifyTimes = {};           // Время последнего уведомления
+this.chatRequestNotified = {};       // Уведомлённые ChatRequests
+const NOTIFY_COOLDOWN = 30000;       // 30 сек между уведомлениями
 ```
 
 ---
 
-## Частые проблемы и решения
+## Структура HTML элементов
 
-### 1. Дублирование уведомлений
-**Причина:** checkChatSync вызывается каждые 3-7 сек
-**Решение:** Используются cooldown таймеры и tracking объекты
+```
+#tabs-bar                        - Панель вкладок
+  .tab-item#tab-{botId}          - Вкладка бота
+    .status-dot                  - Индикатор статуса
+    .tab-close                   - Кнопка закрытия
 
-### 2. Chat не отправляется
-**Причина:** WebView не авторизован или нет cookies
-**Решение:** Проверить createWebview() и скрипт авто-логина
+#panels-container                - Контейнер рабочих областей
+  .workspace#ws-{botId}          - Рабочая область бота
+    #tpl-select-{botId}          - Выбор шаблона
+    #msg-{botId}                 - Текст сообщения (textarea)
+    #btn-start-{botId}           - Кнопка Старт/Стоп
+    #stat-sent-{botId}           - Счётчик отправленных
+    #stat-err-{botId}            - Счётчик ошибок
+    #bl-list-{botId}             - Список blacklist
+    #target-select-{botId}       - Выбор категории
+    #custom-ids-field-{botId}    - Поле Custom IDs
 
-### 3. "Анкета не оплачена"
-**Причина:** checkProfilePaymentStatus возвращает isPaid=false
-**Решение:** Проверить billing на сервере
+#browsers-container              - Скрытые WebView
+  webview#webview-{botId}        - WebView для каждого бота
 
-### 4. AI не работает
-**Причина:** Нет API key или AI отключен для анкеты
-**Решение:** Проверить globalSettings.apiKey и checkProfileAIEnabled
+#logger-list                     - Список уведомлений
+#minichat-modal                  - Модалка MiniChat
+#settings-modal                  - Модалка настроек
+```
+
+---
+
+## Типичные ID
+
+- `bot.id` = `'bot_1234567890'` — внутренний ID (timestamp создания)
+- `bot.displayId` = `'12345'` — ID анкеты на платформе LadaDate
+- `bot.login` = `'email@mail.com'` — логин аккаунта
 
 ---
 
@@ -360,81 +404,85 @@ const ACTIVE_CHAT_SOUND_INTERVAL = 15000; // 15 сек повторный зву
 
 ### НЕ ТРОГАТЬ без крайней необходимости:
 
-1. **WebView логика** (строки 2053-2126) - критична для сессии
-2. **checkChatSync** (строки 2213-2399) - хрупкая система уведомлений
-3. **KEEP_ALIVE_SCRIPT** (строки 531-556) - поддержание онлайна
-4. **Порядок вызовов в processMailUser/processChatUser** - важна последовательность API
+1. **WebView логика** в AccountBot.js — критична для сессии
+2. **checkChatSync()** — хрупкая система уведомлений с cooldown
+3. **KEEP_ALIVE_SCRIPT** в logger.js — поддержание онлайна
+4. **Порядок вызовов в processMailUser/processChatUser** — важна последовательность
 
-### При изменении кода:
+### При внесении изменений:
 
-1. Всегда проверять `globalMode` ('mail' или 'chat')
-2. Сохранять на сервер через `saveTemplatesToServer`, `saveBlacklistToServer`
-3. Обновлять UI через `bot.updateUI()` после изменений
-4. Использовать `saveSession()` после изменения настроек бота
+1. Проверять `globalMode` ('mail' или 'chat')
+2. Сохранять данные на сервер: `saveTemplatesToServer()`, `saveBlacklistToServer()`
+3. Обновлять UI: `bot.updateUI()`
+4. Сохранять сессию: `saveSession()`
+5. Mail и Chat работают параллельно — не ломать это!
 
-### Типичные ID:
+### Куда вносить изменения:
 
-- `bot.id` = 'bot_1234567890' (внутренний ID)
-- `bot.displayId` = '12345' (ID анкеты на платформе)
-- `bot.login` = 'email@mail.com'
-
----
-
-## Структура HTML элементов
-
-```
-#tabs-bar                    - Панель вкладок
-  .tab-item#tab-{botId}      - Вкладка бота
-    .status-dot              - Индикатор статуса
-    .tab-close               - Кнопка закрытия
-
-#panels-container            - Контейнер рабочих областей
-  .workspace#ws-{botId}      - Рабочая область бота
-    #tpl-select-{botId}      - Выбор шаблона
-    #msg-{botId}             - Текст сообщения (textarea)
-    #btn-start-{botId}       - Кнопка Старт/Стоп
-    #stat-sent-{botId}       - Счётчик отправленных
-    #stat-err-{botId}        - Счётчик ошибок
-    #bl-list-{botId}         - Список blacklist
-
-#browsers-container          - Скрытые WebView (position: fixed, left: -9999px)
-  webview#webview-{botId}    - WebView для каждого бота
-```
+| Задача | Файл |
+|--------|------|
+| Логика отправки писем/чатов | `AccountBot.js` |
+| API запросы к Lababot | `api.js` |
+| UI, вкладки, интерфейс | `main.js` |
+| Настройки, темы, модалки | `settings.js` |
+| AI генерация | `ai.js` |
+| Уведомления, логи | `logger.js` |
+| Инициализация | `init.js` |
+| Глобальные переменные | `config.js` |
+| Утилиты | `utils.js` |
+| MiniChat | `minichat.js` |
 
 ---
 
-## Быстрая навигация по bot.js
+## Частые проблемы и решения
 
-| Строки | Содержимое |
-|--------|------------|
-| 1-50 | Глобальные переменные |
-| 52-476 | API функции для Lababot сервера |
-| 530-556 | KEEP_ALIVE_SCRIPT |
-| 574-651 | Logger (уведомления) |
-| 654-1092 | MiniChat (история, отправка) |
-| 1145-1193 | Парсинг прокси |
-| 1255-1279 | window.onload, инициализация |
-| 1294-1348 | makeApiRequest (все HTTP запросы) |
-| 1374-1522 | AI функции |
-| 1568-1811 | Настройки (load, save, apply) |
-| 1863-3293 | **Класс AccountBot** |
-| 3295-3437 | createInterface |
-| 3439-3489 | updateInterfaceForMode |
-| 3491-3579 | Настройки бота (speed, auto, target) |
-| 3713-3915 | Шаблоны (add, edit, delete, AI) |
-| 4028-4085 | Избранные шаблоны |
-| 4139-4240 | Blacklist |
-| 4253-4298 | Login |
-| 4301-4387 | Session (save/restore) |
-| 4389-4446 | Tab management |
-| 4448-4476 | Start/Stop all |
-| 4489-4530 | Relogin |
-| 4532-4647 | Export/Import |
+### 1. Текст чата отправляется в письмах (или наоборот)
+**Причина:** При быстром переключении режима textarea не обновился
+**Решение:** `toggleGlobalMode()` теперь сохраняет шаблоны и обновляет ВСЕ вкладки
+
+### 2. Blacklist появляется на других анкетах
+**Причина:** `restoreSession()` использовал неправильный botId
+**Решение:** `performLogin()` возвращает botId, используется напрямую
+
+### 3. Входящие письма не добавляются в blacklist
+**Причина:** `startMonitoring()` вызывался до загрузки данных с сервера
+**Решение:** `startMonitoring()` вызывается после `loadFromServerData()`
+
+### 4. Chat не отправляется
+**Причина:** WebView не авторизован или нет cookies
+**Решение:** Проверить `createWebview()` и авто-логин
+
+### 5. "Анкета не оплачена"
+**Причина:** `checkProfilePaymentStatus()` возвращает `isPaid=false`
+**Решение:** Проверить billing на сервере
+
+### 6. AI не работает
+**Причина:** Нет API key или AI отключен для анкеты
+**Решение:** Проверить `globalSettings.apiKey` и `checkProfileAIEnabled()`
+
+---
+
+## Сборка приложения
+
+```bash
+cd Bot
+npm install
+npm run build        # Сборка для текущей ОС
+npm run build:mac    # Сборка для macOS
+npm run build:win    # Сборка для Windows
+npm run build:linux  # Сборка для Linux
+```
+
+Ключевые файлы для сборки:
+- `package.json` — зависимости и скрипты
+- `main.js` — Electron main process
+- `index.html` — UI (загружает модули)
+- `js/modules/*` — вся логика
 
 ---
 
 ## Версия документации
 
-- **Дата создания:** 2025-12-09
-- **Версия бота:** v10 (Bot Pro Ultimate)
+- **Дата обновления:** 2025-12-18
+- **Версия бота:** v1.3.0 (Novabot)
 - **Автор:** Claude Code
