@@ -31,27 +31,37 @@ function initAutoUpdater() {
     }, 5000);
 }
 
-// Найдено обновление
+// Найдено обновление - отправляем в renderer для показа кастомного диалога
 autoUpdater.on('update-available', (info) => {
     console.log('[AutoUpdater] Доступно обновление:', info.version);
 
-    dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Доступно обновление',
-        message: `Найдена новая версия: ${info.version}`,
-        detail: `Текущая версия: ${app.getVersion()}\n\nСкачать обновление сейчас?`,
-        buttons: ['Скачать', 'Позже'],
-        defaultId: 0,
-        cancelId: 1
-    }).then(result => {
-        if (result.response === 0) {
-            // Показываем прогресс в главном окне
-            if (mainWindow && !mainWindow.isDestroyed()) {
-                mainWindow.webContents.send('update-downloading', { version: info.version });
-            }
-            autoUpdater.downloadUpdate();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-available', {
+            newVersion: info.version,
+            currentVersion: app.getVersion()
+        });
+    }
+});
+
+// Обработка ответа пользователя на диалог обновления
+ipcMain.on('update-response', (event, action) => {
+    if (action === 'download') {
+        console.log('[AutoUpdater] Пользователь выбрал скачать');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('update-downloading', { downloading: true });
         }
-    });
+        autoUpdater.downloadUpdate();
+    } else {
+        console.log('[AutoUpdater] Пользователь отложил обновление');
+    }
+});
+
+// Обработка ответа на диалог установки
+ipcMain.on('update-install-response', (event, action) => {
+    if (action === 'install') {
+        console.log('[AutoUpdater] Пользователь выбрал установить');
+        autoUpdater.quitAndInstall(false, true);
+    }
 });
 
 // Обновление не найдено
@@ -70,23 +80,15 @@ autoUpdater.on('download-progress', (progress) => {
     }
 });
 
-// Обновление скачано
+// Обновление скачано - отправляем в renderer для показа кастомного диалога
 autoUpdater.on('update-downloaded', (info) => {
     console.log('[AutoUpdater] Обновление скачано:', info.version);
 
-    dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Обновление готово',
-        message: 'Обновление загружено!',
-        detail: `Версия ${info.version} готова к установке.\n\nПерезапустить приложение сейчас?`,
-        buttons: ['Перезапустить', 'Позже'],
-        defaultId: 0,
-        cancelId: 1
-    }).then(result => {
-        if (result.response === 0) {
-            autoUpdater.quitAndInstall(false, true);
-        }
-    });
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update-downloaded', {
+            version: info.version
+        });
+    }
 });
 
 // Ошибка обновления

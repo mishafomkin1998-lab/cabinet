@@ -605,6 +605,42 @@
         </div>
     </div>
 
+    <!-- Модальное окно обновления приложения -->
+    <div id="update-modal" class="modal-overlay">
+        <div class="modal-card" style="width: 400px;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+                <h5 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fa fa-cloud-download" style="color: #28a745;"></i>
+                    <span id="update-modal-title">Доступно обновление</span>
+                </h5>
+            </div>
+            <div class="modal-body" style="padding: 20px; text-align: center;">
+                <div id="update-modal-content">
+                    <p style="font-size: 16px; margin-bottom: 15px;">
+                        Найдена новая версия: <strong id="update-new-version">...</strong>
+                    </p>
+                    <p style="color: #6c757d; font-size: 13px;">
+                        Текущая версия: <span id="update-current-version">...</span>
+                    </p>
+                </div>
+                <div id="update-progress-container" style="display: none; margin-top: 15px;">
+                    <div style="background: #e9ecef; border-radius: 8px; height: 20px; overflow: hidden;">
+                        <div id="update-progress-bar" style="background: linear-gradient(90deg, #28a745, #20c997); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                    </div>
+                    <p style="margin-top: 10px; color: #6c757d;" id="update-progress-text">Скачивание: 0%</p>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 15px; border-top: 1px solid var(--border-color, #dee2e6); display: flex; gap: 10px; justify-content: center;">
+                <button id="update-btn-primary" class="btn btn-success" onclick="handleUpdateAction('download')" style="min-width: 120px;">
+                    <i class="fa fa-download"></i> Скачать
+                </button>
+                <button id="update-btn-secondary" class="btn btn-outline-secondary" onclick="handleUpdateAction('later')" style="min-width: 120px;">
+                    Позже
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Модули (разделённый bot.js) - порядок загрузки критичен! -->
     <script src="js/modules/config.js"></script>      <!-- 1. Глобальные переменные и константы -->
     <script src="js/modules/utils.js"></script>       <!-- 2. Утилиты, parseProxy, validateInput -->

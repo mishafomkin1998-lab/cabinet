@@ -16,6 +16,7 @@ window.onload = async function() {
     initTranscriptionContextMenu(); // Контекстное меню с переменными транскрипции
     updateDisabledStatusesUI(); // Отображаем отключенные статусы
     startGlobalMenOnlineUpdater(); // Запускаем обновление "Мужчины онлайн"
+    initUpdateHandlers(); // Обработчики обновлений приложения
 
     // Глобальное отслеживание Shift для bulk-действий
     document.addEventListener('keydown', (e) => { if (e.key === 'Shift') isShiftPressed = true; });
@@ -35,6 +36,78 @@ window.onload = async function() {
         }
     };
 };
+
+// ============= ОБРАБОТЧИКИ ОБНОВЛЕНИЙ ПРИЛОЖЕНИЯ =============
+let updateState = 'idle'; // idle, downloading, ready
+
+function initUpdateHandlers() {
+    const { ipcRenderer } = require('electron');
+
+    // Доступно обновление
+    ipcRenderer.on('update-available', (event, data) => {
+        console.log('[Update] Доступно обновление:', data.newVersion);
+        document.getElementById('update-new-version').textContent = data.newVersion;
+        document.getElementById('update-current-version').textContent = data.currentVersion;
+        document.getElementById('update-modal-title').textContent = 'Доступно обновление';
+        document.getElementById('update-modal-content').style.display = 'block';
+        document.getElementById('update-progress-container').style.display = 'none';
+        document.getElementById('update-btn-primary').innerHTML = '<i class="fa fa-download"></i> Скачать';
+        document.getElementById('update-btn-primary').onclick = () => handleUpdateAction('download');
+        document.getElementById('update-btn-secondary').style.display = '';
+        updateState = 'idle';
+        openModal('update-modal');
+    });
+
+    // Началось скачивание
+    ipcRenderer.on('update-downloading', (event, data) => {
+        console.log('[Update] Скачивание началось');
+        document.getElementById('update-modal-title').textContent = 'Скачивание обновления';
+        document.getElementById('update-modal-content').style.display = 'none';
+        document.getElementById('update-progress-container').style.display = 'block';
+        document.getElementById('update-btn-primary').disabled = true;
+        document.getElementById('update-btn-primary').innerHTML = '<i class="fa fa-spinner fa-spin"></i> Скачивание...';
+        document.getElementById('update-btn-secondary').style.display = 'none';
+        updateState = 'downloading';
+    });
+
+    // Прогресс скачивания
+    ipcRenderer.on('update-progress', (event, data) => {
+        document.getElementById('update-progress-bar').style.width = data.percent + '%';
+        document.getElementById('update-progress-text').textContent = `Скачивание: ${data.percent}%`;
+    });
+
+    // Обновление скачано
+    ipcRenderer.on('update-downloaded', (event, data) => {
+        console.log('[Update] Обновление скачано:', data.version);
+        document.getElementById('update-modal-title').textContent = 'Обновление готово!';
+        document.getElementById('update-modal-content').innerHTML = `
+            <p style="font-size: 16px; margin-bottom: 15px;">
+                <i class="fa fa-check-circle" style="color: #28a745; font-size: 48px;"></i>
+            </p>
+            <p style="font-size: 16px;">Версия <strong>${data.version}</strong> готова к установке</p>
+            <p style="color: #6c757d; font-size: 13px;">Перезапустить приложение сейчас?</p>
+        `;
+        document.getElementById('update-modal-content').style.display = 'block';
+        document.getElementById('update-progress-container').style.display = 'none';
+        document.getElementById('update-btn-primary').disabled = false;
+        document.getElementById('update-btn-primary').innerHTML = '<i class="fa fa-refresh"></i> Перезапустить';
+        document.getElementById('update-btn-primary').onclick = () => handleUpdateAction('install');
+        document.getElementById('update-btn-secondary').style.display = '';
+        updateState = 'ready';
+    });
+}
+
+function handleUpdateAction(action) {
+    const { ipcRenderer } = require('electron');
+
+    if (action === 'download') {
+        ipcRenderer.send('update-response', 'download');
+    } else if (action === 'install') {
+        ipcRenderer.send('update-install-response', 'install');
+    } else if (action === 'later') {
+        closeModal('update-modal');
+    }
+}
 
 // ============= ЗАЩИТА ОТ ПОТЕРИ ФОКУСА =============
 function initFocusProtection() {

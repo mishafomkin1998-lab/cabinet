@@ -1,5 +1,5 @@
 // Версия приложения
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.3.3';
 
 // Лимит записей в blacklist (предотвращение утечки памяти)
 const BLACKLIST_MAX_SIZE = 5000;

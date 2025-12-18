@@ -24,7 +24,7 @@ function createInterface(bot) {
             <select id="tpl-select-${bot.id}" class="form-select mb-2" onchange="onTemplateSelect('${bot.id}')"><option value="">-- Выберите --</option></select>
             <div class="d-flex gap-1 mb-2">
                 <button class="btn btn-sm btn-success btn-xs flex-fill" onclick="addTemplateInline('${bot.id}', event)" data-tip="Новый шаблон (Shift=всем)"><i class="fa fa-plus"></i></button>
-                <button class="btn btn-sm btn-secondary btn-xs flex-fill" onclick="openTemplateModal('${bot.id}', true)" data-tip="Редактировать"><i class="fa fa-edit"></i></button>
+                <button class="btn btn-sm btn-secondary btn-xs flex-fill" onclick="editTemplateNameInline('${bot.id}')" data-tip="Редактировать название"><i class="fa fa-edit"></i></button>
                 <button class="btn btn-sm btn-danger btn-xs flex-fill" onclick="deleteTemplate('${bot.id}', event)" data-tip="Удалить (Shift=всем)"><i class="fa fa-trash"></i></button>
                 <button class="btn btn-sm btn-outline-danger btn-xs flex-fill hide-in-chat" id="btn-fav-${bot.id}" onclick="toggleTemplateFavorite('${bot.id}')" data-tip="В избранное"><i class="fa fa-heart"></i></button>
             </div>
@@ -782,6 +782,63 @@ async function addTemplateToAll() {
     showBulkNotification('Шаблон добавлен всем анкетам', count);
 }
 
+// Inline редактирование названия шаблона (без модального окна)
+function editTemplateNameInline(botId) {
+    const select = document.getElementById(`tpl-select-${botId}`);
+    const idx = select.value;
+    if (idx === "") {
+        showToast("Сначала выберите шаблон", "warning");
+        return;
+    }
+
+    const bot = bots[botId];
+    const isChat = globalMode === 'chat';
+    const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
+    const currentName = tpls[idx].name;
+
+    // Создаём input для редактирования
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentName;
+    input.className = 'form-control form-control-sm';
+    input.style.cssText = 'width: 100%; margin-bottom: 8px;';
+
+    // Скрываем select и показываем input
+    select.style.display = 'none';
+    select.parentNode.insertBefore(input, select);
+    input.focus();
+    input.select();
+
+    // Функция сохранения
+    const saveNewName = () => {
+        const newName = input.value.trim();
+        if (newName && newName !== currentName) {
+            tpls[idx].name = newName;
+            saveTemplatesToServer(bot.login, getBotTemplates(bot.login));
+            updateTemplateDropdown(botId, idx);
+            showToast("Название сохранено", "success");
+        }
+        // Убираем input, показываем select
+        input.remove();
+        select.style.display = '';
+    };
+
+    // Enter - сохранить
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveNewName();
+        } else if (e.key === 'Escape') {
+            // Escape - отменить
+            input.remove();
+            select.style.display = '';
+        }
+    });
+
+    // Потеря фокуса - сохранить
+    input.addEventListener('blur', saveNewName);
+}
+
 // Модальное окно теперь только для редактирования (переименования) шаблона
 function openTemplateModal(botId, isEdit) {
     currentModalBotId = botId;
@@ -1251,6 +1308,54 @@ function renderBlacklist(botId) {
                 lastSelectedBlacklistIndex[botId] = index;
             }
         };
+
+        // Двойной клик - редактировать ID
+        d.ondblclick = (e) => {
+            e.stopPropagation();
+            const currentId = id;
+
+            // Создаём input для редактирования
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentId;
+            input.className = 'form-control form-control-sm';
+            input.style.cssText = 'width: 100%; padding: 2px 6px; font-size: 12px;';
+
+            // Заменяем содержимое div на input
+            d.innerHTML = '';
+            d.appendChild(input);
+            input.focus();
+            input.select();
+
+            // Функция сохранения
+            const saveEditedId = () => {
+                const newId = input.value.trim();
+                if (newId) {
+                    // Обновляем в массиве
+                    data[index] = newId;
+                    // Обновляем в selectedBlacklistIds если был выбран
+                    const selIdx = bot.selectedBlacklistIds.indexOf(currentId);
+                    if (selIdx !== -1) bot.selectedBlacklistIds[selIdx] = newId;
+                    // Сохраняем на сервер
+                    saveBlacklistToServer(bot.login, data, globalMode);
+                }
+                renderBlacklist(botId);
+            };
+
+            // Enter - сохранить
+            input.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter') {
+                    ev.preventDefault();
+                    saveEditedId();
+                } else if (ev.key === 'Escape') {
+                    renderBlacklist(botId);
+                }
+            });
+
+            // Потеря фокуса - сохранить
+            input.addEventListener('blur', saveEditedId);
+        };
+
         listEl.appendChild(d);
     });
 }
