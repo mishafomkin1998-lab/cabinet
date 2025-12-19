@@ -1465,10 +1465,24 @@ async function performLogin(login, pass, displayId) {
 
             // Отправляем первый heartbeat после создания бота
             setTimeout(() => sendHeartbeatToLababot(bid, displayId, 'online'), 2000);
+
+            // Очищаем ошибку при успешном входе
+            if(e) e.innerText = '';
             return bid;  // Возвращаем botId вместо true для точной идентификации
         }
     } catch(err) {
-        if(e) e.innerText = err.response ? (err.response.data.Error || `Ошибка входа: ${err.response.status}`) : "Ошибка входа. Проверьте Proxy для Ladadate.";
+        if(e) {
+            if (err.response) {
+                // Ошибка от сервера (неверный логин/пароль и т.д.)
+                e.innerText = err.response.data.Error || `Ошибка входа: ${err.response.status}`;
+            } else {
+                // Сетевая ошибка - проверяем настроен ли прокси
+                const hasProxy = globalSettings.proxy1 || globalSettings.proxy;
+                e.innerText = hasProxy
+                    ? "Ошибка сети. Проверьте прокси или интернет-соединение."
+                    : "Ошибка сети. Проверьте интернет-соединение.";
+            }
+        }
     }
     finally { if(s) s.style.display='none'; }
     return false;
