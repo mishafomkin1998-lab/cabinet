@@ -23,9 +23,12 @@
   "build": {
     "appId": "com.novabot.app",
     "productName": "Novabot",
+    "copyright": "Copyright © 2025 Novabot",
     "directories": {
       "output": "dist"
     },
+    "asar": true,
+    "asarUnpack": ["**/*.node", "**/*.dll"],
     "publish": {
       "provider": "generic",
       "url": "https://novabot.com.ua/download/"
@@ -37,7 +40,9 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "assets/icon(2).ico"
+      "icon": "assets/icon(2).ico",
+      "legalTrademarks": "Novabot",
+      "publisherName": "Novabot"
     },
     "nsis": {
       "oneClick": false,
@@ -60,7 +65,9 @@
     },
     "files": [
       "**/*",
-      "!dist/**"
+      "!dist/**",
+      "!node_modules/*/{README,readme,CHANGELOG,changelog}*",
+      "!**/*.{md,txt,map}"
     ]
   }
 }
