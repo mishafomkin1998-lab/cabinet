@@ -1072,7 +1072,8 @@ class AccountBot {
                     }
                 }
             } else if (target === 'inbox') {
-                const messagesRes = await makeApiRequest(this, 'GET', '/api/messages');
+                // Запрашиваем сообщения за весь период (startDate с 2020 года)
+                const messagesRes = await makeApiRequest(this, 'GET', '/api/messages?startDate=2020-01-01T00:00:00');
                 const allMsgs = messagesRes.data.Messages || [];
                 const unrepliedMsgs = allMsgs.filter(m => !m.IsReplied);
 

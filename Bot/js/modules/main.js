@@ -104,7 +104,7 @@ function createInterface(bot) {
                 <option value="online">Online</option>
                 <option value="favorites">I am a favorite of</option>
                 <option value="my-favorites">My favorite</option>
-                <option value="inbox">Inbox (Unreplied)</option>
+                <option value="inbox">Inbox</option>
                 <option value="payers">Payers</option>
                 <option value="custom-ids">Custom IDs</option>
             </select>
