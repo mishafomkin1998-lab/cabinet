@@ -603,6 +603,35 @@ function createWindow() {
     });
 
     require('events').EventEmitter.defaultMaxListeners = 100;
+
+    // === СОХРАНЕНИЕ СЕССИИ ПРИ ЗАКРЫТИИ ===
+    let isQuitting = false;
+
+    mainWindow.on('close', (e) => {
+        if (!isQuitting) {
+            e.preventDefault(); // Предотвращаем закрытие
+            console.log('[App] Сохранение сессии перед закрытием...');
+
+            // Отправляем команду renderer сохранить сессию
+            mainWindow.webContents.send('save-session-before-quit');
+
+            // Таймаут на случай если renderer не ответит
+            setTimeout(() => {
+                if (!isQuitting) {
+                    console.log('[App] Таймаут сохранения, закрываем принудительно');
+                    isQuitting = true;
+                    mainWindow.close();
+                }
+            }, 3000);
+        }
+    });
+
+    // Обработчик ответа от renderer что сессия сохранена
+    ipcMain.once('session-saved', () => {
+        console.log('[App] Сессия сохранена, закрываем приложение');
+        isQuitting = true;
+        mainWindow.close();
+    });
 }
 
 app.whenReady().then(() => {

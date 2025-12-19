@@ -1658,7 +1658,11 @@ async function saveSession() {
             };
         }).filter(item => item !== null);
 
-        localStorage.setItem('savedBots', JSON.stringify(localStorageData));
+        // Добавляем анкеты которые не удалось залогинить (чтобы не потерять)
+        const allBots = [...localStorageData, ...failedLoginBots];
+        localStorage.setItem('savedBots', JSON.stringify(allBots));
+
+        console.log(`[SaveSession] Сохранено ${localStorageData.length} активных + ${failedLoginBots.length} неактивных анкет`);
 
     } catch (error) {
         console.error('Error saving session:', error);
@@ -1675,10 +1679,14 @@ async function saveSession() {
     }
 }
 
+// Хранилище анкет которые не удалось залогинить (чтобы не потерять при saveSession)
+let failedLoginBots = [];
+
 async function restoreSession() {
     try {
         // Загружаем из localStorage
         const s = JSON.parse(localStorage.getItem('savedBots') || '[]');
+        failedLoginBots = []; // Сбрасываем список неудавшихся логинов
         document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} из кэша...` : "";
 
         for (const a of s) {
@@ -1712,6 +1720,10 @@ async function restoreSession() {
                 if (a.mailTarget === 'custom-ids') {
                     toggleCustomIdsField(bot.id);
                 }
+            } else {
+                // Логин не удался - сохраняем данные анкеты чтобы не потерять
+                console.warn(`[RestoreSession] Не удалось залогинить ${a.displayId}, сохраняем для следующего запуска`);
+                failedLoginBots.push(a);
             }
             await new Promise(r => setTimeout(r, 500));
         }

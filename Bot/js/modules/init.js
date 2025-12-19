@@ -17,6 +17,7 @@ window.onload = async function() {
     updateDisabledStatusesUI(); // Отображаем отключенные статусы
     startGlobalMenOnlineUpdater(); // Запускаем обновление "Мужчины онлайн"
     initUpdateHandlers(); // Обработчики обновлений приложения
+    initQuitHandler(); // Сохранение сессии при закрытии
 
     // Глобальное отслеживание Shift для bulk-действий
     document.addEventListener('keydown', (e) => { if (e.key === 'Shift') isShiftPressed = true; });
@@ -36,6 +37,23 @@ window.onload = async function() {
         }
     };
 };
+
+// ============= СОХРАНЕНИЕ СЕССИИ ПРИ ЗАКРЫТИИ =============
+function initQuitHandler() {
+    const { ipcRenderer } = require('electron');
+
+    ipcRenderer.on('save-session-before-quit', async () => {
+        console.log('[App] Получена команда сохранить сессию перед закрытием');
+        try {
+            await saveSession();
+            console.log('[App] Сессия сохранена успешно');
+        } catch (err) {
+            console.error('[App] Ошибка сохранения сессии:', err);
+        }
+        // Сообщаем main процессу что сохранение завершено
+        ipcRenderer.send('session-saved');
+    });
+}
 
 // ============= ОБРАБОТЧИКИ ОБНОВЛЕНИЙ ПРИЛОЖЕНИЯ =============
 let updateState = 'idle'; // idle, downloading, ready
