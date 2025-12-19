@@ -1808,6 +1808,26 @@ class AccountBot {
         res = res.replace(/{about}/gi, getField('AboutMe', 'About', 'Description', 'aboutMe'));
         res = res.replace(/{lookingfor}/gi, getField('AboutPartner', 'LookingFor', 'lookingFor'));
 
+        // === ФИНАЛЬНАЯ ОЧИСТКА ОТ HTML ENTITIES ===
+        // Убираем &nbsp; и другие entities которые могут остаться в данных профиля
+        res = res
+            .replace(/&nbsp;/gi, ' ')           // HTML entity &nbsp;
+            .replace(/&#160;/gi, ' ')           // Числовой код &nbsp;
+            .replace(/&#xa0;/gi, ' ')           // Hex код &nbsp;
+            .replace(/\u00A0/g, ' ')            // Unicode non-breaking space
+            .replace(/&amp;/gi, '&')            // &amp; -> &
+            .replace(/&lt;/gi, '<')             // &lt; -> <
+            .replace(/&gt;/gi, '>')             // &gt; -> >
+            .replace(/&quot;/gi, '"')           // &quot; -> "
+            .replace(/&#39;/gi, "'")            // &#39; -> '
+            .replace(/&apos;/gi, "'")           // &apos; -> '
+            .replace(/&mdash;/gi, '—')          // &mdash; -> —
+            .replace(/&ndash;/gi, '–')          // &ndash; -> –
+            .replace(/&hellip;/gi, '...')       // &hellip; -> ...
+            .replace(/&#\d+;/g, '')             // Остальные числовые entities - удаляем
+            .replace(/\s{2,}/g, ' ')            // Множественные пробелы -> один
+            .trim();
+
         return res;
     }
 
