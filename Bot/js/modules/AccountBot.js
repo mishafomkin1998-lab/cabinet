@@ -1265,11 +1265,13 @@ class AccountBot {
                 this.mailHistory.errors.push(`${user?.AccountId || 'unknown'}: ${errorReason}`);
                 this.log(`❌ Ошибка: ${user?.Name || 'unknown'} (${user?.AccountId || '?'}) - ${errorReason}`);
 
-                // Проверяем игнор-лист или блокировку
+                // Проверяем игнор-лист, блокировку или несоответствие возрасту
                 const isIgnored = errorReason.toLowerCase().includes('ignore') ||
                                   errorReason.toLowerCase().includes('игнор') ||
                                   errorReason.toLowerCase().includes('block') ||
-                                  errorReason.toLowerCase().includes('заблокир');
+                                  errorReason.toLowerCase().includes('заблокир') ||
+                                  errorReason.toLowerCase().includes('criteria of age') ||
+                                  errorReason.toLowerCase().includes('do not match');
 
                 // Добавляем в игнор-лист если это блокировка/игнор
                 if (user && user.AccountId && isIgnored) {
@@ -1689,11 +1691,13 @@ class AccountBot {
                 this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
                 this.log(`❌ Ошибка чата ${user.Name} (${user.AccountId}): ${errorReason}`);
 
-                // Проверяем игнор-лист или блокировку
+                // Проверяем игнор-лист, блокировку или несоответствие возрасту
                 const isIgnored = errorReason.toLowerCase().includes('ignore') ||
                                   errorReason.toLowerCase().includes('игнор') ||
                                   errorReason.toLowerCase().includes('block') ||
-                                  errorReason.toLowerCase().includes('заблокир');
+                                  errorReason.toLowerCase().includes('заблокир') ||
+                                  errorReason.toLowerCase().includes('criteria of age') ||
+                                  errorReason.toLowerCase().includes('do not match');
 
                 // Добавляем в игнор-лист если это блокировка/игнор
                 if (isIgnored && !this.ignoredUsersChat.includes(user.AccountId)) {
@@ -1743,11 +1747,13 @@ class AccountBot {
                 this.incrementStat('chat', 'errors');
                 this.chatHistory.errors.push(errorReason);
 
-                // Проверяем игнор-лист или блокировку
+                // Проверяем игнор-лист, блокировку или несоответствие возрасту
                 const isIgnored = errorReason.toLowerCase().includes('ignore') ||
                                   errorReason.toLowerCase().includes('игнор') ||
                                   errorReason.toLowerCase().includes('block') ||
-                                  errorReason.toLowerCase().includes('заблокир');
+                                  errorReason.toLowerCase().includes('заблокир') ||
+                                  errorReason.toLowerCase().includes('criteria of age') ||
+                                  errorReason.toLowerCase().includes('do not match');
 
                 // Добавляем в игнор-лист если это блокировка/игнор
                 if (user && user.AccountId && isIgnored) {
