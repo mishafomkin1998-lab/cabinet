@@ -1075,13 +1075,12 @@ class AccountBot {
                 // Запрашиваем сообщения за весь период (startDate с 2020 года)
                 const messagesRes = await makeApiRequest(this, 'GET', '/api/messages?startDate=2020-01-01T00:00:00');
                 const allMsgs = messagesRes.data.Messages || [];
-                const unrepliedMsgs = allMsgs.filter(m => !m.IsReplied);
 
                 // Диагностика: логируем что вернул API
-                console.log(`[Mail inbox] API вернул ${allMsgs.length} сообщений, неотвеченных: ${unrepliedMsgs.length}`);
+                console.log(`[Mail inbox] API вернул ${allMsgs.length} сообщений`);
 
-                if (unrepliedMsgs.length > 0) {
-                    const msg = unrepliedMsgs[Math.floor(Math.random() * unrepliedMsgs.length)];
+                if (allMsgs.length > 0) {
+                    const msg = allMsgs[Math.floor(Math.random() * allMsgs.length)];
                     users.push({
                         AccountId: msg.User.AccountId,
                         Name: msg.User.Name,
