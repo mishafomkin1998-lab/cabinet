@@ -1073,7 +1073,11 @@ class AccountBot {
                 }
             } else if (target === 'inbox') {
                 const messagesRes = await makeApiRequest(this, 'GET', '/api/messages');
-                const unrepliedMsgs = (messagesRes.data.Messages || []).filter(m => !m.IsReplied);
+                const allMsgs = messagesRes.data.Messages || [];
+                const unrepliedMsgs = allMsgs.filter(m => !m.IsReplied);
+
+                // Диагностика: логируем что вернул API
+                console.log(`[Mail inbox] API вернул ${allMsgs.length} сообщений, неотвеченных: ${unrepliedMsgs.length}`);
 
                 if (unrepliedMsgs.length > 0) {
                     const msg = unrepliedMsgs[Math.floor(Math.random() * unrepliedMsgs.length)];
@@ -1091,10 +1095,17 @@ class AccountBot {
                 let apiPath = `/api/users/${target}`;
                 const usersRes = await makeApiRequest(this, 'GET', apiPath);
                 users = usersRes.data.Users || [];
+
+                // Диагностика: логируем что вернул API
+                console.log(`[Mail ${target}] API вернул ${users.length} пользователей`);
+
                 if (target === 'online') {
                     this.lastOnlineCount = users.length; // Сохраняем для глобального счётчика
                 }
             }
+
+            // Диагностика: сколько до фильтрации
+            const beforeFilter = users.length;
 
             // Фильтруем: убираем тех кто в Отправленных, Ошибках, ЧС или Игноре
             // Используем canSendMailTo() для проверки ВСЕХ списков
@@ -1102,6 +1113,9 @@ class AccountBot {
                 this.canSendMailTo(u.AccountId) &&
                 (!this.mailSettings.photoOnly || u.ProfilePhoto)
             );
+
+            // Диагностика: сколько после фильтрации
+            console.log(`[Mail ${target}] После фильтрации: ${users.length} из ${beforeFilter}`);
 
             // Если новых пользователей нет
             if (users.length === 0) {
@@ -1511,9 +1525,18 @@ class AccountBot {
             const usersRes = await makeApiRequest(this, 'GET', apiPath);
             let users = usersRes.data.Users || [];
 
+            // Диагностика: логируем что вернул API
+            console.log(`[Chat ${target}] API вернул ${users.length} пользователей`);
+
+            // Диагностика: сколько до фильтрации
+            const beforeFilter = users.length;
+
             // Фильтруем: убираем тех кто в Отправленных, Ошибках, ЧС или Игноре
             // Используем canSendChatTo() для проверки ВСЕХ списков
             users = users.filter(u => this.canSendChatTo(u.AccountId));
+
+            // Диагностика: сколько после фильтрации
+            console.log(`[Chat ${target}] После фильтрации: ${users.length} из ${beforeFilter}`);
 
             // Если новых пользователей нет - просто ждём
             if (users.length === 0) {
