@@ -5,6 +5,9 @@ const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
 
+// Хранение прокси для каждого бота (для использования в IPC handlers)
+const botProxies = {};
+
 // =====================================================
 // === АВТООБНОВЛЕНИЕ ===
 // =====================================================
@@ -143,6 +146,7 @@ ipcMain.handle('set-session-proxy', async (event, { botId, proxyString }) => {
         if (!proxyString || proxyString.trim() === '') {
             // Убираем прокси - прямое соединение
             await ses.setProxy({ proxyRules: '' });
+            delete botProxies[botId]; // Удаляем из хранилища
             console.log(`[Proxy MAIN] ${botId}: прокси отключен (прямое соединение)`);
             return { success: true, proxy: null };
         }
@@ -218,6 +222,9 @@ ipcMain.handle('set-session-proxy', async (event, { botId, proxyString }) => {
         console.log(`[Proxy MAIN] Вызов ses.setProxy({ proxyRules: "${proxyUrl}" })...`);
         await ses.setProxy({ proxyRules: proxyUrl });
         console.log(`[Proxy MAIN] ✅ Прокси успешно установлен для ${botId}: ${proxyUrl}`);
+
+        // Сохраняем прокси URL для использования в HTTP запросах (upload-photo-internal и т.д.)
+        botProxies[botId] = proxyUrl;
 
         return { success: true, proxy: proxyUrl };
     } catch (error) {
