@@ -1332,6 +1332,14 @@ class AccountBot {
                     }
                 }
                 
+                // DEBUG: Логируем payload перед отправкой
+                console.log(`[Photo DEBUG] Payload attachment:`, {
+                    AttachmentName: payload.AttachmentName,
+                    AttachmentHash: payload.AttachmentHash,
+                    AttachmentFileLength: payload.AttachmentFile ? payload.AttachmentFile.length : null,
+                    AttachmentFileStart: payload.AttachmentFile ? payload.AttachmentFile.substring(0, 50) : null
+                });
+
                 // 1. Отправляем на Ladadate
                 await makeApiRequest(this, 'POST', '/api/messages/send', payload);
 
