@@ -1156,18 +1156,24 @@ class AccountBot {
                 // Диагностика: логируем что вернул API
                 console.log(`[Mail inbox] API вернул ${allMsgs.length} сообщений`);
 
-                if (allMsgs.length > 0) {
-                    const msg = allMsgs[Math.floor(Math.random() * allMsgs.length)];
-                    users.push({
-                        AccountId: msg.User.AccountId,
-                        Name: msg.User.Name,
-                        City: msg.User.City,
-                        Age: msg.User.Age,
-                        Country: msg.User.Country,
-                        ProfilePhoto: msg.User.ProfilePhoto,
-                        messageToReply: msg.MessageId
-                    });
-                }
+                // Собираем УНИКАЛЬНЫХ отправителей (один человек мог писать несколько раз)
+                const uniqueSenders = new Map();
+                allMsgs.forEach(msg => {
+                    if (!uniqueSenders.has(msg.User.AccountId)) {
+                        uniqueSenders.set(msg.User.AccountId, {
+                            AccountId: msg.User.AccountId,
+                            Name: msg.User.Name,
+                            City: msg.User.City,
+                            Age: msg.User.Age,
+                            Country: msg.User.Country,
+                            ProfilePhoto: msg.User.ProfilePhoto,
+                            messageToReply: msg.MessageId // Последнее сообщение для ответа
+                        });
+                    }
+                });
+
+                users = Array.from(uniqueSenders.values());
+                console.log(`[Mail inbox] Уникальных отправителей: ${users.length}`);
             } else if (target === 'shared-online') {
                 // Берём из общего пула SharedPool (собирается со всех анкет)
                 users = SharedPool.getAll();
