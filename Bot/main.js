@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, session, Menu, dialog } = require('electron
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
+const axios = require('axios');
 
 let mainWindow = null;
 
