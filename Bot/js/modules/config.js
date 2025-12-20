@@ -108,7 +108,7 @@ let controlStatus = {
 const SharedPool = {
     users: new Map(),           // AccountId → user data
     lastUpdate: 0,              // Время последнего обновления
-    updateInterval: 10000,      // Интервал обновления (10 сек)
+    updateInterval: 30000,      // Интервал обновления (30 сек)
     isUpdating: false,          // Флаг что идёт обновление
     timer: null,                // ID таймера
 

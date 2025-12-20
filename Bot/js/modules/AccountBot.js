@@ -1123,8 +1123,8 @@ class AccountBot {
 
             // Если новых пользователей нет
             if (users.length === 0) {
-                if (target === 'online') {
-                    // На online остаёмся ВСЕГДА и ждём новых пользователей
+                if (target === 'online' || target === 'shared-online') {
+                    // На online/shared-online остаёмся ВСЕГДА и ждём новых пользователей
                     this.log(`⏳ Нет онлайн пользователей. Ожидание...`);
                     return;
                 } else {

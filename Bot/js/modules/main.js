@@ -101,8 +101,8 @@ function createInterface(bot) {
         <div class="panel-col">
             <div class="col-title">Настройки</div>
             <select id="target-select-${bot.id}" class="form-select form-select-sm mb-1" onchange="updateSettings('${bot.id}'); toggleCustomIdsField('${bot.id}')">
-                <option value="shared-online">Онлайн (общий)</option>
-                <option value="online">Онлайн</option>
+                <option value="shared-online">Online shared</option>
+                <option value="online">Online</option>
                 <option value="favorites">I am a favorite of</option>
                 <option value="my-favorites">My favorite</option>
                 <option value="inbox">Inbox</option>
