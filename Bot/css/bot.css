@@ -1149,6 +1149,10 @@
         .btn-status-circle.btn-custom-ids-color { color: #20c997; border-color: #9be7d3; }
         .btn-status-circle.btn-custom-ids-color:hover { background: #d1f5eb; }
 
+        /* Разделители между группами статусов */
+        .status-divider { width: 1px; height: 20px; background: #ddd; margin: 0 6px; }
+        .status-divider-left { width: 1px; height: 20px; background: #ddd; margin: 0 6px 0 0; }
+
         /* Отключенные статусы (серые, пропускаются в авто-режиме) */
         .btn-status-circle.status-disabled {
             opacity: 0.4 !important;
@@ -1457,6 +1461,7 @@
         .stat-ignored-text { font-size: 11px; color: #999; cursor: pointer; }
         .stat-ignored-text:hover { color: #666; text-decoration: underline; }
         .stat-hotqueue { font-size: 11px; color: #ff6b35; margin-left: 5px; font-weight: 500; }
+        .stat-val-wrapper { display: inline-flex; align-items: center; }
 
         /* Модальное окно игнор-листа */
         .custom-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 3000; display: none; }
