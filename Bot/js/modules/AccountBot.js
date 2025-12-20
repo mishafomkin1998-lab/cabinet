@@ -1363,7 +1363,16 @@ class AccountBot {
 
                 console.log(`[Photo WebView] Страница compose загружена, выполняем отправку...`);
 
-                // ШАГ 4: Выполняем upload и send через JS в WebView
+                // ШАГ 4: Извлекаем uid из URL compose-страницы
+                // URL: https://ladadate.com/message-compose/d04626e-xxxx-xxxx
+                const composeUid = currentUrl.split('/message-compose/')[1]?.split('?')[0] || '';
+                console.log(`[Photo WebView] Извлечён uid из URL: ${composeUid}`);
+
+                if (!composeUid) {
+                    throw new Error('Не удалось извлечь uid из URL compose страницы');
+                }
+
+                // ШАГ 5: Выполняем upload и send через JS в WebView
                 const jsCode = `
                     (async () => {
                         try {
@@ -1372,9 +1381,8 @@ class AccountBot {
                             const msgBody = ${JSON.stringify(msgBody)};
                             const hash = '${photoHash}';
 
-                            // Генерируем uid (32 hex)
-                            const uid = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-                                .map(b => b.toString(16).padStart(2, '0')).join('');
+                            // Используем uid из URL (сгенерирован сервером)
+                            const uid = '${composeUid}';
 
                             console.log('[WebView JS] uid=' + uid);
 
