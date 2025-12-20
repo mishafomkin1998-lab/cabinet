@@ -663,73 +663,11 @@ ipcMain.handle('send-message-internal', async (event, { uid, body, botId }) => {
     }
 });
 
-// Инициализация compose-сессии (устанавливает recipient в cookies)
+// Инициализация compose-сессии больше не нужна - WebView делает всё сам
+// Оставляем пустой handler для совместимости
 ipcMain.handle('init-compose-session', async (event, { recipientId, botId }) => {
-    console.log(`[Compose Session] Инициализация для recipient=${recipientId}, bot=${botId}`);
-
-    try {
-        // ВАЖНО: WebView использует партицию wv_${botId}, а не ${botId}
-        const ses = session.fromPartition(`persist:wv_${botId}`);
-        const allCookies = await ses.cookies.get({ url: 'https://ladadate.com' });
-        const cookieString = allCookies.map(c => `${c.name}=${c.value}`).join('; ');
-        console.log(`[Compose Session] Cookies из wv_${botId}: ${allCookies.length} шт`);
-
-        // Получаем прокси для бота
-        let proxyAgent = null;
-        if (botId && botProxies[botId]) {
-            const proxyUrl = botProxies[botId];
-            const { HttpsProxyAgent } = require('https-proxy-agent');
-            proxyAgent = new HttpsProxyAgent(proxyUrl);
-        }
-
-        const axiosConfig = {
-            method: 'GET',
-            url: `https://ladadate.com/message-compose/${recipientId}`,
-            headers: {
-                'Cookie': cookieString,
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            },
-            maxRedirects: 5,
-            timeout: 30000
-        };
-
-        if (proxyAgent) {
-            axiosConfig.httpsAgent = proxyAgent;
-        }
-
-        const response = await axios(axiosConfig);
-        console.log(`[Compose Session] Response status: ${response.status}`);
-        console.log(`[Compose Session] Final URL: ${response.request?.res?.responseUrl || 'unknown'}`);
-
-        // Сохраняем cookies из ответа в сессию бота
-        const setCookies = response.headers['set-cookie'];
-        if (setCookies) {
-            for (const cookieStr of setCookies) {
-                try {
-                    const cookieParts = cookieStr.split(';')[0].split('=');
-                    const name = cookieParts[0];
-                    const value = cookieParts.slice(1).join('=');
-                    await ses.cookies.set({
-                        url: 'https://ladadate.com',
-                        name: name,
-                        value: value
-                    });
-                } catch (cookieErr) {
-                    console.warn(`[Compose Session] Cookie set error:`, cookieErr.message);
-                }
-            }
-            console.log(`[Compose Session] Updated ${setCookies.length} cookies`);
-        }
-
-        return { success: true };
-    } catch (err) {
-        console.error(`[Compose Session] Ошибка:`, err.message);
-        if (err.response) {
-            console.error(`[Compose Session] Status: ${err.response.status}`);
-        }
-        return { success: false, error: err.message };
-    }
+    console.log(`[Compose Session] Пропускаем - WebView выполнит всё сам`);
+    return { success: true, recipientId };
 });
 
 // =====================================================

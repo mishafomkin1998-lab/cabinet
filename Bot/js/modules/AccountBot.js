@@ -1271,32 +1271,22 @@ class AccountBot {
             msgBody = this.replaceMacros(msgTemplate, user);
 
             // ============ ОТПРАВКА ПИСЬМА ============
-            // Если есть фото — используем внутренний API (через cookies)
+            // Если есть фото — используем внутренний API через WebView
             if (this.photoPath) {
-                console.log(`[Photo Internal API] Используем внутренний API для отправки с фото`);
+                console.log(`[Photo WebView] Отправка с фото через WebView`);
 
-                // ШАГ 1: Инициализируем compose-сессию (устанавливает recipient в cookies)
-                console.log(`[Photo Internal API] Инициализация compose-сессии для recipient=${user.AccountId}`);
-                const composeResult = await ipcRenderer.invoke('init-compose-session', {
-                    recipientId: user.AccountId,
-                    botId: this.id
-                });
-
-                if (!composeResult.success) {
-                    throw new Error(`Ошибка инициализации compose: ${composeResult.error}`);
+                // Проверяем что WebView существует
+                if (!this.webview) {
+                    throw new Error('WebView не инициализирован');
                 }
-                console.log(`[Photo Internal API] Compose-сессия инициализирована`);
 
-                // ШАГ 2: Генерируем уникальный uid (32 hex символа)
-                const uid = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-                    .map(b => b.toString(16).padStart(2, '0')).join('');
-
-                // ШАГ 3: Вычисляем MD5 хеш фото и загружаем
+                // ШАГ 1: Читаем фото как base64
                 const fileResult = await ipcRenderer.invoke('read-photo-file', { filePath: this.photoPath });
                 if (!fileResult.success) {
                     throw new Error(`Файл не найден: ${this.photoPath}`);
                 }
 
+                // Вычисляем MD5 хеш
                 const binaryString = atob(fileResult.base64);
                 const bytes = new Uint8Array(binaryString.length);
                 for (let i = 0; i < binaryString.length; i++) {
@@ -1304,41 +1294,102 @@ class AccountBot {
                 }
                 const photoHash = calculateMD5(bytes.buffer);
 
-                console.log(`[Photo Internal API] uid=${uid}, hash=${photoHash}, file=${fileResult.fileName}`);
+                console.log(`[Photo WebView] hash=${photoHash}, file=${fileResult.fileName}`);
 
-                // Загружаем фото через внутренний API (cookies получаются в main process из сессии)
-                console.log(`[Photo Internal API] Вызываем upload-photo-internal...`);
+                // ШАГ 2: Переводим WebView на compose страницу
+                const composeUrl = `https://ladadate.com/message-compose/${user.AccountId}`;
+                console.log(`[Photo WebView] Переход на ${composeUrl}`);
 
-                let uploadResult;
-                try {
-                    uploadResult = await ipcRenderer.invoke('upload-photo-internal', {
-                        filePath: this.photoPath,
-                        hash: photoHash,
-                        uid: uid,
-                        botId: this.id
-                    });
-                    console.log(`[Photo Internal API] upload-photo-internal вернул:`, uploadResult);
-                } catch (ipcErr) {
-                    console.error(`[Photo Internal API] IPC ошибка:`, ipcErr);
-                    throw ipcErr;
-                }
+                this.webview.src = composeUrl;
 
-                if (!uploadResult.success) {
-                    throw new Error(`Ошибка загрузки фото: ${uploadResult.error}`);
-                }
-                console.log(`[Photo Internal API] Фото загружено:`, uploadResult.data);
-
-                // ШАГ 4: Отправляем письмо через внутренний API
-                const sendResult = await ipcRenderer.invoke('send-message-internal', {
-                    uid: uid,
-                    body: msgBody,
-                    botId: this.id
+                // Ждём загрузки страницы (макс 15 сек)
+                await new Promise((resolve, reject) => {
+                    const timeout = setTimeout(() => reject(new Error('Timeout loading compose page')), 15000);
+                    this.webview.addEventListener('did-finish-load', () => {
+                        clearTimeout(timeout);
+                        resolve();
+                    }, { once: true });
+                    this.webview.addEventListener('did-fail-load', (e) => {
+                        clearTimeout(timeout);
+                        reject(new Error(`Failed to load: ${e.errorDescription}`));
+                    }, { once: true });
                 });
 
-                if (!sendResult.success) {
-                    throw new Error(`Ошибка отправки письма: ${sendResult.error}`);
+                console.log(`[Photo WebView] Страница загружена, выполняем отправку...`);
+
+                // ШАГ 3: Выполняем upload и send через JS в WebView
+                const jsCode = `
+                    (async () => {
+                        try {
+                            const base64 = '${fileResult.base64}';
+                            const fileName = '${fileResult.fileName}';
+                            const msgBody = ${JSON.stringify(msgBody)};
+                            const hash = '${photoHash}';
+
+                            // Генерируем uid (32 hex)
+                            const uid = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                                .map(b => b.toString(16).padStart(2, '0')).join('');
+
+                            console.log('[WebView JS] uid=' + uid);
+
+                            // Конвертируем base64 в Blob
+                            const byteCharacters = atob(base64);
+                            const byteNumbers = new Array(byteCharacters.length);
+                            for (let i = 0; i < byteCharacters.length; i++) {
+                                byteNumbers[i] = byteCharacters.charCodeAt(i);
+                            }
+                            const byteArray = new Uint8Array(byteNumbers);
+                            const blob = new Blob([byteArray], {type: 'image/jpeg'});
+
+                            // Upload фото
+                            const formData = new FormData();
+                            formData.append('hash', hash);
+                            formData.append('uploadfile', blob, fileName);
+
+                            console.log('[WebView JS] Uploading photo...');
+                            const uploadRes = await fetch('/message-attachment-upload?uid=' + uid, {
+                                method: 'POST',
+                                body: formData
+                            });
+                            const uploadData = await uploadRes.json();
+                            console.log('[WebView JS] Upload response:', uploadData);
+
+                            if (uploadData.IsSuccess === false) {
+                                return { success: false, step: 'upload', error: uploadData.Message || uploadData.Reason };
+                            }
+
+                            // Отправляем письмо
+                            console.log('[WebView JS] Sending message...');
+                            const sendRes = await fetch('/message-send', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/x-www-form-urlencoded',
+                                    'X-Requested-With': 'XMLHttpRequest'
+                                },
+                                body: 'uid=' + encodeURIComponent(uid) + '&body=' + encodeURIComponent(msgBody)
+                            });
+                            const sendData = await sendRes.json();
+                            console.log('[WebView JS] Send response:', sendData);
+
+                            if (sendData.IsSuccess === false) {
+                                return { success: false, step: 'send', error: sendData.Message || sendData.Reason };
+                            }
+
+                            return { success: true, data: sendData };
+                        } catch (err) {
+                            return { success: false, step: 'exception', error: err.message };
+                        }
+                    })()
+                `;
+
+                const result = await this.webview.executeJavaScript(jsCode);
+                console.log(`[Photo WebView] Результат:`, result);
+
+                if (!result.success) {
+                    throw new Error(`Ошибка на шаге ${result.step}: ${result.error}`);
                 }
-                console.log(`[Photo Internal API] Письмо отправлено:`, sendResult.data);
+
+                console.log(`[Photo WebView] Письмо с фото отправлено!`);
 
             } else {
                 // ============ БЕЗ ФОТО: публичный API (Bearer token) ============
