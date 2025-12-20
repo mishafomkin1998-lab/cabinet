@@ -685,6 +685,20 @@ class AccountBot {
             if (!this.chatRequestNotified) this.chatRequestNotified = {}; // Для отслеживания уведомлённых ChatRequests
             if (!this.activeChatSoundTimes) this.activeChatSoundTimes = {}; // Для повторного звука активных чатов
 
+            // === ИСПРАВЛЕНИЕ: При первом sync после старта - помечаем все как "виденные" без уведомлений ===
+            // Это предотвращает уведомления о старых неактивных чатах при перезапуске программы
+            if (!this.firstChatSyncDone) {
+                this.firstChatSyncDone = true;
+                // Помечаем все текущие запросы как уже обработанные
+                for (const request of chatRequests) {
+                    if (request.MessageId) {
+                        this.chatRequestNotified[request.MessageId] = now;
+                    }
+                }
+                console.log(`[Lababot] 📋 Первый sync: ${chatRequests.length} запросов помечены как виденные (без уведомлений)`);
+                // Продолжаем выполнение, но уведомления не будут показаны т.к. всё уже в chatRequestNotified
+            }
+
             // Set для отслеживания partnerId, уведомлённых в этом цикле через ChatRequests
             const notifiedPartnersThisCycle = new Set();
 
@@ -1523,6 +1537,15 @@ class AccountBot {
             }
         }
 
+        // === ИСПРАВЛЕНИЕ: Валидация индекса инвайта при старте ===
+        const invites = fullText.split(/\n\s*__\s*\n/);
+        if (this.chatSettings.currentInviteIndex >= invites.length) {
+            // Индекс вышел за пределы - сбрасываем на 0
+            console.log(`[Chat] currentInviteIndex (${this.chatSettings.currentInviteIndex}) >= invites.length (${invites.length}), сброс на 0`);
+            this.chatSettings.currentInviteIndex = 0;
+            this.chatSettings.rotationStartTime = Date.now(); // Сбрасываем таймер ротации
+        }
+
         if (this.chatSettings.rotationStartTime === 0) this.chatSettings.rotationStartTime = Date.now();
         this.isChatRunning = true;
         this.chatStartTime = Date.now();
@@ -1596,18 +1619,19 @@ class AccountBot {
             this.chatSettings.currentInviteIndex++;
             this.chatSettings.rotationStartTime = Date.now();
             if (this.chatSettings.currentInviteIndex >= invites.length) {
-                if (this.chatSettings.cyclic) { 
-                    this.chatSettings.currentInviteIndex = 0; 
-                    this.log("🔄 Цикл перезапущен"); 
-                } else { 
-                    this.log("⏹ Все инвайты отправлены. Остановка."); 
-                    this.stopChat(); 
-                    return; 
+                if (this.chatSettings.cyclic) {
+                    this.chatSettings.currentInviteIndex = 0;
+                    this.log("🔄 Цикл перезапущен");
+                } else {
+                    // === ИСПРАВЛЕНИЕ: Не останавливаем, а остаёмся на последнем инвайте ===
+                    // Продолжаем ждать новых пользователей с последним инвайтом
+                    this.chatSettings.currentInviteIndex = invites.length - 1;
+                    this.log("📌 Все инвайты использованы. Продолжаем с последним.");
                 }
             } else {
                 this.log(`⏩ Переключено на инвайт #${this.chatSettings.currentInviteIndex + 1}`);
             }
-            saveSession(); 
+            saveSession();
             this.updateUI();
         }
         
