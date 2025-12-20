@@ -538,12 +538,22 @@ ipcMain.handle('read-photo-file', async (event, { filePath }) => {
 
 // Загрузка фото через внутренний API (multipart/form-data)
 ipcMain.handle('upload-photo-internal', async (event, { filePath, hash, uid, cookies, botId }) => {
+    console.log('[Photo Upload MAIN] === Начало обработки ===');
+    console.log('[Photo Upload MAIN] filePath:', filePath);
+    console.log('[Photo Upload MAIN] hash:', hash);
+    console.log('[Photo Upload MAIN] uid:', uid);
+    console.log('[Photo Upload MAIN] botId:', botId);
+    console.log('[Photo Upload MAIN] cookies length:', cookies ? cookies.length : 0);
+
     try {
         if (!filePath || !fs.existsSync(filePath)) {
+            console.log('[Photo Upload MAIN] Файл не найден:', filePath);
             return { success: false, error: 'Файл не найден' };
         }
+        console.log('[Photo Upload MAIN] Файл существует');
 
         const FormData = require('form-data');
+        console.log('[Photo Upload MAIN] FormData loaded');
         const fileBuffer = fs.readFileSync(filePath);
         const fileName = path.basename(filePath);
 
@@ -580,12 +590,18 @@ ipcMain.handle('upload-photo-internal', async (event, { filePath, hash, uid, coo
             axiosConfig.httpsAgent = proxyAgent;
         }
 
+        console.log('[Photo Upload MAIN] Отправляем запрос на:', axiosConfig.url);
         const response = await axios(axiosConfig);
-        console.log('[Photo Upload] Response:', response.data);
+        console.log('[Photo Upload MAIN] Response status:', response.status);
+        console.log('[Photo Upload MAIN] Response data:', response.data);
 
         return { success: true, data: response.data };
     } catch (err) {
-        console.error('[Photo Upload] Ошибка:', err.message);
+        console.error('[Photo Upload MAIN] Ошибка:', err.message);
+        if (err.response) {
+            console.error('[Photo Upload MAIN] Response status:', err.response.status);
+            console.error('[Photo Upload MAIN] Response data:', err.response.data);
+        }
         return { success: false, error: err.message };
     }
 });
