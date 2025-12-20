@@ -61,6 +61,11 @@ class AccountBot {
         // === Счётчик сетевых ошибок для exponential backoff ===
         this.networkErrorCount = 0;
 
+        // === Отслеживание статистики по статусу (для логирования при авто-переключении) ===
+        this.statusStartTime = null;      // Время переключения на текущий статус
+        this.statusStartSent = 0;         // Sent на момент переключения
+        this.statusStartErrors = 0;       // Errors на момент переключения
+
         // ПРИМЕЧАНИЕ: Фильтрация теперь проверяет mailHistory.sent, mailHistory.errors,
         // chatHistory.sent, chatHistory.errors, blacklist и ignoredUsers напрямую.
         // Это защищает от спама - если пользователь есть в ЛЮБОМ списке, ему не отправляется.
@@ -977,6 +982,7 @@ class AccountBot {
 
         this.isMailRunning = true;
         this.mailStartTime = Date.now();
+        this.initStatusTracking(); // Инициализируем отслеживание статуса
         this.startMailTimer();
         this.updateUI();
         this.log(`🚀 MAIL Started (v${APP_VERSION})`);
@@ -1034,6 +1040,66 @@ class AccountBot {
         }, delay);
     }
 
+    // === Получение количества пользователей в статусе (для логирования) ===
+    async getStatusUserCount(status) {
+        try {
+            if (status === 'shared-online') {
+                return SharedPool.size;
+            }
+
+            if (status === 'online') {
+                const res = await makeApiRequest(this, 'GET', '/api/users/online');
+                return (res.data.Users || []).length;
+            }
+
+            if (status === 'inbox') {
+                const res = await makeApiRequest(this, 'GET', '/api/messages?startDate=2020-01-01T00:00:00');
+                const msgs = res.data.Messages || [];
+                // Фильтруем уникальных пользователей
+                const uniqueIds = new Set(msgs.map(m => m.User.AccountId));
+                return uniqueIds.size;
+            }
+
+            if (status === 'custom-ids') {
+                const remaining = (this.mailSettings.customIds || []).filter(id =>
+                    !this.mailSettings.sentCustomIds?.includes(id)
+                );
+                return remaining.length;
+            }
+
+            // Для остальных статусов (payers, favorites, my-favorites)
+            const apiPath = `/api/users/${status}`;
+            const res = await makeApiRequest(this, 'GET', apiPath);
+            return (res.data.Users || []).length;
+        } catch (e) {
+            console.warn(`[getStatusUserCount] Ошибка для ${status}:`, e.message);
+            return '?';
+        }
+    }
+
+    // === Инициализация отслеживания статуса (вызывается при старте и переключении) ===
+    initStatusTracking() {
+        this.statusStartTime = Date.now();
+        this.statusStartSent = this.mailStats.sent;
+        this.statusStartErrors = this.mailStats.errors;
+    }
+
+    // === Получение статистики по текущему статусу ===
+    getStatusStats() {
+        const sentOnStatus = this.mailStats.sent - this.statusStartSent;
+        const errorsOnStatus = this.mailStats.errors - this.statusStartErrors;
+
+        let timeOnStatus = '';
+        if (this.statusStartTime) {
+            const elapsed = Math.floor((Date.now() - this.statusStartTime) / 1000);
+            const mins = Math.floor(elapsed / 60);
+            const secs = elapsed % 60;
+            timeOnStatus = mins > 0 ? `${mins}м ${secs}с` : `${secs}с`;
+        }
+
+        return { sentOnStatus, errorsOnStatus, timeOnStatus };
+    }
+
     async processMailUser(msgTemplate) {
         let user = null;
         let msgBody = '';
@@ -1057,7 +1123,18 @@ class AccountBot {
                     this.log(`✅ Custom IDs: все ID из списка обработаны`);
                     if (this.mailSettings.auto) {
                         const newTarget = getNextActiveStatus('payers');
-                        this.log(`⚠️ Переход на ${newTarget}`);
+
+                        // Получаем статистику по custom-ids и количество в новом статусе
+                        const statusStats = this.getStatusStats();
+                        const newCount = await this.getStatusUserCount(newTarget);
+
+                        const statsInfo = statusStats.sentOnStatus > 0 || statusStats.errorsOnStatus > 0
+                            ? ` | custom-ids: ✉️${statusStats.sentOnStatus} ❌${statusStats.errorsOnStatus} (${statusStats.timeOnStatus})`
+                            : '';
+                        this.log(`🔄 Авто → ${newTarget.toUpperCase()} (${newCount} чел.)${statsInfo}`);
+
+                        this.initStatusTracking();
+
                         this.mailSettings.target = newTarget;
                         // Списки НЕ очищаем - пользователь сам решает когда очистить
                         if(activeTabId === this.id) {
@@ -1131,7 +1208,20 @@ class AccountBot {
                     // Для других статусов - переключаемся на следующий (если auto)
                     if (this.mailSettings.auto) {
                         const newTarget = getNextActiveStatus(target);
-                        this.log(`⚠️ Нет пользователей (${target}). Переход на ${newTarget}`);
+
+                        // Получаем статистику по текущему статусу
+                        const statusStats = this.getStatusStats();
+                        const newCount = await this.getStatusUserCount(newTarget);
+
+                        // Формируем информативный лог
+                        const statsInfo = statusStats.sentOnStatus > 0 || statusStats.errorsOnStatus > 0
+                            ? ` | ${target}: ✉️${statusStats.sentOnStatus} ❌${statusStats.errorsOnStatus} (${statusStats.timeOnStatus})`
+                            : '';
+                        this.log(`🔄 Авто → ${newTarget.toUpperCase()} (${newCount} чел.)${statsInfo}`);
+
+                        // Сбрасываем отслеживание для нового статуса
+                        this.initStatusTracking();
+
                         this.mailSettings.target = newTarget;
                         // Списки НЕ очищаем - пользователь сам решает когда очистить
                         if(activeTabId === this.id) document.getElementById(`target-select-${this.id}`).value = newTarget;
