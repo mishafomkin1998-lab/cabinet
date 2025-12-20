@@ -559,11 +559,11 @@ ipcMain.handle('upload-photo-internal', async (event, { filePath, hash, uid, bot
         }
         console.log('[Photo Upload MAIN] Файл существует');
 
-        // Получаем cookies из сессии бота (включая HttpOnly)
-        const ses = session.fromPartition(`persist:${botId}`);
+        // ВАЖНО: WebView использует партицию wv_${botId}, а не ${botId}
+        const ses = session.fromPartition(`persist:wv_${botId}`);
         const allCookies = await ses.cookies.get({ url: 'https://ladadate.com' });
         const cookieString = allCookies.map(c => `${c.name}=${c.value}`).join('; ');
-        console.log('[Photo Upload MAIN] Cookies из сессии:', allCookies.length, 'шт');
+        console.log(`[Photo Upload MAIN] Cookies из wv_${botId}:`, allCookies.length, 'шт');
 
         const FormData = require('form-data');
         const fileBuffer = fs.readFileSync(filePath);
@@ -621,11 +621,11 @@ ipcMain.handle('upload-photo-internal', async (event, { filePath, hash, uid, bot
 // Отправка письма через внутренний API
 ipcMain.handle('send-message-internal', async (event, { uid, body, botId }) => {
     try {
-        // Получаем cookies из сессии бота (включая HttpOnly)
-        const ses = session.fromPartition(`persist:${botId}`);
+        // ВАЖНО: WebView использует партицию wv_${botId}, а не ${botId}
+        const ses = session.fromPartition(`persist:wv_${botId}`);
         const allCookies = await ses.cookies.get({ url: 'https://ladadate.com' });
         const cookieString = allCookies.map(c => `${c.name}=${c.value}`).join('; ');
-        console.log('[Message Send MAIN] Cookies из сессии:', allCookies.length, 'шт');
+        console.log(`[Message Send MAIN] Cookies из wv_${botId}:`, allCookies.length, 'шт');
 
         // Получаем прокси для бота
         let proxyAgent = null;
@@ -668,11 +668,11 @@ ipcMain.handle('init-compose-session', async (event, { recipientId, botId }) => 
     console.log(`[Compose Session] Инициализация для recipient=${recipientId}, bot=${botId}`);
 
     try {
-        // Получаем cookies из сессии бота
-        const ses = session.fromPartition(`persist:${botId}`);
+        // ВАЖНО: WebView использует партицию wv_${botId}, а не ${botId}
+        const ses = session.fromPartition(`persist:wv_${botId}`);
         const allCookies = await ses.cookies.get({ url: 'https://ladadate.com' });
         const cookieString = allCookies.map(c => `${c.name}=${c.value}`).join('; ');
-        console.log(`[Compose Session] Cookies: ${allCookies.length} шт`);
+        console.log(`[Compose Session] Cookies из wv_${botId}: ${allCookies.length} шт`);
 
         // Получаем прокси для бота
         let proxyAgent = null;
