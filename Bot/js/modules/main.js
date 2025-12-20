@@ -1410,30 +1410,21 @@ function onPhotoSelect(botId) {
     const file = fi.files[0];
     const bot = bots[botId];
 
-    // Сохраняем имя файла
+    // Сохраняем путь к файлу (Electron даёт доступ к path)
+    bot.photoPath = file.path;
     bot.photoName = file.name;
     document.getElementById(`photo-name-${botId}`).innerText = file.name;
     document.getElementById(`photo-label-${botId}`).classList.add('file-selected');
 
-    // Читаем файл как ArrayBuffer для MD5
-    const readerBuffer = new FileReader();
-    readerBuffer.onload = function(e) {
-        const arrayBuffer = e.target.result;
-        bot.photoHash = calculateMD5(arrayBuffer);
-        console.log(`[Photo] ${botId}: hash = ${bot.photoHash}`);
-    };
-    readerBuffer.readAsArrayBuffer(file);
-
-    // Читаем файл как base64 для превью и отправки
-    const readerBase64 = new FileReader();
-    readerBase64.onload = function(e) {
-        const dataUrl = e.target.result;
-        document.getElementById(`preview-img-${botId}`).src = dataUrl;
+    // Читаем файл для превью
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById(`preview-img-${botId}`).src = e.target.result;
         document.getElementById(`preview-box-${botId}`).classList.add('has-img');
-        // Сохраняем только base64 часть (без data:image/...;base64,)
-        bot.photoBase64 = dataUrl.split(',')[1];
     };
-    readerBase64.readAsDataURL(file);
+    reader.readAsDataURL(file);
+
+    console.log(`[Photo] ${botId}: path = ${bot.photoPath}`);
 }
 
 function removePhoto(botId) {
@@ -1442,9 +1433,8 @@ function removePhoto(botId) {
     document.getElementById(`preview-box-${botId}`).classList.remove('has-img');
     document.getElementById(`photo-label-${botId}`).classList.remove('file-selected');
     const bot = bots[botId];
+    bot.photoPath = null;
     bot.photoName = null;
-    bot.photoHash = null;
-    bot.photoBase64 = null;
 }
 
 async function handleLoginOrUpdate() {
@@ -1707,7 +1697,10 @@ async function saveSession() {
                 autoReplyEnabled: b.chatSettings.autoReplyEnabled || false,
                 // Blacklist (локальное сохранение)
                 mailBlacklist: b.mailSettings.blacklist || [],
-                chatBlacklist: b.chatSettings.blacklist || []
+                chatBlacklist: b.chatSettings.blacklist || [],
+                // Путь к прикреплённому фото
+                photoPath: b.photoPath || null,
+                photoName: b.photoName || null
             };
         }).filter(item => item !== null);
 
@@ -1767,11 +1760,19 @@ async function restoreSession() {
                 // ВАЖНО: Blacklist НЕ восстанавливаем из localStorage!
                 // Сервер имеет актуальные данные, localStorage может быть устаревшим
                 // Blacklist уже загружен с сервера в performLogin → loadFromServerData
+                // Восстанавливаем путь к фото
+                if (a.photoPath) bot.photoPath = a.photoPath;
+                if (a.photoName) bot.photoName = a.photoName;
 
                 updateInterfaceForMode(bot.id);
                 // Показываем поле Custom IDs если выбран этот режим
                 if (a.mailTarget === 'custom-ids') {
                     toggleCustomIdsField(bot.id);
+                }
+                // Восстанавливаем UI для фото
+                if (bot.photoName) {
+                    document.getElementById(`photo-name-${bot.id}`).innerText = bot.photoName;
+                    document.getElementById(`photo-label-${bot.id}`).classList.add('file-selected');
                 }
             } else {
                 // Логин не удался - сохраняем данные анкеты чтобы не потерять
@@ -1999,7 +2000,9 @@ async function exportAllData() {
                 customIdsList: bot.customIdsList || [],
                 customIdsSent: bot.customIdsSent || [],
                 ignoredUsersMail: bot.ignoredUsersMail || [],
-                ignoredUsersChat: bot.ignoredUsersChat || []
+                ignoredUsersChat: bot.ignoredUsersChat || [],
+                photoPath: bot.photoPath || null,
+                photoName: bot.photoName || null
             });
         });
 
@@ -2068,6 +2071,9 @@ async function handleFullImport(input) {
                                     // Восстанавливаем игнор-листы
                                     if (botData.ignoredUsersMail) bot.ignoredUsersMail = botData.ignoredUsersMail;
                                     if (botData.ignoredUsersChat) bot.ignoredUsersChat = botData.ignoredUsersChat;
+                                    // Восстанавливаем путь к фото (если файл существует - будет использован)
+                                    if (botData.photoPath) bot.photoPath = botData.photoPath;
+                                    if (botData.photoName) bot.photoName = botData.photoName;
 
                                     console.log(`[Import] Восстановлены данные для ${botData.displayId}`);
                                 }

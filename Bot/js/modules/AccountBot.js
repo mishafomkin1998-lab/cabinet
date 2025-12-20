@@ -13,9 +13,8 @@ class AccountBot {
         this.mailStats = { sent: 0, errors: 0, waiting: 0 };
         this.mailHistory = { sent: [], errors: [], waiting: [] };
         this.mailSettings = { target: 'online', speed: 'smart', blacklist: [], photoOnly: false, auto: false };
-        this.photoName = null;
-        this.photoHash = null;
-        this.photoBase64 = null;
+        this.photoPath = null;  // Путь к файлу фото
+        this.photoName = null;  // Имя файла для отображения
         this.mailStartTime = null; // Время начала работы Mail
         this.mailTimerInterval = null; // Интервал обновления таймера Mail
 
@@ -1284,30 +1283,44 @@ class AccountBot {
                     AttachmentFile: null
                 };
 
-                // Если есть прикреплённое фото - обрабатываем вложение
-                if (this.photoName && this.photoHash) {
+                // Если есть прикреплённое фото - читаем файл и обрабатываем вложение
+                if (this.photoPath) {
                     try {
-                        // Проверяем, есть ли уже такой файл на сервере по хешу
-                        const attachCheck = await makeApiRequest(this, 'GET', `/api/messages/check-attachment-by-hash/${this.photoHash}`);
+                        // Читаем файл через IPC (main process)
+                        const fileResult = await ipcRenderer.invoke('read-photo-file', { filePath: this.photoPath });
 
-                        if (attachCheck.data && attachCheck.data.AttachmentHash) {
-                            // Файл уже существует на сервере - используем его данные
-                            payload.AttachmentName = attachCheck.data.AttachmentName;
-                            payload.AttachmentHash = attachCheck.data.AttachmentHash;
-                            console.log(`[Photo] Файл уже на сервере: ${payload.AttachmentName}`);
+                        if (fileResult.success && fileResult.base64) {
+                            // Вычисляем MD5 хеш
+                            const base64Data = fileResult.base64;
+                            const binaryString = atob(base64Data);
+                            const bytes = new Uint8Array(binaryString.length);
+                            for (let i = 0; i < binaryString.length; i++) {
+                                bytes[i] = binaryString.charCodeAt(i);
+                            }
+                            const photoHash = calculateMD5(bytes.buffer);
+
+                            // Проверяем, есть ли уже такой файл на сервере
+                            const attachCheck = await makeApiRequest(this, 'GET', `/api/messages/check-attachment-by-hash/${photoHash}`);
+
+                            if (attachCheck.data && attachCheck.data.AttachmentHash) {
+                                // Файл уже на сервере - используем существующий
+                                payload.AttachmentName = attachCheck.data.AttachmentName;
+                                payload.AttachmentHash = attachCheck.data.AttachmentHash;
+                                console.log(`[Photo] Файл уже на сервере: ${payload.AttachmentName}`);
+                            } else {
+                                // Файл новый - отправляем с base64
+                                payload.AttachmentName = fileResult.fileName;
+                                payload.AttachmentHash = photoHash;
+                                payload.AttachmentFile = base64Data;
+                                console.log(`[Photo] Загружаем новый файл: ${fileResult.fileName}`);
+                            }
                         } else {
-                            // Файл новый - отправляем с base64
-                            payload.AttachmentName = this.photoName;
-                            payload.AttachmentHash = this.photoHash;
-                            payload.AttachmentFile = this.photoBase64;
-                            console.log(`[Photo] Загружаем новый файл: ${this.photoName}`);
+                            // Файл не найден - отправляем без фото
+                            console.warn(`[Photo] Файл не найден: ${this.photoPath}`);
                         }
                     } catch (attachErr) {
-                        // Ошибка проверки - пробуем отправить как новый файл
-                        console.warn(`[Photo] Ошибка проверки хеша, отправляем как новый:`, attachErr.message);
-                        payload.AttachmentName = this.photoName;
-                        payload.AttachmentHash = this.photoHash;
-                        payload.AttachmentFile = this.photoBase64;
+                        console.warn(`[Photo] Ошибка обработки фото:`, attachErr.message);
+                        // Продолжаем без фото
                     }
                 }
                 

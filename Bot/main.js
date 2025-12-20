@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, session, Menu, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 
 let mainWindow = null;
@@ -518,6 +519,21 @@ ipcMain.handle('set-bot-proxy', async (event, { botId, proxyString }) => {
         delete proxySettings[botId || 'default'];
     }
     return { success: true };
+});
+
+// Чтение фото для отправки в письмах
+ipcMain.handle('read-photo-file', async (event, { filePath }) => {
+    try {
+        if (!filePath || !fs.existsSync(filePath)) {
+            return { success: false, error: 'Файл не найден' };
+        }
+        const buffer = fs.readFileSync(filePath);
+        const base64 = buffer.toString('base64');
+        return { success: true, base64, fileName: path.basename(filePath) };
+    } catch (err) {
+        console.error('[Photo] Ошибка чтения файла:', err);
+        return { success: false, error: err.message };
+    }
 });
 
 // =====================================================
