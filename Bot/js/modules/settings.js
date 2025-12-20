@@ -283,9 +283,32 @@ function initHotkeys() {
             e.stopPropagation();
             switchTabRelative(e.shiftKey ? -1 : 1);
         }
+        // Ctrl+F - поиск в логгере
+        else if(e.ctrlKey && e.key === 'f') {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleLoggerSearch();
+        }
         else if(e.shiftKey && e.key === 'F5') { e.preventDefault(); reloginAllBots(); }
         else if(e.key === 'F5') { e.preventDefault(); if(activeTabId && bots[activeTabId]) bots[activeTabId].doActivity(); }
     }, true); // capture phase для перехвата до браузера
+
+    // Обработка клавиш в поле поиска логгера
+    document.addEventListener('keydown', function(e) {
+        const searchInput = document.getElementById('logger-search-input');
+        if (document.activeElement !== searchInput) return;
+
+        // Enter - следующий результат
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            navigateLoggerSearch(e.shiftKey ? -1 : 1);
+        }
+        // Escape - закрыть поиск
+        else if (e.key === 'Escape') {
+            e.preventDefault();
+            closeLoggerSearch();
+        }
+    });
 }
 
 function switchTabRelative(step) {

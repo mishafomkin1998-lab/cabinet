@@ -722,6 +722,49 @@
             background: rgba(255, 85, 85, 0.2);
         }
 
+        /* Logger Search - Dark theme */
+        body.theme-dark .logger-search-box {
+            background: #1a1a1a;
+            border-bottom-color: #333;
+        }
+        body.theme-dark .logger-search-box input {
+            background: #0d0d0d;
+            border-color: #444;
+            color: #f0f0f0;
+        }
+        body.theme-dark .logger-search-box input:focus {
+            border-color: #00ff88;
+            box-shadow: 0 0 0 2px rgba(0, 255, 136, 0.15);
+        }
+        body.theme-dark .logger-search-box input::placeholder {
+            color: #666;
+        }
+        body.theme-dark #logger-search-count {
+            color: #aaa;
+        }
+        body.theme-dark .logger-search-nav button {
+            background: #2a2a2a;
+            border-color: #444;
+            color: #ccc;
+        }
+        body.theme-dark .logger-search-nav button:hover {
+            background: #3a3a3a;
+        }
+        body.theme-dark .logger-search-close {
+            color: #888;
+        }
+        body.theme-dark .logger-search-close:hover {
+            color: #ff5555;
+        }
+        body.theme-dark .search-highlight {
+            background: #3d3d00;
+            color: #ffc107;
+        }
+        body.theme-dark .search-highlight.current {
+            background: #554400;
+            outline-color: #ff9800;
+        }
+
         body.theme-dark .active-invite-box {
             background: #152515;
             border-color: #254525;
@@ -1622,6 +1665,84 @@
             background: #dc3545;
         }
         .log-entry { position: relative; }
+
+        /* Logger header buttons */
+        .logger-header-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        /* Logger Search Box */
+        .logger-search-box {
+            display: flex;
+            align-items: center;
+            padding: 6px 10px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+            gap: 8px;
+        }
+        .logger-search-box input {
+            flex: 1;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            outline: none;
+        }
+        .logger-search-box input:focus {
+            border-color: var(--mode-color);
+            box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
+        }
+        #logger-search-count {
+            font-size: 11px;
+            color: #666;
+            white-space: nowrap;
+            min-width: 50px;
+        }
+        .logger-search-nav {
+            display: flex;
+            gap: 2px;
+        }
+        .logger-search-nav button {
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            border-radius: 3px;
+            padding: 2px 6px;
+            cursor: pointer;
+            font-size: 10px;
+            color: #495057;
+        }
+        .logger-search-nav button:hover {
+            background: #dee2e6;
+        }
+        .logger-search-close {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #999;
+            font-size: 12px;
+            padding: 2px 4px;
+        }
+        .logger-search-close:hover {
+            color: #dc3545;
+        }
+
+        /* Search highlight */
+        .search-highlight {
+            background: #fff3cd;
+            padding: 1px 2px;
+            border-radius: 2px;
+        }
+        .search-highlight.current {
+            background: #ffc107;
+            outline: 2px solid #fd7e14;
+        }
+
+        /* Hide non-matching logs during search */
+        .log-entry.search-hidden {
+            display: none !important;
+        }
 
         /* IMPORT RESULT MODAL - Результаты импорта */
         .import-result-card {

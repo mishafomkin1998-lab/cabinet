@@ -373,3 +373,186 @@ async function openResponseWindowAndTrack(botId, partnerId, partnerName, type, l
     // Открываем окно
     await openResponseWindow(botId, partnerId, partnerName, type);
 }
+
+// ============= LOGGER SEARCH =============
+
+let loggerSearchState = {
+    query: '',
+    matches: [],         // Массив найденных log-entry элементов
+    currentIndex: -1,    // Текущий выделенный результат
+    originalHtml: {}     // Оригинальный HTML до подсветки
+};
+
+// Открыть/закрыть поиск
+function toggleLoggerSearch() {
+    const searchBox = document.getElementById('logger-search-box');
+    const loggerColumn = document.getElementById('logger-column');
+
+    // Если логгер скрыт - сначала открываем его
+    if (!loggerColumn.classList.contains('show')) {
+        toggleLogger();
+    }
+
+    if (searchBox.style.display === 'none') {
+        searchBox.style.display = 'flex';
+        document.getElementById('logger-search-input').focus();
+    } else {
+        closeLoggerSearch();
+    }
+}
+
+// Закрыть поиск
+function closeLoggerSearch() {
+    const searchBox = document.getElementById('logger-search-box');
+    searchBox.style.display = 'none';
+    document.getElementById('logger-search-input').value = '';
+    document.getElementById('logger-search-count').textContent = '';
+
+    // Убираем все подсветки и показываем все записи
+    clearSearchHighlights();
+    loggerSearchState = { query: '', matches: [], currentIndex: -1, originalHtml: {} };
+}
+
+// Очистка подсветки
+function clearSearchHighlights() {
+    const container = document.getElementById('logger-content');
+    const entries = container.querySelectorAll('.log-entry');
+
+    entries.forEach(entry => {
+        // Убираем класс скрытия
+        entry.classList.remove('search-hidden');
+
+        // Восстанавливаем оригинальный HTML если был сохранён
+        const logId = entry.dataset.logId;
+        if (loggerSearchState.originalHtml[logId]) {
+            entry.innerHTML = loggerSearchState.originalHtml[logId];
+        }
+    });
+}
+
+// Поиск в логах
+function searchLoggerEntries(query) {
+    const container = document.getElementById('logger-content');
+    const entries = container.querySelectorAll('.log-entry');
+    const countEl = document.getElementById('logger-search-count');
+
+    // Очищаем предыдущий поиск
+    clearSearchHighlights();
+    loggerSearchState.query = query;
+    loggerSearchState.matches = [];
+    loggerSearchState.currentIndex = -1;
+
+    if (!query || query.length < 2) {
+        countEl.textContent = '';
+        return;
+    }
+
+    const lowerQuery = query.toLowerCase();
+    let matchCount = 0;
+
+    entries.forEach(entry => {
+        const text = entry.textContent.toLowerCase();
+        const logId = entry.dataset.logId;
+
+        if (text.includes(lowerQuery)) {
+            // Сохраняем оригинальный HTML
+            if (!loggerSearchState.originalHtml[logId]) {
+                loggerSearchState.originalHtml[logId] = entry.innerHTML;
+            }
+
+            // Подсвечиваем найденные совпадения
+            highlightMatches(entry, query);
+
+            loggerSearchState.matches.push(entry);
+            matchCount++;
+        } else {
+            // Скрываем не найденные
+            entry.classList.add('search-hidden');
+        }
+    });
+
+    // Обновляем счётчик
+    if (matchCount > 0) {
+        countEl.textContent = `${matchCount} найдено`;
+        // Переходим к первому результату
+        navigateLoggerSearch(1);
+    } else {
+        countEl.textContent = 'Не найдено';
+    }
+}
+
+// Подсветка совпадений в элементе
+function highlightMatches(entry, query) {
+    const walker = document.createTreeWalker(entry, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+
+    while (walker.nextNode()) {
+        textNodes.push(walker.currentNode);
+    }
+
+    const lowerQuery = query.toLowerCase();
+
+    textNodes.forEach(node => {
+        const text = node.textContent;
+        const lowerText = text.toLowerCase();
+        const index = lowerText.indexOf(lowerQuery);
+
+        if (index !== -1) {
+            const before = text.substring(0, index);
+            const match = text.substring(index, index + query.length);
+            const after = text.substring(index + query.length);
+
+            const span = document.createElement('span');
+            span.className = 'search-highlight';
+            span.textContent = match;
+
+            const parent = node.parentNode;
+            const fragment = document.createDocumentFragment();
+
+            if (before) fragment.appendChild(document.createTextNode(before));
+            fragment.appendChild(span);
+            if (after) fragment.appendChild(document.createTextNode(after));
+
+            parent.replaceChild(fragment, node);
+        }
+    });
+}
+
+// Навигация по результатам
+function navigateLoggerSearch(direction) {
+    const matches = loggerSearchState.matches;
+    if (matches.length === 0) return;
+
+    // Убираем текущую подсветку
+    if (loggerSearchState.currentIndex >= 0) {
+        const prevEntry = matches[loggerSearchState.currentIndex];
+        if (prevEntry) {
+            const highlights = prevEntry.querySelectorAll('.search-highlight.current');
+            highlights.forEach(h => h.classList.remove('current'));
+        }
+    }
+
+    // Вычисляем новый индекс
+    loggerSearchState.currentIndex += direction;
+    if (loggerSearchState.currentIndex >= matches.length) {
+        loggerSearchState.currentIndex = 0;
+    } else if (loggerSearchState.currentIndex < 0) {
+        loggerSearchState.currentIndex = matches.length - 1;
+    }
+
+    // Подсвечиваем текущий
+    const currentEntry = matches[loggerSearchState.currentIndex];
+    if (currentEntry) {
+        const firstHighlight = currentEntry.querySelector('.search-highlight');
+        if (firstHighlight) {
+            firstHighlight.classList.add('current');
+        }
+
+        // Скроллим к элементу
+        currentEntry.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // Обновляем счётчик
+    const countEl = document.getElementById('logger-search-count');
+    countEl.textContent = `${loggerSearchState.currentIndex + 1} / ${matches.length}`;
+}
