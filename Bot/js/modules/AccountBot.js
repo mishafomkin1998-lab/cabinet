@@ -1613,8 +1613,8 @@ class AccountBot {
                 }
 
                 // ============ ONLINE SMART: Проверка глобального лимита ============
-                // Если ошибка "hourly incoming message limit" - обрабатываем глобально
-                if (user && user.AccountId && errorReason.includes(LIMIT_ERROR_TEXT)) {
+                // Если ошибка "hourly incoming message limit" - обрабатываем глобально (ТОЛЬКО для online-smart!)
+                if (this.mailSettings.target === 'online-smart' && user && user.AccountId && errorReason.includes(LIMIT_ERROR_TEXT)) {
                     handleGlobalLimit(user.AccountId, user.Name, this.id);
                 }
 
