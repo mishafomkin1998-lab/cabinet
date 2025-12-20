@@ -545,13 +545,12 @@ ipcMain.handle('read-photo-file', async (event, { filePath }) => {
 });
 
 // Загрузка фото через внутренний API (multipart/form-data)
-ipcMain.handle('upload-photo-internal', async (event, { filePath, hash, uid, cookies, botId }) => {
+ipcMain.handle('upload-photo-internal', async (event, { filePath, hash, uid, botId }) => {
     console.log('[Photo Upload MAIN] === Начало обработки ===');
     console.log('[Photo Upload MAIN] filePath:', filePath);
     console.log('[Photo Upload MAIN] hash:', hash);
     console.log('[Photo Upload MAIN] uid:', uid);
     console.log('[Photo Upload MAIN] botId:', botId);
-    console.log('[Photo Upload MAIN] cookies length:', cookies ? cookies.length : 0);
 
     try {
         if (!filePath || !fs.existsSync(filePath)) {
@@ -560,8 +559,13 @@ ipcMain.handle('upload-photo-internal', async (event, { filePath, hash, uid, coo
         }
         console.log('[Photo Upload MAIN] Файл существует');
 
+        // Получаем cookies из сессии бота (включая HttpOnly)
+        const ses = session.fromPartition(`persist:${botId}`);
+        const allCookies = await ses.cookies.get({ url: 'https://ladadate.com' });
+        const cookieString = allCookies.map(c => `${c.name}=${c.value}`).join('; ');
+        console.log('[Photo Upload MAIN] Cookies из сессии:', allCookies.length, 'шт');
+
         const FormData = require('form-data');
-        console.log('[Photo Upload MAIN] FormData loaded');
         const fileBuffer = fs.readFileSync(filePath);
         const fileName = path.basename(filePath);
 
@@ -586,7 +590,7 @@ ipcMain.handle('upload-photo-internal', async (event, { filePath, hash, uid, coo
             url: `https://ladadate.com/message-attachment-upload?uid=${uid}`,
             headers: {
                 ...formData.getHeaders(),
-                'Cookie': cookies,
+                'Cookie': cookieString,
                 'Origin': 'https://ladadate.com',
                 'Referer': 'https://ladadate.com/'
             },
@@ -615,8 +619,14 @@ ipcMain.handle('upload-photo-internal', async (event, { filePath, hash, uid, coo
 });
 
 // Отправка письма через внутренний API
-ipcMain.handle('send-message-internal', async (event, { uid, body, cookies, botId }) => {
+ipcMain.handle('send-message-internal', async (event, { uid, body, botId }) => {
     try {
+        // Получаем cookies из сессии бота (включая HttpOnly)
+        const ses = session.fromPartition(`persist:${botId}`);
+        const allCookies = await ses.cookies.get({ url: 'https://ladadate.com' });
+        const cookieString = allCookies.map(c => `${c.name}=${c.value}`).join('; ');
+        console.log('[Message Send MAIN] Cookies из сессии:', allCookies.length, 'шт');
+
         // Получаем прокси для бота
         let proxyAgent = null;
         if (botId && botProxies[botId]) {
@@ -630,7 +640,7 @@ ipcMain.handle('send-message-internal', async (event, { uid, body, cookies, botI
             url: 'https://ladadate.com/message-send',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-                'Cookie': cookies,
+                'Cookie': cookieString,
                 'Origin': 'https://ladadate.com',
                 'Referer': 'https://ladadate.com/',
                 'X-Requested-With': 'XMLHttpRequest'
@@ -644,11 +654,11 @@ ipcMain.handle('send-message-internal', async (event, { uid, body, cookies, botI
         }
 
         const response = await axios(axiosConfig);
-        console.log('[Message Send Internal] Response:', response.data);
+        console.log('[Message Send MAIN] Response:', response.data);
 
         return { success: true, data: response.data };
     } catch (err) {
-        console.error('[Message Send Internal] Ошибка:', err.message);
+        console.error('[Message Send MAIN] Ошибка:', err.message);
         return { success: false, error: err.message };
     }
 });

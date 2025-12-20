@@ -1279,21 +1279,6 @@ class AccountBot {
                 const uid = Array.from(crypto.getRandomValues(new Uint8Array(16)))
                     .map(b => b.toString(16).padStart(2, '0')).join('');
 
-                // Получаем cookies из webview
-                let cookies = '';
-                try {
-                    if (this.webview && this.webview.getWebContentsId) {
-                        const webContentsId = this.webview.getWebContentsId();
-                        cookies = await new Promise((resolve) => {
-                            this.webview.executeJavaScript('document.cookie')
-                                .then(c => resolve(c))
-                                .catch(() => resolve(''));
-                        });
-                    }
-                } catch (e) {
-                    console.warn('[Photo] Не удалось получить cookies:', e.message);
-                }
-
                 // Вычисляем MD5 хеш фото
                 const fileResult = await ipcRenderer.invoke('read-photo-file', { filePath: this.photoPath });
                 if (!fileResult.success) {
@@ -1309,9 +1294,8 @@ class AccountBot {
 
                 console.log(`[Photo Internal API] uid=${uid}, hash=${photoHash}, file=${fileResult.fileName}`);
 
-                // Загружаем фото через внутренний API
+                // Загружаем фото через внутренний API (cookies получаются в main process из сессии)
                 console.log(`[Photo Internal API] Вызываем upload-photo-internal...`);
-                console.log(`[Photo Internal API] photoPath=${this.photoPath}, botId=${this.id}`);
 
                 let uploadResult;
                 try {
@@ -1319,7 +1303,6 @@ class AccountBot {
                         filePath: this.photoPath,
                         hash: photoHash,
                         uid: uid,
-                        cookies: cookies,
                         botId: this.id
                     });
                     console.log(`[Photo Internal API] upload-photo-internal вернул:`, uploadResult);
@@ -1337,7 +1320,6 @@ class AccountBot {
                 const sendResult = await ipcRenderer.invoke('send-message-internal', {
                     uid: uid,
                     body: msgBody,
-                    cookies: cookies,
                     botId: this.id
                 });
 
