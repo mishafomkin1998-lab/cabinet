@@ -293,7 +293,7 @@ function initHotkeys() {
         else if(e.key === 'F5') { e.preventDefault(); if(activeTabId && bots[activeTabId]) bots[activeTabId].doActivity(); }
     }, true); // capture phase для перехвата до браузера
 
-    // Обработка клавиш в поле поиска логгера
+    // Обработка клавиш в поле поиска логгера (правая колонка)
     document.addEventListener('keydown', function(e) {
         const searchInput = document.getElementById('logger-search-input');
         if (document.activeElement !== searchInput) return;
@@ -307,6 +307,23 @@ function initHotkeys() {
         else if (e.key === 'Escape') {
             e.preventDefault();
             closeLoggerSearch();
+        }
+    });
+
+    // Обработка клавиш в поле поиска лог-модала (Лог действий)
+    document.addEventListener('keydown', function(e) {
+        const searchInput = document.getElementById('log-modal-search-input');
+        if (document.activeElement !== searchInput) return;
+
+        // Enter - следующий результат
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            navigateLogModalSearch(e.shiftKey ? -1 : 1);
+        }
+        // Escape - очистить поиск
+        else if (e.key === 'Escape') {
+            e.preventDefault();
+            clearLogModalSearch();
         }
     });
 }

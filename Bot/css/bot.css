@@ -2679,6 +2679,81 @@
             -webkit-user-select: text;
         }
 
+        /* Log Modal Search Box */
+        .log-modal-search-box {
+            display: flex;
+            align-items: center;
+            padding: 8px 15px;
+            background: #f0f0f0;
+            border-bottom: 1px solid #ddd;
+            gap: 10px;
+        }
+        .log-modal-search-box > i {
+            color: #888;
+            font-size: 12px;
+        }
+        .log-modal-search-box input {
+            flex: 1;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 5px 10px;
+            font-size: 13px;
+            outline: none;
+        }
+        .log-modal-search-box input:focus {
+            border-color: var(--mode-color);
+            box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
+        }
+        #log-modal-search-count {
+            font-size: 12px;
+            color: #666;
+            white-space: nowrap;
+            min-width: 60px;
+        }
+        .log-modal-search-nav {
+            display: flex;
+            gap: 3px;
+        }
+        .log-modal-search-nav button {
+            background: #e0e0e0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 4px 8px;
+            cursor: pointer;
+            font-size: 11px;
+            color: #555;
+        }
+        .log-modal-search-nav button:hover {
+            background: #d0d0d0;
+        }
+        .log-modal-search-clear {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #999;
+            font-size: 14px;
+            padding: 2px 6px;
+        }
+        .log-modal-search-clear:hover {
+            color: #dc3545;
+        }
+
+        /* Log Modal Search Highlight */
+        .log-modal-content .search-highlight {
+            background: #fff3cd;
+            padding: 1px 2px;
+            border-radius: 2px;
+        }
+        .log-modal-content .search-highlight.current {
+            background: #ffc107;
+            outline: 2px solid #fd7e14;
+        }
+
+        /* Hide non-matching entries in log modal */
+        .log-entry-modal.search-hidden {
+            display: none !important;
+        }
+
         .log-modal .modal-footer {
             padding: 12px 20px;
             border-top: 1px solid #eee;
@@ -2742,6 +2817,52 @@
 
         body.theme-dark .log-entry-modal {
             border-bottom-color: #252525;
+        }
+
+        /* Log Modal Search - Dark theme */
+        body.theme-dark .log-modal-search-box {
+            background: #1a1a1a;
+            border-bottom-color: #333;
+        }
+        body.theme-dark .log-modal-search-box > i {
+            color: #666;
+        }
+        body.theme-dark .log-modal-search-box input {
+            background: #0d0d0d;
+            border-color: #444;
+            color: #f0f0f0;
+        }
+        body.theme-dark .log-modal-search-box input:focus {
+            border-color: #00ff88;
+            box-shadow: 0 0 0 2px rgba(0, 255, 136, 0.15);
+        }
+        body.theme-dark .log-modal-search-box input::placeholder {
+            color: #666;
+        }
+        body.theme-dark #log-modal-search-count {
+            color: #aaa;
+        }
+        body.theme-dark .log-modal-search-nav button {
+            background: #2a2a2a;
+            border-color: #444;
+            color: #ccc;
+        }
+        body.theme-dark .log-modal-search-nav button:hover {
+            background: #3a3a3a;
+        }
+        body.theme-dark .log-modal-search-clear {
+            color: #888;
+        }
+        body.theme-dark .log-modal-search-clear:hover {
+            color: #ff5555;
+        }
+        body.theme-dark .log-modal-content .search-highlight {
+            background: #3d3d00;
+            color: #ffc107;
+        }
+        body.theme-dark .log-modal-content .search-highlight.current {
+            background: #554400;
+            outline-color: #ff9800;
         }
 
         /* LadaDate theme for log modal */

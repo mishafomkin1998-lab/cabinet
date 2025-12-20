@@ -601,6 +601,16 @@
                 <h5><i class="fa fa-list-alt"></i> Лог действий - Анкета <span id="log-modal-bot-id">...</span></h5>
                 <button class="btn btn-sm btn-outline-secondary" onclick="closeLogModal()"><i class="fa fa-times"></i></button>
             </div>
+            <div id="log-modal-search-box" class="log-modal-search-box">
+                <i class="fa fa-search"></i>
+                <input type="text" id="log-modal-search-input" placeholder="Поиск..." oninput="searchLogModalEntries(this.value)">
+                <span id="log-modal-search-count"></span>
+                <div class="log-modal-search-nav">
+                    <button onclick="navigateLogModalSearch(-1)" title="Предыдущее (↑)"><i class="fa fa-chevron-up"></i></button>
+                    <button onclick="navigateLogModalSearch(1)" title="Следующее (↓)"><i class="fa fa-chevron-down"></i></button>
+                </div>
+                <button class="log-modal-search-clear" onclick="clearLogModalSearch()" title="Очистить"><i class="fa fa-times"></i></button>
+            </div>
             <div class="modal-body">
                 <div id="log-modal-content" class="log-modal-content">Лог пуст...</div>
             </div>

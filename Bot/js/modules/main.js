@@ -2530,6 +2530,9 @@ function openLogModal(botId) {
         logContent.innerHTML = 'Лог пуст...';
     }
 
+    // Очищаем предыдущий поиск
+    clearLogModalSearch();
+
     // Показываем модальное окно
     document.getElementById('log-modal').classList.add('show');
 
@@ -2590,5 +2593,183 @@ function clearCurrentLogs() {
     // Обновляем содержимое модального окна
     document.getElementById('log-modal-content').innerHTML = 'Лог очищен';
 
+    // Очищаем поиск
+    clearLogModalSearch();
+
     showToast('Лог очищен', 'success');
+}
+
+// ============= LOG MODAL SEARCH =============
+
+let logModalSearchState = {
+    query: '',
+    matches: [],         // Массив найденных log-entry-modal элементов
+    currentIndex: -1,    // Текущий выделенный результат
+    originalHtml: {}     // Оригинальный HTML до подсветки
+};
+
+/**
+ * Поиск в логе модального окна
+ */
+function searchLogModalEntries(query) {
+    const container = document.getElementById('log-modal-content');
+    const entries = container.querySelectorAll('.log-entry-modal');
+    const countEl = document.getElementById('log-modal-search-count');
+
+    // Очищаем предыдущий поиск
+    clearLogModalHighlights();
+    logModalSearchState.query = query;
+    logModalSearchState.matches = [];
+    logModalSearchState.currentIndex = -1;
+
+    if (!query || query.length < 2) {
+        countEl.textContent = '';
+        return;
+    }
+
+    const lowerQuery = query.toLowerCase();
+    let matchCount = 0;
+
+    entries.forEach((entry, idx) => {
+        const text = entry.textContent.toLowerCase();
+
+        if (text.includes(lowerQuery)) {
+            // Сохраняем оригинальный HTML
+            if (!logModalSearchState.originalHtml[idx]) {
+                logModalSearchState.originalHtml[idx] = entry.innerHTML;
+            }
+
+            // Подсвечиваем найденные совпадения
+            highlightLogModalMatches(entry, query);
+
+            entry.classList.remove('search-hidden');
+            logModalSearchState.matches.push({ element: entry, index: idx });
+            matchCount++;
+        } else {
+            // Скрываем не найденные
+            entry.classList.add('search-hidden');
+        }
+    });
+
+    // Обновляем счётчик
+    if (matchCount > 0) {
+        countEl.textContent = `${matchCount} найдено`;
+        // Переходим к первому результату
+        navigateLogModalSearch(1);
+    } else {
+        countEl.textContent = 'Не найдено';
+    }
+}
+
+/**
+ * Подсветка совпадений в элементе
+ */
+function highlightLogModalMatches(entry, query) {
+    const walker = document.createTreeWalker(entry, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+
+    while (walker.nextNode()) {
+        textNodes.push(walker.currentNode);
+    }
+
+    const lowerQuery = query.toLowerCase();
+
+    textNodes.forEach(node => {
+        const text = node.textContent;
+        const lowerText = text.toLowerCase();
+        let index = lowerText.indexOf(lowerQuery);
+
+        if (index !== -1) {
+            const before = text.substring(0, index);
+            const match = text.substring(index, index + query.length);
+            const after = text.substring(index + query.length);
+
+            const span = document.createElement('span');
+            span.className = 'search-highlight';
+            span.textContent = match;
+
+            const parent = node.parentNode;
+            const fragment = document.createDocumentFragment();
+
+            if (before) fragment.appendChild(document.createTextNode(before));
+            fragment.appendChild(span);
+            if (after) fragment.appendChild(document.createTextNode(after));
+
+            parent.replaceChild(fragment, node);
+        }
+    });
+}
+
+/**
+ * Навигация по результатам поиска
+ */
+function navigateLogModalSearch(direction) {
+    const matches = logModalSearchState.matches;
+    if (matches.length === 0) return;
+
+    // Убираем текущую подсветку
+    if (logModalSearchState.currentIndex >= 0 && matches[logModalSearchState.currentIndex]) {
+        const prevEntry = matches[logModalSearchState.currentIndex].element;
+        if (prevEntry) {
+            const highlights = prevEntry.querySelectorAll('.search-highlight.current');
+            highlights.forEach(h => h.classList.remove('current'));
+        }
+    }
+
+    // Вычисляем новый индекс
+    logModalSearchState.currentIndex += direction;
+    if (logModalSearchState.currentIndex >= matches.length) {
+        logModalSearchState.currentIndex = 0;
+    } else if (logModalSearchState.currentIndex < 0) {
+        logModalSearchState.currentIndex = matches.length - 1;
+    }
+
+    // Подсвечиваем текущий
+    const currentMatch = matches[logModalSearchState.currentIndex];
+    if (currentMatch && currentMatch.element) {
+        const firstHighlight = currentMatch.element.querySelector('.search-highlight');
+        if (firstHighlight) {
+            firstHighlight.classList.add('current');
+        }
+
+        // Скроллим к элементу
+        currentMatch.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // Обновляем счётчик
+    const countEl = document.getElementById('log-modal-search-count');
+    countEl.textContent = `${logModalSearchState.currentIndex + 1} / ${matches.length}`;
+}
+
+/**
+ * Очистка подсветки поиска
+ */
+function clearLogModalHighlights() {
+    const container = document.getElementById('log-modal-content');
+    const entries = container.querySelectorAll('.log-entry-modal');
+
+    entries.forEach((entry, idx) => {
+        // Убираем класс скрытия
+        entry.classList.remove('search-hidden');
+
+        // Восстанавливаем оригинальный HTML если был сохранён
+        if (logModalSearchState.originalHtml[idx]) {
+            entry.innerHTML = logModalSearchState.originalHtml[idx];
+        }
+    });
+}
+
+/**
+ * Очистить поиск в модальном окне лога
+ */
+function clearLogModalSearch() {
+    const searchInput = document.getElementById('log-modal-search-input');
+    const countEl = document.getElementById('log-modal-search-count');
+
+    if (searchInput) searchInput.value = '';
+    if (countEl) countEl.textContent = '';
+
+    // Убираем все подсветки и показываем все записи
+    clearLogModalHighlights();
+    logModalSearchState = { query: '', matches: [], currentIndex: -1, originalHtml: {} };
 }
