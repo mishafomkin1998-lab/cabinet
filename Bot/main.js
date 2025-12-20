@@ -536,6 +536,99 @@ ipcMain.handle('read-photo-file', async (event, { filePath }) => {
     }
 });
 
+// Загрузка фото через внутренний API (multipart/form-data)
+ipcMain.handle('upload-photo-internal', async (event, { filePath, hash, uid, cookies, botId }) => {
+    try {
+        if (!filePath || !fs.existsSync(filePath)) {
+            return { success: false, error: 'Файл не найден' };
+        }
+
+        const FormData = require('form-data');
+        const fileBuffer = fs.readFileSync(filePath);
+        const fileName = path.basename(filePath);
+
+        // Создаём FormData
+        const formData = new FormData();
+        formData.append('hash', hash);
+        formData.append('uploadfile', fileBuffer, {
+            filename: fileName,
+            contentType: 'image/jpeg'
+        });
+
+        // Получаем прокси для бота
+        let proxyAgent = null;
+        if (botId && botProxies[botId]) {
+            const proxyUrl = botProxies[botId];
+            const { HttpsProxyAgent } = require('https-proxy-agent');
+            proxyAgent = new HttpsProxyAgent(proxyUrl);
+        }
+
+        const axiosConfig = {
+            method: 'POST',
+            url: `https://ladadate.com/message-attachment-upload?uid=${uid}`,
+            headers: {
+                ...formData.getHeaders(),
+                'Cookie': cookies,
+                'Origin': 'https://ladadate.com',
+                'Referer': 'https://ladadate.com/'
+            },
+            data: formData,
+            timeout: 60000
+        };
+
+        if (proxyAgent) {
+            axiosConfig.httpsAgent = proxyAgent;
+        }
+
+        const response = await axios(axiosConfig);
+        console.log('[Photo Upload] Response:', response.data);
+
+        return { success: true, data: response.data };
+    } catch (err) {
+        console.error('[Photo Upload] Ошибка:', err.message);
+        return { success: false, error: err.message };
+    }
+});
+
+// Отправка письма через внутренний API
+ipcMain.handle('send-message-internal', async (event, { uid, body, cookies, botId }) => {
+    try {
+        // Получаем прокси для бота
+        let proxyAgent = null;
+        if (botId && botProxies[botId]) {
+            const proxyUrl = botProxies[botId];
+            const { HttpsProxyAgent } = require('https-proxy-agent');
+            proxyAgent = new HttpsProxyAgent(proxyUrl);
+        }
+
+        const axiosConfig = {
+            method: 'POST',
+            url: 'https://ladadate.com/message-send',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Cookie': cookies,
+                'Origin': 'https://ladadate.com',
+                'Referer': 'https://ladadate.com/',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            data: `uid=${encodeURIComponent(uid)}&body=${encodeURIComponent(body)}`,
+            timeout: 30000
+        };
+
+        if (proxyAgent) {
+            axiosConfig.httpsAgent = proxyAgent;
+        }
+
+        const response = await axios(axiosConfig);
+        console.log('[Message Send Internal] Response:', response.data);
+
+        return { success: true, data: response.data };
+    } catch (err) {
+        console.error('[Message Send Internal] Ошибка:', err.message);
+        return { success: false, error: err.message };
+    }
+});
+
 // =====================================================
 
 // === КРИТИЧЕСКИ ВАЖНО: Флаги для поддержания ОНЛАЙНА ===

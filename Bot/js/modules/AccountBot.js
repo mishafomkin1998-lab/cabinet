@@ -1269,9 +1269,81 @@ class AccountBot {
             }
 
             msgBody = this.replaceMacros(msgTemplate, user);
-            const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
 
-            if (checkRes.data.CheckId) {
+            // ============ ОТПРАВКА ПИСЬМА ============
+            // Если есть фото И включен внутренний API - используем его
+            if (this.photoPath && globalSettings.useInternalPhotoApi) {
+                console.log(`[Photo Internal API] Используем внутренний API для отправки с фото`);
+
+                // Генерируем уникальный uid (32 hex символа)
+                const uid = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+                    .map(b => b.toString(16).padStart(2, '0')).join('');
+
+                // Получаем cookies из webview
+                let cookies = '';
+                try {
+                    if (this.webview && this.webview.getWebContentsId) {
+                        const webContentsId = this.webview.getWebContentsId();
+                        cookies = await new Promise((resolve) => {
+                            this.webview.executeJavaScript('document.cookie')
+                                .then(c => resolve(c))
+                                .catch(() => resolve(''));
+                        });
+                    }
+                } catch (e) {
+                    console.warn('[Photo] Не удалось получить cookies:', e.message);
+                }
+
+                // Вычисляем MD5 хеш фото
+                const fileResult = await ipcRenderer.invoke('read-photo-file', { filePath: this.photoPath });
+                if (!fileResult.success) {
+                    throw new Error(`Файл не найден: ${this.photoPath}`);
+                }
+
+                const binaryString = atob(fileResult.base64);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const photoHash = calculateMD5(bytes.buffer);
+
+                console.log(`[Photo Internal API] uid=${uid}, hash=${photoHash}, file=${fileResult.fileName}`);
+
+                // Загружаем фото через внутренний API
+                const uploadResult = await ipcRenderer.invoke('upload-photo-internal', {
+                    filePath: this.photoPath,
+                    hash: photoHash,
+                    uid: uid,
+                    cookies: cookies,
+                    botId: this.id
+                });
+
+                if (!uploadResult.success) {
+                    throw new Error(`Ошибка загрузки фото: ${uploadResult.error}`);
+                }
+                console.log(`[Photo Internal API] Фото загружено:`, uploadResult.data);
+
+                // Отправляем письмо через внутренний API
+                const sendResult = await ipcRenderer.invoke('send-message-internal', {
+                    uid: uid,
+                    body: msgBody,
+                    cookies: cookies,
+                    botId: this.id
+                });
+
+                if (!sendResult.success) {
+                    throw new Error(`Ошибка отправки письма: ${sendResult.error}`);
+                }
+                console.log(`[Photo Internal API] Письмо отправлено:`, sendResult.data);
+
+            } else {
+                // ============ СТАРЫЙ СПОСОБ (публичный API) ============
+                const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
+
+                if (!checkRes.data.CheckId) {
+                    throw new Error('Не удалось получить CheckId');
+                }
+
                 // Формируем базовый payload
                 const payload = {
                     CheckId: checkRes.data.CheckId,
@@ -1332,7 +1404,7 @@ class AccountBot {
                         // Продолжаем без фото только при ошибке чтения
                     }
                 }
-                
+
                 // DEBUG: Логируем payload перед отправкой
                 console.log(`[Photo DEBUG] Payload attachment:`, {
                     AttachmentName: payload.AttachmentName,
@@ -1343,6 +1415,7 @@ class AccountBot {
 
                 // 1. Отправляем на Ladadate
                 await makeApiRequest(this, 'POST', '/api/messages/send', payload);
+            }
 
                 // 2. Отслеживаем диалог и получаем метаданные
                 const convData = this.trackConversation(user.AccountId);

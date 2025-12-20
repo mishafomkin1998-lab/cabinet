@@ -76,7 +76,9 @@ let defaultSettings = {
         myPromptChat: null,
         replyPrompt: null,
         chatPrompt: null
-    }
+    },
+    // Использовать внутренний API сайта для отправки фото (true = новый способ, false = старый)
+    useInternalPhotoApi: true
 };
 
 // Шаблоны промптов (загружаются с сервера)
