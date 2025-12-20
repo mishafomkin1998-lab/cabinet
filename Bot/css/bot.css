@@ -1447,14 +1447,14 @@
         
         .action-log { font-size: 11px; color: #555; flex: 1; min-height: 80px; max-height: 310px; overflow-y: auto; background: #fafafa; border: 1px solid #eee; padding: 5px; font-family: monospace; border-radius: 4px; }
         
-        .stat-line { font-size: 13px; margin-top: 6px; display: flex; justify-content: space-between; border-bottom: 1px dashed #eee; padding-bottom: 2px; }
-        .stat-val { cursor: pointer; text-decoration: none; font-weight: 600; min-width: 30px; text-align: right; display: inline-block; }
+        .stat-line { font-size: 13px; margin-top: 6px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #eee; padding-bottom: 2px; }
+        .stat-val { cursor: pointer; text-decoration: none; font-weight: 600; min-width: 40px; text-align: right; display: inline-block; order: 2; }
         .stat-waiting-row { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
         .stat-waiting-text { font-size: 11px; color: #999; text-align: right; }
         .stat-ignored-text { font-size: 11px; color: #999; cursor: pointer; }
         .stat-ignored-text:hover { color: #666; text-decoration: underline; }
-        .stat-hotqueue { font-size: 11px; color: #ff6b35; margin-left: 5px; font-weight: 500; }
-        .stat-val-wrapper { display: inline-flex; align-items: center; min-width: 50px; justify-content: flex-end; }
+        .stat-hotqueue { font-size: 11px; color: #ff6b35; font-weight: 500; order: 1; margin-right: 5px; }
+        .stat-val-wrapper { display: inline-flex; align-items: center; justify-content: flex-end; }
 
         /* Стили для разделителя в select */
         select option:disabled {
