@@ -104,7 +104,7 @@ function createInterface(bot) {
                 <option value="online-smart">Online Smart</option>
                 <option value="shared-online">Online Shared</option>
                 <option value="online">Online</option>
-                <option disabled>───────────</option>
+                <option disabled>─ ─ ─ ─ ─ ─</option>
                 <option value="favorites">I am a favorite of</option>
                 <option value="my-favorites">My favorite</option>
                 <option value="inbox">Inbox</option>
@@ -150,7 +150,7 @@ function createInterface(bot) {
             
             <div class="border-top pt-2">
                 <div class="stat-line text-success"><span>Отправлено:</span> <span class="stat-val-wrapper"><b id="stat-sent-${bot.id}" class="stat-val" onclick="openStatsModal('${bot.id}', 'sent')">0</b><span id="stat-hotqueue-${bot.id}" class="stat-hotqueue" title="Отправлено из горячей очереди"></span></span></div>
-                <div class="stat-line text-danger"><span>Ошибки:</span> <b id="stat-err-${bot.id}" class="stat-val" onclick="openStatsModal('${bot.id}', 'errors')">0</b></div>
+                <div class="stat-line text-danger"><span>Ошибки:</span> <span class="stat-val-wrapper"><b id="stat-err-${bot.id}" class="stat-val" onclick="openStatsModal('${bot.id}', 'errors')">0</b></span></div>
                 <div class="stat-waiting-row">
                     <span id="stat-ignored-${bot.id}" class="stat-ignored-text" onclick="openIgnoredModal('${bot.id}')" title="Пользователи в игноре (клик для управления)">Игнор: 0</span>
                     <span id="stat-wait-${bot.id}" class="stat-waiting-text">Ожидают: 0</span>
