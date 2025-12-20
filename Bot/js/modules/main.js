@@ -236,8 +236,15 @@ function updateInterfaceForMode(botId) {
         toggleCustomIdsField(botId);
 
         document.getElementById(`auto-check-${botId}`).checked = bot.mailSettings.auto;
+        document.getElementById(`check-photo-${botId}`).checked = bot.mailSettings.photoOnly || false;
     }
-    
+
+    // Обновляем селектор скорости в зависимости от режима
+    const speedSelect = document.getElementById(`speed-select-${botId}`);
+    if (speedSelect) {
+        speedSelect.value = isChat ? bot.chatSettings.speed : bot.mailSettings.speed;
+    }
+
     let lastIdx = isChat ? bot.lastTplChat : bot.lastTplMail;
     if (lastIdx === null || lastIdx === undefined || lastIdx === "") {
         if(accountPreferences[bot.login]) {
@@ -1687,8 +1694,12 @@ async function saveSession() {
                 chatCyclic: b.chatSettings.cyclic,
                 chatCurrentIndex: b.chatSettings.currentInviteIndex,
                 chatStartTime: b.chatSettings.rotationStartTime,
+                chatTarget: b.chatSettings.target,
+                chatSpeed: b.chatSettings.speed,
                 mailAuto: b.mailSettings.auto,
                 mailTarget: b.mailSettings.target,
+                mailSpeed: b.mailSettings.speed,
+                mailPhotoOnly: b.mailSettings.photoOnly,
                 vipList: b.vipList,
                 customIdsList: b.customIdsList || [],
                 customIdsSent: b.customIdsSent || [],
@@ -1749,8 +1760,12 @@ async function restoreSession() {
                 if (a.chatCyclic !== undefined) bot.chatSettings.cyclic = a.chatCyclic;
                 if (a.chatCurrentIndex) bot.chatSettings.currentInviteIndex = a.chatCurrentIndex;
                 if (a.chatStartTime) bot.chatSettings.rotationStartTime = a.chatStartTime;
+                if (a.chatTarget) bot.chatSettings.target = a.chatTarget;
+                if (a.chatSpeed) bot.chatSettings.speed = a.chatSpeed;
                 if (a.mailAuto !== undefined) bot.mailSettings.auto = a.mailAuto;
                 if (a.mailTarget) bot.mailSettings.target = a.mailTarget;
+                if (a.mailSpeed) bot.mailSettings.speed = a.mailSpeed;
+                if (a.mailPhotoOnly !== undefined) bot.mailSettings.photoOnly = a.mailPhotoOnly;
                 if (a.vipList) bot.vipList = a.vipList;
                 if (a.customIdsList) bot.customIdsList = a.customIdsList;
                 if (a.customIdsSent) bot.customIdsSent = a.customIdsSent;
