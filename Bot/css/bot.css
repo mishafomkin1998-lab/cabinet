@@ -1090,6 +1090,7 @@
             max-width: 450px; /* Достаточно места для badge + 5 кнопок */
             opacity: 1;
             pointer-events: auto;
+            overflow: visible; /* Чтобы hover-эффект не обрезался */
         }
 
         .toolbar-right { margin-left: auto; z-index: 2; display: flex; align-items: center; gap: 15px; }

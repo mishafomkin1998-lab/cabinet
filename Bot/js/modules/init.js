@@ -648,6 +648,10 @@ function saveAutoClearSettings() {
     console.log(`[AutoClear] Настройки ${isChat ? 'Chat' : 'Mail'} сохранены:`, { errors: errorSettings, sent: sentSettings });
 }
 
+// Время последней автоочистки (глобальное, раздельно для ошибок и отправленных)
+let lastAutoClearErrorsTime = { mail: 0, chat: 0 };
+let lastAutoClearSentTime = { mail: 0, chat: 0 };
+
 // Проверка условий автоочистки для бота (вызывается в scheduleNextMail/scheduleNextChat)
 function checkAutoClearConditions(bot, mode) {
     const isChat = mode === 'chat';
@@ -656,15 +660,19 @@ function checkAutoClearConditions(bot, mode) {
 
     const stats = isChat ? bot.chatStats : bot.mailStats;
     const startTime = isChat ? bot.chatStartTime : bot.mailStartTime;
+    const lastClearTime = lastAutoClearErrorsTime[mode] || 0;
 
     let shouldClear = false;
 
-    // Условие 1: По времени
+    // Условие 1: По времени (от старта рассылки, но не чаще чем раз в N минут)
     if (settings.byTimeEnabled && startTime) {
-        const elapsedMinutes = (Date.now() - startTime) / 60000;
-        if (elapsedMinutes >= settings.byTimeMinutes) {
+        const elapsedFromStart = (Date.now() - startTime) / 60000;
+        const elapsedFromLastClear = (Date.now() - lastClearTime) / 60000;
+
+        // Срабатывает если: прошло достаточно времени от старта И от последней очистки
+        if (elapsedFromStart >= settings.byTimeMinutes && elapsedFromLastClear >= settings.byTimeMinutes) {
             shouldClear = true;
-            console.log(`[AutoClear] ${bot.displayId} - условие времени (${Math.floor(elapsedMinutes)} мин >= ${settings.byTimeMinutes} мин)`);
+            console.log(`[AutoClear] ${bot.displayId} - условие времени (${Math.floor(elapsedFromStart)} мин от старта)`);
         }
     }
 
@@ -693,13 +701,12 @@ function performAutoClear(mode) {
             bot.updateUI();
         }
 
-        // Сбрасываем время старта для отсчёта следующего интервала
-        if (isChat) {
-            bot.chatStartTime = Date.now();
-        } else {
-            bot.mailStartTime = Date.now();
-        }
+        // НЕ сбрасываем mailStartTime/chatStartTime - это основной таймер!
+        // Он нужен для автоочистки отправленных
     });
+
+    // Запоминаем время последней очистки ошибок
+    lastAutoClearErrorsTime[mode] = Date.now();
 
     if (totalCleared > 0) {
         console.log(`[AutoClear] ${mode}: Очищено ${totalCleared} ошибок по всем анкетам`);
@@ -714,15 +721,19 @@ function checkAutoClearSentConditions(bot, mode) {
 
     const stats = isChat ? bot.chatStats : bot.mailStats;
     const startTime = isChat ? bot.chatStartTime : bot.mailStartTime;
+    const lastClearTime = lastAutoClearSentTime[mode] || 0;
 
     let shouldClear = false;
 
-    // Условие 1: По времени
+    // Условие 1: По времени (от старта рассылки, но не чаще чем раз в N минут)
     if (settings.byTimeEnabled && settings.byTimeMinutes && startTime) {
-        const elapsedMinutes = (Date.now() - startTime) / 60000;
-        if (elapsedMinutes >= settings.byTimeMinutes) {
+        const elapsedFromStart = (Date.now() - startTime) / 60000;
+        const elapsedFromLastClear = (Date.now() - lastClearTime) / 60000;
+
+        // Срабатывает если: прошло достаточно времени от старта И от последней очистки
+        if (elapsedFromStart >= settings.byTimeMinutes && elapsedFromLastClear >= settings.byTimeMinutes) {
             shouldClear = true;
-            console.log(`[AutoClearSent] ${bot.displayId} - условие времени (${Math.floor(elapsedMinutes)} мин >= ${settings.byTimeMinutes} мин)`);
+            console.log(`[AutoClearSent] ${bot.displayId} - условие времени (${Math.floor(elapsedFromStart)} мин от старта)`);
         }
     }
 
@@ -754,13 +765,11 @@ function performAutoClearSent(mode) {
             bot.updateUI();
         }
 
-        // Сбрасываем время старта для отсчёта следующего интервала
-        if (isChat) {
-            bot.chatStartTime = Date.now();
-        } else {
-            bot.mailStartTime = Date.now();
-        }
+        // НЕ сбрасываем mailStartTime/chatStartTime - это основной таймер!
     });
+
+    // Запоминаем время последней очистки отправленных
+    lastAutoClearSentTime[mode] = Date.now();
 
     if (totalCleared > 0) {
         console.log(`[AutoClearSent] ${mode}: Очищено ${totalCleared} отправленных, история сброшена - бот сможет писать тем же людям`);

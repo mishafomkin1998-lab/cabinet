@@ -1366,6 +1366,26 @@ function renderBlacklist(botId) {
 
         listEl.appendChild(d);
     });
+
+    // Делаем список фокусируемым для Ctrl+C
+    listEl.tabIndex = 0;
+
+    // Обработчик Ctrl+C для копирования выбранных ID
+    listEl.onkeydown = (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+            const selected = bot.selectedBlacklistIds || [];
+            if (selected.length > 0) {
+                e.preventDefault();
+                const text = selected.join(', ');
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast(`Скопировано ${selected.length} ID`, 'success');
+                }).catch(err => {
+                    console.error('Ошибка копирования:', err);
+                    showToast('Ошибка копирования', 'error');
+                });
+            }
+        }
+    };
 }
 
 async function removeSelectedBlacklist(botId) {

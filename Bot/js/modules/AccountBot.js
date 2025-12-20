@@ -53,6 +53,7 @@ class AccountBot {
         this.webviewReady = false; // Флаг: WebView загружен и dom-ready сработал
         this.lastChatSessions = [];
         this.lastMailId = 0;
+        this.isFirstMailCheck = true; // Флаг первой проверки почты (для уведомлений при входе)
         this.myBirthday = null;
 
         // === Списки игнорирующих пользователей (сохраняются навсегда, раздельно для Mail и Chat) ===
@@ -870,14 +871,23 @@ class AccountBot {
 
     async checkNewMails() {
         if (!this.token || !this.isMonitoring) return;
+        const isFirstCheck = this.isFirstMailCheck;
+        this.isFirstMailCheck = false; // Сбрасываем флаг
+
         try {
             const res = await makeApiRequest(this, 'GET', '/api/messages');
             const msgs = res.data.Messages || [];
-            
+
             if (msgs.length > 0) {
                 const newestMsg = msgs[0];
-                const newMessages = msgs.filter(m => m.MessageId > this.lastMailId);
-                
+
+                // При первом запуске проверяем ВСЕ непрочитанные, потом только новые
+                const newMessages = isFirstCheck
+                    ? msgs.filter(m => !m.IsReplied) // Первый запуск: все неотвеченные
+                    : msgs.filter(m => m.MessageId > this.lastMailId); // Потом: только новые
+
+                let unrepliedCount = 0; // Счётчик для первого запуска
+
                 newMessages.reverse().forEach(msg => {
                     const partnerId = msg.User.AccountId;
                     const partnerName = msg.User.Name || `ID ${partnerId}`;
@@ -902,7 +912,6 @@ class AccountBot {
                     }
 
                     // Отправляем входящее сообщение на сервер статистики
-                    // Текст берём из msg.Text, msg.Body или msg.Preview если есть
                     const mailText = msg.Text || msg.Body || msg.Preview || null;
                     sendIncomingMessageToLababot({
                         botId: this.id,
@@ -914,21 +923,49 @@ class AccountBot {
                         messageText: mailText
                     });
 
+                    // Уведомление для неотвеченных писем
                     if (!msg.IsReplied) {
-                        // Получаем аватарку мужчины (разные возможные поля)
+                        unrepliedCount++;
                         const avatarUrl = msg.User.Avatar || msg.User.Photo ||
                             (msg.User.Photos && msg.User.Photos[0]) ||
                             `https://ladadate.com/photo/${partnerId}/1.jpg`;
 
-                        Logger.add(
-                            `💌 Входящее письмо от <b>${partnerName}</b> (Ждет ответа)`,
-                            'mail',
-                            this.id,
-                            { partnerId: partnerId, partnerName: partnerName, messageId: msg.MessageId, avatarUrl: avatarUrl }
-                        );
-                        // playSound('message') убран - Logger.add уже воспроизводит звук для type='mail'
+                        // При первом запуске добавляем в Logger БЕЗ звука (звук один раз в конце)
+                        if (isFirstCheck) {
+                            // Добавляем запись напрямую без Logger.add чтобы избежать дедупликации
+                            const logItem = {
+                                id: Date.now() + unrepliedCount,
+                                text: `💌 Входящее письмо от <b>${partnerName}</b> (Ждет ответа)`,
+                                type: 'mail',
+                                botId: this.id,
+                                data: { partnerId, partnerName, messageId: msg.MessageId, avatarUrl },
+                                time: new Date()
+                            };
+                            Logger.logs.unshift(logItem);
+                        } else {
+                            // Обычный режим - через Logger.add
+                            Logger.add(
+                                `💌 Входящее письмо от <b>${partnerName}</b> (Ждет ответа)`,
+                                'mail',
+                                this.id,
+                                { partnerId, partnerName, messageId: msg.MessageId, avatarUrl }
+                            );
+                        }
                     }
                 });
+
+                // При первом запуске: один звук если были непрочитанные
+                if (isFirstCheck && unrepliedCount > 0) {
+                    Logger.render(); // Отрисовываем добавленные записи
+                    playSound('message');
+                    console.log(`[Bot ${this.displayId}] 📬 При входе найдено ${unrepliedCount} неотвеченных писем`);
+
+                    // Мигание кнопки логгера
+                    const col = document.getElementById('logger-column');
+                    if (!col.classList.contains('show')) {
+                        document.getElementById('btn-logger-main').classList.add('blinking');
+                    }
+                }
 
                 if (newestMsg.MessageId > this.lastMailId) {
                     this.lastMailId = newestMsg.MessageId;
