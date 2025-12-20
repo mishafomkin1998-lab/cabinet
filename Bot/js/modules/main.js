@@ -1948,8 +1948,13 @@ async function exportAllData() {
             exportDate: new Date().toISOString()
         };
 
-        // Сохраняем данные ботов (включая пароли и автоответы)
-        Object.values(bots).forEach(bot => {
+        // Получаем порядок вкладок из DOM (как в saveSession)
+        const tabOrder = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
+
+        // Сохраняем данные ботов в порядке вкладок (включая пароли и автоответы)
+        tabOrder.forEach(botId => {
+            const bot = bots[botId];
+            if (!bot) return;
             data.bots.push({
                 id: bot.id,
                 login: bot.login,
