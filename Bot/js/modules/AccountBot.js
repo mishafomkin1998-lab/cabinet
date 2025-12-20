@@ -564,7 +564,7 @@ class AccountBot {
                 modePrefix = globalMode === 'chat' ? '[CHAT]' : '[MAIL]';
             }
         }
-        if(box) box.innerHTML = `<div><span style="opacity:0.6">${new Date().toLocaleTimeString()}</span> <b>${modePrefix}</b> ${text}</div>` + box.innerHTML;
+        if(box) box.innerHTML = `<div class="log-entry"><span style="opacity:0.6">${new Date().toLocaleTimeString()}</span> <b>${modePrefix}</b> ${text}</div>` + box.innerHTML;
     }
 
     startMonitoring() {

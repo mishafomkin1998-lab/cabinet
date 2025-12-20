@@ -970,6 +970,25 @@ ipcMain.handle('open-response-window', async (event, data) => {
         // Проверяем на редирект на логин
         const currentUrl = win.webContents.getURL();
         if (currentUrl.includes('/login') && login && pass) {
+            console.log(`[ResponseWindow] Требуется авто-логин, целевой URL: ${url}`);
+
+            // Ждём навигации после логина и редиректим на оригинальный URL
+            const navigationHandler = (event, navUrl) => {
+                // Если ушли со страницы логина - редиректим на целевой URL
+                if (!navUrl.includes('/login') && !navUrl.includes('/sign-in')) {
+                    console.log(`[ResponseWindow] Авто-логин успешен, редирект на: ${url}`);
+                    // Убираем слушатель чтобы не зациклиться
+                    win.webContents.removeListener('did-navigate', navigationHandler);
+                    // Небольшая задержка для завершения авторизации
+                    setTimeout(() => {
+                        if (!win.isDestroyed()) {
+                            win.loadURL(url);
+                        }
+                    }, 500);
+                }
+            };
+            win.webContents.on('did-navigate', navigationHandler);
+
             // Авто-логин
             await win.webContents.executeJavaScript(`
                 setTimeout(() => {
