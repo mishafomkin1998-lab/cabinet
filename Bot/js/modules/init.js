@@ -224,10 +224,12 @@ function setGlobalTarget(targetType) {
     Object.values(bots).forEach(bot => {
         if(globalMode === 'mail') bot.mailSettings.target = targetType;
         else bot.chatSettings.target = targetType;
-        if(activeTabId === bot.id) {
-            const sel = document.getElementById(`target-select-${bot.id}`);
-            if(sel) sel.value = targetType;
-        }
+
+        const sel = document.getElementById(`target-select-${bot.id}`);
+        if(sel) sel.value = targetType;
+
+        // Обновляем видимость поля Custom IDs
+        toggleCustomIdsField(bot.id);
     });
     saveSession();
     showToast(`Всем установлен: ${targetType.toUpperCase()}`, 'success');
