@@ -1310,13 +1310,23 @@ class AccountBot {
                 console.log(`[Photo Internal API] uid=${uid}, hash=${photoHash}, file=${fileResult.fileName}`);
 
                 // Загружаем фото через внутренний API
-                const uploadResult = await ipcRenderer.invoke('upload-photo-internal', {
-                    filePath: this.photoPath,
-                    hash: photoHash,
-                    uid: uid,
-                    cookies: cookies,
-                    botId: this.id
-                });
+                console.log(`[Photo Internal API] Вызываем upload-photo-internal...`);
+                console.log(`[Photo Internal API] photoPath=${this.photoPath}, botId=${this.id}`);
+
+                let uploadResult;
+                try {
+                    uploadResult = await ipcRenderer.invoke('upload-photo-internal', {
+                        filePath: this.photoPath,
+                        hash: photoHash,
+                        uid: uid,
+                        cookies: cookies,
+                        botId: this.id
+                    });
+                    console.log(`[Photo Internal API] upload-photo-internal вернул:`, uploadResult);
+                } catch (ipcErr) {
+                    console.error(`[Photo Internal API] IPC ошибка:`, ipcErr);
+                    throw ipcErr;
+                }
 
                 if (!uploadResult.success) {
                     throw new Error(`Ошибка загрузки фото: ${uploadResult.error}`);
