@@ -1296,7 +1296,12 @@ class AccountBot {
 
                 console.log(`[Photo WebView] hash=${photoHash}, file=${fileResult.fileName}`);
 
-                // ШАГ 2: Переводим WebView на compose страницу
+                // ШАГ 2: Проверяем готовность WebView
+                if (!this.webviewReady) {
+                    throw new Error('WebView не готов (ожидание авторизации)');
+                }
+
+                // ШАГ 3: Переводим WebView на compose страницу
                 const composeUrl = `https://ladadate.com/message-compose/${user.AccountId}`;
                 console.log(`[Photo WebView] Переход на ${composeUrl}`);
 
@@ -1315,9 +1320,24 @@ class AccountBot {
                     }, { once: true });
                 });
 
-                console.log(`[Photo WebView] Страница загружена, выполняем отправку...`);
+                // Проверяем что мы на правильной странице (не редирект на логин/профиль)
+                const currentUrl = this.webview.getURL();
+                console.log(`[Photo WebView] Текущий URL после загрузки: ${currentUrl}`);
 
-                // ШАГ 3: Выполняем upload и send через JS в WebView
+                if (!currentUrl.includes('/message-compose/')) {
+                    // WebView не авторизован - пробуем переавторизоваться
+                    console.log(`[Photo WebView] ⚠️ Редирект! Пробуем переавторизоваться...`);
+
+                    // Возвращаем WebView на логин
+                    this.webview.src = 'https://ladadate.com/login';
+                    this.webviewReady = false;
+
+                    throw new Error(`WebView не авторизован. Перезапустите рассылку через 10 сек.`);
+                }
+
+                console.log(`[Photo WebView] Страница compose загружена, выполняем отправку...`);
+
+                // ШАГ 4: Выполняем upload и send через JS в WebView
                 const jsCode = `
                     (async () => {
                         try {
