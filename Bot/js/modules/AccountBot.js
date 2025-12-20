@@ -438,10 +438,36 @@ class AccountBot {
             }
         });
 
+        // Отслеживаем навигацию - устанавливаем webviewReady только когда ушли со страницы логина
+        webview.addEventListener('did-navigate', (e) => {
+            const url = e.url;
+            console.log(`[WebView ${this.id}] 🔀 did-navigate: ${url}`);
+
+            // Если ушли со страницы логина - WebView авторизован
+            if (!url.includes('/login') && !url.includes('/sign-in')) {
+                if (!this.webviewReady) {
+                    this.webviewReady = true;
+                    console.log(`[WebView ${this.id}] ✅ WebView АВТОРИЗОВАН (ушли с login)`);
+                }
+            } else {
+                // Вернулись на login - сбрасываем флаг
+                if (this.webviewReady) {
+                    console.log(`[WebView ${this.id}] ⚠️ Сессия истекла (вернулись на login)`);
+                    this.webviewReady = false;
+                }
+            }
+        });
+
+        // Fallback: если за 20 секунд не авторизовались, логируем предупреждение
+        setTimeout(() => {
+            if (!this.webviewReady) {
+                console.warn(`[WebView ${this.id}] ⚠️ WebView не авторизовался за 20 секунд`);
+            }
+        }, 20000);
+
         webview.addEventListener('dom-ready', () => {
-            // ВАЖНО: Устанавливаем флаг готовности WebView
-            this.webviewReady = true;
-            console.log(`[WebView ${this.id}] ✅ dom-ready - WebView готов к использованию`);
+            // НЕ устанавливаем webviewReady здесь - ждём завершения авторизации
+            console.log(`[WebView ${this.id}] 📄 dom-ready (ожидаем авторизацию)`);
 
             // 0. Отключаем звук в WebView (чтобы не дублировался со звуком бота)
             muteWebview();
