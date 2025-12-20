@@ -1383,9 +1383,10 @@ class AccountBot {
                             if (!fileExistsOnServer) {
                                 payload.AttachmentName = fileResult.fileName;
                                 payload.AttachmentHash = photoHash;
-                                // Чистый base64 без prefix (как в документации API)
-                                payload.AttachmentFile = base64Data;
-                                console.log(`[Photo] Загружаем новый файл: ${fileResult.fileName}`);
+                                // Пробуем с Data URI prefix
+                                const mimeType = fileResult.fileName.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+                                payload.AttachmentFile = `data:${mimeType};base64,${base64Data}`;
+                                console.log(`[Photo] Загружаем новый файл: ${fileResult.fileName} (с Data URI prefix)`);
                             }
                         } else {
                             // Файл не найден локально - отправляем без фото
