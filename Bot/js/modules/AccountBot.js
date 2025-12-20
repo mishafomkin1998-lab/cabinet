@@ -1271,15 +1271,27 @@ class AccountBot {
             msgBody = this.replaceMacros(msgTemplate, user);
 
             // ============ ОТПРАВКА ПИСЬМА ============
-            // Если есть фото И включен внутренний API - используем его
-            if (this.photoPath && globalSettings.useInternalPhotoApi) {
+            // Если есть фото — используем внутренний API (через cookies)
+            if (this.photoPath) {
                 console.log(`[Photo Internal API] Используем внутренний API для отправки с фото`);
 
-                // Генерируем уникальный uid (32 hex символа)
+                // ШАГ 1: Инициализируем compose-сессию (устанавливает recipient в cookies)
+                console.log(`[Photo Internal API] Инициализация compose-сессии для recipient=${user.AccountId}`);
+                const composeResult = await ipcRenderer.invoke('init-compose-session', {
+                    recipientId: user.AccountId,
+                    botId: this.id
+                });
+
+                if (!composeResult.success) {
+                    throw new Error(`Ошибка инициализации compose: ${composeResult.error}`);
+                }
+                console.log(`[Photo Internal API] Compose-сессия инициализирована`);
+
+                // ШАГ 2: Генерируем уникальный uid (32 hex символа)
                 const uid = Array.from(crypto.getRandomValues(new Uint8Array(16)))
                     .map(b => b.toString(16).padStart(2, '0')).join('');
 
-                // Вычисляем MD5 хеш фото
+                // ШАГ 3: Вычисляем MD5 хеш фото и загружаем
                 const fileResult = await ipcRenderer.invoke('read-photo-file', { filePath: this.photoPath });
                 if (!fileResult.success) {
                     throw new Error(`Файл не найден: ${this.photoPath}`);
@@ -1316,7 +1328,7 @@ class AccountBot {
                 }
                 console.log(`[Photo Internal API] Фото загружено:`, uploadResult.data);
 
-                // Отправляем письмо через внутренний API
+                // ШАГ 4: Отправляем письмо через внутренний API
                 const sendResult = await ipcRenderer.invoke('send-message-internal', {
                     uid: uid,
                     body: msgBody,
@@ -1329,126 +1341,62 @@ class AccountBot {
                 console.log(`[Photo Internal API] Письмо отправлено:`, sendResult.data);
 
             } else {
-                // ============ СТАРЫЙ СПОСОБ (публичный API) ============
+                // ============ БЕЗ ФОТО: публичный API (Bearer token) ============
                 const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
 
                 if (!checkRes.data.CheckId) {
                     throw new Error('Не удалось получить CheckId');
                 }
 
-                // Формируем базовый payload
+                // Формируем payload (без вложений)
                 const payload = {
                     CheckId: checkRes.data.CheckId,
                     RecipientAccountId: user.AccountId,
                     Body: msgBody,
-                    ReplyForMessageId: user.messageToReply || null,
-                    AttachmentName: null,
-                    AttachmentHash: null,
-                    AttachmentFile: null
+                    ReplyForMessageId: user.messageToReply || null
                 };
 
-                // Если есть прикреплённое фото - читаем файл и обрабатываем вложение
-                if (this.photoPath) {
-                    try {
-                        // Читаем файл через IPC (main process)
-                        const fileResult = await ipcRenderer.invoke('read-photo-file', { filePath: this.photoPath });
-
-                        if (fileResult.success && fileResult.base64) {
-                            // Вычисляем MD5 хеш
-                            const base64Data = fileResult.base64;
-                            const binaryString = atob(base64Data);
-                            const bytes = new Uint8Array(binaryString.length);
-                            for (let i = 0; i < binaryString.length; i++) {
-                                bytes[i] = binaryString.charCodeAt(i);
-                            }
-                            const photoHash = calculateMD5(bytes.buffer);
-
-                            // Проверяем, есть ли уже такой файл на сервере
-                            let fileExistsOnServer = false;
-                            try {
-                                const attachCheck = await makeApiRequest(this, 'GET', `/api/messages/check-attachment-by-hash/${photoHash}`);
-                                if (attachCheck.data && attachCheck.data.AttachmentHash) {
-                                    // Файл уже на сервере - используем существующий
-                                    fileExistsOnServer = true;
-                                    payload.AttachmentName = attachCheck.data.AttachmentName;
-                                    payload.AttachmentHash = attachCheck.data.AttachmentHash;
-                                    console.log(`[Photo] Файл уже на сервере: ${payload.AttachmentName}`);
-                                }
-                            } catch (checkErr) {
-                                // 404 или другая ошибка = файла нет на сервере, это нормально
-                                console.log(`[Photo] Файл не найден на сервере, загружаем как новый...`);
-                            }
-
-                            // Если файла нет на сервере - загружаем с base64
-                            if (!fileExistsOnServer) {
-                                payload.AttachmentName = fileResult.fileName;
-                                payload.AttachmentHash = photoHash;
-                                // Пробуем с Data URI prefix
-                                const mimeType = fileResult.fileName.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
-                                payload.AttachmentFile = `data:${mimeType};base64,${base64Data}`;
-                                console.log(`[Photo] Загружаем новый файл: ${fileResult.fileName} (с Data URI prefix)`);
-                            }
-                        } else {
-                            // Файл не найден локально - отправляем без фото
-                            console.warn(`[Photo] Локальный файл не найден: ${this.photoPath}`);
-                        }
-                    } catch (readErr) {
-                        console.warn(`[Photo] Ошибка чтения файла:`, readErr.message);
-                        // Продолжаем без фото только при ошибке чтения
-                    }
-                }
-
-                // DEBUG: Логируем payload перед отправкой
-                console.log(`[Photo DEBUG] Payload attachment:`, {
-                    AttachmentName: payload.AttachmentName,
-                    AttachmentHash: payload.AttachmentHash,
-                    AttachmentFileLength: payload.AttachmentFile ? payload.AttachmentFile.length : null,
-                    AttachmentFileStart: payload.AttachmentFile ? payload.AttachmentFile.substring(0, 50) : null
-                });
-
-                // 1. Отправляем на Ladadate
+                // Отправляем на Ladadate
                 await makeApiRequest(this, 'POST', '/api/messages/send', payload);
             }
 
-                // 2. Отслеживаем диалог и получаем метаданные
-                const convData = this.trackConversation(user.AccountId);
-                const convId = this.getConvId(user.AccountId);
+            // Отслеживаем диалог и получаем метаданные
+            const convData = this.trackConversation(user.AccountId);
+            const convId = this.getConvId(user.AccountId);
 
-                // 3. Отправляем полную статистику на НАШ сервер Lababot
-                const lababotResult = await sendMessageToLababot({
-                    botId: this.id,
-                    accountDisplayId: this.displayId,
-                    recipientId: user.AccountId,
-                    type: 'outgoing', // Письмо = $1.5
-                    textContent: msgBody,
-                    status: 'success',
-                    responseTime: convData.responseTime,
-                    isFirst: convData.isFirst,
-                    isLast: false, // Письма обычно не имеют явного "последнего"
-                    convId: convId,
-                    mediaUrl: this.photoName ? `attached_photo_${this.photoName}` : null,
-                    fileName: this.photoName || null,
-                    translatorId: this.translatorId,
-                    errorReason: null,
-                    usedAi: this.usedAi || false
-                });
+            // Отправляем полную статистику на НАШ сервер Lababot
+            const lababotResult = await sendMessageToLababot({
+                botId: this.id,
+                accountDisplayId: this.displayId,
+                recipientId: user.AccountId,
+                type: 'outgoing',
+                textContent: msgBody,
+                status: 'success',
+                responseTime: convData.responseTime,
+                isFirst: convData.isFirst,
+                isLast: false,
+                convId: convId,
+                mediaUrl: this.photoName ? `attached_photo_${this.photoName}` : null,
+                fileName: this.photoName || null,
+                translatorId: this.translatorId,
+                errorReason: null,
+                usedAi: this.usedAi || false
+            });
 
-                if (!lababotResult.success) {
-                    console.warn(`⚠️ Не удалось отправить статистику на Lababot: ${lababotResult.error}`);
-                }
+            if (!lababotResult.success) {
+                console.warn(`⚠️ Не удалось отправить статистику на Lababot: ${lababotResult.error}`);
+            }
 
-                // Сбрасываем флаг AI после отправки
-                if (this.usedAi) {
-                    console.log(`🤖 Сообщение с AI отправлено, сбрасываем флаг`);
-                    this.usedAi = false;
-                }
+            // Сбрасываем флаг AI после отправки
+            if (this.usedAi) {
+                console.log(`🤖 Сообщение с AI отправлено, сбрасываем флаг`);
+                this.usedAi = false;
+            }
 
-                this.incrementStat('mail', 'sent');
-                this.mailHistory.sent.push(`${user.AccountId} (${user.Name})`);
-                this.log(`✅ Письмо отправлено: ${user.Name} (${user.AccountId})`);
-                this.networkErrorCount = 0; // Сброс счётчика при успехе
-
-                // Данные уже добавлены в mailHistory.sent - фильтрация проверяет этот список
+            this.incrementStat('mail', 'sent');
+            this.mailHistory.sent.push(`${user.AccountId} (${user.Name})`);
+            this.log(`✅ Письмо отправлено: ${user.Name} (${user.AccountId})`);
+            this.networkErrorCount = 0;
 
             // Отмечаем Custom ID как отправленный (если это custom-ids режим)
             if (this.mailSettings.target === 'custom-ids') {
