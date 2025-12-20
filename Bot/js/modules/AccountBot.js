@@ -1457,50 +1457,11 @@ class AccountBot {
 
                 // Данные уже добавлены в mailHistory.sent - фильтрация проверяет этот список
 
-                // Отмечаем Custom ID как отправленный (если это custom-ids режим)
-                if (this.mailSettings.target === 'custom-ids') {
-                    markCustomIdSent(this.id, user.AccountId.toString());
-                }
-            } else {
-                // Нет CheckId - считаем как ошибку
-                const errorReason = extractApiError({ data: checkRes.data, status: 200 }, 'нет CheckId');
-                this.incrementStat('mail', 'errors');
-                this.mailHistory.errors.push(`${user.AccountId}: ${errorReason}`);
-                this.log(`❌ Ошибка: не могу отправить письмо ${user.Name} (${user.AccountId}): ${errorReason}`);
-
-                // Отправляем ошибку на сервер (с защитой от падения)
-                try {
-                    await sendErrorToLababot(
-                        this.id,
-                        this.displayId,
-                        'mail_no_checkid',
-                        errorReason
-                    );
-                } catch (err) { console.error('sendErrorToLababot failed:', err); }
-
-                // Также через message_sent API с status='failed'
-                try {
-                    const convData = this.trackConversation(user.AccountId);
-                    const convId = this.getConvId(user.AccountId);
-                    await sendMessageToLababot({
-                        botId: this.id,
-                        accountDisplayId: this.displayId,
-                        recipientId: user.AccountId,
-                        type: 'outgoing',
-                        textContent: msgBody || '',
-                        status: 'failed',
-                        responseTime: convData.responseTime,
-                        isFirst: convData.isFirst,
-                        isLast: false,
-                        convId: convId,
-                        mediaUrl: null,
-                        fileName: null,
-                        translatorId: this.translatorId,
-                        errorReason: errorReason,
-                        usedAi: false
-                    });
-                } catch (err) { console.error('sendMessageToLababot failed:', err); }
+            // Отмечаем Custom ID как отправленный (если это custom-ids режим)
+            if (this.mailSettings.target === 'custom-ids') {
+                markCustomIdSent(this.id, user.AccountId.toString());
             }
+
         } catch (e) {
             if(e.message === "Network Error" || !e.response) {
                 // Exponential backoff при сетевых ошибках
