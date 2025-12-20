@@ -102,6 +102,89 @@ let controlStatus = {
     mailingEnabled: true,
     lastCheck: null
 };
+
+// ============= SHARED ONLINE POOL =============
+// Глобальный пул мужчин онлайн, собранный со всех анкет
+const SharedPool = {
+    users: new Map(),           // AccountId → user data
+    lastUpdate: 0,              // Время последнего обновления
+    updateInterval: 10000,      // Интервал обновления (10 сек)
+    isUpdating: false,          // Флаг что идёт обновление
+    timer: null,                // ID таймера
+
+    // Запуск автообновления
+    start() {
+        if (this.timer) return;
+        this.refresh();
+        this.timer = setInterval(() => this.refresh(), this.updateInterval);
+        console.log('[SharedPool] Запущен');
+    },
+
+    // Остановка
+    stop() {
+        if (this.timer) {
+            clearInterval(this.timer);
+            this.timer = null;
+        }
+        console.log('[SharedPool] Остановлен');
+    },
+
+    // Обновление пула - сбор данных со всех анкет
+    async refresh() {
+        if (this.isUpdating) return;
+        if (Object.keys(bots).length === 0) return;
+
+        this.isUpdating = true;
+        const newUsers = new Map();
+
+        try {
+            // Собираем списки со всех активных ботов
+            const promises = Object.values(bots)
+                .filter(bot => bot.token)
+                .map(async (bot) => {
+                    try {
+                        const res = await makeApiRequest(bot, 'GET', '/api/users/online');
+                        return res.data.Users || [];
+                    } catch (e) {
+                        return [];
+                    }
+                });
+
+            const results = await Promise.all(promises);
+
+            // Объединяем в один пул (Map автоматически убирает дубли)
+            results.forEach(users => {
+                users.forEach(u => {
+                    if (!newUsers.has(u.AccountId)) {
+                        newUsers.set(u.AccountId, u);
+                    }
+                });
+            });
+
+            this.users = newUsers;
+            this.lastUpdate = Date.now();
+
+            // Обновляем счётчик в UI если есть
+            const counter = document.getElementById('shared-online-count');
+            if (counter) counter.textContent = this.users.size;
+
+        } catch (e) {
+            console.error('[SharedPool] Ошибка обновления:', e);
+        } finally {
+            this.isUpdating = false;
+        }
+    },
+
+    // Получить всех пользователей как массив
+    getAll() {
+        return Array.from(this.users.values());
+    },
+
+    // Количество пользователей
+    get size() {
+        return this.users.size;
+    }
+};
 let currentModalBotId = null;
 let editingTemplateIndex = null;
 let editingBotId = null;

@@ -101,7 +101,8 @@ function createInterface(bot) {
         <div class="panel-col">
             <div class="col-title">Настройки</div>
             <select id="target-select-${bot.id}" class="form-select form-select-sm mb-1" onchange="updateSettings('${bot.id}'); toggleCustomIdsField('${bot.id}')">
-                <option value="online">Online</option>
+                <option value="shared-online">Онлайн (общий)</option>
+                <option value="online">Онлайн</option>
                 <option value="favorites">I am a favorite of</option>
                 <option value="my-favorites">My favorite</option>
                 <option value="inbox">Inbox</option>
@@ -211,8 +212,8 @@ function updateInterfaceForMode(botId) {
         ws.querySelectorAll('.hide-in-mail').forEach(el => el.style.display = 'block');
 
         Array.from(targetSelect.options).forEach(opt => {
-            // Скрываем опции недоступные в Chat режиме (включая custom-ids)
-            if (['favorites', 'my-favorites', 'inbox', 'custom-ids'].includes(opt.value)) { opt.style.display = 'none'; }
+            // Скрываем опции недоступные в Chat режиме (включая custom-ids и shared-online)
+            if (['favorites', 'my-favorites', 'inbox', 'custom-ids', 'shared-online'].includes(opt.value)) { opt.style.display = 'none'; }
             else { opt.style.display = 'block'; }
         });
         targetSelect.value = bot.chatSettings.target;
@@ -1462,6 +1463,11 @@ async function performLogin(login, pass, displayId) {
             // ВАЖНО: Запускаем мониторинг ПОСЛЕ загрузки данных с сервера!
             // Иначе входящие письма добавятся в blacklist, который потом перезапишется
             bot.startMonitoring();
+
+            // Запускаем SharedPool если ещё не запущен
+            if (!SharedPool.timer) {
+                SharedPool.start();
+            }
 
             // Отправляем первый heartbeat после создания бота
             setTimeout(() => sendHeartbeatToLababot(bid, displayId, 'online'), 2000);

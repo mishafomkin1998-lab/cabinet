@@ -1091,6 +1091,10 @@ class AccountBot {
                         messageToReply: msg.MessageId
                     });
                 }
+            } else if (target === 'shared-online') {
+                // Берём из общего пула SharedPool (собирается со всех анкет)
+                users = SharedPool.getAll();
+                console.log(`[Mail shared-online] SharedPool содержит ${users.length} пользователей`);
             } else {
                 let apiPath = `/api/users/${target}`;
                 const usersRes = await makeApiRequest(this, 'GET', apiPath);
