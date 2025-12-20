@@ -1124,6 +1124,10 @@
         
         /* Стили для 5 статусов */
         .btn-status-circle { background: #fff; border: 1px solid #ccc; transition: 0.2s; }
+
+        .btn-status-circle.btn-online-smart-color { color: #ff6b35; border-color: #ffb399; }
+        .btn-status-circle.btn-online-smart-color:hover { background: #ffe4d9; }
+
         .btn-status-circle.btn-shared-online-color { color: #0d6efd; border-color: #86b7fe; }
         .btn-status-circle.btn-shared-online-color:hover { background: #cfe2ff; }
 
@@ -1452,6 +1456,7 @@
         .stat-waiting-text { font-size: 11px; color: #999; text-align: right; }
         .stat-ignored-text { font-size: 11px; color: #999; cursor: pointer; }
         .stat-ignored-text:hover { color: #666; text-decoration: underline; }
+        .stat-hotqueue { font-size: 11px; color: #ff6b35; margin-left: 5px; font-weight: 500; }
 
         /* Модальное окно игнор-листа */
         .custom-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 3000; display: none; }

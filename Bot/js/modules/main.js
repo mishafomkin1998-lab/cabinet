@@ -101,6 +101,7 @@ function createInterface(bot) {
         <div class="panel-col">
             <div class="col-title">Настройки</div>
             <select id="target-select-${bot.id}" class="form-select form-select-sm mb-1" onchange="updateSettings('${bot.id}'); toggleCustomIdsField('${bot.id}')">
+                <option value="online-smart">Online Smart</option>
                 <option value="shared-online">Online shared</option>
                 <option value="online">Online</option>
                 <option value="favorites">I am a favorite of</option>
@@ -147,7 +148,7 @@ function createInterface(bot) {
             <button id="btn-start-${bot.id}" class="btn btn-primary w-100 mb-2" onclick="toggleBot('${bot.id}')"><i class="fa fa-paper-plane"></i> Старт</button>
             
             <div class="border-top pt-2">
-                <div class="stat-line text-success"><span>Отправлено:</span> <b id="stat-sent-${bot.id}" class="stat-val" onclick="openStatsModal('${bot.id}', 'sent')">0</b></div>
+                <div class="stat-line text-success"><span>Отправлено:</span> <b id="stat-sent-${bot.id}" class="stat-val" onclick="openStatsModal('${bot.id}', 'sent')">0</b> <span id="stat-hotqueue-${bot.id}" class="stat-hotqueue" title="Отправлено из горячей очереди"></span></div>
                 <div class="stat-line text-danger"><span>Ошибки:</span> <b id="stat-err-${bot.id}" class="stat-val" onclick="openStatsModal('${bot.id}', 'errors')">0</b></div>
                 <div class="stat-waiting-row">
                     <span id="stat-ignored-${bot.id}" class="stat-ignored-text" onclick="openIgnoredModal('${bot.id}')" title="Пользователи в игноре (клик для управления)">Игнор: 0</span>

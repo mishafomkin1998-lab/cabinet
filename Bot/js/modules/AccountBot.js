@@ -1182,11 +1182,33 @@ class AccountBot {
     async processMailUser(msgTemplate) {
         let user = null;
         let msgBody = '';
+        let fromHotQueue = false; // Флаг: взят из горячей очереди
         try {
             const target = this.mailSettings.target;
             let users = [];
 
-            if (target === 'custom-ids') {
+            // ============ ONLINE SMART: Приоритет горячей очереди ============
+            if (target === 'online-smart') {
+                // Сначала пробуем взять из горячей очереди
+                const hotUser = getFromHotQueue(this.id, this);
+                if (hotUser) {
+                    this.log(`🔥 Из горячей очереди: ${hotUser.name} (${hotUser.manId})`);
+                    users.push({
+                        AccountId: hotUser.manId,
+                        Name: hotUser.name,
+                        City: '',
+                        Age: '',
+                        Country: ''
+                    });
+                    fromHotQueue = true;
+                } else {
+                    // Горячая очередь пуста - берём из обычного online
+                    const usersRes = await makeApiRequest(this, 'GET', '/api/users/online');
+                    users = usersRes.data.Users || [];
+                    this.lastOnlineCount = users.length;
+                    console.log(`[Mail online-smart] API вернул ${users.length} пользователей (горячая очередь пуста)`);
+                }
+            } else if (target === 'custom-ids') {
                 // Рассылка по конкретным ID из списка
                 const nextId = getNextCustomId(this.id);
                 if (nextId) {
@@ -1285,8 +1307,8 @@ class AccountBot {
 
             // Если новых пользователей нет
             if (users.length === 0) {
-                if (target === 'online' || target === 'shared-online') {
-                    // На online/shared-online остаёмся ВСЕГДА и ждём новых пользователей
+                if (target === 'online' || target === 'shared-online' || target === 'online-smart') {
+                    // На online/shared-online/online-smart остаёмся ВСЕГДА и ждём новых пользователей
                     this.log(`⏳ Нет онлайн пользователей. Ожидание...`);
                     return;
                 } else {
@@ -1545,6 +1567,20 @@ class AccountBot {
                 markCustomIdSent(this.id, user.AccountId.toString());
             }
 
+            // ============ ONLINE SMART: Добавляем в горячую очередь ============
+            // Добавляем для ВСЕХ режимов (не только online-smart), чтобы другие анкеты
+            // с online-smart могли подхватить "горячего" мужчину
+            if (this.mailSettings.target === 'online-smart' ||
+                this.mailSettings.target === 'online' ||
+                this.mailSettings.target === 'shared-online') {
+                addToHotQueue(user.AccountId, user.Name, this.id);
+
+                // Обновляем статистику горячей очереди
+                if (fromHotQueue) {
+                    this.mailStats.hotQueueSent = (this.mailStats.hotQueueSent || 0) + 1;
+                }
+            }
+
         } catch (e) {
             if(e.message === "Network Error" || !e.response) {
                 // Exponential backoff при сетевых ошибках
@@ -1574,6 +1610,12 @@ class AccountBot {
                         this.log(`⛔ ${user.Name} добавлен в игнор-лист писем (навсегда)`);
                         saveIgnoredUsersToStorage(this.displayId, 'mail', this.ignoredUsersMail);
                     }
+                }
+
+                // ============ ONLINE SMART: Проверка глобального лимита ============
+                // Если ошибка "hourly incoming message limit" - обрабатываем глобально
+                if (user && user.AccountId && errorReason.includes(LIMIT_ERROR_TEXT)) {
+                    handleGlobalLimit(user.AccountId, user.Name, this.id);
                 }
 
                 // Отправляем ошибку на сервер (с защитой от падения)
@@ -2498,9 +2540,15 @@ class AccountBot {
         const e = document.getElementById(`stat-err-${this.id}`);
         const w = document.getElementById(`stat-wait-${this.id}`);
         const ig = document.getElementById(`stat-ignored-${this.id}`);
+        const hq = document.getElementById(`stat-hotqueue-${this.id}`);
         if(s) s.innerText = stats.sent;
         if(e) e.innerText = stats.errors;
         if(w) w.innerText = "Ожидают: " + stats.waiting;
+        // Показываем статистику горячей очереди (только для Mail)
+        if(hq) {
+            const hotQueueSent = this.mailStats.hotQueueSent || 0;
+            hq.innerText = hotQueueSent > 0 ? `🔥${hotQueueSent}` : '';
+        }
         // Показываем счетчик игнора в зависимости от режима
         const ignoredList = isChat ? this.ignoredUsersChat : this.ignoredUsersMail;
         if(ig) ig.innerText = "Игнор: " + (ignoredList ? ignoredList.length : 0);
