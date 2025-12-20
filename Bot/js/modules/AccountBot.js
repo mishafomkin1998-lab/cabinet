@@ -685,18 +685,11 @@ class AccountBot {
             if (!this.chatRequestNotified) this.chatRequestNotified = {}; // Для отслеживания уведомлённых ChatRequests
             if (!this.activeChatSoundTimes) this.activeChatSoundTimes = {}; // Для повторного звука активных чатов
 
-            // === ИСПРАВЛЕНИЕ: При первом sync после старта - помечаем все как "виденные" без уведомлений ===
-            // Это предотвращает уведомления о старых неактивных чатах при перезапуске программы
-            if (!this.firstChatSyncDone) {
+            // === Флаг первого sync - добавляем в ЧС, но без уведомлений ===
+            const isFirstSync = !this.firstChatSyncDone;
+            if (isFirstSync) {
                 this.firstChatSyncDone = true;
-                // Помечаем все текущие запросы как уже обработанные
-                for (const request of chatRequests) {
-                    if (request.MessageId) {
-                        this.chatRequestNotified[request.MessageId] = now;
-                    }
-                }
-                console.log(`[Lababot] 📋 Первый sync: ${chatRequests.length} запросов помечены как виденные (без уведомлений)`);
-                // Продолжаем выполнение, но уведомления не будут показаны т.к. всё уже в chatRequestNotified
+                console.log(`[Lababot] 📋 Первый sync: обрабатываем ${chatRequests.length} запросов (добавим в ЧС, без уведомлений)`);
             }
 
             // Set для отслеживания partnerId, уведомлённых в этом цикле через ChatRequests
@@ -710,34 +703,42 @@ class AccountBot {
                 const messageBody = request.Body || "";
                 const isRead = request.IsRead;
 
-                // Уведомляем только о непрочитанных запросах, которые ещё не уведомляли
-                if (!isRead && requestId && !this.chatRequestNotified[requestId]) {
-                    this.chatRequestNotified[requestId] = now;
-                    notifiedPartnersThisCycle.add(partnerId); // Запоминаем partnerId
+                // Пропускаем уже обработанные
+                if (this.chatRequestNotified[requestId]) continue;
+
+                // Помечаем как обработанный
+                this.chatRequestNotified[requestId] = now;
+
+                // === ВСЕГДА ДОБАВЛЯЕМ В ЧС ЧАТА (с лимитом) ===
+                const partnerIdStr = partnerId.toString();
+                if (!this.chatSettings.blacklist.includes(partnerIdStr)) {
+                    // Проверяем лимит blacklist
+                    if (this.chatSettings.blacklist.length >= BLACKLIST_MAX_SIZE) {
+                        // Удаляем старые записи (первые 100)
+                        this.chatSettings.blacklist.splice(0, 100);
+                        console.log(`[Lababot] ⚠️ Blacklist Chat достиг лимита ${BLACKLIST_MAX_SIZE}, удалены старые записи`);
+                    }
+                    this.chatSettings.blacklist.push(partnerIdStr);
+                    saveBlacklistToServer(this.displayId, 'chat', this.chatSettings.blacklist);
+                    console.log(`[Lababot] ✅ ${partnerName} (${partnerId}) добавлен в ЧС чата${isFirstSync ? ' (первый sync)' : ''}`);
+
+                    // Обновляем UI blacklist если эта вкладка активна и режим Chat
+                    if (activeTabId === this.id && globalMode === 'chat') {
+                        renderBlacklist(this.id);
+                    }
+                }
+
+                // При первом sync - только добавляем в ЧС, без уведомлений и автоответов
+                if (isFirstSync) continue;
+
+                // === Дальше только для НОВЫХ запросов (не первый sync) ===
+                if (!isRead) {
+                    notifiedPartnersThisCycle.add(partnerId);
 
                     // Обрезаем текст сообщения до 50 символов
                     const truncatedBody = messageBody.length > 50
                         ? messageBody.substring(0, 50) + '...'
                         : messageBody;
-
-                    // === СРАЗУ ДОБАВЛЯЕМ В ЧС ЧАТА (с лимитом) ===
-                    const partnerIdStr = partnerId.toString();
-                    if (!this.chatSettings.blacklist.includes(partnerIdStr)) {
-                        // Проверяем лимит blacklist
-                        if (this.chatSettings.blacklist.length >= BLACKLIST_MAX_SIZE) {
-                            // Удаляем старые записи (первые 100)
-                            this.chatSettings.blacklist.splice(0, 100);
-                            console.log(`[Lababot] ⚠️ Blacklist Chat достиг лимита ${BLACKLIST_MAX_SIZE}, удалены старые записи`);
-                        }
-                        this.chatSettings.blacklist.push(partnerIdStr);
-                        saveBlacklistToServer(this.displayId, 'chat', this.chatSettings.blacklist);
-                        console.log(`[Lababot] ✅ ${partnerName} (${partnerId}) добавлен в ЧС чата`);
-
-                        // Обновляем UI blacklist если эта вкладка активна и режим Chat
-                        if (activeTabId === this.id && globalMode === 'chat') {
-                            renderBlacklist(this.id);
-                        }
-                    }
 
                     // Отправляем на сервер статистики
                     sendIncomingMessageToLababot({
