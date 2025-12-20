@@ -1317,16 +1317,11 @@ class AccountBot {
 
                             // Если файла нет на сервере - загружаем с base64
                             if (!fileExistsOnServer) {
-                                // Определяем MIME тип по расширению
-                                const ext = fileResult.fileName.toLowerCase().split('.').pop();
-                                const mimeTypes = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp' };
-                                const mimeType = mimeTypes[ext] || 'image/jpeg';
-
                                 payload.AttachmentName = fileResult.fileName;
                                 payload.AttachmentHash = photoHash;
-                                // Пробуем с Data URI prefix
-                                payload.AttachmentFile = `data:${mimeType};base64,${base64Data}`;
-                                console.log(`[Photo] Загружаем новый файл: ${fileResult.fileName} (${mimeType})`);
+                                // Чистый base64 без prefix (как в документации API)
+                                payload.AttachmentFile = base64Data;
+                                console.log(`[Photo] Загружаем новый файл: ${fileResult.fileName}`);
                             }
                         } else {
                             // Файл не найден локально - отправляем без фото
