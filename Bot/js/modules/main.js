@@ -1404,14 +1404,47 @@ function toggleVipStatus(botId) {
 }
 
 function onPhotoSelect(botId) {
-    const fi=document.getElementById(`photo-input-${botId}`);
-    if(fi.files.length) {
-        bots[botId].photoName=fi.files[0].name; document.getElementById(`photo-name-${botId}`).innerText=fi.files[0].name; document.getElementById(`photo-label-${botId}`).classList.add('file-selected');
-        const r=new FileReader(); r.onload=e=>{ document.getElementById(`preview-img-${botId}`).src=e.target.result; document.getElementById(`preview-box-${botId}`).classList.add('has-img'); }; r.readAsDataURL(fi.files[0]);
-    }
+    const fi = document.getElementById(`photo-input-${botId}`);
+    if (!fi.files.length) return;
+
+    const file = fi.files[0];
+    const bot = bots[botId];
+
+    // Сохраняем имя файла
+    bot.photoName = file.name;
+    document.getElementById(`photo-name-${botId}`).innerText = file.name;
+    document.getElementById(`photo-label-${botId}`).classList.add('file-selected');
+
+    // Читаем файл как ArrayBuffer для MD5
+    const readerBuffer = new FileReader();
+    readerBuffer.onload = function(e) {
+        const arrayBuffer = e.target.result;
+        bot.photoHash = calculateMD5(arrayBuffer);
+        console.log(`[Photo] ${botId}: hash = ${bot.photoHash}`);
+    };
+    readerBuffer.readAsArrayBuffer(file);
+
+    // Читаем файл как base64 для превью и отправки
+    const readerBase64 = new FileReader();
+    readerBase64.onload = function(e) {
+        const dataUrl = e.target.result;
+        document.getElementById(`preview-img-${botId}`).src = dataUrl;
+        document.getElementById(`preview-box-${botId}`).classList.add('has-img');
+        // Сохраняем только base64 часть (без data:image/...;base64,)
+        bot.photoBase64 = dataUrl.split(',')[1];
+    };
+    readerBase64.readAsDataURL(file);
 }
+
 function removePhoto(botId) {
-    document.getElementById(`photo-input-${botId}`).value=""; document.getElementById(`photo-name-${botId}`).innerText="Прикрепить фото"; document.getElementById(`preview-box-${botId}`).classList.remove('has-img'); document.getElementById(`photo-label-${botId}`).classList.remove('file-selected'); bots[botId].photoName=null;
+    document.getElementById(`photo-input-${botId}`).value = "";
+    document.getElementById(`photo-name-${botId}`).innerText = "Прикрепить фото";
+    document.getElementById(`preview-box-${botId}`).classList.remove('has-img');
+    document.getElementById(`photo-label-${botId}`).classList.remove('file-selected');
+    const bot = bots[botId];
+    bot.photoName = null;
+    bot.photoHash = null;
+    bot.photoBase64 = null;
 }
 
 async function handleLoginOrUpdate() {

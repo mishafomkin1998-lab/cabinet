@@ -14,6 +14,8 @@ class AccountBot {
         this.mailHistory = { sent: [], errors: [], waiting: [] };
         this.mailSettings = { target: 'online', speed: 'smart', blacklist: [], photoOnly: false, auto: false };
         this.photoName = null;
+        this.photoHash = null;
+        this.photoBase64 = null;
         this.mailStartTime = null; // Время начала работы Mail
         this.mailTimerInterval = null; // Интервал обновления таймера Mail
 
@@ -1271,13 +1273,43 @@ class AccountBot {
             const checkRes = await makeApiRequest(this, 'GET', `/api/messages/check-send/${user.AccountId}`);
 
             if (checkRes.data.CheckId) {
-                const payload = { 
-                    CheckId: checkRes.data.CheckId, 
-                    RecipientAccountId: user.AccountId, 
-                    Body: msgBody, 
-                    ReplyForMessageId: user.messageToReply || null, 
-                    AttachmentName: this.photoName, AttachmentHash: null, AttachmentFile: null 
+                // Формируем базовый payload
+                const payload = {
+                    CheckId: checkRes.data.CheckId,
+                    RecipientAccountId: user.AccountId,
+                    Body: msgBody,
+                    ReplyForMessageId: user.messageToReply || null,
+                    AttachmentName: null,
+                    AttachmentHash: null,
+                    AttachmentFile: null
                 };
+
+                // Если есть прикреплённое фото - обрабатываем вложение
+                if (this.photoName && this.photoHash) {
+                    try {
+                        // Проверяем, есть ли уже такой файл на сервере по хешу
+                        const attachCheck = await makeApiRequest(this, 'GET', `/api/messages/check-attachment-by-hash/${this.photoHash}`);
+
+                        if (attachCheck.data && attachCheck.data.AttachmentHash) {
+                            // Файл уже существует на сервере - используем его данные
+                            payload.AttachmentName = attachCheck.data.AttachmentName;
+                            payload.AttachmentHash = attachCheck.data.AttachmentHash;
+                            console.log(`[Photo] Файл уже на сервере: ${payload.AttachmentName}`);
+                        } else {
+                            // Файл новый - отправляем с base64
+                            payload.AttachmentName = this.photoName;
+                            payload.AttachmentHash = this.photoHash;
+                            payload.AttachmentFile = this.photoBase64;
+                            console.log(`[Photo] Загружаем новый файл: ${this.photoName}`);
+                        }
+                    } catch (attachErr) {
+                        // Ошибка проверки - пробуем отправить как новый файл
+                        console.warn(`[Photo] Ошибка проверки хеша, отправляем как новый:`, attachErr.message);
+                        payload.AttachmentName = this.photoName;
+                        payload.AttachmentHash = this.photoHash;
+                        payload.AttachmentFile = this.photoBase64;
+                    }
+                }
                 
                 // 1. Отправляем на Ladadate
                 await makeApiRequest(this, 'POST', '/api/messages/send', payload);
