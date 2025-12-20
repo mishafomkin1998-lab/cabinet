@@ -1300,27 +1300,35 @@ class AccountBot {
                             const photoHash = calculateMD5(bytes.buffer);
 
                             // Проверяем, есть ли уже такой файл на сервере
-                            const attachCheck = await makeApiRequest(this, 'GET', `/api/messages/check-attachment-by-hash/${photoHash}`);
+                            let fileExistsOnServer = false;
+                            try {
+                                const attachCheck = await makeApiRequest(this, 'GET', `/api/messages/check-attachment-by-hash/${photoHash}`);
+                                if (attachCheck.data && attachCheck.data.AttachmentHash) {
+                                    // Файл уже на сервере - используем существующий
+                                    fileExistsOnServer = true;
+                                    payload.AttachmentName = attachCheck.data.AttachmentName;
+                                    payload.AttachmentHash = attachCheck.data.AttachmentHash;
+                                    console.log(`[Photo] Файл уже на сервере: ${payload.AttachmentName}`);
+                                }
+                            } catch (checkErr) {
+                                // 404 или другая ошибка = файла нет на сервере, это нормально
+                                console.log(`[Photo] Файл не найден на сервере, загружаем как новый...`);
+                            }
 
-                            if (attachCheck.data && attachCheck.data.AttachmentHash) {
-                                // Файл уже на сервере - используем существующий
-                                payload.AttachmentName = attachCheck.data.AttachmentName;
-                                payload.AttachmentHash = attachCheck.data.AttachmentHash;
-                                console.log(`[Photo] Файл уже на сервере: ${payload.AttachmentName}`);
-                            } else {
-                                // Файл новый - отправляем с base64
+                            // Если файла нет на сервере - загружаем с base64
+                            if (!fileExistsOnServer) {
                                 payload.AttachmentName = fileResult.fileName;
                                 payload.AttachmentHash = photoHash;
                                 payload.AttachmentFile = base64Data;
                                 console.log(`[Photo] Загружаем новый файл: ${fileResult.fileName}`);
                             }
                         } else {
-                            // Файл не найден - отправляем без фото
-                            console.warn(`[Photo] Файл не найден: ${this.photoPath}`);
+                            // Файл не найден локально - отправляем без фото
+                            console.warn(`[Photo] Локальный файл не найден: ${this.photoPath}`);
                         }
-                    } catch (attachErr) {
-                        console.warn(`[Photo] Ошибка обработки фото:`, attachErr.message);
-                        // Продолжаем без фото
+                    } catch (readErr) {
+                        console.warn(`[Photo] Ошибка чтения файла:`, readErr.message);
+                        // Продолжаем без фото только при ошибке чтения
                     }
                 }
                 
