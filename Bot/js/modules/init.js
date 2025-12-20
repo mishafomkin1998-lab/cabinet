@@ -215,6 +215,12 @@ function initFocusProtection() {
 }
 
 function setGlobalTarget(targetType) {
+    // Проверяем, не отключен ли статус
+    if (globalSettings.disabledStatuses && globalSettings.disabledStatuses.includes(targetType)) {
+        showToast(`Статус ${targetType.toUpperCase()} отключен`, 'warning');
+        return;
+    }
+
     Object.values(bots).forEach(bot => {
         if(globalMode === 'mail') bot.mailSettings.target = targetType;
         else bot.chatSettings.target = targetType;
@@ -273,17 +279,20 @@ function updateDisabledStatusesUI() {
             if (globalSettings.disabledStatuses && globalSettings.disabledStatuses.includes(optValue)) {
                 opt.classList.add('status-disabled-option');
                 opt.style.color = '#999';
+                opt.disabled = true; // Запрещаем выбор
             } else {
                 opt.classList.remove('status-disabled-option');
                 opt.style.color = '';
+                opt.disabled = false;
             }
         });
     });
 }
 
 // Получить следующий активный статус (пропуская отключенные)
+// Порядок снизу вверх по списку: Payers → Inbox → My favorite → I am a favorite of → Online
 function getNextActiveStatus(currentStatus) {
-    const statusOrder = ['payers', 'my-favorites', 'favorites', 'inbox', 'online'];
+    const statusOrder = ['payers', 'inbox', 'my-favorites', 'favorites', 'online'];
     const currentIdx = statusOrder.indexOf(currentStatus);
 
     // Ищем следующий не отключенный статус
