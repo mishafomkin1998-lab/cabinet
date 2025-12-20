@@ -104,6 +104,7 @@ function createInterface(bot) {
                 <option value="online-smart">Online Smart</option>
                 <option value="shared-online">Online Shared</option>
                 <option value="online">Online</option>
+                <option disabled>───────────</option>
                 <option value="favorites">I am a favorite of</option>
                 <option value="my-favorites">My favorite</option>
                 <option value="inbox">Inbox</option>

@@ -1149,9 +1149,8 @@
         .btn-status-circle.btn-custom-ids-color { color: #20c997; border-color: #9be7d3; }
         .btn-status-circle.btn-custom-ids-color:hover { background: #d1f5eb; }
 
-        /* Разделители между группами статусов */
+        /* Разделитель между группами статусов */
         .status-divider { width: 1px; height: 20px; background: #ddd; margin: 0 6px; }
-        .status-divider-left { width: 1px; height: 20px; background: #ddd; margin: 0 6px 0 0; }
 
         /* Отключенные статусы (серые, пропускаются в авто-режиме) */
         .btn-status-circle.status-disabled {
@@ -1455,7 +1454,7 @@
         .action-log { font-size: 11px; color: #555; flex: 1; min-height: 80px; max-height: 310px; overflow-y: auto; background: #fafafa; border: 1px solid #eee; padding: 5px; font-family: monospace; border-radius: 4px; }
         
         .stat-line { font-size: 13px; margin-top: 6px; display: flex; justify-content: space-between; border-bottom: 1px dashed #eee; padding-bottom: 2px; }
-        .stat-val { cursor: pointer; text-decoration: none; font-weight: 600; }
+        .stat-val { cursor: pointer; text-decoration: none; font-weight: 600; min-width: 30px; text-align: right; display: inline-block; }
         .stat-waiting-row { display: flex; justify-content: space-between; align-items: center; margin-top: 2px; }
         .stat-waiting-text { font-size: 11px; color: #999; text-align: right; }
         .stat-ignored-text { font-size: 11px; color: #999; cursor: pointer; }
