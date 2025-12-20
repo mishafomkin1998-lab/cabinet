@@ -78,7 +78,8 @@ let defaultSettings = {
         chatPrompt: null
     },
     // Использовать внутренний API сайта для отправки фото (true = новый способ, false = старый)
-    useInternalPhotoApi: true
+    // ОТКЛЮЧЕНО: внутренний API требует cookie-авторизацию, которая не работает с Bearer token
+    useInternalPhotoApi: false
 };
 
 // Шаблоны промптов (загружаются с сервера)
