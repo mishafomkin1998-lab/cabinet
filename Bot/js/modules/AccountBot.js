@@ -355,6 +355,24 @@ class AccountBot {
         return generateConvId(this.id, recipientId);
     }
 
+    // Очистка старых диалогов (старше 24 часов) для экономии памяти
+    cleanupConversations() {
+        const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 часа
+        const now = Date.now();
+        let cleaned = 0;
+
+        for (const recipientId in this.conversations) {
+            if (now - this.conversations[recipientId].lastMessageTime > MAX_AGE_MS) {
+                delete this.conversations[recipientId];
+                cleaned++;
+            }
+        }
+
+        if (cleaned > 0) {
+            console.log(`[${this.id}] 🧹 Очищено ${cleaned} старых диалогов`);
+        }
+    }
+
     // Проверить, является ли это последним сообщением (для rotationHours в chat режиме)
     isLastMessageInRotation() {
         if (globalMode !== 'chat') return false;

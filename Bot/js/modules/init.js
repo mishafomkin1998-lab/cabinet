@@ -18,6 +18,7 @@ window.onload = async function() {
     startGlobalMenOnlineUpdater(); // Запускаем обновление "Мужчины онлайн"
     initUpdateHandlers(); // Обработчики обновлений приложения
     initQuitHandler(); // Сохранение сессии при закрытии
+    startMemoryCleanup(); // Периодическая очистка памяти
 
     // Глобальное отслеживание Shift для bulk-действий
     document.addEventListener('keydown', (e) => { if (e.key === 'Shift') isShiftPressed = true; });
@@ -1037,4 +1038,87 @@ function initTranscriptionContextMenu() {
     });
 
     console.log('✅ Контекстное меню транскрипции инициализировано');
+}
+
+// ============= ПЕРИОДИЧЕСКАЯ ОЧИСТКА ПАМЯТИ =============
+// Предотвращает утечки памяти при длительной работе (95+ анкет весь день)
+
+function startMemoryCleanup() {
+    // Очистка каждые 10 минут для hotManQueue (записи старше 5 мин)
+    setInterval(() => {
+        cleanupHotManQueue();
+    }, 10 * 60 * 1000);
+
+    // Очистка каждый час для остальных объектов
+    setInterval(() => {
+        cleanupGlobalLimitedMen();
+        cleanupLoggerTracking();
+        cleanupAllConversations();
+    }, 60 * 60 * 1000);
+
+    console.log('✅ Периодическая очистка памяти запущена');
+}
+
+// Очистка горячей очереди (записи старше 5 минут)
+function cleanupHotManQueue() {
+    const MAX_AGE_MS = 5 * 60 * 1000; // 5 минут
+    const now = Date.now();
+    let cleaned = 0;
+
+    for (const manId in hotManQueue) {
+        if (now - hotManQueue[manId].addedAt > MAX_AGE_MS) {
+            delete hotManQueue[manId];
+            cleaned++;
+        }
+    }
+
+    if (cleaned > 0) {
+        console.log(`🧹 hotManQueue: очищено ${cleaned} записей`);
+    }
+}
+
+// Очистка глобальных лимитов (записи старше 1 часа)
+function cleanupGlobalLimitedMen() {
+    const MAX_AGE_MS = 60 * 60 * 1000; // 1 час
+    const now = Date.now();
+    let cleaned = 0;
+
+    for (const manId in globalLimitedMen) {
+        if (now - globalLimitedMen[manId].limitedAt > MAX_AGE_MS) {
+            delete globalLimitedMen[manId];
+            cleaned++;
+        }
+    }
+
+    if (cleaned > 0) {
+        console.log(`🧹 globalLimitedMen: очищено ${cleaned} записей`);
+    }
+}
+
+// Очистка логгера (сбрасываем Set уведомлений каждый час)
+function cleanupLoggerTracking() {
+    const size = loggerTracking.notified.size;
+    if (size > 0) {
+        loggerTracking.notified.clear();
+        console.log(`🧹 loggerTracking.notified: очищено ${size} записей`);
+    }
+}
+
+// Очистка conversations для всех ботов (записи старше 24 часов)
+function cleanupAllConversations() {
+    let totalCleaned = 0;
+
+    for (const botId in bots) {
+        const bot = bots[botId];
+        if (bot && typeof bot.cleanupConversations === 'function') {
+            const before = Object.keys(bot.conversations || {}).length;
+            bot.cleanupConversations();
+            const after = Object.keys(bot.conversations || {}).length;
+            totalCleaned += (before - after);
+        }
+    }
+
+    if (totalCleaned > 0) {
+        console.log(`🧹 conversations: очищено ${totalCleaned} записей у всех ботов`);
+    }
 }
