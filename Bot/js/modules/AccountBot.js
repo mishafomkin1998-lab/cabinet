@@ -9,6 +9,7 @@ class AccountBot {
         this.lastTplMail = null; 
         this.lastTplChat = null;
         this.isMailRunning = false;
+        this.isMailWaiting = false; // true когда рассылка ждёт пользователей
         this.mailTimeout = null;
         this.mailStats = { sent: 0, errors: 0, waiting: 0 };
         this.mailHistory = { sent: [], errors: [], waiting: [] };
@@ -19,6 +20,7 @@ class AccountBot {
         this.mailTimerInterval = null; // Интервал обновления таймера Mail
 
         this.isChatRunning = false;
+        this.isChatWaiting = false; // true когда рассылка ждёт пользователей
         this.chatTimeout = null;
         this.chatStats = { sent: 0, errors: 0, waiting: 0 };
         this.chatHistory = { sent: [], errors: [], waiting: [] };
@@ -1133,6 +1135,7 @@ class AccountBot {
 
     stopMail() {
         this.isMailRunning = false;
+        this.isMailWaiting = false;
         clearTimeout(this.mailTimeout);
         this.stopMailTimer();
         this.log("⏹ MAIL Stopped");
@@ -1246,6 +1249,8 @@ class AccountBot {
         let user = null;
         let msgBody = '';
         let fromHotQueue = false; // Флаг: взят из горячей очереди
+        this.isMailWaiting = true; // По умолчанию ждём пока не найдём пользователя
+        this.updateUI();
         try {
             const target = this.mailSettings.target;
             let users = [];
@@ -1415,6 +1420,8 @@ class AccountBot {
             }
 
             user = users[Math.floor(Math.random() * users.length)];
+            this.isMailWaiting = false; // Нашли пользователя - активно отправляем
+            this.updateUI();
 
             // Загружаем полный профиль для расширенных макросов
             try {
@@ -1985,6 +1992,7 @@ class AccountBot {
 
     stopChat() {
         this.isChatRunning = false;
+        this.isChatWaiting = false;
         clearTimeout(this.chatTimeout);
         this.stopChatTimer();
         // Отменяем все автоответы при остановке
@@ -2036,9 +2044,12 @@ class AccountBot {
         }, delay);
     }
     async processChatUser(fullText) {
+        this.isChatWaiting = true; // По умолчанию ждём пока не найдём пользователя
+        this.updateUI();
+
         const invites = fullText.split(/\n\s*__\s*\n/);
         if (invites.length === 0) return;
-        
+
         const durationMs = this.chatSettings.rotationHours * 3600 * 1000;
         const elapsed = Date.now() - this.chatSettings.rotationStartTime;
         
@@ -2098,6 +2109,8 @@ class AccountBot {
             }
 
             user = users[Math.floor(Math.random() * users.length)];
+            this.isChatWaiting = false; // Нашли пользователя - активно отправляем
+            this.updateUI();
 
             // Загружаем полный профиль для расширенных макросов
             try {
@@ -2728,17 +2741,33 @@ class AccountBot {
         const startTime = isChat ? this.chatStartTime : this.mailStartTime;
         const stats = isChat ? this.chatStats : this.mailStats;
         const btn = document.getElementById(`btn-start-${this.id}`);
-        const dot = document.querySelector(`#tab-${this.id} .status-dot`);
+
+        // Обновляем точки статуса (Mail и Chat независимо)
+        const mailDot = document.querySelector(`#tab-${this.id} .status-dot.mail`);
+        const chatDot = document.querySelector(`#tab-${this.id} .status-dot.chat`);
+
+        if (mailDot) {
+            mailDot.classList.remove('active', 'waiting');
+            if (this.isMailRunning) {
+                mailDot.classList.add(this.isMailWaiting ? 'waiting' : 'active');
+            }
+        }
+
+        if (chatDot) {
+            chatDot.classList.remove('active', 'waiting');
+            if (this.isChatRunning) {
+                chatDot.classList.add(this.isChatWaiting ? 'waiting' : 'active');
+            }
+        }
+
         if(btn) {
             if(running) {
                 const timerStr = this.formatElapsedTime(startTime);
                 btn.innerHTML = `<i class="fa fa-stop"></i> ${timerStr}`;
                 btn.classList.replace('btn-primary', 'btn-danger');
-                if(dot) dot.style.boxShadow = "0 0 8px #28a745";
             } else {
                 btn.innerHTML = `<i class="fa fa-paper-plane"></i> Старт`;
                 btn.classList.replace('btn-danger', 'btn-primary');
-                if(dot) dot.style.boxShadow = "none";
             }
         }
         const s = document.getElementById(`stat-sent-${this.id}`);

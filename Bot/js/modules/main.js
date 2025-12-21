@@ -8,7 +8,7 @@ function createInterface(bot) {
     // ОБНОВЛЕНИЕ 2: Привязка нового события DragNDrop
     tab.onmousedown = (e) => startTabDrag(e, tab);
 
-    tab.innerHTML = `<div class="status-dot online"></div><span class="tab-id">${bot.displayId}</span><span class="tab-spinner"><i class="fa fa-sync fa-spin"></i></span><span class="tab-close" onclick="closeTab(event, '${bot.id}')"><i class="fa fa-times"></i></span>`;
+    tab.innerHTML = `<div class="status-dots"><div class="status-dot mail"></div><div class="status-dot chat"></div></div><span class="tab-id">${bot.displayId}</span><span class="tab-spinner"><i class="fa fa-sync fa-spin"></i></span><span class="tab-close" onclick="closeTab(event, '${bot.id}')"><i class="fa fa-times"></i></span>`;
     document.getElementById('tabs-bar').appendChild(tab);
 
     const ws = document.createElement('div');
@@ -1501,7 +1501,7 @@ async function handleLoginOrUpdate() {
     document.getElementById('loginError').innerText = "";
     if(editingBotId) {
         const bot = bots[editingBotId];
-        if(bot) { bot.login = l; bot.pass = p; bot.displayId = i; document.getElementById(`tab-${bot.id}`).innerHTML = `<div class="status-dot online"></div> ${i} <span class="tab-close" onclick="closeTab(event, '${bot.id}')"><i class="fa fa-times"></i></span>`; saveSession(); }
+        if(bot) { bot.login = l; bot.pass = p; bot.displayId = i; document.getElementById(`tab-${bot.id}`).innerHTML = `<div class="status-dots"><div class="status-dot mail"></div><div class="status-dot chat"></div></div><span class="tab-id">${i}</span><span class="tab-spinner"><i class="fa fa-sync fa-spin"></i></span><span class="tab-close" onclick="closeTab(event, '${bot.id}')"><i class="fa fa-times"></i></span>`; saveSession(); }
         closeModal('add-modal'); return;
     }
     if(checkDuplicate(l, i)) { document.getElementById('loginError').innerText = "Этот аккаунт уже добавлен"; return; }
