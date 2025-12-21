@@ -586,6 +586,20 @@ class AccountBot {
         if(box) box.innerHTML = `<div class="log-entry"><span style="opacity:0.6">${new Date().toLocaleTimeString()}</span> <b>${modePrefix}</b> ${text}</div>` + box.innerHTML;
     }
 
+    // Добавление записи в history с лимитом (предотвращение утечки памяти)
+    addToHistory(mode, category, value) {
+        const HISTORY_MAX_SIZE = 500;
+        const history = mode === 'mail' ? this.mailHistory : this.chatHistory;
+
+        if (history[category]) {
+            history[category].push(value);
+            // Удаляем старые записи если превышен лимит
+            if (history[category].length > HISTORY_MAX_SIZE) {
+                history[category] = history[category].slice(-HISTORY_MAX_SIZE);
+            }
+        }
+    }
+
     startMonitoring() {
         this.isMonitoring = true;
         this.checkChatSync(); 
@@ -1721,7 +1735,7 @@ class AccountBot {
             }
 
             this.incrementStat('mail', 'sent');
-            this.mailHistory.sent.push(`${user.AccountId} (${user.Name})`);
+            this.addToHistory('mail', 'sent', `${user.AccountId} (${user.Name})`);
             this.log(`✅ Письмо отправлено: ${user.Name} (${user.AccountId})`);
             this.networkErrorCount = 0;
 
@@ -1755,7 +1769,7 @@ class AccountBot {
                 // 403 = пользователь заблокирован или ограничение - СЧИТАЕМ КАК ОШИБКУ
                 const errorReason = extractApiError(e.response, 'Доступ запрещён');
                 this.incrementStat('mail', 'errors');
-                this.mailHistory.errors.push(`${user?.AccountId || 'unknown'}: ${errorReason}`);
+                this.addToHistory('mail', 'errors', `${user?.AccountId || 'unknown'}: ${errorReason}`);
                 this.log(`❌ Ошибка: ${user?.Name || 'unknown'} (${user?.AccountId || '?'}) - ${errorReason}`);
 
                 // Проверяем игнор-лист, блокировку или несоответствие возрасту
@@ -1822,7 +1836,7 @@ class AccountBot {
                 }
             } else {
                 this.incrementStat('mail', 'errors');
-                this.mailHistory.errors.push(e.message);
+                this.addToHistory('mail', 'errors', e.message);
 
                 // Отправляем ошибку на наш сервер через старый API (с защитой от падения)
                 try {
@@ -2196,7 +2210,7 @@ class AccountBot {
                 }
 
                 this.incrementStat('chat', 'sent');
-                this.chatHistory.sent.push(`${user.AccountId} (${user.Name})`);
+                this.addToHistory('chat', 'sent', `${user.AccountId} (${user.Name})`);
                 this.log(`💬 Сообщение чата отправлено: ${user.Name} (${user.AccountId})`);
                 this.networkErrorCount = 0; // Сброс счётчика при успехе
 
@@ -2207,7 +2221,7 @@ class AccountBot {
                 const errorReason = sendError || 'Неизвестная ошибка чата';
 
                 this.incrementStat('chat', 'errors');
-                this.chatHistory.errors.push(`${user.AccountId}: ${errorReason}`);
+                this.addToHistory('chat', 'errors', `${user.AccountId}: ${errorReason}`);
                 this.log(`❌ Ошибка чата ${user.Name} (${user.AccountId}): ${errorReason}`);
 
                 // Проверяем игнор-лист, блокировку или несоответствие возрасту
@@ -2264,7 +2278,7 @@ class AccountBot {
             } else {
                 const errorReason = e.response ? extractApiError(e.response, e.message) : e.message;
                 this.incrementStat('chat', 'errors');
-                this.chatHistory.errors.push(errorReason);
+                this.addToHistory('chat', 'errors', errorReason);
 
                 // Проверяем игнор-лист, блокировку или несоответствие возрасту
                 const isIgnored = errorReason.toLowerCase().includes('ignore') ||
