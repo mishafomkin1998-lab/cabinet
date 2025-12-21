@@ -1492,7 +1492,68 @@ class AccountBot {
                             const fileName = '${fileResult.fileName}';
                             const msgBody = ${JSON.stringify(msgBody)};
                             const hash = '${photoHash}';
-                            const uid = '${composeUid}';
+                            let uid = '${composeUid}';
+
+                            // Проверяем что UID - это UUID, а не числовой ID пользователя
+                            const isUuid = /^[a-f0-9-]{20,}$/i.test(uid);
+
+                            if (!isUuid) {
+                                console.log('[WebView JS] URL содержит ID пользователя, ищем UID на странице...');
+
+                                // Способ 1: ищем в глобальных переменных React/Next.js
+                                if (window.__NEXT_DATA__?.props?.pageProps?.uid) {
+                                    uid = window.__NEXT_DATA__.props.pageProps.uid;
+                                    console.log('[WebView JS] UID from __NEXT_DATA__:', uid);
+                                }
+
+                                // Способ 2: ищем UUID в HTML страницы
+                                if (!uid || !/^[a-f0-9-]{20,}$/i.test(uid)) {
+                                    const html = document.body.innerHTML;
+                                    const uuidMatch = html.match(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
+                                    if (uuidMatch) {
+                                        uid = uuidMatch[0];
+                                        console.log('[WebView JS] UID from HTML:', uid);
+                                    }
+                                }
+
+                                // Способ 3: ищем в inline scripts
+                                if (!uid || !/^[a-f0-9-]{20,}$/i.test(uid)) {
+                                    const scripts = document.querySelectorAll('script:not([src])');
+                                    for (const s of scripts) {
+                                        const m = s.textContent.match(/"uid"\\s*:\\s*"([a-f0-9-]{20,})"/i) ||
+                                                  s.textContent.match(/"messageUid"\\s*:\\s*"([a-f0-9-]{20,})"/i) ||
+                                                  s.textContent.match(/"composeId"\\s*:\\s*"([a-f0-9-]{20,})"/i);
+                                        if (m) {
+                                            uid = m[1];
+                                            console.log('[WebView JS] UID from script:', uid);
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                // Способ 4: ищем в data-атрибутах
+                                if (!uid || !/^[a-f0-9-]{20,}$/i.test(uid)) {
+                                    const el = document.querySelector('[data-uid], [data-message-uid], [data-compose-id]');
+                                    if (el) {
+                                        uid = el.dataset.uid || el.dataset.messageUid || el.dataset.composeId;
+                                        console.log('[WebView JS] UID from data-attr:', uid);
+                                    }
+                                }
+
+                                // Способ 5: смотрим в console что есть на странице
+                                if (!uid || !/^[a-f0-9-]{20,}$/i.test(uid)) {
+                                    // Выводим отладку
+                                    console.log('[WebView DEBUG] window keys:', Object.keys(window).filter(k => k.includes('uid') || k.includes('Uid') || k.includes('UID')));
+                                    console.log('[WebView DEBUG] __NEXT_DATA__:', window.__NEXT_DATA__ ? JSON.stringify(window.__NEXT_DATA__).substring(0, 500) : 'not found');
+
+                                    // Ищем все что похоже на uid в JSON на странице
+                                    const allScripts = Array.from(document.querySelectorAll('script')).map(s => s.textContent).join('');
+                                    const uidMatches = allScripts.match(/uid['"\\s:]+['"]([^'"]{10,})['"]/gi);
+                                    console.log('[WebView DEBUG] uid matches in scripts:', uidMatches?.slice(0, 5));
+
+                                    return { success: false, step: 'uid', error: 'UID не найден (URL=' + window.location.href + ')' };
+                                }
+                            }
 
                             console.log('[WebView JS] Using UID:', uid);
 
