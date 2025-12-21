@@ -1403,22 +1403,64 @@ class AccountBot {
 
                 this.webview.src = composeUrl;
 
-                // Ждём загрузки страницы (макс 15 сек)
-                await new Promise((resolve, reject) => {
+                // Ждём навигации на URL с UUID (сервер редиректит с /885167 на /30e4a06-xxxx)
+                const currentUrl = await new Promise((resolve, reject) => {
                     const timeout = setTimeout(() => reject(new Error('Timeout loading compose page')), 15000);
-                    this.webview.addEventListener('did-finish-load', () => {
+                    let lastUrl = '';
+
+                    const checkUrl = (url) => {
+                        lastUrl = url;
+                        // Проверяем что URL содержит UUID (не просто числовой ID)
+                        const uidMatch = url.match(/message-compose\/([a-f0-9-]{20,})/i);
+                        if (uidMatch) {
+                            clearTimeout(timeout);
+                            cleanup();
+                            resolve(url);
+                            return true;
+                        }
+                        return false;
+                    };
+
+                    const onNavigate = (e) => {
+                        console.log(`[Photo WebView] did-navigate: ${e.url}`);
+                        checkUrl(e.url);
+                    };
+
+                    const onFinishLoad = () => {
+                        const url = this.webview.getURL();
+                        console.log(`[Photo WebView] did-finish-load, URL: ${url}`);
+                        // Даём 2 секунды на редирект если URL ещё не UUID
+                        if (!checkUrl(url)) {
+                            setTimeout(() => {
+                                const finalUrl = this.webview.getURL();
+                                if (!checkUrl(finalUrl)) {
+                                    // Всё равно продолжаем с тем что есть
+                                    clearTimeout(timeout);
+                                    cleanup();
+                                    resolve(finalUrl);
+                                }
+                            }, 2000);
+                        }
+                    };
+
+                    const onFailLoad = (e) => {
                         clearTimeout(timeout);
-                        resolve();
-                    }, { once: true });
-                    this.webview.addEventListener('did-fail-load', (e) => {
-                        clearTimeout(timeout);
+                        cleanup();
                         reject(new Error(`Failed to load: ${e.errorDescription}`));
-                    }, { once: true });
+                    };
+
+                    const cleanup = () => {
+                        this.webview.removeEventListener('did-navigate', onNavigate);
+                        this.webview.removeEventListener('did-finish-load', onFinishLoad);
+                        this.webview.removeEventListener('did-fail-load', onFailLoad);
+                    };
+
+                    this.webview.addEventListener('did-navigate', onNavigate);
+                    this.webview.addEventListener('did-finish-load', onFinishLoad);
+                    this.webview.addEventListener('did-fail-load', onFailLoad);
                 });
 
-                // Проверяем что мы на правильной странице (не редирект на логин/профиль)
-                const currentUrl = this.webview.getURL();
-                console.log(`[Photo WebView] Текущий URL после загрузки: ${currentUrl}`);
+                console.log(`[Photo WebView] Финальный URL: ${currentUrl}`);
 
                 if (!currentUrl.includes('/message-compose/')) {
                     // WebView не авторизован - пробуем переавторизоваться
@@ -1450,109 +1492,9 @@ class AccountBot {
                             const fileName = '${fileResult.fileName}';
                             const msgBody = ${JSON.stringify(msgBody)};
                             const hash = '${photoHash}';
+                            const uid = '${composeUid}';
 
-                            // === ОТЛАДКА: собираем информацию о странице ===
-                            const debugInfo = {
-                                url: window.location.href,
-                                inputs: [],
-                                dataAttrs: [],
-                                windowVars: [],
-                                scriptMatches: []
-                            };
-
-                            // Все input поля
-                            document.querySelectorAll('input').forEach(inp => {
-                                if (inp.name || inp.id) {
-                                    debugInfo.inputs.push({ name: inp.name, id: inp.id, value: inp.value?.substring(0, 50) });
-                                }
-                            });
-
-                            // Элементы с data-атрибутами содержащими uid/id
-                            document.querySelectorAll('[data-uid], [data-id], [data-message-id], [data-compose-id]').forEach(el => {
-                                debugInfo.dataAttrs.push({
-                                    tag: el.tagName,
-                                    uid: el.dataset.uid,
-                                    id: el.dataset.id,
-                                    messageId: el.dataset.messageId,
-                                    composeId: el.dataset.composeId
-                                });
-                            });
-
-                            // Window переменные
-                            ['uid', 'messageUid', 'composeUid', 'messageId', 'composeId', '__INITIAL_STATE__', '__NUXT__'].forEach(v => {
-                                if (window[v]) debugInfo.windowVars.push({ name: v, type: typeof window[v] });
-                            });
-
-                            // React/Vue state
-                            const reactRoot = document.querySelector('[data-reactroot], #app, #__nuxt, #__next');
-                            if (reactRoot) debugInfo.framework = 'React/Vue detected';
-
-                            console.log('[WebView DEBUG] Page info:', JSON.stringify(debugInfo, null, 2));
-
-                            // === Поиск UID ===
-                            let uid = null;
-
-                            // Вариант 1: скрытое поле формы
-                            const hiddenUid = document.querySelector('input[name="uid"], input[name="messageUid"], input[name="message_uid"], input[name="compose_uid"]');
-                            if (hiddenUid) {
-                                uid = hiddenUid.value;
-                                console.log('[WebView JS] UID from hidden input:', uid);
-                            }
-
-                            // Вариант 2: data-атрибут
-                            if (!uid) {
-                                const container = document.querySelector('[data-uid], [data-message-uid], [data-compose-id]');
-                                if (container) {
-                                    uid = container.dataset.uid || container.dataset.messageUid || container.dataset.composeId;
-                                    console.log('[WebView JS] UID from data-attr:', uid);
-                                }
-                            }
-
-                            // Вариант 3: React/Vue state
-                            if (!uid && window.__INITIAL_STATE__) {
-                                const state = window.__INITIAL_STATE__;
-                                uid = state.uid || state.messageUid || state.compose?.uid;
-                                if (uid) console.log('[WebView JS] UID from __INITIAL_STATE__:', uid);
-                            }
-
-                            // Вариант 4: ищем UUID в любом месте страницы
-                            if (!uid) {
-                                const pageHtml = document.body.innerHTML;
-                                const uuidMatch = pageHtml.match(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
-                                if (uuidMatch) {
-                                    uid = uuidMatch[0];
-                                    console.log('[WebView JS] UID from HTML (UUID format):', uid);
-                                }
-                            }
-
-                            // Вариант 5: ищем длинный hex в JSON на странице
-                            if (!uid) {
-                                const scripts = document.querySelectorAll('script:not([src])');
-                                for (const script of scripts) {
-                                    const match = script.textContent.match(/"uid"\\s*:\\s*"([^"]{20,})"/i) ||
-                                                  script.textContent.match(/"composeId"\\s*:\\s*"([^"]{20,})"/i);
-                                    if (match) {
-                                        uid = match[1];
-                                        console.log('[WebView JS] UID from inline script:', uid);
-                                        break;
-                                    }
-                                }
-                            }
-
-                            // Вариант 6: из URL (legacy - только если UUID формат)
-                            if (!uid) {
-                                const urlMatch = window.location.pathname.match(/message-compose\\/([a-f0-9-]{20,})/i);
-                                if (urlMatch) {
-                                    uid = urlMatch[1];
-                                    console.log('[WebView JS] UID from URL:', uid);
-                                }
-                            }
-
-                            if (!uid) {
-                                return { success: false, step: 'uid', error: 'Не найден UID', debug: debugInfo };
-                            }
-
-                            console.log('[WebView JS] uid=' + uid);
+                            console.log('[WebView JS] Using UID:', uid);
 
                             // Конвертируем base64 в Blob
                             const byteCharacters = atob(base64);
@@ -1608,9 +1550,6 @@ class AccountBot {
                 console.log(`[Photo WebView] Результат:`, result);
 
                 if (!result.success) {
-                    if (result.debug) {
-                        console.log(`[Photo WebView] DEBUG INFO:`, JSON.stringify(result.debug, null, 2));
-                    }
                     throw new Error(`Ошибка на шаге ${result.step}: ${result.error}`);
                 }
 
