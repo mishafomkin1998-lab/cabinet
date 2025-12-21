@@ -1,7 +1,11 @@
 const KEEP_ALIVE_SCRIPT = `
     console.log("%c[Lababot] Анти-сон активирован", "color: green; font-weight: bold");
-    Object.defineProperty(document, 'hidden', { value: false, writable: false });
-    Object.defineProperty(document, 'visibilityState', { value: 'visible', writable: false });
+    try {
+        Object.defineProperty(document, 'hidden', { value: false, writable: false, configurable: true });
+    } catch(e) { console.log('[Lababot] hidden уже определён'); }
+    try {
+        Object.defineProperty(document, 'visibilityState', { value: 'visible', writable: false, configurable: true });
+    } catch(e) { console.log('[Lababot] visibilityState уже определён'); }
 
     setInterval(() => {
         const x = Math.floor(Math.random() * window.innerWidth);
