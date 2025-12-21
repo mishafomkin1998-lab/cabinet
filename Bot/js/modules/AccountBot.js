@@ -1470,7 +1470,8 @@ class AccountBot {
                 }
 
                 // ШАГ 3: Переводим WebView на compose страницу
-                const composeUrl = `https://ladadate.com/message-compose/${user.AccountId}`;
+                // Добавляем timestamp для предотвращения кэширования (иначе client-side redirect не происходит)
+                const composeUrl = `https://ladadate.com/message-compose/${user.AccountId}?_t=${Date.now()}`;
                 console.log(`[Photo WebView] Переход на ${composeUrl}`);
 
                 this.webview.src = composeUrl;
