@@ -1,0 +1,2880 @@
+function createInterface(bot) {
+    const tab = document.createElement('div');
+    tab.className = 'tab-item';
+    tab.id = `tab-${bot.id}`;
+    tab.onclick = () => selectTab(bot.id);
+    tab.oncontextmenu = (e) => onTabRightClick(e, bot.id);
+    
+    // ОБНОВЛЕНИЕ 2: Привязка нового события DragNDrop
+    tab.onmousedown = (e) => startTabDrag(e, tab);
+
+    tab.innerHTML = `<div class="status-dot online"></div><span class="tab-id">${bot.displayId}</span><span class="tab-spinner"><i class="fa fa-sync fa-spin"></i></span><span class="tab-close" onclick="closeTab(event, '${bot.id}')"><i class="fa fa-times"></i></span>`;
+    document.getElementById('tabs-bar').appendChild(tab);
+
+    const ws = document.createElement('div');
+    ws.className = 'workspace';
+    ws.id = `ws-${bot.id}`;
+    const row = document.createElement('div'); row.className = 'row h-100 g-2';
+    
+    // Col 1
+    const col1 = document.createElement('div'); col1.className='col-3';
+    col1.innerHTML = `
+        <div class="panel-col">
+            <div class="col-title" id="title-tpl-${bot.id}">Шаблоны Писем</div>
+            <select id="tpl-select-${bot.id}" class="form-select mb-2" onchange="onTemplateSelect('${bot.id}')"><option value="">-- Выберите --</option></select>
+            <div class="d-flex gap-1 mb-2">
+                <button class="btn btn-sm btn-success btn-xs flex-fill" onclick="addTemplateInline('${bot.id}', event)" data-tip="Новый шаблон (Shift=всем)"><i class="fa fa-plus"></i></button>
+                <button class="btn btn-sm btn-secondary btn-xs flex-fill" onclick="editTemplateNameInline('${bot.id}')" data-tip="Редактировать название"><i class="fa fa-edit"></i></button>
+                <button class="btn btn-sm btn-danger btn-xs flex-fill" onclick="deleteTemplate('${bot.id}', event)" data-tip="Удалить (Shift=всем)"><i class="fa fa-trash"></i></button>
+                <button class="btn btn-sm btn-outline-danger btn-xs flex-fill hide-in-chat" id="btn-fav-${bot.id}" onclick="toggleTemplateFavorite('${bot.id}')" data-tip="В избранное"><i class="fa fa-heart"></i></button>
+            </div>
+
+            <!-- Кнопка Inbox (только в режиме Mail) -->
+            <button class="btn btn-inbox w-100 mb-2 hide-in-chat" onclick="openInboxWindow('${bot.id}')" data-tip="Открыть входящие на сайте">
+                <i class="fa fa-inbox"></i> Inbox
+            </button>
+
+            <!-- Кнопка SHARE MY CAM (только в режиме Chat) -->
+            <button class="btn btn-share-cam w-100 mb-2 hide-in-mail" id="btn-share-cam-${bot.id}" onclick="openVideoChatWindow('${bot.id}')">
+                <i class="fa fa-video-camera"></i> SHARE MY CAM
+            </button>
+
+            <!-- Секция автоответов (только для Chat режима) -->
+            <div class="auto-reply-section hide-in-mail" id="auto-reply-section-${bot.id}">
+                <div class="auto-reply-header">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="auto-reply-enabled-${bot.id}" onchange="toggleAutoReply('${bot.id}')">
+                        <label class="form-check-label" for="auto-reply-enabled-${bot.id}">
+                            <i class="fa fa-robot"></i> Автоответы
+                        </label>
+                    </div>
+                </div>
+                <div class="auto-reply-list" id="auto-reply-list-${bot.id}">
+                    <!-- Автоответы будут добавляться динамически -->
+                </div>
+                <button class="btn btn-sm btn-outline-success w-100 mt-2" onclick="addAutoReply('${bot.id}')">
+                    <i class="fa fa-plus"></i> Добавить автоответ
+                </button>
+            </div>
+        </div>`;
+    row.appendChild(col1);
+
+    // Col 2
+    const col2 = document.createElement('div'); col2.className='col-4';
+    col2.innerHTML = `
+        <div class="panel-col">
+            <div class="col-title">
+                <span id="title-text-${bot.id}">Письмо</span>
+                <div class="ai-container ${globalSettings.extendedFeatures ? '' : 'ai-hidden'}">
+                    <button class="btn-ai-main" onclick="toggleAI('${bot.id}')"><i class="fa fa-magic"></i> AI</button>
+                    <div class="ai-options" id="ai-options-${bot.id}">
+                        <div class="btn-ai-sub-with-submenu" id="btn-improve-${bot.id}" onmouseenter="showImproveSubmenu('${bot.id}')" onmouseleave="hideImproveSubmenuDelayed('${bot.id}')">
+                            <span class="btn-ai-sub-trigger"><i class="fa fa-check"></i> Improve <i class="fa fa-caret-right submenu-arrow"></i></span>
+                            <div class="improve-submenu" id="improve-submenu-${bot.id}" onmouseenter="cancelHideImproveSubmenu('${bot.id}')" onmouseleave="hideImproveSubmenuDelayed('${bot.id}')"></div>
+                        </div>
+                        <button class="btn-ai-sub" onclick="handleAIAction('${bot.id}', 'generate', event)" title="Shift=всем"><i class="fa fa-pencil"></i> Generate</button>
+                        <div class="btn-ai-sub-with-submenu" id="btn-myprompt-${bot.id}" onmouseenter="showPromptSubmenu('${bot.id}')" onmouseleave="hidePromptSubmenuDelayed('${bot.id}')">
+                            <span class="btn-ai-sub-trigger"><i class="fa fa-user"></i> <span class="myprompt-label">My Prompt</span> <i class="fa fa-caret-right submenu-arrow"></i></span>
+                            <div class="prompt-submenu" id="prompt-submenu-${bot.id}" onmouseenter="cancelHidePromptSubmenu('${bot.id}')" onmouseleave="hidePromptSubmenuDelayed('${bot.id}')"></div>
+                        </div>
+                    </div>
+            </div>
+            </div>
+            <div class="relative-box d-flex flex-column flex-grow-1">
+                <textarea id="msg-${bot.id}" class="textarea-msg form-control" disabled placeholder="Текст..." onclick="this.focus()" oninput="bots['${bot.id}'].updateUI(); validateInput(this); autoSaveTemplateText('${bot.id}')" onblur="saveTemplateTextNow('${bot.id}')"></textarea>
+            </div>
+            <div id="active-invite-${bot.id}" class="active-invite-box hide-in-mail"></div>
+            <div class="photo-block hide-in-chat">
+                <div id="preview-box-${bot.id}" class="photo-preview-float"><img id="preview-img-${bot.id}"></div>
+                <label id="photo-label-${bot.id}" class="photo-select-area">
+                    <i class="fa fa-camera"></i> <span id="photo-name-${bot.id}" class="photo-name">Прикрепить фото</span>
+                    <input type="file" id="photo-input-${bot.id}" hidden onchange="onPhotoSelect('${bot.id}')">
+                </label>
+                <button class="btn-remove-photo" onclick="removePhoto('${bot.id}')"><i class="fa fa-times"></i></button>
+            </div>
+        </div>`;
+    row.appendChild(col2);
+
+    // Col 3
+    const col3 = document.createElement('div'); col3.className='col-3';
+    col3.innerHTML = `
+        <div class="panel-col">
+            <div class="col-title">Настройки</div>
+            <select id="target-select-${bot.id}" class="form-select form-select-sm mb-1" onchange="updateSettings('${bot.id}'); toggleCustomIdsField('${bot.id}')">
+                <option value="online-smart">Online Smart</option>
+                <option value="shared-online">Online Shared</option>
+                <option value="online">Online</option>
+                <option disabled>─────────────</option>
+                <option value="favorites">I am a favorite of</option>
+                <option value="my-favorites">My favorite</option>
+                <option value="inbox">Inbox</option>
+                <option value="payers">Payers</option>
+                <option value="custom-ids">Custom IDs</option>
+            </select>
+            <div id="custom-ids-field-${bot.id}" class="custom-ids-field mb-1" style="display: none;">
+                <textarea id="custom-ids-input-${bot.id}" class="form-control form-control-sm" rows="2" placeholder="ID через запятую, пробел или в столбик" onchange="saveCustomIds('${bot.id}')"></textarea>
+                <small class="text-muted">Осталось: <span id="custom-ids-remaining-${bot.id}">0</span></small>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <select class="form-select form-select-sm" id="speed-select-${bot.id}" style="width: 100px;" onmousedown="shiftWasPressed=event.shiftKey" onchange="handleSpeedChange('${bot.id}', this.value)" title="Скорость отправки (Shift=всем)">
+                    <option value="smart" selected>Smart</option>
+                    <option value="15">15s</option>
+                    <option value="30">30s</option>
+                </select>
+                <div class="form-check small m-0 hide-in-chat" title="Auto: Payers -> My Favorite -> Favorites -> Inbox -> Online (Shift=всем)">
+                    <input class="form-check-input" type="checkbox" id="auto-check-${bot.id}" onmousedown="shiftWasPressed=event.shiftKey" onchange="handleAutoChange('${bot.id}')">
+                    <label class="form-check-label text-muted" for="auto-check-${bot.id}">Auto</label>
+                </div>
+                <div class="form-check small m-0 hide-in-chat" title="Отправлять только пользователям с фото">
+                    <input class="form-check-input" type="checkbox" id="check-photo-${bot.id}" onchange="updateSettings('${bot.id}')">
+                    <label class="form-check-label text-muted" for="check-photo-${bot.id}">Photo</label>
+                </div>
+            </div>
+
+            <div class="mb-2 hide-in-mail p-2 bg-light border rounded">
+                <label class="form-label small mb-0 text-muted">Следующий инвайт через</label>
+                <select class="form-select form-select-sm mb-1" id="rot-time-${bot.id}" onchange="updateChatRotation('${bot.id}')">
+                    <option value="3">3 часа</option>
+                    <option value="6">6 часов</option>
+                    <option value="12">12 часа</option>
+                    <option value="24">24 часа</option>
+                </select>
+                <div class="form-check small">
+                    <input class="form-check-input" type="checkbox" id="rot-cyclic-${bot.id}" onchange="updateChatRotation('${bot.id}')">
+                    <label class="form-check-label" for="rot-cyclic-${bot.id}">Циклично</label>
+                </div>
+            </div>
+
+            <button id="btn-start-${bot.id}" class="btn btn-primary w-100 mb-2" onclick="toggleBot('${bot.id}')"><i class="fa fa-paper-plane"></i> Старт</button>
+            
+            <div class="border-top pt-2">
+                <div class="stat-line text-success"><span>Отправлено:</span> <span class="stat-val-wrapper"><b id="stat-sent-${bot.id}" class="stat-val" onclick="openStatsModal('${bot.id}', 'sent')">0</b><span id="stat-hotqueue-${bot.id}" class="stat-hotqueue" title="Отправлено из горячей очереди"></span></span></div>
+                <div class="stat-line text-danger"><span>Ошибки:</span> <span class="stat-val-wrapper"><b id="stat-err-${bot.id}" class="stat-val" onclick="openStatsModal('${bot.id}', 'errors')">0</b></span></div>
+                <div class="stat-waiting-row">
+                    <span id="stat-ignored-${bot.id}" class="stat-ignored-text" onclick="openIgnoredModal('${bot.id}')" title="Пользователи в игноре (клик для управления)">Игнор: 0</span>
+                    <span id="stat-wait-${bot.id}" class="stat-waiting-text">Ожидают: 0</span>
+                </div>
+            </div>
+            <div class="action-log-wrapper mt-2">
+                <div id="log-${bot.id}" class="action-log"></div>
+                <button class="btn-expand-log mt-1" onclick="openLogModal('${bot.id}')" title="Развернуть лог">
+                    <i class="fa fa-expand"></i> Развернуть
+                </button>
+            </div>
+        </div>`;
+    row.appendChild(col3);
+
+    // Col 4
+    const col4 = document.createElement('div'); col4.className='col-2';
+    col4.innerHTML = `
+        <div class="panel-col">
+            <div class="col-title">Blacklist</div>
+            <div id="bl-list-${bot.id}" class="scroll-list"></div>
+            <div class="bl-input-row">
+                <input type="text" id="bl-input-${bot.id}" class="form-control form-control-sm" placeholder="ID..." onkeydown="handleBlacklistKeydown(event, '${bot.id}')">
+                <button class="btn btn-success btn-sm" onclick="addBlacklistFromInput('${bot.id}')" title="1 ID = этому боту, несколько = всем">+</button>
+            </div>
+            <div class="bl-actions">
+                <button class="btn btn-outline-danger btn-sm flex-fill" onclick="removeSelectedBlacklist('${bot.id}')" data-tip="Удалить выбранные"><i class="fa fa-trash"></i></button>
+                <button class="btn btn-outline-warning btn-sm flex-fill" onclick="toggleVipStatus('${bot.id}')" data-tip="VIP Клиент (Отслеживать онлайн)"><i class="fa fa-star"></i></button>
+            </div>
+        </div>`;
+    row.appendChild(col4);
+    ws.appendChild(row);
+    document.getElementById('panels-container').appendChild(ws);
+    updateInterfaceForMode(bot.id);
+    updateBotCount();
+    
+    toggleExtendedFeatures();
+}
+
+function getBotTemplates(login) {
+     if(!botTemplates[login]) botTemplates[login] = { mail: [], chat: [] };
+     return botTemplates[login];
+}
+
+function updateInterfaceForMode(botId) {
+    const isChat = globalMode === 'chat';
+    const bot = bots[botId];
+    document.getElementById(`title-tpl-${botId}`).innerText = isChat ? "Шаблоны ЧАТА" : "Шаблоны ПИСЕМ";
+    document.getElementById(`title-text-${botId}`).innerText = isChat ? "Сообщения (разд. __)" : "Текст письма";
+    document.getElementById(`chat-hint`).style.display = isChat ? 'block' : 'none';
+
+    // Обновляем текст кнопки My Prompt в зависимости от режима
+    const myPromptLabel = document.querySelector(`#btn-myprompt-${botId} .myprompt-label`);
+    if (myPromptLabel) {
+        myPromptLabel.innerText = isChat ? "My Prompt (Chat)" : "My Prompt";
+    }
+    const ws = document.getElementById(`ws-${botId}`);
+    const targetSelect = document.getElementById(`target-select-${botId}`);
+
+    if(isChat) {
+        ws.querySelectorAll('.hide-in-chat').forEach(el => el.style.display = 'none');
+        ws.querySelectorAll('.hide-in-mail').forEach(el => el.style.display = 'block');
+
+        Array.from(targetSelect.options).forEach(opt => {
+            // Скрываем опции недоступные в Chat режиме (включая custom-ids и shared-online)
+            if (['favorites', 'my-favorites', 'inbox', 'custom-ids', 'shared-online'].includes(opt.value)) { opt.style.display = 'none'; }
+            else { opt.style.display = 'block'; }
+        });
+        targetSelect.value = bot.chatSettings.target;
+
+        // Скрываем поле Custom IDs в Chat режиме
+        const customIdsField = document.getElementById(`custom-ids-field-${botId}`);
+        if (customIdsField) customIdsField.style.display = 'none';
+
+        document.getElementById(`rot-time-${botId}`).value = bot.chatSettings.rotationHours;
+        document.getElementById(`rot-cyclic-${botId}`).checked = bot.chatSettings.cyclic;
+    } else {
+        ws.querySelectorAll('.hide-in-chat').forEach(el => { if(el.classList.contains('photo-block')) el.style.display = 'flex'; else el.style.display = 'block'; });
+        ws.querySelectorAll('.hide-in-chat.d-none').forEach(el => el.style.display = 'none');
+        ws.querySelectorAll('.hide-in-mail').forEach(el => el.style.display = 'none');
+
+        Array.from(targetSelect.options).forEach(opt => opt.style.display = 'block');
+        targetSelect.value = bot.mailSettings.target;
+
+        // Показываем поле Custom IDs если выбран этот режим
+        toggleCustomIdsField(botId);
+
+        document.getElementById(`auto-check-${botId}`).checked = bot.mailSettings.auto;
+        document.getElementById(`check-photo-${botId}`).checked = bot.mailSettings.photoOnly || false;
+    }
+
+    // Обновляем селектор скорости в зависимости от режима
+    const speedSelect = document.getElementById(`speed-select-${botId}`);
+    if (speedSelect) {
+        speedSelect.value = isChat ? bot.chatSettings.speed : bot.mailSettings.speed;
+    }
+
+    let lastIdx = isChat ? bot.lastTplChat : bot.lastTplMail;
+    if (lastIdx === null || lastIdx === undefined || lastIdx === "") {
+        if(accountPreferences[bot.login]) {
+            lastIdx = isChat ? accountPreferences[bot.login].chatTpl : accountPreferences[bot.login].mailTpl;
+            if(lastIdx !== undefined) {
+                 if(isChat) bot.lastTplChat = lastIdx; else bot.lastTplMail = lastIdx;
+            }
+        }
+    }
+
+    updateTemplateDropdown(botId, lastIdx);
+    renderBlacklist(botId);
+
+    // Инициализация UI автоответов при переключении в Chat режим
+    if (isChat) {
+        initAutoRepliesUI(botId);
+    }
+
+    bot.updateUI();
+}
+
+function updateSettings(botId, type, val) {
+    const isChat = globalMode === 'chat';
+    const bot = bots[botId];
+    const set = isChat ? bot.chatSettings : bot.mailSettings;
+    if (type === 'speed') set.speed = val;
+    else {
+        set.target = document.getElementById(`target-select-${botId}`).value;
+        if(!isChat) {
+            set.photoOnly = document.getElementById(`check-photo-${botId}`).checked;
+            bot.mailSettings.auto = document.getElementById(`auto-check-${botId}`).checked;
+        }
+    }
+    saveSession();
+}
+
+// Обработчик Auto с поддержкой Shift
+function handleAutoChange(botId) {
+    const checkbox = document.getElementById(`auto-check-${botId}`);
+    const isChecked = checkbox.checked;
+
+    if (shiftWasPressed) {
+        // Shift был зажат при клике - применяем ко всем анкетам
+        setAutoForAll(isChecked);
+        shiftWasPressed = false; // Сбрасываем
+    } else {
+        // Обычное поведение - только для этой анкеты
+        const bot = bots[botId];
+        bot.mailSettings.auto = isChecked;
+        saveSession();
+    }
+}
+
+// Установить Auto для ВСЕХ анкет
+function setAutoForAll(isChecked) {
+    const botIds = Object.keys(bots);
+    let count = 0;
+
+    for (const botId of botIds) {
+        const bot = bots[botId];
+        bot.mailSettings.auto = isChecked;
+
+        const checkbox = document.getElementById(`auto-check-${botId}`);
+        if (checkbox) checkbox.checked = isChecked;
+        count++;
+    }
+
+    saveSession();
+    showBulkNotification(isChecked ? 'Auto включён для всех' : 'Auto выключен для всех', count);
+}
+
+// Обработчик скорости с поддержкой Shift
+function handleSpeedChange(botId, val) {
+    if (shiftWasPressed) {
+        // Shift был зажат при клике - применяем ко всем анкетам
+        setSpeedForAll(val);
+        shiftWasPressed = false; // Сбрасываем
+    } else {
+        // Обычное поведение
+        updateSettings(botId, 'speed', val);
+    }
+}
+
+// Установить скорость для ВСЕХ анкет
+function setSpeedForAll(val) {
+    const isChat = globalMode === 'chat';
+    const botIds = Object.keys(bots);
+    let count = 0;
+
+    for (const botId of botIds) {
+        const bot = bots[botId];
+        const set = isChat ? bot.chatSettings : bot.mailSettings;
+        set.speed = val;
+
+        const selector = document.getElementById(`speed-select-${botId}`);
+        if (selector) selector.value = val;
+        count++;
+    }
+
+    saveSession();
+    const speedLabel = val === 'smart' ? 'Smart' : `${val}s`;
+    showBulkNotification(`Скорость ${speedLabel} установлена всем`, count);
+}
+
+function updateChatRotation(botId) {
+    const bot = bots[botId];
+    bot.chatSettings.rotationHours = parseInt(document.getElementById(`rot-time-${botId}`).value);
+    bot.chatSettings.cyclic = document.getElementById(`rot-cyclic-${botId}`).checked;
+    saveSession();
+}
+function onTabRightClick(e, botId) {
+    e.preventDefault();
+    const tab = document.getElementById(`tab-${botId}`);
+    const bot = bots[botId];
+    bot.tabColorState = (bot.tabColorState + 1) % 4;
+    tab.classList.remove('tab-green', 'tab-yellow', 'tab-red');
+    if (bot.tabColorState === 1) tab.classList.add('tab-green');
+    else if (bot.tabColorState === 2) tab.classList.add('tab-yellow');
+    else if (bot.tabColorState === 3) tab.classList.add('tab-red');
+}
+function checkDuplicate(login, displayId) {
+    return !!Object.values(bots).find(b => b.login.toLowerCase() === login.toLowerCase() || b.displayId.toLowerCase() === displayId.toLowerCase());
+}
+function renderManagerList() {
+    const list = document.getElementById('manager-list'); list.innerHTML = '';
+    Object.values(bots).forEach(b => {
+        const row = document.createElement('div'); row.className = 'acc-row';
+        row.innerHTML = `<div><b>${b.displayId}</b> (${b.login})</div>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" onclick="editAccount('${b.id}')"><i class="fa fa-pencil"></i></button>
+                <button class="btn btn-outline-danger" onclick="closeTab(event, '${b.id}'); renderManagerList()"><i class="fa fa-trash"></i></button>
+            </div>`;
+        list.appendChild(row);
+    });
+}
+// Функция показа красивого модального окна результатов импорта
+function showImportResult(successList, duplicateList, errorList) {
+    let html = '';
+
+    // Успешные
+    if (successList.length > 0) {
+        html += `<div class="import-section import-success">
+            <div class="import-section-header">
+                <i class="fa fa-check-circle"></i> Успешно добавлены <span class="import-count">${successList.length}</span>
+            </div>
+            <div class="import-section-list">
+                ${successList.map(item => `<div class="import-item"><span class="import-id">${item.displayId}</span> ${item.login}</div>`).join('')}
+            </div>
+        </div>`;
+    }
+
+    // Дубликаты
+    if (duplicateList.length > 0) {
+        html += `<div class="import-section import-duplicate">
+            <div class="import-section-header">
+                <i class="fa fa-clone"></i> Пропущены (дубли) <span class="import-count">${duplicateList.length}</span>
+            </div>
+            <div class="import-section-list">
+                ${duplicateList.map(item => `<div class="import-item"><span class="import-id">${item.displayId}</span> ${item.login}</div>`).join('')}
+            </div>
+        </div>`;
+    }
+
+    // Ошибки
+    if (errorList.length > 0) {
+        html += `<div class="import-section import-error">
+            <div class="import-section-header">
+                <i class="fa fa-times-circle"></i> Ошибки входа <span class="import-count">${errorList.length}</span>
+            </div>
+            <div class="import-section-list">
+                ${errorList.map(item => `<div class="import-item"><span class="import-id">${item.displayId}</span> ${item.login}</div>`).join('')}
+            </div>
+        </div>`;
+    }
+
+    // Если всё пусто
+    if (successList.length === 0 && duplicateList.length === 0 && errorList.length === 0) {
+        html = '<div class="text-center text-muted p-3"><i class="fa fa-info-circle"></i> Нет данных для импорта</div>';
+    }
+
+    document.getElementById('import-result-content').innerHTML = html;
+    openModal('import-result-modal');
+}
+
+async function handleUniversalImport(input) {
+    if (!input.files.length) return;
+    const file = input.files[0];
+    const fileName = file.name.toLowerCase();
+
+    // Параллельный импорт - до 5 анкет одновременно
+    const PARALLEL_LIMIT = 5;
+
+    async function importBatch(accounts) {
+        const successList = [], duplicateList = [], errorList = [];
+
+        // Фильтруем дубликаты сразу
+        const toImport = [];
+        for (const acc of accounts) {
+            if (checkDuplicate(acc.login, acc.displayId)) {
+                duplicateList.push({ login: acc.login, displayId: acc.displayId });
+            } else {
+                toImport.push(acc);
+            }
+        }
+
+        // Импортируем параллельно батчами
+        for (let i = 0; i < toImport.length; i += PARALLEL_LIMIT) {
+            const batch = toImport.slice(i, i + PARALLEL_LIMIT);
+            const results = await Promise.all(
+                batch.map(acc => performLoginFast(acc.login, acc.pass, acc.displayId))
+            );
+
+            results.forEach((success, idx) => {
+                const acc = batch[idx];
+                if (success) {
+                    successList.push({ login: acc.login, displayId: acc.displayId });
+                } else {
+                    errorList.push({ login: acc.login, displayId: acc.displayId });
+                }
+            });
+        }
+
+        // После всех логинов - загружаем данные с сервера в фоне
+        loadServerDataForAllBots();
+
+        return { successList, duplicateList, errorList };
+    }
+
+    if (fileName.endsWith('.json')) {
+        // JSON - полный импорт (сохраняет порядок вкладок!)
+        if (!await customConfirm('Внимание! Импорт JSON перезапишет существующие данные. Продолжить?', { type: 'warning' })) {
+            input.value = '';
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+
+                // === СОХРАНЯЕМ БОТОВ В LOCALSTORAGE В ПРАВИЛЬНОМ ПОРЯДКЕ ===
+                // Не логиним сейчас - restoreSession залогинит их последовательно при reload
+                if (data.bots && Array.isArray(data.bots)) {
+                    const savedBotsData = data.bots
+                        .filter(b => b.login && b.displayId)
+                        .map(botData => ({
+                            login: botData.login,
+                            pass: botData.pass || 'password',
+                            displayId: botData.displayId,
+                            // Настройки для восстановления
+                            mailTarget: botData.mailSettings?.target,
+                            mailSpeed: botData.mailSettings?.speed,
+                            mailAuto: botData.mailSettings?.auto,
+                            mailPhotoOnly: botData.mailSettings?.photoOnly,
+                            chatTarget: botData.chatSettings?.target,
+                            chatSpeed: botData.chatSettings?.speed,
+                            chatRotationHours: botData.chatSettings?.rotationHours,
+                            chatCyclic: botData.chatSettings?.cyclic,
+                            chatCurrentIndex: botData.chatSettings?.currentInviteIndex,
+                            chatStartTime: botData.chatSettings?.rotationStartTime,
+                            autoReplies: botData.chatSettings?.autoReplies || [],
+                            autoReplyEnabled: botData.chatSettings?.autoReplyEnabled || false,
+                            vipList: botData.vipList || [],
+                            customIdsList: botData.customIdsList || [],
+                            customIdsSent: botData.customIdsSent || [],
+                            photoPath: botData.photoPath || null,
+                            photoName: botData.photoName || null
+                        }));
+                    localStorage.setItem('savedBots', JSON.stringify(savedBotsData));
+                    console.log(`[Import] Сохранено ${savedBotsData.length} ботов в localStorage`);
+                }
+
+                // Импортируем шаблоны
+                if (data.templates) {
+                    botTemplates = data.templates;
+                    localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+                }
+                // Импортируем настройки аккаунтов
+                if (data.accountPreferences) {
+                    accountPreferences = data.accountPreferences;
+                    localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
+                }
+                // Импортируем глобальные настройки
+                if (data.globalSettings) {
+                    globalSettings = { ...globalSettings, ...data.globalSettings };
+                    localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+                }
+
+                alert('Данные успешно импортированы! Перезагрузка...');
+                setTimeout(() => location.reload(), 500);
+
+            } catch (error) {
+                console.error('Import error:', error);
+                alert('Ошибка импорта: ' + error.message);
+            }
+            input.value = '';
+        };
+        reader.readAsText(file);
+
+    } else if (fileName.endsWith('.txt')) {
+        // TXT - только анкеты (ID Логин Пароль)
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+            const lines = e.target.result.split('\n');
+            const accounts = [];
+
+            for (let line of lines) {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length >= 3) {
+                    const [displayId, login, pass] = parts;
+                    accounts.push({ login, pass, displayId });
+                }
+            }
+
+            const result = await importBatch(accounts);
+            showImportResult(result.successList, result.duplicateList, result.errorList);
+            input.value = '';
+            renderManagerList();
+        };
+        reader.readAsText(file);
+
+    } else {
+        showImportResult([], [], [{ login: 'Файл', displayId: 'Неподдерживаемый формат. Используйте .txt или .json' }]);
+        input.value = '';
+    }
+}
+
+// Быстрый логин без загрузки данных с сервера
+async function performLoginFast(login, pass, displayId) {
+    try {
+        const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: login, Password: pass });
+
+        if(res.data.Token) {
+            const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
+            const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
+            bots[bid] = bot;
+
+            // Загружаем игнор-листы из localStorage
+            bot.ignoredUsersMail = loadIgnoredUsersFromStorage(displayId, 'mail');
+            bot.ignoredUsersChat = loadIgnoredUsersFromStorage(displayId, 'chat');
+
+            // Устанавливаем прокси
+            await setWebviewProxy(bid);
+
+            // Показываем UI
+            createInterface(bot);
+
+            // Создаём WebView
+            bot.createWebview();
+
+            // Помечаем что данные ещё не загружены
+            bot.serverDataLoaded = false;
+
+            return true;
+        }
+    } catch(err) {
+        console.error(`[Login Error] ${displayId}:`, err.message);
+    }
+    return false;
+}
+
+// Загрузка данных с сервера для всех ботов (в фоне)
+async function loadServerDataForAllBots() {
+    const botsToLoad = Object.values(bots).filter(b => !b.serverDataLoaded);
+    if (botsToLoad.length === 0) return;
+
+    console.log(`[Server Data] Загрузка данных для ${botsToLoad.length} анкет...`);
+
+    // Загружаем параллельно по 3 штуки
+    for (let i = 0; i < botsToLoad.length; i += 3) {
+        const batch = botsToLoad.slice(i, i + 3);
+        await Promise.all(batch.map(async (bot) => {
+            try {
+                const serverData = await loadBotDataFromServer(bot.displayId);
+                if (serverData) {
+                    await bot.loadFromServerData(serverData);
+                    bot.updateUI();
+                    updateTemplateDropdown(bot.id);
+                    renderBlacklist(bot.id);
+                }
+                bot.serverDataLoaded = true;
+
+                // ВАЖНО: Запускаем мониторинг ПОСЛЕ загрузки данных с сервера!
+                // Иначе входящие письма добавятся в blacklist до загрузки актуальных данных
+                if (!bot.isMonitoring) {
+                    bot.startMonitoring();
+                }
+            } catch (e) {
+                console.error(`[Server Data] Ошибка для ${bot.displayId}:`, e);
+            }
+        }));
+    }
+
+    // Выбираем первую вкладку и сохраняем сессию
+    const firstBot = Object.keys(bots)[0];
+    if (firstBot) selectTab(firstBot);
+    saveSession();
+
+    console.log(`[Server Data] ✅ Загрузка завершена`);
+}
+function editAccount(id) {
+    const bot = bots[id];
+    if(!bot) return;
+    editingBotId = id;
+    document.getElementById('add-modal-title').innerHTML = '<i class="fa fa-pencil text-warning"></i> Изменить анкету';
+    document.getElementById('newLogin').value = bot.login; document.getElementById('newPass').value = bot.pass; document.getElementById('newId').value = bot.displayId;
+    document.getElementById('btnLoginText').innerText = "Сохранить"; document.getElementById('loginError').innerText = "";
+}
+function openAddModal() {
+    editingBotId = null;
+    document.getElementById('add-modal-title').innerHTML = '<i class="fa fa-plus text-success"></i> Добавить анкету';
+    document.getElementById('newLogin').value = ""; document.getElementById('newPass').value = ""; document.getElementById('newId').value = "";
+    document.getElementById('btnLoginText').innerText = "Добавить"; document.getElementById('loginError').innerText = "";
+    renderManagerList();
+    openModal('add-modal');
+}
+function openStatsModal(botId, type) {
+    currentModalBotId = botId; currentStatsType = type;
+    document.getElementById('stats-title').innerText = (type === 'sent') ? "Отправленные" : "Ошибки";
+    renderStatsList(); openModal('stats-modal');
+}
+function renderStatsList() {
+    const list = document.getElementById('stats-list-content'); list.innerHTML = '';
+    const isChat = globalMode === 'chat';
+    const data = isChat ? bots[currentModalBotId].chatHistory[currentStatsType] : bots[currentModalBotId].mailHistory[currentStatsType];
+    if(!data.length) list.innerHTML = '<div class="text-center text-muted p-2">Пусто</div>';
+    else data.forEach(item => { const d = document.createElement('div'); d.className = 'list-item'; d.innerText = item; list.appendChild(d); });
+}
+function copyStats() { navigator.clipboard.writeText((globalMode==='chat' ? bots[currentModalBotId].chatHistory[currentStatsType] : bots[currentModalBotId].mailHistory[currentStatsType]).join('\n')); }
+async function clearStats(event) {
+    // Shift + клик = очистить на ВСЕХ анкетах
+    if (event && event.shiftKey) {
+        clearStatsAll();
+        return;
+    }
+    if (await customConfirm("Очистить?", { type: 'danger' })) {
+        const b = bots[currentModalBotId];
+        if (globalMode === 'chat') {
+            b.chatHistory[currentStatsType] = [];
+            b.chatStats[currentStatsType] = 0;
+        } else {
+            b.mailHistory[currentStatsType] = [];
+            b.mailStats[currentStatsType] = 0;
+        }
+        b.updateUI();
+        renderStatsList();
+    }
+}
+
+// Очистить статистику (sent/errors) на ВСЕХ анкетах
+function clearStatsAll() {
+    const isChat = globalMode === 'chat';
+    const typeName = currentStatsType === 'sent' ? 'Отправленные' : 'Ошибки';
+    const modeName = isChat ? 'чатов' : 'писем';
+    const botIds = Object.keys(bots);
+    let count = 0;
+
+    for (const botId of botIds) {
+        const b = bots[botId];
+        if (isChat) {
+            b.chatHistory[currentStatsType] = [];
+            b.chatStats[currentStatsType] = 0;
+        } else {
+            b.mailHistory[currentStatsType] = [];
+            b.mailStats[currentStatsType] = 0;
+        }
+        b.updateUI();
+        count++;
+    }
+
+    renderStatsList();
+    showToast(`${typeName} ${modeName} очищены на ${count} анкетах`, 'success');
+}
+
+// Генерация имени шаблона на основе даты
+function generateTemplateName(tpls) {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const baseName = `${day}.${month}.${year}`;
+
+    // Проверяем уникальность
+    if (!tpls.some(t => t.name === baseName)) {
+        return baseName;
+    }
+
+    // Добавляем номер если такая дата уже есть
+    let num = 2;
+    while (tpls.some(t => t.name === `${baseName} (${num})`)) {
+        num++;
+    }
+    return `${baseName} (${num})`;
+}
+
+// Красивое уведомление для массовых действий
+function showBulkNotification(message, count) {
+    const existing = document.getElementById('bulk-notification');
+    if (existing) existing.remove();
+
+    const notification = document.createElement('div');
+    notification.id = 'bulk-notification';
+    notification.innerHTML = `<i class="fa fa-check-circle"></i> ${message} <b>(${count})</b>`;
+    notification.style.cssText = `
+        position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+        background: linear-gradient(135deg, #28a745, #20c997); color: white;
+        padding: 12px 24px; border-radius: 25px; font-size: 14px; font-weight: 500;
+        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4); z-index: 10000;
+        animation: bulkNotifIn 0.3s ease-out;
+    `;
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        notification.style.animation = 'bulkNotifOut 0.3s ease-in forwards';
+        setTimeout(() => notification.remove(), 300);
+    }, 2000);
+}
+
+// Инлайн добавление нового шаблона (без модалки)
+async function addTemplateInline(botId, event) {
+    // Shift + клик = добавить всем анкетам
+    if (event && event.shiftKey) {
+        await addTemplateToAll();
+        return;
+    }
+
+    const bot = bots[botId];
+    const isChat = globalMode === 'chat';
+    const type = isChat ? 'chat' : 'mail';
+    const tpls = getBotTemplates(bot.login)[type];
+
+    const newName = generateTemplateName(tpls);
+    const newTemplate = { name: newName, text: '', favorite: false };
+    tpls.push(newTemplate);
+
+    localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+    await saveTemplatesToServer(bot.displayId, type, tpls);
+
+    const newIdx = tpls.length - 1;
+    updateTemplateDropdown(botId, newIdx);
+
+    const textarea = document.getElementById(`msg-${botId}`);
+    if (textarea) {
+        textarea.value = '';
+        textarea.focus();
+    }
+
+    console.log(`➕ Создан новый шаблон "${newName}" для ${bot.displayId}`);
+}
+
+// Добавить шаблон ВСЕМ анкетам
+async function addTemplateToAll() {
+    const isChat = globalMode === 'chat';
+    const type = isChat ? 'chat' : 'mail';
+    const botIds = Object.keys(bots);
+    let count = 0;
+
+    for (const botId of botIds) {
+        const bot = bots[botId];
+        const tpls = getBotTemplates(bot.login)[type];
+        const newName = generateTemplateName(tpls);
+        const newTemplate = { name: newName, text: '', favorite: false };
+        tpls.push(newTemplate);
+
+        localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+        await saveTemplatesToServer(bot.displayId, type, tpls);
+
+        const newIdx = tpls.length - 1;
+        updateTemplateDropdown(botId, newIdx);
+        count++;
+    }
+
+    showBulkNotification('Шаблон добавлен всем анкетам', count);
+}
+
+// Inline редактирование названия шаблона (без модального окна)
+function editTemplateNameInline(botId) {
+    const select = document.getElementById(`tpl-select-${botId}`);
+    const idx = select.value;
+    if (idx === "") {
+        showToast("Сначала выберите шаблон", "warning");
+        return;
+    }
+
+    const bot = bots[botId];
+    const isChat = globalMode === 'chat';
+    const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
+    const currentName = tpls[idx].name;
+
+    // Создаём input для редактирования
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentName;
+    input.className = 'form-control form-control-sm';
+    input.style.cssText = 'width: 100%; margin-bottom: 8px;';
+
+    // Скрываем select и показываем input
+    select.style.display = 'none';
+    select.parentNode.insertBefore(input, select);
+    input.focus();
+    input.select();
+
+    // Функция сохранения
+    const saveNewName = () => {
+        const newName = input.value.trim();
+        if (newName && newName !== currentName) {
+            tpls[idx].name = newName;
+            saveTemplatesToServer(bot.login, getBotTemplates(bot.login));
+            updateTemplateDropdown(botId, idx);
+            showToast("Название сохранено", "success");
+        }
+        // Убираем input, показываем select
+        input.remove();
+        select.style.display = '';
+    };
+
+    // Enter - сохранить
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveNewName();
+        } else if (e.key === 'Escape') {
+            // Escape - отменить
+            input.remove();
+            select.style.display = '';
+        }
+    });
+
+    // Потеря фокуса - сохранить
+    input.addEventListener('blur', saveNewName);
+}
+
+// Модальное окно теперь только для редактирования (переименования) шаблона
+function openTemplateModal(botId, isEdit) {
+    currentModalBotId = botId;
+    const bot = bots[botId];
+    const isChat = globalMode === 'chat';
+    const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
+
+    // Модалка только для редактирования
+    const idx = document.getElementById(`tpl-select-${botId}`).value;
+    if(idx === "") return alert("Выберите шаблон для редактирования");
+
+    editingTemplateIndex = idx;
+    document.getElementById('tpl-modal-title').innerText = "Редактировать шаблон";
+    document.getElementById('tpl-modal-name').value = tpls[idx].name;
+    document.getElementById('tpl-modal-text').value = tpls[idx].text;
+    openModal('tpl-modal');
+}
+
+// Генерация текста шаблона с помощью AI
+async function generateTemplateWithAI() {
+    const promptInput = document.getElementById('tpl-ai-prompt');
+    const textArea = document.getElementById('tpl-modal-text');
+    const btn = document.getElementById('tpl-ai-btn');
+    const userPrompt = promptInput.value.trim();
+
+    if (!userPrompt) {
+        alert('Опишите какой текст нужно сгенерировать');
+        promptInput.focus();
+        return;
+    }
+
+    if (!globalSettings.apiKey) {
+        alert('Добавьте OpenAI API Key в настройках (вкладка AI функции)');
+        return;
+    }
+
+    const originalBtnHtml = btn.innerHTML;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Проверка...';
+    btn.disabled = true;
+
+    // Проверяем разрешение AI для активной анкеты
+    const bot = activeTabId ? bots[activeTabId] : null;
+    if (bot && bot.displayId) {
+        const aiStatus = await checkProfileAIEnabled(bot.displayId);
+        if (!aiStatus.enabled) {
+            btn.innerHTML = originalBtnHtml;
+            btn.disabled = false;
+            const reason = aiStatus.reason === 'disabled_by_admin'
+                ? 'AI отключен администратором для этой анкеты'
+                : aiStatus.reason === 'no_translator'
+                ? 'Анкете не назначен переводчик'
+                : 'AI недоступен для этой анкеты';
+            alert(`⚠️ ${reason}`);
+            return;
+        }
+    }
+
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Генерация...';
+
+    try {
+        const isChat = globalMode === 'chat';
+        const systemPrompt = isChat
+            ? `You are an expert at writing romantic chat invitations for a dating site. Write in English. The message should be friendly, intriguing and make the person want to respond. Use {Name} placeholder for recipient's name if appropriate. Keep it short (2-3 sentences). Do not use emojis.`
+            : `You are an expert at writing romantic letters for a dating site. Write in English. The letter should be warm, personal and engaging. Use {Name} placeholder for recipient's name, {City} for their city, {Age} for their age if appropriate. Keep it medium length (3-5 sentences). Do not use emojis.`;
+
+        const config = {
+            headers: {
+                'Authorization': `Bearer ${globalSettings.apiKey}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        if (globalSettings.proxyAI) {
+            const proxyConfig = parseProxyUrl(globalSettings.proxyAI);
+            if (proxyConfig) config.proxy = proxyConfig;
+        }
+
+        const response = await axios.post(OPENAI_API_ENDPOINT, {
+            model: 'gpt-3.5-turbo',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: `Write a ${isChat ? 'chat invitation' : 'letter'} with this style/theme: ${userPrompt}` }
+            ],
+            temperature: 0.8,
+            max_tokens: 300
+        }, config);
+
+        const generatedText = response.data.choices[0].message.content.trim();
+        textArea.value = generatedText;
+
+        // Очищаем поле промпта после успешной генерации
+        promptInput.value = '';
+
+    } catch (error) {
+        console.error('AI Generation error:', error);
+        const errorMsg = error.response?.data?.error?.message || error.message || 'Неизвестная ошибка';
+        alert(`Ошибка генерации: ${errorMsg}`);
+    } finally {
+        btn.innerHTML = originalBtnHtml;
+        btn.disabled = false;
+    }
+}
+
+// Таймеры для debounce автосохранения текста
+const autoSaveTimers = {};
+
+// Автосохранение текста шаблона (debounce 3 сек)
+function autoSaveTemplateText(botId) {
+    if (autoSaveTimers[botId]) clearTimeout(autoSaveTimers[botId]);
+    autoSaveTimers[botId] = setTimeout(() => {
+        saveTemplateTextNow(botId);
+    }, 3000);
+}
+
+// Немедленное сохранение текста шаблона (при blur или по таймеру)
+async function saveTemplateTextNow(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    const isChat = globalMode === 'chat';
+    const type = isChat ? 'chat' : 'mail';
+    const sel = document.getElementById(`tpl-select-${botId}`);
+    const textarea = document.getElementById(`msg-${botId}`);
+
+    if (!sel || !textarea || sel.value === '') return;
+
+    const idx = parseInt(sel.value);
+    const tpls = getBotTemplates(bot.login)[type];
+
+    if (tpls[idx]) {
+        // Обновляем текст в шаблоне
+        tpls[idx].text = textarea.value;
+
+        // Сохраняем в localStorage
+        localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+
+        // Сохраняем на сервер
+        await saveTemplatesToServer(bot.displayId, type, tpls);
+        console.log(`💾 Текст шаблона автосохранён для ${bot.displayId}`);
+    }
+}
+
+async function saveTemplateFromModal() {
+    const name = document.getElementById('tpl-modal-name').value;
+    const text = document.getElementById('tpl-modal-text').value;
+    if (!name) return;
+
+    const bot = bots[currentModalBotId];
+    const isChat = globalMode === 'chat';
+    const type = isChat ? 'chat' : 'mail';
+
+    try {
+        // 1. Сохраняем в localStorage
+        let tpls = getBotTemplates(bot.login)[type];
+
+        if (editingTemplateIndex !== null) {
+            const fav = tpls[editingTemplateIndex]?.favorite || false;
+            tpls[editingTemplateIndex] = { name, text, favorite: fav };
+        } else {
+            tpls.push({ name, text, favorite: false });
+            editingTemplateIndex = tpls.length - 1;
+        }
+
+        // 2. Сохраняем в localStorage (для обратной совместимости)
+        localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+
+        // 3. ВАЖНО: Сохраняем на сервер
+        await saveTemplatesToServer(bot.displayId, type, tpls);
+
+        updateTemplateDropdown(bot.id, editingTemplateIndex);
+        closeModal('tpl-modal');
+
+    } catch (error) {
+        console.error('Error saving template:', error);
+        alert('Ошибка сохранения шаблона');
+    }
+}
+
+function updateTemplateDropdown(botId, forceSelectIndex = null) {
+    const sel=document.getElementById(`tpl-select-${botId}`); if(!sel) return;
+    const bot = bots[botId];
+    const isChat = globalMode === 'chat';
+    const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
+
+    // Сохраняем текущий текст textarea перед обновлением
+    const area = document.getElementById(`msg-${botId}`);
+    const currentText = area ? area.value : '';
+
+    // Исправлено: проверяем и на null, и на undefined
+    let val = (forceSelectIndex !== null && forceSelectIndex !== undefined) ? forceSelectIndex : sel.value;
+
+    // Приводим к числу если это строка
+    if (typeof val === 'string' && val !== '') {
+        val = parseInt(val);
+    }
+
+    // Если val пустой/null/undefined или выходит за границы массива - выбираем первый шаблон
+    if ((val === null || val === "" || val === undefined || isNaN(val) || val >= tpls.length) && tpls.length > 0) {
+        val = 0;
+    }
+
+    sel.innerHTML='<option value="">-- Выберите --</option>';
+    tpls.forEach((t,i)=> sel.innerHTML+=`<option value="${i}">${t.favorite?'❤ ':''}${t.name}</option>`);
+
+    const btnFav = document.getElementById(`btn-fav-${botId}`);
+    if(val !== null && val !== "" && val !== undefined && !isNaN(val) && tpls[val]) {
+         sel.value = val;
+         area.disabled=false;
+         area.value=tpls[val].text;
+         if(isChat) bots[botId].lastTplChat = val; else bots[botId].lastTplMail = val;
+
+         // Сохраняем выбор шаблона
+         if(!accountPreferences[bot.login]) accountPreferences[bot.login] = {};
+         if(isChat) accountPreferences[bot.login].chatTpl = val;
+         else accountPreferences[bot.login].mailTpl = val;
+         localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
+         saveSession();
+
+         if(btnFav) { if(tpls[val].favorite) { btnFav.classList.add('btn-heart-active','btn-danger'); btnFav.classList.remove('btn-outline-danger'); } else { btnFav.classList.remove('btn-heart-active','btn-danger'); btnFav.classList.add('btn-outline-danger'); } }
+         validateInput(area);
+    } else {
+         sel.value="";
+         // КРИТИЧНО: При переключении режима ВСЕГДА очищаем textarea!
+         // Текст из Mail НИКОГДА не должен попасть в Chat и наоборот!
+         area.disabled = true;
+         area.value = "";
+         if(btnFav) btnFav.classList.remove('btn-heart-active');
+         bots[botId].updateUI();
+    }
+}
+
+function onTemplateSelect(botId) {
+    const idx = document.getElementById(`tpl-select-${botId}`).value;
+    const bot = bots[botId];
+    const isChat = globalMode === 'chat';
+
+    if(!accountPreferences[bot.login]) accountPreferences[bot.login] = {};
+    if(isChat) accountPreferences[bot.login].chatTpl = idx;
+    else accountPreferences[bot.login].mailTpl = idx;
+    localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
+    
+    saveSession();
+    updateTemplateDropdown(botId, idx);
+}
+
+async function toggleTemplateFavorite(botId) {
+    const idx = document.getElementById(`tpl-select-${botId}`).value;
+    if(idx === "") return;
+    const bot = bots[botId];
+    const tpls = getBotTemplates(bot.login)['mail'];
+    if(tpls[idx]) {
+        const wasNotFavorite = !tpls[idx].favorite;
+        tpls[idx].favorite = wasNotFavorite;
+        localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+        updateTemplateDropdown(botId, idx);
+
+        // Синхронизируем с сервером
+        try {
+            if (wasNotFavorite) {
+                // Добавляем в избранное на сервере
+                await fetch(`${LABABOT_SERVER}/api/favorite_template`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        profileId: bot.displayId,
+                        botId: bot.id,
+                        templateName: tpls[idx].name,
+                        templateText: tpls[idx].text,
+                        type: 'mail'
+                    })
+                });
+                console.log(`❤️ Шаблон "${tpls[idx].name}" добавлен в избранное на сервере`);
+            } else {
+                // Удаляем из избранного на сервере
+                await fetch(`${LABABOT_SERVER}/api/favorite_template`, {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        profileId: bot.displayId,
+                        templateText: tpls[idx].text
+                    })
+                });
+                console.log(`💔 Шаблон "${tpls[idx].name}" удалён из избранного на сервере`);
+            }
+        } catch(e) {
+            console.error('Ошибка синхронизации избранного:', e);
+        }
+    }
+}
+
+async function deleteTemplate(botId, event) {
+    // Shift + клик = удалить выбранный шаблон у всех
+    if (event && event.shiftKey) {
+        await deleteTemplateFromAll();
+        return;
+    }
+
+    const isChat = globalMode === 'chat';
+    const type = isChat ? 'chat' : 'mail';
+    const bot = bots[botId];
+    let tpls = getBotTemplates(bot.login)[type];
+    const idx = document.getElementById(`tpl-select-${botId}`).value;
+    if (idx !== "" && (globalSettings.skipDeleteConfirm || await customConfirm("Удалить?", { type: 'danger' }))) {
+        const idxNum = parseInt(idx);
+        tpls.splice(idxNum, 1);
+        localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+        await saveTemplatesToServer(bot.displayId, type, tpls);
+
+        // Выбираем предыдущий шаблон (или последний доступный)
+        const newIdx = tpls.length > 0 ? Math.min(idxNum, tpls.length - 1) : null;
+        updateTemplateDropdown(botId, newIdx);
+    }
+}
+
+// Удалить выбранный шаблон у ВСЕХ анкет
+async function deleteTemplateFromAll() {
+    if (!globalSettings.skipDeleteConfirm && !await customConfirm("Удалить выбранный шаблон у ВСЕХ анкет?", { type: 'danger' })) return;
+
+    const isChat = globalMode === 'chat';
+    const type = isChat ? 'chat' : 'mail';
+    const botIds = Object.keys(bots);
+    let count = 0;
+
+    for (const botId of botIds) {
+        const bot = bots[botId];
+        const tpls = getBotTemplates(bot.login)[type];
+        const sel = document.getElementById(`tpl-select-${botId}`);
+        const idx = sel ? sel.value : "";
+
+        if (idx !== "" && tpls[idx]) {
+            const idxNum = parseInt(idx);
+            tpls.splice(idxNum, 1);
+            localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+            await saveTemplatesToServer(bot.displayId, type, tpls);
+
+            // Выбираем предыдущий шаблон (или последний доступный)
+            const newIdx = tpls.length > 0 ? Math.min(idxNum, tpls.length - 1) : null;
+            updateTemplateDropdown(botId, newIdx);
+            count++;
+        }
+    }
+
+    showBulkNotification('Шаблон удалён у всех анкет', count);
+}
+
+// Обработка Enter в поле ввода blacklist
+function handleBlacklistKeydown(event, botId) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        addBlacklistFromInput(botId);
+    }
+}
+
+// Добавить ID из inline поля
+// 1 ID = добавить этому боту, несколько ID = добавить всем анкетам
+async function addBlacklistFromInput(botId) {
+    const input = document.getElementById(`bl-input-${botId}`);
+    const val = input.value.trim();
+    if (!val) return;
+
+    // Поддержка нескольких ID через запятую, пробел или перенос строки
+    const ids = val.split(/[\s,]+/).filter(id => id.length > 0);
+
+    if (ids.length > 1) {
+        // Несколько ID = добавить всем анкетам
+        for (const id of ids) {
+            await addBlacklistToAll(id);
+        }
+    } else {
+        // Один ID = добавить только этому боту
+        const bot = bots[botId];
+        const isChat = globalMode === 'chat';
+        const list = isChat ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
+
+        if (!list.includes(ids[0])) {
+            list.push(ids[0]);
+            renderBlacklist(botId);
+            await saveBlacklistToServer(bot.displayId, isChat ? 'chat' : 'mail', list);
+        }
+    }
+
+    input.value = '';
+    input.focus();
+}
+
+// Добавить в ЧС для ВСЕХ анкет
+async function addBlacklistToAll(val) {
+    const isChat = globalMode === 'chat';
+    const type = isChat ? 'chat' : 'mail';
+    const botIds = Object.keys(bots);
+    let count = 0;
+
+    for (const botId of botIds) {
+        const bot = bots[botId];
+        const list = isChat ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
+
+        if (!list.includes(val)) {
+            list.push(val);
+            renderBlacklist(botId);
+            await saveBlacklistToServer(bot.displayId, type, list);
+            count++;
+        }
+    }
+
+    showBulkNotification(`ID ${val} добавлен в ЧС всех анкет`, count);
+}
+
+// Хранение последнего выбранного индекса для Shift-выбора
+let lastSelectedBlacklistIndex = {};
+
+function renderBlacklist(botId) {
+    const listEl=document.getElementById(`bl-list-${botId}`); listEl.innerHTML="";
+    const bot = bots[botId];
+    const data = globalMode === 'chat' ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
+
+    // Инициализируем массив выбранных если нет
+    if (!bot.selectedBlacklistIds) bot.selectedBlacklistIds = [];
+
+    data.forEach((id, index) => {
+        const d=document.createElement('div');
+        d.className='list-item';
+        d.dataset.index = index;
+        d.innerText=id;
+
+        if (bot.vipList.includes(id)) {
+            d.classList.add('is-vip');
+            d.innerHTML = `<i class="fa fa-star text-warning me-2"></i> ${id}`;
+        }
+
+        // Восстанавливаем выбор если элемент был выбран
+        if (bot.selectedBlacklistIds.includes(id)) {
+            d.classList.add('selected');
+        }
+
+        d.onclick=(e)=>{
+            if (e.shiftKey && lastSelectedBlacklistIndex[botId] !== undefined) {
+                // Shift+клик - выбрать диапазон
+                const start = Math.min(lastSelectedBlacklistIndex[botId], index);
+                const end = Math.max(lastSelectedBlacklistIndex[botId], index);
+
+                // Снимаем старый выбор
+                listEl.querySelectorAll('.list-item').forEach(i=>i.classList.remove('selected'));
+                bot.selectedBlacklistIds = [];
+
+                // Выбираем диапазон
+                for (let i = start; i <= end; i++) {
+                    const item = listEl.querySelector(`[data-index="${i}"]`);
+                    if (item) {
+                        item.classList.add('selected');
+                        bot.selectedBlacklistIds.push(data[i]);
+                    }
+                }
+            } else if (e.ctrlKey || e.metaKey) {
+                // Ctrl+клик - добавить/убрать из выбора
+                d.classList.toggle('selected');
+                if (d.classList.contains('selected')) {
+                    if (!bot.selectedBlacklistIds.includes(id)) bot.selectedBlacklistIds.push(id);
+                } else {
+                    bot.selectedBlacklistIds = bot.selectedBlacklistIds.filter(x => x !== id);
+                }
+                lastSelectedBlacklistIndex[botId] = index;
+            } else {
+                // Обычный клик - выбрать только один
+                listEl.querySelectorAll('.list-item').forEach(i=>i.classList.remove('selected'));
+                d.classList.add('selected');
+                bot.selectedBlacklistIds = [id];
+                lastSelectedBlacklistIndex[botId] = index;
+            }
+        };
+
+        // Двойной клик - редактировать ID
+        d.ondblclick = (e) => {
+            e.stopPropagation();
+            const currentId = id;
+
+            // Создаём input для редактирования
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = currentId;
+            input.className = 'form-control form-control-sm';
+            input.style.cssText = 'width: 100%; padding: 2px 6px; font-size: 12px;';
+
+            // Заменяем содержимое div на input
+            d.innerHTML = '';
+            d.appendChild(input);
+            input.focus();
+            input.select();
+
+            // Функция сохранения
+            const saveEditedId = () => {
+                const newId = input.value.trim();
+                if (newId) {
+                    // Обновляем в массиве
+                    data[index] = newId;
+                    // Обновляем в selectedBlacklistIds если был выбран
+                    const selIdx = bot.selectedBlacklistIds.indexOf(currentId);
+                    if (selIdx !== -1) bot.selectedBlacklistIds[selIdx] = newId;
+                    // Сохраняем на сервер
+                    saveBlacklistToServer(bot.login, data, globalMode);
+                }
+                renderBlacklist(botId);
+            };
+
+            // Enter - сохранить
+            input.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Enter') {
+                    ev.preventDefault();
+                    saveEditedId();
+                } else if (ev.key === 'Escape') {
+                    renderBlacklist(botId);
+                }
+            });
+
+            // Потеря фокуса - сохранить
+            input.addEventListener('blur', saveEditedId);
+        };
+
+        listEl.appendChild(d);
+    });
+
+    // Делаем список фокусируемым для Ctrl+C
+    listEl.tabIndex = 0;
+
+    // Обработчик Ctrl+C для копирования выбранных ID
+    listEl.onkeydown = (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+            const selected = bot.selectedBlacklistIds || [];
+            if (selected.length > 0) {
+                e.preventDefault();
+                const text = selected.join(', ');
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast(`Скопировано ${selected.length} ID`, 'success');
+                }).catch(err => {
+                    console.error('Ошибка копирования:', err);
+                    showToast('Ошибка копирования', 'error');
+                });
+            }
+        }
+    };
+}
+
+async function removeSelectedBlacklist(botId) {
+    const bot = bots[botId];
+    const selected = bot.selectedBlacklistIds || [];
+
+    if (selected.length > 0) {
+        const isChat = globalMode === 'chat';
+
+        // Удаляем все выбранные
+        for (const s of selected) {
+            if(isChat) bot.chatSettings.blacklist = bot.chatSettings.blacklist.filter(x=>x!==s);
+            else bot.mailSettings.blacklist = bot.mailSettings.blacklist.filter(x=>x!==s);
+            bot.vipList = bot.vipList.filter(x=>x!==s);
+        }
+
+        bot.selectedBlacklistIds = [];
+        lastSelectedBlacklistIndex[botId] = undefined;
+        renderBlacklist(botId);
+
+        // Сохраняем на сервер
+        const list = isChat ? bot.chatSettings.blacklist : bot.mailSettings.blacklist;
+        await saveBlacklistToServer(bot.displayId, isChat ? 'chat' : 'mail', list);
+    }
+}
+
+function toggleVipStatus(botId) {
+    const bot = bots[botId];
+    const selected = bot.selectedBlacklistIds || [];
+
+    if (selected.length === 0) return alert("Выберите ID из списка");
+
+    for (const s of selected) {
+        if(bot.vipList.includes(s)) {
+            bot.vipList = bot.vipList.filter(x=>x!==s);
+        } else {
+            bot.vipList.push(s);
+        }
+    }
+
+    saveSession();
+    renderBlacklist(botId);
+}
+
+function onPhotoSelect(botId) {
+    const fi = document.getElementById(`photo-input-${botId}`);
+    if (!fi.files.length) return;
+
+    const file = fi.files[0];
+    const bot = bots[botId];
+
+    // Сохраняем путь к файлу (Electron даёт доступ к path)
+    bot.photoPath = file.path;
+    bot.photoName = file.name;
+    document.getElementById(`photo-name-${botId}`).innerText = file.name;
+    document.getElementById(`photo-label-${botId}`).classList.add('file-selected');
+
+    // Читаем файл для превью
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        document.getElementById(`preview-img-${botId}`).src = e.target.result;
+        document.getElementById(`preview-box-${botId}`).classList.add('has-img');
+    };
+    reader.readAsDataURL(file);
+
+    console.log(`[Photo] ${botId}: path = ${bot.photoPath}`);
+}
+
+function removePhoto(botId) {
+    document.getElementById(`photo-input-${botId}`).value = "";
+    document.getElementById(`photo-name-${botId}`).innerText = "Прикрепить фото";
+    document.getElementById(`preview-box-${botId}`).classList.remove('has-img');
+    document.getElementById(`photo-label-${botId}`).classList.remove('file-selected');
+    const bot = bots[botId];
+    bot.photoPath = null;
+    bot.photoName = null;
+}
+
+async function handleLoginOrUpdate() {
+    const l=document.getElementById('newLogin').value.trim(); const p=document.getElementById('newPass').value.trim(); const i=document.getElementById('newId').value.trim()||'ID';
+    document.getElementById('loginError').innerText = "";
+    if(editingBotId) {
+        const bot = bots[editingBotId];
+        if(bot) { bot.login = l; bot.pass = p; bot.displayId = i; document.getElementById(`tab-${bot.id}`).innerHTML = `<div class="status-dot online"></div> ${i} <span class="tab-close" onclick="closeTab(event, '${bot.id}')"><i class="fa fa-times"></i></span>`; saveSession(); }
+        closeModal('add-modal'); return;
+    }
+    if(checkDuplicate(l, i)) { document.getElementById('loginError').innerText = "Этот аккаунт уже добавлен"; return; }
+    if(await performLogin(l,p,i)) { document.getElementById('newLogin').value=''; document.getElementById('newPass').value=''; closeModal('add-modal'); }
+}
+
+async function performLogin(login, pass, displayId) {
+    const e=document.getElementById('loginError'); const s=document.getElementById('loginSpinner'); if(s) s.style.display='inline-block';
+    try {
+        const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: login, Password: pass });
+
+        if(res.data.Token) {
+            const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
+            const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
+            bots[bid] = bot; // СНАЧАЛА добавляем в объект bots
+
+            // Загружаем игнор-листы из localStorage (сохраняются навсегда, по displayId, раздельно для Mail и Chat)
+            bot.ignoredUsersMail = loadIgnoredUsersFromStorage(displayId, 'mail');
+            bot.ignoredUsersChat = loadIgnoredUsersFromStorage(displayId, 'chat');
+            console.log(`[IgnoredUsers] Загружено: ${bot.ignoredUsersMail.length} (письма), ${bot.ignoredUsersChat.length} (чаты) для анкеты ${displayId}`);
+
+            // ТЕПЕРЬ устанавливаем прокси (после добавления в bots чтобы getAccountNumber работал)
+            await setWebviewProxy(bid);
+
+            // Показываем UI и создаём WebView
+            createInterface(bot); selectTab(bid); saveSession();
+
+            // Создаём WebView (синхронно, прокси уже настроен на partition)
+            bot.createWebview();
+
+            // Загружаем данные с сервера (шаблоны, blacklist, статистику)
+            const serverData = await loadBotDataFromServer(displayId);
+            if (serverData) {
+                await bot.loadFromServerData(serverData);
+                bot.updateUI();
+                updateTemplateDropdown(bid);
+                renderBlacklist(bid);
+                console.log(`✅ Данные синхронизированы для ${displayId}`);
+            }
+
+            // ВАЖНО: Запускаем мониторинг ПОСЛЕ загрузки данных с сервера!
+            // Иначе входящие письма добавятся в blacklist, который потом перезапишется
+            if (!bot.isMonitoring) {
+                bot.startMonitoring();
+            }
+
+            // Запускаем SharedPool если ещё не запущен
+            if (!SharedPool.timer) {
+                SharedPool.start();
+            }
+
+            // Отправляем первый heartbeat после создания бота
+            setTimeout(() => sendHeartbeatToLababot(bid, displayId, 'online'), 2000);
+
+            // Очищаем ошибку при успешном входе
+            if(e) e.innerText = '';
+            return bid;  // Возвращаем botId вместо true для точной идентификации
+        }
+    } catch(err) {
+        if(e) {
+            if (err.response) {
+                // Ошибка от сервера (неверный логин/пароль и т.д.)
+                e.innerText = err.response.data.Error || `Ошибка входа: ${err.response.status}`;
+            } else {
+                // Сетевая ошибка - проверяем настроен ли прокси
+                const hasProxy = globalSettings.proxy1 || globalSettings.proxy;
+                e.innerText = hasProxy
+                    ? "Ошибка сети. Проверьте прокси или интернет-соединение."
+                    : "Ошибка сети. Проверьте интернет-соединение.";
+            }
+        }
+    }
+    finally { if(s) s.style.display='none'; }
+    return false;
+}
+
+// === Функции для работы с игнор-листом (раздельно для Mail и Chat) ===
+function saveIgnoredUsersToStorage(displayId, type, ignoredUsers) {
+    try {
+        const storageKey = `ignoredUsers_${type}`; // ignoredUsers_mail или ignoredUsers_chat
+        const allIgnored = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        allIgnored[displayId] = ignoredUsers;
+        localStorage.setItem(storageKey, JSON.stringify(allIgnored));
+        console.log(`[IgnoredUsers] Сохранено ${ignoredUsers.length} пользователей (${type}) для анкеты ${displayId}`);
+    } catch (e) {
+        console.error('Ошибка сохранения ignoredUsers:', e);
+    }
+}
+
+function loadIgnoredUsersFromStorage(displayId, type) {
+    try {
+        const storageKey = `ignoredUsers_${type}`; // ignoredUsers_mail или ignoredUsers_chat
+        const allIgnored = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        return allIgnored[displayId] || [];
+    } catch (e) {
+        console.error('Ошибка загрузки ignoredUsers:', e);
+        return [];
+    }
+}
+
+function clearIgnoredUsers(botId, type) {
+    try {
+        const bot = bots[botId];
+        if (bot) {
+            if (type === 'mail') {
+                bot.ignoredUsersMail = [];
+                saveIgnoredUsersToStorage(bot.displayId, 'mail', []);
+            } else {
+                bot.ignoredUsersChat = [];
+                saveIgnoredUsersToStorage(bot.displayId, 'chat', []);
+            }
+            bot.updateUI();
+        }
+    } catch (e) {
+        console.error('Ошибка очистки ignoredUsers:', e);
+    }
+}
+
+function openIgnoredModal(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    const isChat = globalMode === 'chat';
+    const type = isChat ? 'chat' : 'mail';
+    const typeName = isChat ? 'чатов' : 'писем';
+    const list = isChat ? (bot.ignoredUsersChat || []) : (bot.ignoredUsersMail || []);
+    const count = list.length;
+
+    // Создаём содержимое модалки
+    const listHtml = list.length > 0
+        ? list.map(id => `<div class="ignored-item">${id}</div>`).join('')
+        : '<div class="text-muted">Список пуст</div>';
+
+    const modalContent = `
+        <div class="modal-header">
+            <h5>Игнор-лист ${typeName} (${count})</h5>
+            <button type="button" class="btn-close" onclick="closeModal('ignored-modal')"></button>
+        </div>
+        <div class="modal-body">
+            <div class="ignored-list-container">${listHtml}</div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-outline-secondary btn-sm" onclick="copyIgnoredList('${botId}')">
+                <i class="fa fa-copy"></i> Копировать
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="confirmClearIgnored('${botId}', '${type}', event)">
+                <i class="fa fa-trash"></i> Очистить всё
+            </button>
+        </div>
+    `;
+
+    // Удаляем старую модалку и создаём заново (чтобы обработчики работали)
+    let modal = document.getElementById('ignored-modal');
+    if (modal) {
+        modal.remove();
+    }
+
+    modal = document.createElement('div');
+    modal.id = 'ignored-modal';
+    modal.className = 'custom-modal';
+    modal.innerHTML = `<div class="modal-backdrop"></div><div class="modal-content">${modalContent}</div>`;
+    document.body.appendChild(modal);
+
+    // Закрытие только по клику на backdrop (не на content)
+    modal.querySelector('.modal-backdrop').onclick = () => closeModal('ignored-modal');
+    modal.querySelector('.modal-content').onclick = (e) => e.stopPropagation();
+
+    modal.classList.add('show');
+}
+
+function copyIgnoredList(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    const isChat = globalMode === 'chat';
+    const list = isChat ? (bot.ignoredUsersChat || []) : (bot.ignoredUsersMail || []);
+
+    if (list.length === 0) {
+        showToast('Список пуст', 'warning');
+        return;
+    }
+
+    const text = list.join('\n');
+    navigator.clipboard.writeText(text).then(() => {
+        showToast(`Скопировано ${list.length} ID`, 'success');
+    }).catch(err => {
+        console.error('Ошибка копирования:', err);
+        showToast('Ошибка копирования');
+    });
+}
+
+async function confirmClearIgnored(botId, type, event) {
+    // Shift + клик = очистить на ВСЕХ анкетах
+    if (event && event.shiftKey) {
+        clearIgnoredAll(type);
+        return;
+    }
+
+    const typeName = type === 'chat' ? 'чатов' : 'писем';
+    if (await customConfirm(`Очистить игнор-лист ${typeName}? Это действие нельзя отменить.`, { type: 'danger' })) {
+        clearIgnoredUsers(botId, type);
+        closeModal('ignored-modal');
+        showToast(`Игнор-лист ${typeName} очищен`, 'success');
+    }
+}
+
+// Очистить игнор-лист на ВСЕХ анкетах
+function clearIgnoredAll(type) {
+    const typeName = type === 'chat' ? 'чатов' : 'писем';
+    const botIds = Object.keys(bots);
+    let count = 0;
+
+    for (const botId of botIds) {
+        const bot = bots[botId];
+        if (type === 'chat') {
+            bot.ignoredUsersChat = [];
+            saveIgnoredUsersToStorage(bot.displayId, 'chat', []);
+        } else {
+            bot.ignoredUsersMail = [];
+            saveIgnoredUsersToStorage(bot.displayId, 'mail', []);
+        }
+        bot.updateUI();
+        count++;
+    }
+
+    closeModal('ignored-modal');
+    showToast(`Игнор-лист ${typeName} очищен на ${count} анкетах`, 'success');
+}
+
+async function saveSession() {
+    try {
+        // Сохраняем порядок вкладок в localStorage
+        const currentTabOrder = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
+        const localStorageData = currentTabOrder.map(id => {
+            const b = bots[id];
+            if (!b) return null;
+            return {
+                login: b.login,
+                pass: b.pass,
+                displayId: b.displayId,
+                lastTplMail: b.lastTplMail,
+                lastTplChat: b.lastTplChat,
+                chatRotationHours: b.chatSettings.rotationHours,
+                chatCyclic: b.chatSettings.cyclic,
+                chatCurrentIndex: b.chatSettings.currentInviteIndex,
+                chatStartTime: b.chatSettings.rotationStartTime,
+                chatTarget: b.chatSettings.target,
+                chatSpeed: b.chatSettings.speed,
+                mailAuto: b.mailSettings.auto,
+                mailTarget: b.mailSettings.target,
+                mailSpeed: b.mailSettings.speed,
+                mailPhotoOnly: b.mailSettings.photoOnly,
+                vipList: b.vipList,
+                customIdsList: b.customIdsList || [],
+                customIdsSent: b.customIdsSent || [],
+                // Автоответы
+                autoReplies: b.chatSettings.autoReplies || [],
+                autoReplyEnabled: b.chatSettings.autoReplyEnabled || false,
+                // Blacklist (локальное сохранение)
+                mailBlacklist: b.mailSettings.blacklist || [],
+                chatBlacklist: b.chatSettings.blacklist || [],
+                // Путь к прикреплённому фото
+                photoPath: b.photoPath || null,
+                photoName: b.photoName || null
+            };
+        }).filter(item => item !== null);
+
+        // Добавляем анкеты которые не удалось залогинить (чтобы не потерять)
+        const allBots = [...localStorageData, ...failedLoginBots];
+        localStorage.setItem('savedBots', JSON.stringify(allBots));
+
+        console.log(`[SaveSession] Сохранено ${localStorageData.length} активных + ${failedLoginBots.length} неактивных анкет`);
+
+    } catch (error) {
+        console.error('Error saving session:', error);
+        // Падаем обратно на localStorage при ошибке
+        const fallbackData = Array.from(document.querySelectorAll('.tab-item')).map(t => {
+            const b = bots[t.id.replace('tab-', '')];
+            return b ? {
+                login: b.login,
+                pass: b.pass,
+                displayId: b.displayId
+            } : null;
+        }).filter(Boolean);
+        localStorage.setItem('savedBots', JSON.stringify(fallbackData));
+    }
+}
+
+// Хранилище анкет которые не удалось залогинить (чтобы не потерять при saveSession)
+let failedLoginBots = [];
+
+async function restoreSession() {
+    try {
+        // Загружаем из localStorage
+        const s = JSON.parse(localStorage.getItem('savedBots') || '[]');
+        failedLoginBots = []; // Сбрасываем список неудавшихся логинов
+        document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} из кэша...` : "";
+
+        for (const a of s) {
+            // performLogin теперь возвращает botId (строку) или null
+            const botId = await performLogin(a.login, a.pass, a.displayId);
+            if (botId && bots[botId]) {
+                const bot = bots[botId];
+
+                // Восстанавливаем остальные настройки из localStorage
+                bot.lastTplMail = a.lastTplMail;
+                bot.lastTplChat = a.lastTplChat;
+
+                if (a.chatRotationHours) bot.chatSettings.rotationHours = a.chatRotationHours;
+                if (a.chatCyclic !== undefined) bot.chatSettings.cyclic = a.chatCyclic;
+                if (a.chatCurrentIndex) bot.chatSettings.currentInviteIndex = a.chatCurrentIndex;
+                if (a.chatStartTime) bot.chatSettings.rotationStartTime = a.chatStartTime;
+                if (a.chatTarget) bot.chatSettings.target = a.chatTarget;
+                if (a.chatSpeed) bot.chatSettings.speed = a.chatSpeed;
+                if (a.mailAuto !== undefined) bot.mailSettings.auto = a.mailAuto;
+                if (a.mailTarget) bot.mailSettings.target = a.mailTarget;
+                if (a.mailSpeed) bot.mailSettings.speed = a.mailSpeed;
+                if (a.mailPhotoOnly !== undefined) bot.mailSettings.photoOnly = a.mailPhotoOnly;
+                if (a.vipList) bot.vipList = a.vipList;
+                if (a.customIdsList) bot.customIdsList = a.customIdsList;
+                if (a.customIdsSent) bot.customIdsSent = a.customIdsSent;
+                // Восстанавливаем автоответы
+                if (a.autoReplies) bot.chatSettings.autoReplies = a.autoReplies;
+                if (a.autoReplyEnabled !== undefined) bot.chatSettings.autoReplyEnabled = a.autoReplyEnabled;
+                // ВАЖНО: Blacklist НЕ восстанавливаем из localStorage!
+                // Сервер имеет актуальные данные, localStorage может быть устаревшим
+                // Blacklist уже загружен с сервера в performLogin → loadFromServerData
+                // Восстанавливаем путь к фото
+                if (a.photoPath) bot.photoPath = a.photoPath;
+                if (a.photoName) bot.photoName = a.photoName;
+
+                updateInterfaceForMode(bot.id);
+                // Показываем поле Custom IDs если выбран этот режим
+                if (a.mailTarget === 'custom-ids') {
+                    toggleCustomIdsField(bot.id);
+                }
+                // Восстанавливаем UI для фото
+                if (bot.photoName) {
+                    document.getElementById(`photo-name-${bot.id}`).innerText = bot.photoName;
+                    document.getElementById(`photo-label-${bot.id}`).classList.add('file-selected');
+                }
+            } else {
+                // Логин не удался - сохраняем данные анкеты чтобы не потерять
+                console.warn(`[RestoreSession] Не удалось залогинить ${a.displayId}, сохраняем для следующего запуска`);
+                failedLoginBots.push(a);
+            }
+            await new Promise(r => setTimeout(r, 500));
+        }
+        
+        document.getElementById('restore-status').innerText = "";
+        document.getElementById('restore-status').innerText = "";
+        document.getElementById('welcome-screen').style.display = Object.keys(bots).length > 0 ? 'none' : 'flex';
+        
+        // Сохраняем порядок вкладок
+        const tempBots = { ...bots };
+        bots = {};
+        const keys = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
+        keys.forEach(id => {
+            if (tempBots[id]) bots[id] = tempBots[id];
+        });
+        
+    } catch (error) {
+        console.error('Error restoring session:', error);
+        document.getElementById('restore-status').innerText = "Ошибка загрузки. Используется кэш.";
+        document.getElementById('welcome-screen').style.display = Object.keys(bots).length > 0 ? 'none' : 'flex';
+    }
+}
+
+function selectTab(id) {
+    // ВАЖНО: Сохраняем текст текущей вкладки перед переключением
+    if (activeTabId && bots[activeTabId]) {
+        saveTemplateTextNow(activeTabId);
+    }
+
+    document.querySelectorAll('.tab-item').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.workspace').forEach(w=>w.classList.remove('active'));
+    // ВАЖНО: Деактивируем/Активируем webview, но они остаются за экраном
+    document.querySelectorAll('webview').forEach(wv => wv.classList.remove('active'));
+
+    const t=document.getElementById(`tab-${id}`); const w=document.getElementById(`ws-${id}`);
+    const wv=document.getElementById(`webview-${id}`);
+
+    if(t&&w) {
+        t.classList.add('active');
+        w.classList.add('active');
+        activeTabId=id;
+        updateInterfaceForMode(id);
+    }
+    
+    if(wv) wv.classList.add('active'); // Активируем процесс (попадает под стили position: fixed)
+    
+    document.getElementById('welcome-screen').style.display = 'none';
+}
+
+async function closeTab(e, id) {
+    e.stopPropagation();
+    if(globalSettings.confirmTabClose && !await customConfirm(`Закрыть вкладку ${bots[id].displayId}?`)) return;
+    
+    if(bots[id]) {
+        // Сохраняем данные бота в кэш для уведомлений
+        closedBotsCache[id] = {
+            login: bots[id].login,
+            pass: bots[id].pass,
+            displayId: bots[id].displayId,
+            closedAt: Date.now() // Время закрытия для очистки старых
+        };
+
+        // Лимит кэша: максимум 200 записей, удаляем самые старые
+        const cacheKeys = Object.keys(closedBotsCache);
+        if (cacheKeys.length > 200) {
+            // Сортируем по времени закрытия и удаляем самые старые
+            const sorted = cacheKeys.sort((a, b) =>
+                (closedBotsCache[a].closedAt || 0) - (closedBotsCache[b].closedAt || 0)
+            );
+            // Удаляем всё что сверх лимита (самые старые)
+            const toDelete = sorted.slice(0, cacheKeys.length - 200);
+            toDelete.forEach(key => delete closedBotsCache[key]);
+            console.log(`[Cache] Очищено ${toDelete.length} старых записей из closedBotsCache`);
+        }
+
+        bots[id].stopMail(); bots[id].stopChat();
+        bots[id].stopMonitoring();
+
+        // === ОЧИСТКА ВСЕХ ТАЙМЕРОВ (предотвращение утечки памяти) ===
+        clearInterval(bots[id].keepAliveTimer);
+        clearInterval(bots[id].lababotHeartbeatTimer);
+        clearInterval(bots[id].mailTimerInterval);
+        clearInterval(bots[id].chatTimerInterval);
+        clearTimeout(bots[id].mailTimeout);
+        clearTimeout(bots[id].chatTimeout);
+        clearInterval(bots[id].heartbeatInterval); // legacy
+
+        // === Удаляем webview ===
+        const wv = document.getElementById(`webview-${id}`);
+        if(wv) wv.remove();
+
+        delete bots[id];
+    }
+    document.getElementById(`tab-${id}`).remove(); document.getElementById(`ws-${id}`).remove();
+
+    if(activeTabId === id) {
+        const remainingIds = Object.keys(bots);
+        if(remainingIds.length > 0) {
+            const firstTab = document.querySelector('.tab-item');
+            if (firstTab) selectTab(firstTab.id.replace('tab-', ''));
+            else { activeTabId = null; document.getElementById('welcome-screen').style.display = 'flex'; }
+        } else {
+            activeTabId = null;
+            document.getElementById('welcome-screen').style.display = 'flex';
+        }
+    }
+
+    saveSession(); updateBotCount();
+}
+
+function toggleBot(id) {
+    const bot = bots[id];
+    const text = document.getElementById(`msg-${id}`).value;
+    if (globalMode === 'chat') { if(bot.isChatRunning) bot.stopChat(); else bot.startChat(text); } 
+    else { if(bot.isMailRunning) bot.stopMail(); else bot.startMail(text); }
+}
+function startAll() {
+    Object.values(bots).forEach(b => {
+        const text = document.getElementById(`msg-${b.id}`).value;
+        if (globalMode === 'chat') { if(!b.isChatRunning) b.startChat(text); } else { if(!b.isMailRunning) b.startMail(text); }
+    });
+}
+function stopAll() { Object.values(bots).forEach(b => { if (globalMode === 'chat') b.stopChat(); else b.stopMail(); }); }
+async function clearAllStats() {
+    if(!await customConfirm("Очистить статистику на ВСЕХ анкетах?", { type: 'danger' })) return;
+    const type = globalMode === 'chat' ? 'chat' : 'mail';
+    for (const b of Object.values(bots)) {
+        if (globalMode === 'chat') {
+            b.chatStats = {sent:0, errors:0, waiting:0};
+            b.chatHistory = {sent:[], errors:[], waiting:[]};
+        } else {
+            b.mailStats = {sent:0, errors:0, waiting:0};
+            b.mailHistory = {sent:[], errors:[], waiting:[]};
+        }
+        b.updateUI();
+        // Сбрасываем на сервере
+        await resetStatsOnServer(b.displayId, type);
+    }
+}
+// Показать загрузку на вкладке
+function showTabLoading(botId) {
+    const tab = document.getElementById(`tab-${botId}`);
+    if (tab) tab.classList.add('tab-loading');
+}
+
+// Скрыть загрузку на вкладке
+function hideTabLoading(botId) {
+    const tab = document.getElementById(`tab-${botId}`);
+    if (tab) tab.classList.remove('tab-loading');
+}
+
+// Перелогинить одну анкету
+async function reloginBot(botId) {
+    const bot = bots[botId];
+    if (!bot) return false;
+
+    showTabLoading(botId);
+    try {
+        const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: bot.login, Password: bot.pass });
+        if (res.data.Token) {
+            bot.token = res.data.Token;
+            bot.getProfileData();
+            hideTabLoading(botId);
+            return true;
+        }
+    } catch (e) {
+        console.error(`Relogin error for ${bot.displayId}:`, e);
+    }
+    hideTabLoading(botId);
+    return false;
+}
+
+async function reloginAllBots() {
+    if(!await customConfirm("Перезайти во все анкеты?")) return;
+    const botIds = Object.keys(bots);
+    if(botIds.length === 0) return;
+
+    const btn = document.querySelector('.btn-refresh');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+    btn.disabled = true;
+
+    // Показываем загрузку на всех вкладках
+    botIds.forEach(id => showTabLoading(id));
+
+    for(const id of botIds) {
+        await reloginBot(id);
+        await new Promise(r => setTimeout(r, 300));
+    }
+
+    btn.innerHTML = orig;
+    btn.disabled = false;
+}
+
+async function exportAllData() {
+    try {
+        const data = {
+            bots: [],
+            templates: botTemplates,
+            accountPreferences: accountPreferences,
+            globalSettings: globalSettings,
+            exportDate: new Date().toISOString()
+        };
+
+        // Получаем порядок вкладок из DOM (как в saveSession)
+        const tabOrder = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
+
+        // Сохраняем данные ботов в порядке вкладок (включая пароли и автоответы)
+        tabOrder.forEach(botId => {
+            const bot = bots[botId];
+            if (!bot) return;
+            data.bots.push({
+                id: bot.id,
+                login: bot.login,
+                pass: bot.pass, // Пароль для импорта
+                displayId: bot.displayId,
+                mailSettings: bot.mailSettings,
+                chatSettings: bot.chatSettings, // Включает autoReplies и autoReplyEnabled
+                vipList: bot.vipList,
+                customIdsList: bot.customIdsList || [],
+                customIdsSent: bot.customIdsSent || [],
+                ignoredUsersMail: bot.ignoredUsersMail || [],
+                ignoredUsersChat: bot.ignoredUsersChat || [],
+                photoPath: bot.photoPath || null,
+                photoName: bot.photoName || null
+            });
+        });
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `lababot_backup_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        showToast('Данные экспортированы', 'success');
+        return true;
+    } catch (error) {
+        console.error('Error exporting data:', error);
+        showToast('Ошибка экспорта', 'error');
+        return false;
+    }
+}
+
+// ОБНОВЛЕННАЯ ФУНКЦИЯ handleFullImport
+async function handleFullImport(input) {
+    if (!input.files.length) return;
+
+    if (!await customConfirm('Внимание! Импорт перезапишет существующие данные. Продолжить?', { type: 'warning' })) {
+        input.value = '';
+        return;
+    }
+
+    const btn = input.parentElement.querySelector('button');
+    const origText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Импорт...';
+    btn.disabled = true;
+
+    try {
+        const reader = new FileReader();
+
+        reader.onload = async function(e) {
+            try {
+                const data = JSON.parse(e.target.result);
+
+                // === СОХРАНЯЕМ БОТОВ В LOCALSTORAGE В ПРАВИЛЬНОМ ПОРЯДКЕ ===
+                // Не логиним сейчас - restoreSession залогинит их последовательно при reload
+                if (data.bots && Array.isArray(data.bots)) {
+                    const savedBotsData = data.bots.map(botData => ({
+                        login: botData.login,
+                        pass: botData.pass || 'password',
+                        displayId: botData.displayId,
+                        // Настройки для восстановления
+                        mailTarget: botData.mailSettings?.target,
+                        mailSpeed: botData.mailSettings?.speed,
+                        mailAuto: botData.mailSettings?.auto,
+                        mailPhotoOnly: botData.mailSettings?.photoOnly,
+                        chatTarget: botData.chatSettings?.target,
+                        chatSpeed: botData.chatSettings?.speed,
+                        chatRotationHours: botData.chatSettings?.rotationHours,
+                        chatCyclic: botData.chatSettings?.cyclic,
+                        chatCurrentIndex: botData.chatSettings?.currentInviteIndex,
+                        chatStartTime: botData.chatSettings?.rotationStartTime,
+                        autoReplies: botData.chatSettings?.autoReplies || [],
+                        autoReplyEnabled: botData.chatSettings?.autoReplyEnabled || false,
+                        vipList: botData.vipList || [],
+                        customIdsList: botData.customIdsList || [],
+                        customIdsSent: botData.customIdsSent || [],
+                        photoPath: botData.photoPath || null,
+                        photoName: botData.photoName || null
+                    }));
+                    localStorage.setItem('savedBots', JSON.stringify(savedBotsData));
+                    console.log(`[Import] Сохранено ${savedBotsData.length} ботов в localStorage`);
+                }
+
+                // Импортируем шаблоны
+                if (data.templates) {
+                    botTemplates = data.templates;
+                    localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
+                }
+
+                // Импортируем настройки
+                if (data.accountPreferences) {
+                    accountPreferences = data.accountPreferences;
+                    localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
+                }
+
+                if (data.globalSettings) {
+                    globalSettings = { ...globalSettings, ...data.globalSettings };
+                    localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+                }
+
+                alert('Данные успешно импортированы! Перезагрузите приложение.');
+                setTimeout(() => location.reload(), 1000);
+
+            } catch (error) {
+                console.error('Import error:', error);
+                alert('Ошибка импорта: ' + error.message);
+            } finally {
+                btn.innerHTML = origText;
+                btn.disabled = false;
+                input.value = '';
+            }
+        };
+
+        reader.onerror = function(error) {
+            alert('Ошибка чтения файла');
+            btn.innerHTML = origText;
+            btn.disabled = false;
+            input.value = '';
+        };
+
+        reader.readAsText(input.files[0]);
+
+    } catch (error) {
+        console.error('Import error:', error);
+        alert('Ошибка импорта: ' + error.message);
+        btn.innerHTML = origText;
+        btn.disabled = false;
+        input.value = '';
+    }
+}
+
+// =====================================================
+// === АВТООТВЕТЫ НА ВХОДЯЩИЕ ЧАТЫ ===
+// =====================================================
+
+// Переключить автоответы
+function toggleAutoReply(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    const checkbox = document.getElementById(`auto-reply-enabled-${botId}`);
+    bot.chatSettings.autoReplyEnabled = checkbox.checked;
+
+    saveSession();
+    saveAutoRepliesToServer(botId);
+
+    console.log(`[AutoReply] ${bot.displayId}: автоответы ${checkbox.checked ? 'включены' : 'выключены'}`);
+}
+
+// Добавить новый автоответ
+function addAutoReply(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    // Добавляем пустой автоответ с дефолтной задержкой
+    bot.chatSettings.autoReplies.push({
+        text: '',
+        delay: 60 // 60 секунд по умолчанию
+    });
+
+    renderAutoReplies(botId);
+    saveSession();
+}
+
+// Удалить автоответ
+function removeAutoReply(botId, index) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    bot.chatSettings.autoReplies.splice(index, 1);
+
+    renderAutoReplies(botId);
+    saveSession();
+    saveAutoRepliesToServer(botId);
+}
+
+// Обновить текст автоответа
+function updateAutoReplyText(botId, index, text) {
+    const bot = bots[botId];
+    if (!bot || !bot.chatSettings.autoReplies[index]) return;
+
+    bot.chatSettings.autoReplies[index].text = text;
+
+    // Debounced сохранение
+    clearTimeout(bot._autoReplyTextTimer);
+    bot._autoReplyTextTimer = setTimeout(() => {
+        saveSession();
+        saveAutoRepliesToServer(botId);
+    }, 1000);
+}
+
+// Обновить задержку автоответа
+function updateAutoReplyDelay(botId, index, delay) {
+    const bot = bots[botId];
+    if (!bot || !bot.chatSettings.autoReplies[index]) return;
+
+    const delayNum = parseInt(delay) || 60;
+    bot.chatSettings.autoReplies[index].delay = delayNum;
+
+    saveSession();
+    saveAutoRepliesToServer(botId);
+}
+
+// Отрисовать список автоответов
+function renderAutoReplies(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    const listEl = document.getElementById(`auto-reply-list-${botId}`);
+    if (!listEl) return;
+
+    const autoReplies = bot.chatSettings.autoReplies || [];
+
+    if (autoReplies.length === 0) {
+        listEl.innerHTML = '<div class="text-muted small text-center p-2">Нет автоответов</div>';
+        return;
+    }
+
+    listEl.innerHTML = autoReplies.map((reply, idx) => `
+        <div class="auto-reply-item" data-index="${idx}">
+            <div class="auto-reply-item-header">
+                <span class="auto-reply-number">#${idx + 1}</span>
+                <div class="auto-reply-delay-group">
+                    <label>Через:</label>
+                    <input type="number" class="form-control form-control-sm auto-reply-delay"
+                           value="${reply.delay}"
+                           min="5" max="3600"
+                           onchange="updateAutoReplyDelay('${botId}', ${idx}, this.value)">
+                    <span>сек</span>
+                </div>
+                <button class="btn btn-sm btn-outline-danger auto-reply-delete"
+                        onclick="removeAutoReply('${botId}', ${idx})"
+                        title="Удалить">
+                    <i class="fa fa-trash"></i>
+                </button>
+            </div>
+            <textarea class="form-control form-control-sm auto-reply-text"
+                      rows="2"
+                      placeholder="Текст автоответа..."
+                      oninput="updateAutoReplyText('${botId}', ${idx}, this.value)">${reply.text || ''}</textarea>
+        </div>
+    `).join('');
+}
+
+// Сохранить автоответы на сервер
+async function saveAutoRepliesToServer(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(bot.displayId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                autoReplies: bot.chatSettings.autoReplies,
+                autoReplyEnabled: bot.chatSettings.autoReplyEnabled
+            })
+        });
+
+        if (response.ok) {
+            console.log(`[AutoReply] Автоответы сохранены на сервер для ${bot.displayId}`);
+        }
+    } catch (error) {
+        console.error(`[AutoReply] Ошибка сохранения:`, error);
+    }
+}
+
+// Инициализация UI автоответов при переключении режима
+function initAutoRepliesUI(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    // Устанавливаем чекбокс
+    const checkbox = document.getElementById(`auto-reply-enabled-${botId}`);
+    if (checkbox) {
+        checkbox.checked = bot.chatSettings.autoReplyEnabled || false;
+    }
+
+    // Отрисовываем список
+    renderAutoReplies(botId);
+}
+
+// === ВИДЕОЧАТ (SHARE MY CAM) ===
+
+// Хранение открытых окон видеочата и сохранённых камер
+const videoChatWindows = new Map();
+let savedCameras = JSON.parse(localStorage.getItem('savedCameras')) || {};
+
+// Открыть видеочат - показать модальное окно выбора камеры
+async function openVideoChatWindow(botId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    // Проверяем, есть ли сохранённая камера для этой анкеты
+    const savedCamera = savedCameras[bot.displayId];
+    if (savedCamera) {
+        // Сразу открываем с сохранённой камерой
+        launchVideoChatWindow(botId, savedCamera);
+        return;
+    }
+
+    // Показываем модальное окно выбора камеры
+    document.getElementById('camera-select-bot-id').value = botId;
+    document.getElementById('camera-remember-choice').checked = false;
+
+    // Загружаем список камер
+    await loadAvailableCameras();
+
+    openModal('camera-select-modal');
+}
+
+// Загрузить список доступных камер
+async function loadAvailableCameras() {
+    const select = document.getElementById('camera-select-list');
+    select.innerHTML = '<option value="">Загрузка...</option>';
+
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+
+        if (videoDevices.length === 0) {
+            select.innerHTML = '<option value="">Камеры не найдены</option>';
+            return;
+        }
+
+        select.innerHTML = '';
+        videoDevices.forEach((device, index) => {
+            const option = document.createElement('option');
+            option.value = device.deviceId;
+            option.textContent = device.label || `Камера ${index + 1}`;
+            select.appendChild(option);
+        });
+
+    } catch (error) {
+        console.error('Ошибка получения списка камер:', error);
+        select.innerHTML = '<option value="">Ошибка доступа к камерам</option>';
+    }
+}
+
+// Подтвердить выбор камеры и открыть видеочат
+function confirmCameraSelection() {
+    const botId = document.getElementById('camera-select-bot-id').value;
+    const cameraId = document.getElementById('camera-select-list').value;
+    const remember = document.getElementById('camera-remember-choice').checked;
+
+    if (!cameraId) {
+        alert('Выберите камеру');
+        return;
+    }
+
+    const bot = bots[botId];
+    if (!bot) return;
+
+    // Запоминаем выбор если нужно
+    if (remember) {
+        savedCameras[bot.displayId] = cameraId;
+        localStorage.setItem('savedCameras', JSON.stringify(savedCameras));
+    }
+
+    closeModal('camera-select-modal');
+    launchVideoChatWindow(botId, cameraId);
+}
+
+// Запустить окно видеочата
+async function launchVideoChatWindow(botId, cameraId) {
+    const bot = bots[botId];
+    if (!bot) return;
+
+    // Проверяем, есть ли уже открытое окно
+    if (videoChatWindows.has(botId)) {
+        // Фокусируем существующее окно
+        const { ipcRenderer } = require('electron');
+        ipcRenderer.invoke('focus-video-chat-window', { botId });
+        return;
+    }
+
+    try {
+        const { ipcRenderer } = require('electron');
+
+        // Открываем окно видеочата
+        const result = await ipcRenderer.invoke('open-video-chat-window', {
+            botId: botId,
+            displayId: bot.displayId,
+            login: bot.login,
+            pass: bot.pass,
+            cameraId: cameraId
+        });
+
+        if (result.success) {
+            videoChatWindows.set(botId, true);
+
+            // Меняем стиль кнопки на "активный"
+            const btn = document.getElementById(`btn-share-cam-${botId}`);
+            if (btn) btn.classList.add('cam-active');
+
+            console.log(`✅ Видеочат открыт для ${bot.displayId}`);
+        }
+    } catch (error) {
+        console.error('Ошибка открытия видеочата:', error);
+        alert('Ошибка открытия видеочата: ' + error.message);
+    }
+}
+
+// Обработчик закрытия окна видеочата (вызывается из main process)
+if (typeof require !== 'undefined') {
+    const { ipcRenderer } = require('electron');
+
+    ipcRenderer.on('video-chat-window-closed', (event, botId) => {
+        videoChatWindows.delete(botId);
+
+        // Убираем стиль "активный" с кнопки
+        const btn = document.getElementById(`btn-share-cam-${botId}`);
+        if (btn) btn.classList.remove('cam-active');
+
+        console.log(`📹 Видеочат закрыт для ${botId}`);
+    });
+
+    // Обработчик уведомления о камере мужчины
+    ipcRenderer.on('video-chat-man-camera', (event, data) => {
+        const { botId, manName, manId, type } = data;
+        const bot = bots[botId];
+        if (!bot) return;
+
+        let message = '';
+        if (type === 'camera_on') {
+            message = `${manName} (${manId}) включил камеру`;
+        } else if (type === 'watching') {
+            message = `${manName} (${manId}) смотрит вашу камеру`;
+        }
+
+        if (message) {
+            // Звук
+            playSound('chat');
+
+            // Toast уведомление
+            showCameraToast(message, bot.displayId);
+
+            // Мигание вкладки
+            flashTab(botId);
+        }
+    });
+}
+
+// Показать toast уведомление о камере
+function showCameraToast(message, displayId) {
+    // Удаляем старый toast если есть
+    const existingToast = document.querySelector('.camera-toast');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.className = 'camera-toast';
+    toast.innerHTML = `
+        <i class="fa fa-video-camera"></i>
+        <span><b>[${displayId}]</b> ${message}</span>
+    `;
+    document.body.appendChild(toast);
+
+    // Показываем
+    setTimeout(() => toast.classList.add('show'), 10);
+
+    // Убираем через 5 секунд
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 5000);
+}
+
+// === INBOX WINDOW ===
+// Открыть inbox в отдельном окне с авторизацией
+async function openInboxWindow(botId) {
+    const bot = bots[botId];
+    if (!bot) {
+        showToast('Бот не найден');
+        return;
+    }
+
+    const windowId = `inbox-${botId}`;
+    const siteUrl = 'https://ladadate.com/message-inbox';
+
+    console.log(`[InboxWindow] Открываем inbox для ${bot.displayId}`);
+
+    try {
+        const { ipcRenderer } = require('electron');
+        const result = await ipcRenderer.invoke('open-response-window', {
+            windowId,
+            botId,
+            partnerId: null,
+            partnerName: 'Inbox',
+            type: 'inbox',
+            url: siteUrl,
+            login: bot.login,
+            pass: bot.pass
+        });
+
+        if (result.success) {
+            console.log(`[InboxWindow] Окно успешно открыто`);
+        } else {
+            console.error(`[InboxWindow] Ошибка:`, result.error);
+            showToast('Ошибка открытия окна');
+        }
+    } catch (err) {
+        console.error(`[InboxWindow] IPC ошибка:`, err);
+        showToast('Ошибка открытия окна');
+    }
+}
+
+// Мигание вкладки
+function flashTab(botId) {
+    const tab = document.getElementById(`tab-${botId}`);
+    if (!tab) return;
+
+    let flashes = 0;
+    const maxFlashes = 6;
+    const interval = setInterval(() => {
+        tab.style.backgroundColor = flashes % 2 === 0 ? '#dc3545' : '';
+        flashes++;
+        if (flashes >= maxFlashes) {
+            clearInterval(interval);
+            tab.style.backgroundColor = '';
+        }
+    }, 300);
+}
+
+// ========================================
+// === LOG MODAL FUNCTIONS ===
+// ========================================
+
+let currentLogModalBotId = null;
+
+/**
+ * Открыть модальное окно с полным логом
+ */
+function openLogModal(botId) {
+    const bot = bots[botId];
+    if (!bot) {
+        showToast('Анкета не найдена', 'error');
+        return;
+    }
+
+    currentLogModalBotId = botId;
+
+    // Устанавливаем ID анкеты в заголовок
+    document.getElementById('log-modal-bot-id').textContent = bot.displayId;
+
+    // Получаем содержимое лога
+    const logElement = document.getElementById(`log-${botId}`);
+    const logContent = document.getElementById('log-modal-content');
+
+    if (logElement && logElement.innerHTML.trim()) {
+        // Копируем HTML, но делаем его более читаемым для модального окна
+        const entries = logElement.querySelectorAll('.log-entry');
+        if (entries.length > 0) {
+            let html = '';
+            entries.forEach(entry => {
+                // Определяем тип записи по классам или содержимому
+                let entryClass = '';
+                const text = entry.textContent.toLowerCase();
+                if (text.includes('ошибка') || text.includes('error') || text.includes('❌')) {
+                    entryClass = 'error';
+                } else if (text.includes('✅') || text.includes('отправлено') || text.includes('успешно')) {
+                    entryClass = 'success';
+                } else if (text.includes('⚠') || text.includes('пропуск') || text.includes('cooldown')) {
+                    entryClass = 'warning';
+                }
+                html += `<div class="log-entry-modal ${entryClass}">${entry.innerHTML}</div>`;
+            });
+            logContent.innerHTML = html;
+        } else {
+            // Если нет записей с классом log-entry, копируем весь HTML
+            logContent.innerHTML = logElement.innerHTML || 'Лог пуст...';
+        }
+    } else {
+        logContent.innerHTML = 'Лог пуст...';
+    }
+
+    // Очищаем предыдущий поиск
+    clearLogModalSearch();
+
+    // Показываем модальное окно
+    document.getElementById('log-modal').classList.add('show');
+
+    // Прокручиваем к последней записи
+    logContent.scrollTop = 0;
+}
+
+/**
+ * Закрыть модальное окно лога
+ */
+function closeLogModal() {
+    document.getElementById('log-modal').classList.remove('show');
+    currentLogModalBotId = null;
+}
+
+/**
+ * Копировать весь лог в буфер обмена
+ */
+function copyAllLogs() {
+    const logContent = document.getElementById('log-modal-content');
+    if (!logContent) return;
+
+    // Получаем текстовое содержимое (без HTML тегов)
+    const textContent = logContent.innerText || logContent.textContent;
+
+    if (!textContent || textContent.trim() === 'Лог пуст...') {
+        showToast('Лог пуст, нечего копировать', 'warning');
+        return;
+    }
+
+    // Копируем в буфер обмена
+    navigator.clipboard.writeText(textContent).then(() => {
+        showToast('Лог скопирован в буфер обмена', 'success');
+    }).catch(err => {
+        console.error('Ошибка копирования:', err);
+        // Fallback для старых браузеров
+        const textarea = document.createElement('textarea');
+        textarea.value = textContent;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showToast('Лог скопирован в буфер обмена', 'success');
+    });
+}
+
+/**
+ * Очистить лог текущей анкеты
+ */
+function clearCurrentLogs() {
+    if (!currentLogModalBotId) return;
+
+    const logElement = document.getElementById(`log-${currentLogModalBotId}`);
+    if (logElement) {
+        logElement.innerHTML = '';
+    }
+
+    // Обновляем содержимое модального окна
+    document.getElementById('log-modal-content').innerHTML = 'Лог очищен';
+
+    // Очищаем поиск
+    clearLogModalSearch();
+
+    showToast('Лог очищен', 'success');
+}
+
+// ============= LOG MODAL SEARCH =============
+
+let logModalSearchState = {
+    query: '',
+    matches: [],         // Массив найденных log-entry-modal элементов
+    currentIndex: -1,    // Текущий выделенный результат
+    originalHtml: {}     // Оригинальный HTML до подсветки
+};
+
+/**
+ * Поиск в логе модального окна
+ */
+function searchLogModalEntries(query) {
+    const container = document.getElementById('log-modal-content');
+    const entries = container.querySelectorAll('.log-entry-modal');
+    const countEl = document.getElementById('log-modal-search-count');
+
+    // Очищаем предыдущий поиск
+    clearLogModalHighlights();
+    logModalSearchState.query = query;
+    logModalSearchState.matches = [];
+    logModalSearchState.currentIndex = -1;
+
+    if (!query || query.length < 2) {
+        countEl.textContent = '';
+        return;
+    }
+
+    const lowerQuery = query.toLowerCase();
+    let matchCount = 0;
+
+    entries.forEach((entry, idx) => {
+        const text = entry.textContent.toLowerCase();
+
+        if (text.includes(lowerQuery)) {
+            // Сохраняем оригинальный HTML
+            if (!logModalSearchState.originalHtml[idx]) {
+                logModalSearchState.originalHtml[idx] = entry.innerHTML;
+            }
+
+            // Подсвечиваем найденные совпадения
+            highlightLogModalMatches(entry, query);
+
+            entry.classList.remove('search-hidden');
+            logModalSearchState.matches.push({ element: entry, index: idx });
+            matchCount++;
+        } else {
+            // Скрываем не найденные
+            entry.classList.add('search-hidden');
+        }
+    });
+
+    // Обновляем счётчик
+    if (matchCount > 0) {
+        countEl.textContent = `${matchCount} найдено`;
+        // Переходим к первому результату
+        navigateLogModalSearch(1);
+    } else {
+        countEl.textContent = 'Не найдено';
+    }
+}
+
+/**
+ * Подсветка совпадений в элементе
+ */
+function highlightLogModalMatches(entry, query) {
+    const walker = document.createTreeWalker(entry, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+
+    while (walker.nextNode()) {
+        textNodes.push(walker.currentNode);
+    }
+
+    const lowerQuery = query.toLowerCase();
+
+    textNodes.forEach(node => {
+        const text = node.textContent;
+        const lowerText = text.toLowerCase();
+        let index = lowerText.indexOf(lowerQuery);
+
+        if (index !== -1) {
+            const before = text.substring(0, index);
+            const match = text.substring(index, index + query.length);
+            const after = text.substring(index + query.length);
+
+            const span = document.createElement('span');
+            span.className = 'search-highlight';
+            span.textContent = match;
+
+            const parent = node.parentNode;
+            const fragment = document.createDocumentFragment();
+
+            if (before) fragment.appendChild(document.createTextNode(before));
+            fragment.appendChild(span);
+            if (after) fragment.appendChild(document.createTextNode(after));
+
+            parent.replaceChild(fragment, node);
+        }
+    });
+}
+
+/**
+ * Навигация по результатам поиска
+ */
+function navigateLogModalSearch(direction) {
+    const matches = logModalSearchState.matches;
+    if (matches.length === 0) return;
+
+    // Убираем текущую подсветку
+    if (logModalSearchState.currentIndex >= 0 && matches[logModalSearchState.currentIndex]) {
+        const prevEntry = matches[logModalSearchState.currentIndex].element;
+        if (prevEntry) {
+            const highlights = prevEntry.querySelectorAll('.search-highlight.current');
+            highlights.forEach(h => h.classList.remove('current'));
+        }
+    }
+
+    // Вычисляем новый индекс
+    logModalSearchState.currentIndex += direction;
+    if (logModalSearchState.currentIndex >= matches.length) {
+        logModalSearchState.currentIndex = 0;
+    } else if (logModalSearchState.currentIndex < 0) {
+        logModalSearchState.currentIndex = matches.length - 1;
+    }
+
+    // Подсвечиваем текущий
+    const currentMatch = matches[logModalSearchState.currentIndex];
+    if (currentMatch && currentMatch.element) {
+        const firstHighlight = currentMatch.element.querySelector('.search-highlight');
+        if (firstHighlight) {
+            firstHighlight.classList.add('current');
+        }
+
+        // Скроллим к элементу
+        currentMatch.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // Обновляем счётчик
+    const countEl = document.getElementById('log-modal-search-count');
+    countEl.textContent = `${logModalSearchState.currentIndex + 1} / ${matches.length}`;
+}
+
+/**
+ * Очистка подсветки поиска
+ */
+function clearLogModalHighlights() {
+    const container = document.getElementById('log-modal-content');
+    const entries = container.querySelectorAll('.log-entry-modal');
+
+    entries.forEach((entry, idx) => {
+        // Убираем класс скрытия
+        entry.classList.remove('search-hidden');
+
+        // Восстанавливаем оригинальный HTML если был сохранён
+        if (logModalSearchState.originalHtml[idx]) {
+            entry.innerHTML = logModalSearchState.originalHtml[idx];
+        }
+    });
+}
+
+/**
+ * Очистить поиск в модальном окне лога
+ */
+function clearLogModalSearch() {
+    const searchInput = document.getElementById('log-modal-search-input');
+    const countEl = document.getElementById('log-modal-search-count');
+
+    if (searchInput) searchInput.value = '';
+    if (countEl) countEl.textContent = '';
+
+    // Убираем все подсветки и показываем все записи
+    clearLogModalHighlights();
+    logModalSearchState = { query: '', matches: [], currentIndex: -1, originalHtml: {} };
+}
