@@ -4,7 +4,7 @@ const { Pool } = require('pg');
 const pool = new Pool({
     user: process.env.DB_USER || 'postgres',
     host: process.env.DB_HOST || 'localhost',
-    database: process.env.DB_NAME || 'novabotbase',
+    database: process.env.DB_NAME || 'novabot',
     password: process.env.DB_PASSWORD || 'mikmik98',
     port: process.env.DB_PORT || 5432,
     // Оптимизация connection pool для параллельных запросов
