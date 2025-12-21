@@ -886,12 +886,10 @@ class AccountBot {
             if (msgs.length > 0) {
                 const newestMsg = msgs[0];
 
-                // При первом запуске показываем ВСЕ входящие, потом только новые
+                // При первом запуске показываем только НЕОТВЕЧЕННЫЕ, потом только новые
                 const newMessages = isFirstCheck
-                    ? msgs // Первый запуск: ВСЕ входящие письма
+                    ? msgs.filter(m => !m.IsReplied) // Первый запуск: только неотвеченные
                     : msgs.filter(m => m.MessageId > this.lastMailId); // Потом: только новые
-
-                let unrepliedCount = 0; // Счётчик для первого запуска
 
                 newMessages.reverse().forEach(msg => {
                     const partnerId = msg.User.AccountId;
@@ -928,25 +926,17 @@ class AccountBot {
                         messageText: mailText
                     });
 
-                    // Уведомление для входящих писем
+                    // Уведомление для неотвеченных писем
                     const avatarUrl = msg.User.Avatar || msg.User.Photo ||
                         (msg.User.Photos && msg.User.Photos[0]) ||
                         `https://ladadate.com/photo/${partnerId}/1.jpg`;
-
-                    // Счётчик непрочитанных (для звука)
-                    if (!msg.IsReplied) {
-                        unrepliedCount++;
-                    }
-
-                    // Текст зависит от статуса письма
-                    const statusText = msg.IsReplied ? '(Прочитано)' : '(Новое)';
 
                     // При первом запуске добавляем в Logger БЕЗ звука (звук один раз в конце)
                     if (isFirstCheck) {
                         // Добавляем запись напрямую без Logger.add чтобы избежать дедупликации
                         const logItem = {
                             id: Date.now() + newMessages.indexOf(msg),
-                            text: `💌 Входящее письмо от <b>${partnerName}</b> ${statusText}`,
+                            text: `💌 Входящее письмо от <b>${partnerName}</b> (Ждет ответа)`,
                             type: 'mail',
                             botId: this.id,
                             data: { partnerId, partnerName, messageId: msg.MessageId, avatarUrl },
@@ -956,7 +946,7 @@ class AccountBot {
                     } else {
                         // Обычный режим - через Logger.add
                         Logger.add(
-                            `💌 Входящее письмо от <b>${partnerName}</b> ${statusText}`,
+                            `💌 Входящее письмо от <b>${partnerName}</b> (Ждет ответа)`,
                             'mail',
                             this.id,
                             { partnerId, partnerName, messageId: msg.MessageId, avatarUrl }
@@ -964,16 +954,12 @@ class AccountBot {
                     }
                 });
 
-                // При первом запуске: рендерим логгер если есть входящие письма
+                // При первом запуске: рендерим логгер если есть неотвеченные письма
                 if (isFirstCheck && newMessages.length > 0) {
                     Logger.render(); // Отрисовываем добавленные записи
+                    playSound('message'); // Звук для неотвеченных писем
 
-                    // Звук только если есть непрочитанные
-                    if (unrepliedCount > 0) {
-                        playSound('message');
-                    }
-
-                    console.log(`[Bot ${this.displayId}] 📬 При входе найдено ${newMessages.length} писем (${unrepliedCount} новых)`);
+                    console.log(`[Bot ${this.displayId}] 📬 При входе найдено ${newMessages.length} неотвеченных писем`);
 
                     // Мигание кнопки логгера
                     const col = document.getElementById('logger-column');
