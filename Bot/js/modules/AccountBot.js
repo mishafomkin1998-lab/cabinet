@@ -1503,17 +1503,27 @@ class AccountBot {
                     const onFinishLoad = () => {
                         const url = this.webview.getURL();
                         console.log(`[Photo WebView] did-finish-load, URL: ${url}`);
-                        // Даём 2 секунды на редирект если URL ещё не UUID
+                        // Даём 3 секунды на client-side редирект (Next.js history.replaceState)
                         if (!checkUrl(url)) {
-                            setTimeout(() => {
-                                const finalUrl = this.webview.getURL();
-                                if (!checkUrl(finalUrl)) {
-                                    // Всё равно продолжаем с тем что есть
+                            setTimeout(async () => {
+                                try {
+                                    // Важно: getURL() не видит history.replaceState!
+                                    // Используем executeJavaScript для реального URL
+                                    const realUrl = await this.webview.executeJavaScript('window.location.href');
+                                    console.log(`[Photo WebView] Real URL (via JS): ${realUrl}`);
+                                    if (!checkUrl(realUrl)) {
+                                        // Всё равно продолжаем с тем что есть
+                                        clearTimeout(timeout);
+                                        cleanup();
+                                        resolve(realUrl);
+                                    }
+                                } catch (e) {
+                                    console.log(`[Photo WebView] executeJavaScript error:`, e.message);
                                     clearTimeout(timeout);
                                     cleanup();
-                                    resolve(finalUrl);
+                                    resolve(url);
                                 }
-                            }, 2000);
+                            }, 3000);
                         }
                     };
 
@@ -1549,68 +1559,97 @@ class AccountBot {
 
                 console.log(`[Photo WebView] Страница compose загружена, извлекаем UID...`);
 
-                // ШАГ 4: Извлекаем uid - сначала из URL, потом из HTML страницы
+                // ШАГ 4: Извлекаем uid - сначала из URL (с учётом client-side редиректа)
                 let composeUid = '';
 
-                // Способ 1: Из URL (если сервер сделал редирект)
+                // Способ 1: Из URL переданного в currentUrl
                 const uidMatchUrl = currentUrl.match(/message-compose\/([a-f0-9]{32})/i);
                 if (uidMatchUrl) {
                     composeUid = uidMatchUrl[1];
                     console.log(`[Photo WebView] UID из URL: ${composeUid}`);
                 }
 
-                // Способ 2: Поиск UID на странице через executeJavaScript (CSP отключен)
+                // Способ 2: Проверяем реальный URL через JS (client-side редирект)
+                if (!composeUid || composeUid.length !== 32) {
+                    try {
+                        const realUrl = await this.webview.executeJavaScript('window.location.href');
+                        console.log(`[Photo WebView] Real URL: ${realUrl}`);
+                        const uidMatchReal = realUrl.match(/message-compose\/([a-f0-9]{32})/i);
+                        if (uidMatchReal) {
+                            composeUid = uidMatchReal[1];
+                            console.log(`[Photo WebView] UID из реального URL: ${composeUid}`);
+                        }
+                    } catch (e) {
+                        console.log(`[Photo WebView] Ошибка получения реального URL:`, e.message);
+                    }
+                }
+
+                // Способ 3: Поиск UID на странице через executeJavaScript
                 if (!composeUid || composeUid.length !== 32) {
                     console.log(`[Photo WebView] URL числовой, ищем UID на странице...`);
-
-                    // Ждём 1 секунду для инициализации JS на странице
-                    await new Promise(r => setTimeout(r, 1000));
 
                     try {
                         const foundUid = await this.webview.executeJavaScript(`
                             (function() {
-                                // Ищем 32-символьный hex UID на странице
-                                const html = document.documentElement.innerHTML;
+                                // Сначала проверяем URL ещё раз
+                                const urlMatch = window.location.href.match(/message-compose\\/([a-f0-9]{32})/i);
+                                if (urlMatch) {
+                                    console.log('[UID Search] Found in URL:', urlMatch[1]);
+                                    return urlMatch[1];
+                                }
 
-                                // Способ 1: в __NEXT_DATA__
+                                // Способ 1: ищем по ключу "uid" в __NEXT_DATA__
                                 const nextData = document.getElementById('__NEXT_DATA__');
                                 if (nextData) {
-                                    const match = nextData.textContent.match(/[a-f0-9]{32}/gi);
-                                    if (match && match[0]) {
-                                        console.log('[UID Search] Found in __NEXT_DATA__:', match[0]);
-                                        return match[0];
+                                    try {
+                                        const data = JSON.parse(nextData.textContent);
+                                        // Ищем uid в props.pageProps
+                                        if (data.props?.pageProps?.uid) {
+                                            console.log('[UID Search] Found in pageProps.uid:', data.props.pageProps.uid);
+                                            return data.props.pageProps.uid;
+                                        }
+                                        // Ищем composeUid
+                                        if (data.props?.pageProps?.composeUid) {
+                                            console.log('[UID Search] Found in pageProps.composeUid:', data.props.pageProps.composeUid);
+                                            return data.props.pageProps.composeUid;
+                                        }
+                                        // Ищем в строковом представлении по ключу "uid":"..."
+                                        const str = JSON.stringify(data);
+                                        const uidKeyMatch = str.match(/"uid":"([a-f0-9]{32})"/i);
+                                        if (uidKeyMatch) {
+                                            console.log('[UID Search] Found "uid" key in __NEXT_DATA__:', uidKeyMatch[1]);
+                                            return uidKeyMatch[1];
+                                        }
+                                    } catch (e) {
+                                        console.log('[UID Search] Error parsing __NEXT_DATA__:', e.message);
                                     }
                                 }
 
-                                // Способ 2: в любом script теге
+                                // Способ 2: ищем в window.__NEXT_DATA__
+                                if (window.__NEXT_DATA__?.props?.pageProps?.uid) {
+                                    console.log('[UID Search] Found in window pageProps.uid:', window.__NEXT_DATA__.props.pageProps.uid);
+                                    return window.__NEXT_DATA__.props.pageProps.uid;
+                                }
+
+                                // Способ 3: ищем по ключу "uid" в любом script теге
                                 const scripts = document.querySelectorAll('script');
                                 for (const script of scripts) {
-                                    const match = script.textContent.match(/"uid":"([a-f0-9]{32})"/i);
-                                    if (match && match[1]) {
-                                        console.log('[UID Search] Found in script:', match[1]);
+                                    const match = script.textContent.match(/"uid"\\s*:\\s*"([a-f0-9]{32})"/i);
+                                    if (match) {
+                                        console.log('[UID Search] Found "uid" key in script:', match[1]);
                                         return match[1];
                                     }
                                 }
 
-                                // Способ 3: поиск по всему HTML (32 hex подряд, но не в URL)
+                                // Способ 4: последний resort - первый 32-hex (может быть неверным!)
+                                const html = document.documentElement.innerHTML;
                                 const allHexMatches = html.match(/[a-f0-9]{32}/gi);
                                 if (allHexMatches) {
-                                    // Фильтруем - UID обычно не содержит только цифры
                                     for (const hex of allHexMatches) {
                                         if (/[a-f]/i.test(hex)) {
-                                            console.log('[UID Search] Found hex:', hex);
+                                            console.log('[UID Search] WARNING: Using first hex found:', hex);
                                             return hex;
                                         }
-                                    }
-                                }
-
-                                // Способ 4: window объекты (Next.js data)
-                                if (window.__NEXT_DATA__ && window.__NEXT_DATA__.props) {
-                                    const str = JSON.stringify(window.__NEXT_DATA__.props);
-                                    const match = str.match(/[a-f0-9]{32}/gi);
-                                    if (match && match[0]) {
-                                        console.log('[UID Search] Found in window.__NEXT_DATA__.props:', match[0]);
-                                        return match[0];
                                     }
                                 }
 
