@@ -1473,15 +1473,17 @@ class AccountBot {
 
                 this.webview.src = composeUrl;
 
-                // Ждём навигации на URL с UUID (сервер редиректит с /885167 на /30e4a06-xxxx)
+                // Ждём навигации на URL с UID (сервер редиректит с /885167 на /ff5d7f0be79d4366858af4967719aafb)
+                // UID формат: 32 hex символа БЕЗ дефисов
                 const currentUrl = await new Promise((resolve, reject) => {
                     const timeout = setTimeout(() => reject(new Error('Timeout loading compose page')), 15000);
                     let lastUrl = '';
 
                     const checkUrl = (url) => {
                         lastUrl = url;
-                        // Проверяем что URL содержит UUID (не просто числовой ID)
-                        const uidMatch = url.match(/message-compose\/([a-f0-9-]{20,})/i);
+                        // Проверяем что URL содержит UID (32 hex символа, не числовой ID)
+                        // Формат: /message-compose/ff5d7f0be79d4366858af4967719aafb
+                        const uidMatch = url.match(/message-compose\/([a-f0-9]{32})/i);
                         if (uidMatch) {
                             clearTimeout(timeout);
                             cleanup();
@@ -1543,160 +1545,58 @@ class AccountBot {
                     throw new Error(`WebView не авторизован. Перезапустите рассылку через 10 сек.`);
                 }
 
-                console.log(`[Photo WebView] Страница compose загружена, выполняем отправку...`);
+                console.log(`[Photo WebView] Страница compose загружена, извлекаем UID...`);
 
                 // ШАГ 4: Извлекаем uid из URL compose-страницы
-                // URL: https://ladadate.com/message-compose/d04626e-xxxx-xxxx
-                const composeUid = currentUrl.split('/message-compose/')[1]?.split('?')[0] || '';
+                // URL: https://ladadate.com/message-compose/ff5d7f0be79d4366858af4967719aafb
+                const uidMatch = currentUrl.match(/message-compose\/([a-f0-9]{32})/i);
+                const composeUid = uidMatch ? uidMatch[1] : '';
                 console.log(`[Photo WebView] Извлечён uid из URL: ${composeUid}`);
 
-                if (!composeUid) {
-                    throw new Error('Не удалось извлечь uid из URL compose страницы');
+                if (!composeUid || composeUid.length !== 32) {
+                    throw new Error(`Не удалось извлечь UID из URL: ${currentUrl}`);
                 }
 
-                // ШАГ 5: Выполняем upload и send через JS в WebView
-                const jsCode = `
-                    (async () => {
-                        try {
-                            const base64 = '${fileResult.base64}';
-                            const fileName = '${fileResult.fileName}';
-                            const msgBody = ${JSON.stringify(msgBody)};
-                            const hash = '${photoHash}';
-                            let uid = '${composeUid}';
+                // ШАГ 5: Загружаем фото через IPC (обходим CSP)
+                console.log(`[Photo IPC] Загрузка фото через main process...`);
+                const uploadResult = await ipcRenderer.invoke('upload-photo-internal', {
+                    filePath: this.photoPath,
+                    hash: photoHash,
+                    uid: composeUid,
+                    botId: this.id
+                });
 
-                            // Проверяем что UID - это UUID, а не числовой ID пользователя
-                            const isUuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(uid);
+                console.log(`[Photo IPC] Upload результат:`, uploadResult);
 
-                            if (!isUuid) {
-                                console.log('[WebView JS] URL содержит ID пользователя (' + uid + '), ищем compose UID...');
-
-                                // Ждём 1 секунду для инициализации React/Vue
-                                await new Promise(r => setTimeout(r, 1000));
-
-                                let foundUid = null;
-
-                                // Способ 1: ищем UUID формат в HTML страницы
-                                const html = document.documentElement.innerHTML;
-                                const uuidRegex = /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi;
-                                const uuids = html.match(uuidRegex);
-                                if (uuids && uuids.length > 0) {
-                                    // Берём первый уникальный UUID
-                                    foundUid = uuids[0];
-                                    console.log('[WebView JS] Found UUIDs on page:', uuids.length, 'using:', foundUid);
-                                }
-
-                                // Способ 2: ищем в React/Next state
-                                if (!foundUid) {
-                                    const nextData = document.getElementById('__NEXT_DATA__');
-                                    if (nextData) {
-                                        try {
-                                            const data = JSON.parse(nextData.textContent);
-                                            console.log('[WebView JS] __NEXT_DATA__ found, searching...');
-                                            const dataStr = JSON.stringify(data);
-                                            const match = dataStr.match(uuidRegex);
-                                            if (match) {
-                                                foundUid = match[0];
-                                                console.log('[WebView JS] UID from __NEXT_DATA__:', foundUid);
-                                            }
-                                        } catch(e) {}
-                                    }
-                                }
-
-                                // Способ 3: ищем в window объектах
-                                if (!foundUid) {
-                                    for (const key of Object.keys(window)) {
-                                        try {
-                                            const val = window[key];
-                                            if (val && typeof val === 'object') {
-                                                const str = JSON.stringify(val).substring(0, 5000);
-                                                const match = str.match(uuidRegex);
-                                                if (match) {
-                                                    foundUid = match[0];
-                                                    console.log('[WebView JS] UID from window.' + key + ':', foundUid);
-                                                    break;
-                                                }
-                                            }
-                                        } catch(e) {}
-                                    }
-                                }
-
-                                if (foundUid) {
-                                    uid = foundUid;
-                                } else {
-                                    // Выводим отладочную информацию
-                                    console.log('[WebView DEBUG] No UUID found on page');
-                                    console.log('[WebView DEBUG] Page title:', document.title);
-                                    console.log('[WebView DEBUG] Scripts count:', document.querySelectorAll('script').length);
-                                    console.log('[WebView DEBUG] Body length:', document.body.innerHTML.length);
-
-                                    // Пробуем найти любые длинные hex строки
-                                    const hexMatches = html.match(/[a-f0-9]{20,}/gi);
-                                    console.log('[WebView DEBUG] Long hex strings:', hexMatches?.slice(0, 5));
-
-                                    return { success: false, step: 'uid', error: 'Compose UID не найден на странице' };
-                                }
-                            }
-
-                            console.log('[WebView JS] Using UID:', uid);
-
-                            // Конвертируем base64 в Blob
-                            const byteCharacters = atob(base64);
-                            const byteNumbers = new Array(byteCharacters.length);
-                            for (let i = 0; i < byteCharacters.length; i++) {
-                                byteNumbers[i] = byteCharacters.charCodeAt(i);
-                            }
-                            const byteArray = new Uint8Array(byteNumbers);
-                            const blob = new Blob([byteArray], {type: 'image/jpeg'});
-
-                            // Upload фото
-                            const formData = new FormData();
-                            formData.append('hash', hash);
-                            formData.append('uploadfile', blob, fileName);
-
-                            console.log('[WebView JS] Uploading photo...');
-                            const uploadRes = await fetch('/message-attachment-upload?uid=' + uid, {
-                                method: 'POST',
-                                body: formData
-                            });
-                            const uploadData = await uploadRes.json();
-                            console.log('[WebView JS] Upload response:', uploadData);
-
-                            if (uploadData.IsSuccess === false) {
-                                return { success: false, step: 'upload', error: uploadData.Message || uploadData.Reason };
-                            }
-
-                            // Отправляем письмо
-                            console.log('[WebView JS] Sending message...');
-                            const sendRes = await fetch('/message-send', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/x-www-form-urlencoded',
-                                    'X-Requested-With': 'XMLHttpRequest'
-                                },
-                                body: 'uid=' + encodeURIComponent(uid) + '&body=' + encodeURIComponent(msgBody)
-                            });
-                            const sendData = await sendRes.json();
-                            console.log('[WebView JS] Send response:', sendData);
-
-                            if (sendData.IsSuccess === false) {
-                                return { success: false, step: 'send', error: sendData.Message || sendData.Reason };
-                            }
-
-                            return { success: true, data: sendData };
-                        } catch (err) {
-                            return { success: false, step: 'exception', error: err.message };
-                        }
-                    })()
-                `;
-
-                const result = await this.webview.executeJavaScript(jsCode);
-                console.log(`[Photo WebView] Результат:`, result);
-
-                if (!result.success) {
-                    throw new Error(`Ошибка на шаге ${result.step}: ${result.error}`);
+                if (!uploadResult.success) {
+                    throw new Error(`Ошибка загрузки фото: ${uploadResult.error}`);
                 }
 
-                console.log(`[Photo WebView] Письмо с фото отправлено!`);
+                // Проверяем ответ сервера
+                if (uploadResult.data && uploadResult.data.IsSuccess === false) {
+                    throw new Error(`Сервер отклонил фото: ${uploadResult.data.Message || uploadResult.data.Reason || 'Unknown'}`);
+                }
+
+                // ШАГ 6: Отправляем письмо через IPC
+                console.log(`[Photo IPC] Отправка письма через main process...`);
+                const sendResult = await ipcRenderer.invoke('send-message-internal', {
+                    uid: composeUid,
+                    body: msgBody,
+                    botId: this.id
+                });
+
+                console.log(`[Photo IPC] Send результат:`, sendResult);
+
+                if (!sendResult.success) {
+                    throw new Error(`Ошибка отправки письма: ${sendResult.error}`);
+                }
+
+                // Проверяем ответ сервера
+                if (sendResult.data && sendResult.data.IsSuccess === false) {
+                    throw new Error(`Сервер отклонил письмо: ${sendResult.data.Message || sendResult.data.Reason || 'Unknown'}`);
+                }
+
+                console.log(`[Photo IPC] ✅ Письмо с фото успешно отправлено!`);
 
                 // ОПТИМИЗАЦИЯ: Возвращаем WebView на лёгкую страницу
                 setTimeout(() => {
