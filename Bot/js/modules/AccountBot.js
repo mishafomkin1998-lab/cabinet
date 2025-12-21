@@ -875,7 +875,7 @@ class AccountBot {
         this.isFirstMailCheck = false; // Сбрасываем флаг
 
         try {
-            // Получаем письма за последние 6 дней
+            // Получаем письма за последние 6 дней (для уведомлений)
             const sixDaysAgo = new Date();
             sixDaysAgo.setDate(sixDaysAgo.getDate() - 6);
             const startDate = sixDaysAgo.toISOString().split('.')[0]; // формат: 2025-01-01T00:00:00
@@ -884,9 +884,38 @@ class AccountBot {
             const msgs = res.data.Messages || [];
 
             if (msgs.length > 0) {
-                const newestMsg = msgs[0];
+                // === СНАЧАЛА: Добавляем в ЧС ВСЕХ отправителей за последние 2 дня (сегодня + вчера) ===
+                const twoDaysAgo = new Date();
+                twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+                twoDaysAgo.setHours(0, 0, 0, 0); // Начало позавчерашнего дня
 
-                // При первом запуске показываем только НЕОТВЕЧЕННЫЕ, потом только новые
+                const recentMsgs = msgs.filter(m => new Date(m.DatePost) >= twoDaysAgo);
+                let blacklistUpdated = false;
+
+                recentMsgs.forEach(msg => {
+                    const partnerId = msg.User.AccountId;
+                    const partnerIdStr = partnerId.toString();
+                    if (!this.mailSettings.blacklist.includes(partnerIdStr)) {
+                        if (this.mailSettings.blacklist.length >= BLACKLIST_MAX_SIZE) {
+                            this.mailSettings.blacklist.splice(0, 100);
+                            console.log(`[Lababot] ⚠️ Blacklist Mail достиг лимита ${BLACKLIST_MAX_SIZE}, удалены старые записи`);
+                        }
+                        this.mailSettings.blacklist.push(partnerIdStr);
+                        blacklistUpdated = true;
+                        const partnerName = msg.User.Name || `ID ${partnerId}`;
+                        console.log(`[Lababot] ✅ ${partnerName} (${partnerId}) добавлен в ЧС писем (за 2 дня)`);
+                    }
+                });
+
+                // Сохраняем ЧС один раз если были изменения
+                if (blacklistUpdated) {
+                    saveBlacklistToServer(this.displayId, 'mail', this.mailSettings.blacklist);
+                    if (activeTabId === this.id && globalMode === 'mail') {
+                        renderBlacklist(this.id);
+                    }
+                }
+
+                // === ЗАТЕМ: Уведомления для неотвеченных ===
                 const newMessages = isFirstCheck
                     ? msgs.filter(m => !m.IsReplied) // Первый запуск: только неотвеченные
                     : msgs.filter(m => m.MessageId > this.lastMailId); // Потом: только новые
@@ -894,25 +923,6 @@ class AccountBot {
                 newMessages.reverse().forEach(msg => {
                     const partnerId = msg.User.AccountId;
                     const partnerName = msg.User.Name || `ID ${partnerId}`;
-
-                    // === СРАЗУ ДОБАВЛЯЕМ В ЧС ПИСЕМ (с лимитом) ===
-                    const partnerIdStr = partnerId.toString();
-                    if (!this.mailSettings.blacklist.includes(partnerIdStr)) {
-                        // Проверяем лимит blacklist
-                        if (this.mailSettings.blacklist.length >= BLACKLIST_MAX_SIZE) {
-                            // Удаляем старые записи (первые 100)
-                            this.mailSettings.blacklist.splice(0, 100);
-                            console.log(`[Lababot] ⚠️ Blacklist Mail достиг лимита ${BLACKLIST_MAX_SIZE}, удалены старые записи`);
-                        }
-                        this.mailSettings.blacklist.push(partnerIdStr);
-                        saveBlacklistToServer(this.displayId, 'mail', this.mailSettings.blacklist);
-                        console.log(`[Lababot] ✅ ${partnerName} (${partnerId}) добавлен в ЧС писем`);
-
-                        // Обновляем UI blacklist если эта вкладка активна и режим Mail
-                        if (activeTabId === this.id && globalMode === 'mail') {
-                            renderBlacklist(this.id);
-                        }
-                    }
 
                     // Отправляем входящее сообщение на сервер статистики
                     const mailText = msg.Text || msg.Body || msg.Preview || null;
