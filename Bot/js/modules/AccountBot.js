@@ -1451,8 +1451,44 @@ class AccountBot {
                             const msgBody = ${JSON.stringify(msgBody)};
                             const hash = '${photoHash}';
 
-                            // Используем uid из URL (сгенерирован сервером)
-                            const uid = '${composeUid}';
+                            // Извлекаем uid из страницы (скрытое поле, data-атрибут или переменная)
+                            let uid = null;
+
+                            // Вариант 1: скрытое поле формы
+                            const hiddenUid = document.querySelector('input[name="uid"], input[name="messageUid"], input[name="message_uid"]');
+                            if (hiddenUid) uid = hiddenUid.value;
+
+                            // Вариант 2: data-атрибут на контейнере
+                            if (!uid) {
+                                const container = document.querySelector('[data-uid], [data-message-uid]');
+                                if (container) uid = container.dataset.uid || container.dataset.messageUid;
+                            }
+
+                            // Вариант 3: window переменная
+                            if (!uid && window.messageUid) uid = window.messageUid;
+                            if (!uid && window.composeUid) uid = window.composeUid;
+
+                            // Вариант 4: из URL (legacy)
+                            if (!uid) {
+                                const urlMatch = window.location.pathname.match(/message-compose\\/([a-f0-9-]{20,})/i);
+                                if (urlMatch) uid = urlMatch[1];
+                            }
+
+                            // Вариант 5: ищем в скриптах на странице
+                            if (!uid) {
+                                const scripts = document.querySelectorAll('script:not([src])');
+                                for (const script of scripts) {
+                                    const match = script.textContent.match(/["']uid["']\\s*:\\s*["']([a-f0-9-]{20,})["']/i) ||
+                                                  script.textContent.match(/messageUid\\s*[=:]\\s*["']([a-f0-9-]{20,})["']/i);
+                                    if (match) { uid = match[1]; break; }
+                                }
+                            }
+
+                            console.log('[WebView JS] Extracted uid:', uid);
+
+                            if (!uid) {
+                                return { success: false, step: 'uid', error: 'Не найден message UID на странице' };
+                            }
 
                             console.log('[WebView JS] uid=' + uid);
 
