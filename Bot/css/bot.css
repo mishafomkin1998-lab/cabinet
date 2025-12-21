@@ -1285,12 +1285,12 @@
             box-shadow: 0 0 3px rgba(255, 193, 7, 0.7);
             animation: dotAppear 0.35s cubic-bezier(0.68, -0.55, 0.265, 1.55), dotBreathe 1.5s ease-in-out 0.35s infinite;
         }
-        /* Chat активен - фиолетовый */
+        /* Chat активен - фиолетовый (светлый) */
         .status-dot.chat-dot.active {
             width: 5px;
             height: 5px;
-            background: #9c27b0;
-            box-shadow: 0 0 3px rgba(156, 39, 176, 0.9);
+            background: #ba68c8;
+            box-shadow: 0 0 3px rgba(186, 104, 200, 0.9);
             animation: dotAppear 0.35s cubic-bezier(0.68, -0.55, 0.265, 1.55);
         }
         /* Chat ждёт - жёлтый */
