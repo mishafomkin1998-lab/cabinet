@@ -1504,27 +1504,35 @@ class AccountBot {
                     const onFinishLoad = () => {
                         const url = this.webview.getURL();
                         console.log(`[Photo WebView] did-finish-load, URL: ${url}`);
-                        // Даём 3 секунды на client-side редирект (Next.js history.replaceState)
+                        // Активно проверяем URL несколько раз (Next.js client-side redirect)
                         if (!checkUrl(url)) {
-                            setTimeout(async () => {
+                            let attempts = 0;
+                            const maxAttempts = 10;
+                            const checkInterval = setInterval(async () => {
+                                attempts++;
                                 try {
-                                    // Важно: getURL() не видит history.replaceState!
-                                    // Используем executeJavaScript для реального URL
                                     const realUrl = await this.webview.executeJavaScript('window.location.href');
-                                    console.log(`[Photo WebView] Real URL (via JS): ${realUrl}`);
-                                    if (!checkUrl(realUrl)) {
-                                        // Всё равно продолжаем с тем что есть
+                                    console.log(`[Photo WebView] URL check #${attempts}: ${realUrl}`);
+                                    if (checkUrl(realUrl)) {
+                                        clearInterval(checkInterval);
+                                        return; // checkUrl уже вызвал resolve
+                                    }
+                                    if (attempts >= maxAttempts) {
+                                        clearInterval(checkInterval);
                                         clearTimeout(timeout);
                                         cleanup();
                                         resolve(realUrl);
                                     }
                                 } catch (e) {
-                                    console.log(`[Photo WebView] executeJavaScript error:`, e.message);
-                                    clearTimeout(timeout);
-                                    cleanup();
-                                    resolve(url);
+                                    console.log(`[Photo WebView] URL check error:`, e.message);
+                                    if (attempts >= maxAttempts) {
+                                        clearInterval(checkInterval);
+                                        clearTimeout(timeout);
+                                        cleanup();
+                                        resolve(url);
+                                    }
                                 }
-                            }, 3000);
+                            }, 500); // Проверяем каждые 500мс, до 5 секунд
                         }
                     };
 
