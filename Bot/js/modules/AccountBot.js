@@ -1305,6 +1305,17 @@ class AccountBot {
             // Диагностика: сколько после фильтрации
             console.log(`[Mail ${target}] После фильтрации: ${users.length} из ${beforeFilter}`);
 
+            // Custom IDs: если ID отфильтрован - пропускаем и берём следующий
+            if (target === 'custom-ids' && beforeFilter > 0 && users.length === 0) {
+                // ID был отфильтрован (уже в errors/sent/blacklist) - помечаем как обработанный
+                const skippedId = getNextCustomId(this.id);
+                if (skippedId) {
+                    markCustomIdSent(this.id, skippedId);
+                    console.log(`[Custom IDs] ID ${skippedId} отфильтрован, переходим к следующему`);
+                    return this.processMailUser(msgTemplate); // Рекурсивно берём следующий
+                }
+            }
+
             // Если новых пользователей нет
             if (users.length === 0) {
                 if (target === 'online' || target === 'shared-online' || target === 'online-smart') {
