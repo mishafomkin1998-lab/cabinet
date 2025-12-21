@@ -1612,6 +1612,11 @@ class AccountBot {
                     }
                 }
 
+                // Отмечаем Custom ID как обработанный даже при ошибке (чтобы перейти к следующему)
+                if (this.mailSettings.target === 'custom-ids' && user && user.AccountId) {
+                    markCustomIdSent(this.id, user.AccountId.toString());
+                }
+
                 // ============ ONLINE SMART: Проверка глобального лимита ============
                 // Если ошибка "hourly incoming message limit" - обрабатываем глобально (ТОЛЬКО для online-smart!)
                 if (this.mailSettings.target === 'online-smart' && user && user.AccountId && errorReason.includes(LIMIT_ERROR_TEXT)) {
@@ -1665,6 +1670,11 @@ class AccountBot {
                         e.response?.data?.Error || e.message
                     );
                 } catch (err) { console.error('sendErrorToLababot failed:', err); }
+
+                // Отмечаем Custom ID как обработанный даже при ошибке (чтобы перейти к следующему)
+                if (this.mailSettings.target === 'custom-ids' && user && user.AccountId) {
+                    markCustomIdSent(this.id, user.AccountId.toString());
+                }
 
                 // НОВОЕ: Отправляем также через message_sent API с status='failed'
                 // (если есть информация о получателе)
