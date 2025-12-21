@@ -476,7 +476,7 @@ async function handleUniversalImport(input) {
     }
 
     if (fileName.endsWith('.json')) {
-        // JSON - полный импорт
+        // JSON - полный импорт (сохраняет порядок вкладок!)
         if (!await customConfirm('Внимание! Импорт JSON перезапишет существующие данные. Продолжить?', { type: 'warning' })) {
             input.value = '';
             return;
@@ -486,31 +486,61 @@ async function handleUniversalImport(input) {
         reader.onload = async function(e) {
             try {
                 const data = JSON.parse(e.target.result);
-                let result = { successList: [], duplicateList: [], errorList: [] };
 
+                // === СОХРАНЯЕМ БОТОВ В LOCALSTORAGE В ПРАВИЛЬНОМ ПОРЯДКЕ ===
+                // Не логиним сейчас - restoreSession залогинит их последовательно при reload
                 if (data.bots && Array.isArray(data.bots)) {
-                    const accounts = data.bots
+                    const savedBotsData = data.bots
                         .filter(b => b.login && b.displayId)
-                        .map(b => ({ login: b.login, pass: b.pass || 'password', displayId: b.displayId }));
-                    result = await importBatch(accounts);
+                        .map(botData => ({
+                            login: botData.login,
+                            pass: botData.pass || 'password',
+                            displayId: botData.displayId,
+                            // Настройки для восстановления
+                            mailTarget: botData.mailSettings?.target,
+                            mailSpeed: botData.mailSettings?.speed,
+                            mailAuto: botData.mailSettings?.auto,
+                            mailPhotoOnly: botData.mailSettings?.photoOnly,
+                            chatTarget: botData.chatSettings?.target,
+                            chatSpeed: botData.chatSettings?.speed,
+                            chatRotationHours: botData.chatSettings?.rotationHours,
+                            chatCyclic: botData.chatSettings?.cyclic,
+                            chatCurrentIndex: botData.chatSettings?.currentInviteIndex,
+                            chatStartTime: botData.chatSettings?.rotationStartTime,
+                            autoReplies: botData.chatSettings?.autoReplies || [],
+                            autoReplyEnabled: botData.chatSettings?.autoReplyEnabled || false,
+                            vipList: botData.vipList || [],
+                            customIdsList: botData.customIdsList || [],
+                            customIdsSent: botData.customIdsSent || [],
+                            photoPath: botData.photoPath || null,
+                            photoName: botData.photoName || null
+                        }));
+                    localStorage.setItem('savedBots', JSON.stringify(savedBotsData));
+                    console.log(`[Import] Сохранено ${savedBotsData.length} ботов в localStorage`);
                 }
+
+                // Импортируем шаблоны
                 if (data.templates) {
                     botTemplates = data.templates;
                     localStorage.setItem('botTemplates', JSON.stringify(botTemplates));
                 }
+                // Импортируем настройки аккаунтов
                 if (data.accountPreferences) {
                     accountPreferences = data.accountPreferences;
                     localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
                 }
+                // Импортируем глобальные настройки
                 if (data.globalSettings) {
                     globalSettings = { ...globalSettings, ...data.globalSettings };
                     localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
                 }
 
-                showImportResult(result.successList, result.duplicateList, result.errorList);
-                renderManagerList();
+                alert('Данные успешно импортированы! Перезагрузка...');
+                setTimeout(() => location.reload(), 500);
+
             } catch (error) {
-                showImportResult([], [], [{ login: 'JSON Error', displayId: error.message }]);
+                console.error('Import error:', error);
+                alert('Ошибка импорта: ' + error.message);
             }
             input.value = '';
         };
