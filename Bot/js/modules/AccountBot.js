@@ -1619,7 +1619,7 @@ class AccountBot {
 
             if (isLimitError) {
                 // Лимит на этого пользователя - пропускаем его, переходим к следующему
-                this.log(`⏭️ Пропущен: ${user?.Name || 'unknown'} (лимит сообщений)`);
+                this.log(`❌ Ошибка: ${user?.Name || 'unknown'} (${user?.AccountId || '?'}) - лимит сообщений`);
                 // Добавляем в blacklist на эту сессию чтобы не пытаться снова
                 if (user && user.AccountId && !this.mailSettings.blacklist.includes(user.AccountId)) {
                     this.mailSettings.blacklist.push(user.AccountId);
