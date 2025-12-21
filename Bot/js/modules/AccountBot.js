@@ -1609,7 +1609,23 @@ class AccountBot {
             }
 
         } catch (e) {
-            if(e.message === "Network Error" || !e.response) {
+            // Проверяем на ошибку лимита сообщений - пропускаем пользователя, НЕ делаем retry
+            const isLimitError = e.message && (
+                e.message.includes('Лимит сообщений') ||
+                e.message.includes('лимит') ||
+                e.message.toLowerCase().includes('limit') ||
+                e.message.toLowerCase().includes('exceeded')
+            );
+
+            if (isLimitError) {
+                // Лимит на этого пользователя - пропускаем его, переходим к следующему
+                this.log(`⏭️ Пропущен: ${user?.Name || 'unknown'} (лимит сообщений)`);
+                // Добавляем в blacklist на эту сессию чтобы не пытаться снова
+                if (user && user.AccountId && !this.mailSettings.blacklist.includes(user.AccountId)) {
+                    this.mailSettings.blacklist.push(user.AccountId);
+                }
+                // НЕ делаем retry - просто выходим из catch, следующий пользователь будет обработан
+            } else if(e.message === "Network Error" || !e.response) {
                 // Exponential backoff при сетевых ошибках
                 this.networkErrorCount++;
                 const backoffDelay = Math.min(5000 * Math.pow(2, this.networkErrorCount - 1), 60000); // max 60 сек
