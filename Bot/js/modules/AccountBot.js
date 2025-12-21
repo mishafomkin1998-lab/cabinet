@@ -968,8 +968,10 @@ class AccountBot {
                     }
                 }
 
-                if (newestMsg.MessageId > this.lastMailId) {
-                    this.lastMailId = newestMsg.MessageId;
+                // Обновляем lastMailId на МАКСИМАЛЬНЫЙ ID из всех писем
+                const maxMessageId = Math.max(...msgs.map(m => m.MessageId));
+                if (maxMessageId > this.lastMailId) {
+                    this.lastMailId = maxMessageId;
                 }
             }
         } catch(e) { console.error(`[Bot ${this.displayId}] checkNewMails error:`, e.message); }
