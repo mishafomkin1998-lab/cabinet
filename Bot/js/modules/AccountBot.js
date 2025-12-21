@@ -875,7 +875,12 @@ class AccountBot {
         this.isFirstMailCheck = false; // Сбрасываем флаг
 
         try {
-            const res = await makeApiRequest(this, 'GET', '/api/messages');
+            // Получаем письма за последние 6 дней
+            const sixDaysAgo = new Date();
+            sixDaysAgo.setDate(sixDaysAgo.getDate() - 6);
+            const startDate = sixDaysAgo.toISOString().split('.')[0]; // формат: 2025-01-01T00:00:00
+
+            const res = await makeApiRequest(this, 'GET', `/api/messages?startDate=${startDate}`);
             const msgs = res.data.Messages || [];
 
             if (msgs.length > 0) {
