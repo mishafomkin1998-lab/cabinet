@@ -402,6 +402,8 @@ class AccountBot {
         // Название отличается от bot partition чтобы прокси не применялся
         webview.partition = `persist:wv_${this.id}`;
         webview.useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+        // ВАЖНО: Отключаем CSP чтобы JS на странице compose мог выполниться и сгенерировать UID
+        webview.setAttribute('webpreferences', 'webSecurity=no');
         webview.src = "https://ladadate.com/login";
 
         console.log(`[WebView] 📦 Partition: persist:wv_${this.id} (без прокси), src: ${webview.src}`);
