@@ -2742,21 +2742,21 @@ class AccountBot {
         const stats = isChat ? this.chatStats : this.mailStats;
         const btn = document.getElementById(`btn-start-${this.id}`);
 
-        // Обновляем точки статуса (Mail и Chat независимо)
-        const mailDot = document.querySelector(`#tab-${this.id} .status-dot.mail`);
-        const chatDot = document.querySelector(`#tab-${this.id} .status-dot.chat`);
+        // Обновляем полоску статуса сверху (Mail и Chat независимо)
+        const mailBar = document.querySelector(`#tab-${this.id} .status-bar-mail`);
+        const chatBar = document.querySelector(`#tab-${this.id} .status-bar-chat`);
 
-        if (mailDot) {
-            mailDot.classList.remove('active', 'waiting');
+        if (mailBar) {
+            mailBar.classList.remove('active', 'waiting');
             if (this.isMailRunning) {
-                mailDot.classList.add(this.isMailWaiting ? 'waiting' : 'active');
+                mailBar.classList.add(this.isMailWaiting ? 'waiting' : 'active');
             }
         }
 
-        if (chatDot) {
-            chatDot.classList.remove('active', 'waiting');
+        if (chatBar) {
+            chatBar.classList.remove('active', 'waiting');
             if (this.isChatRunning) {
-                chatDot.classList.add(this.isChatWaiting ? 'waiting' : 'active');
+                chatBar.classList.add(this.isChatWaiting ? 'waiting' : 'active');
             }
         }
 

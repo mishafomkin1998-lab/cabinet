@@ -1243,39 +1243,43 @@
         .tab-item:hover:not(.active) { background: #f1f1f1; }
         .tab-close { font-size: 14px; margin-left: 2px; opacity: 0.5; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
         .tab-close:hover { background: #ff4d4d; color: white !important; opacity: 1; }
-        /* Контейнер для точек статуса (Mail + Chat) */
-        .status-dots {
+
+        /* === Полоска статуса сверху вкладки === */
+        .status-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
             display: flex;
-            flex-direction: column;
-            gap: 2px;
-            margin-right: 4px;
+            border-radius: 50rem 50rem 0 0;
+            overflow: hidden;
         }
-        .status-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: transparent;
+        .status-bar-mail,
+        .status-bar-chat {
+            height: 100%;
+            flex: 0;
             transition: all 0.3s ease;
         }
-        /* Mail активен и отправляет - зелёный */
-        .status-dot.mail.active {
+        /* Mail активен - зелёный */
+        .status-bar-mail.active {
             background: #28a745;
-            box-shadow: 0 0 6px #28a745;
+            flex: 1;
         }
-        /* Mail ждёт пользователей - жёлтый */
-        .status-dot.mail.waiting {
+        /* Mail ждёт - жёлтый */
+        .status-bar-mail.waiting {
             background: #ffc107;
-            box-shadow: 0 0 6px #ffc107;
+            flex: 1;
         }
-        /* Chat активен и отправляет - фиолетовый */
-        .status-dot.chat.active {
+        /* Chat активен - фиолетовый */
+        .status-bar-chat.active {
             background: #9c27b0;
-            box-shadow: 0 0 6px #9c27b0;
+            flex: 1;
         }
-        /* Chat ждёт пользователей - жёлтый */
-        .status-dot.chat.waiting {
+        /* Chat ждёт - жёлтый */
+        .status-bar-chat.waiting {
             background: #ffc107;
-            box-shadow: 0 0 6px #ffc107;
+            flex: 1;
         }
 
         /* Стили для "призрака" перетаскивания */
