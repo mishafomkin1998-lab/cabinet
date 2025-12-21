@@ -449,6 +449,15 @@ class AccountBot {
                 if (!this.webviewReady) {
                     this.webviewReady = true;
                     console.log(`[WebView ${this.id}] ✅ WebView АВТОРИЗОВАН (ушли с login)`);
+
+                    // ОПТИМИЗАЦИЯ: Переходим на лёгкую страницу для экономии памяти
+                    // Не переходим если это уже ignore-list или compose (отправка фото)
+                    if (!url.includes('/ignore-list') && !url.includes('/message-compose')) {
+                        setTimeout(() => {
+                            console.log(`[WebView ${this.id}] 🔄 Переход на /ignore-list для экономии памяти`);
+                            webview.src = 'https://ladadate.com/ignore-list';
+                        }, 1000);
+                    }
                 }
             } else {
                 // Вернулись на login - сбрасываем флаг
@@ -510,6 +519,15 @@ class AccountBot {
         document.getElementById('browsers-container').appendChild(webview);
         this.webview = webview;
         console.log(`[WebView] ✅ WebView добавлен в DOM и начал загрузку`);
+
+        // ОПТИМИЗАЦИЯ: Блокируем загрузку изображений для экономии RAM
+        ipcRenderer.invoke('optimize-webview-session', { botId: this.id })
+            .then(result => {
+                if (result.success) {
+                    console.log(`[WebView ${this.id}] 🎯 Оптимизация RAM включена`);
+                }
+            })
+            .catch(err => console.warn(`[WebView ${this.id}] Оптимизация не удалась:`, err.message));
 
         // DEBUG: Проверяем IP через WebView через 10 секунд после загрузки
         setTimeout(async () => {
@@ -1640,6 +1658,14 @@ class AccountBot {
                 }
 
                 console.log(`[Photo WebView] Письмо с фото отправлено!`);
+
+                // ОПТИМИЗАЦИЯ: Возвращаем WebView на лёгкую страницу
+                setTimeout(() => {
+                    if (this.webview && this.webviewReady) {
+                        console.log(`[WebView ${this.id}] 🔄 Возврат на /ignore-list после отправки фото`);
+                        this.webview.src = 'https://ladadate.com/ignore-list';
+                    }
+                }, 500);
 
             } else {
                 // ============ БЕЗ ФОТО: публичный API (Bearer token) ============

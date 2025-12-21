@@ -314,6 +314,41 @@ ipcMain.handle('get-session-proxy', async (event, { botId }) => {
     }
 });
 
+// IPC: Оптимизация WebView сессии (блокировка изображений для экономии RAM)
+ipcMain.handle('optimize-webview-session', async (event, { botId }) => {
+    try {
+        const ses = session.fromPartition(`persist:wv_${botId}`);
+
+        // Блокируем загрузку изображений, видео, шрифтов для экономии памяти
+        ses.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (details, callback) => {
+            const url = details.url.toLowerCase();
+
+            // Блокируем тяжёлые ресурсы (изображения, видео, шрифты)
+            const blockExtensions = [
+                '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.ico', '.bmp',
+                '.mp4', '.webm', '.avi', '.mov',
+                '.woff', '.woff2', '.ttf', '.eot', '.otf'
+            ];
+
+            // Не блокируем если это API запрос или основная страница
+            const isApiRequest = url.includes('/api/') || url.includes('/chat-') || url.includes('/message-');
+
+            if (!isApiRequest && blockExtensions.some(ext => url.includes(ext))) {
+                // console.log(`[WebView Optimize] Заблокирован: ${url.substring(0, 80)}...`);
+                callback({ cancel: true });
+            } else {
+                callback({ cancel: false });
+            }
+        });
+
+        console.log(`[WebView Optimize] ✅ Оптимизация включена для wv_${botId} (блокировка изображений)`);
+        return { success: true };
+    } catch (error) {
+        console.error(`[WebView Optimize] ❌ Ошибка:`, error.message);
+        return { success: false, error: error.message };
+    }
+});
+
 // IPC: Установить прокси для default session (для axios запросов из renderer)
 ipcMain.handle('set-default-session-proxy', async (event, { proxyString }) => {
     console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
