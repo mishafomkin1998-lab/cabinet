@@ -1252,9 +1252,10 @@
             top: 0;
             left: 0;
             right: 0;
-            height: 3px;
+            height: 1.5px;
             background: transparent;
-            transition: background 0.3s ease;
+            border-radius: 50rem 50rem 0 0;
+            transition: all 0.3s ease;
             pointer-events: none;
         }
         /* Mail активен - зелёный */
