@@ -1549,14 +1549,88 @@ class AccountBot {
 
                 console.log(`[Photo WebView] Страница compose загружена, извлекаем UID...`);
 
-                // ШАГ 4: Извлекаем uid из URL compose-страницы
-                // URL: https://ladadate.com/message-compose/ff5d7f0be79d4366858af4967719aafb
-                const uidMatch = currentUrl.match(/message-compose\/([a-f0-9]{32})/i);
-                const composeUid = uidMatch ? uidMatch[1] : '';
-                console.log(`[Photo WebView] Извлечён uid из URL: ${composeUid}`);
+                // ШАГ 4: Извлекаем uid - сначала из URL, потом из HTML страницы
+                let composeUid = '';
+
+                // Способ 1: Из URL (если сервер сделал редирект)
+                const uidMatchUrl = currentUrl.match(/message-compose\/([a-f0-9]{32})/i);
+                if (uidMatchUrl) {
+                    composeUid = uidMatchUrl[1];
+                    console.log(`[Photo WebView] UID из URL: ${composeUid}`);
+                }
+
+                // Способ 2: Поиск UID на странице через executeJavaScript (CSP отключен)
+                if (!composeUid || composeUid.length !== 32) {
+                    console.log(`[Photo WebView] URL числовой, ищем UID на странице...`);
+
+                    // Ждём 1 секунду для инициализации JS на странице
+                    await new Promise(r => setTimeout(r, 1000));
+
+                    try {
+                        const foundUid = await this.webview.executeJavaScript(`
+                            (function() {
+                                // Ищем 32-символьный hex UID на странице
+                                const html = document.documentElement.innerHTML;
+
+                                // Способ 1: в __NEXT_DATA__
+                                const nextData = document.getElementById('__NEXT_DATA__');
+                                if (nextData) {
+                                    const match = nextData.textContent.match(/[a-f0-9]{32}/gi);
+                                    if (match && match[0]) {
+                                        console.log('[UID Search] Found in __NEXT_DATA__:', match[0]);
+                                        return match[0];
+                                    }
+                                }
+
+                                // Способ 2: в любом script теге
+                                const scripts = document.querySelectorAll('script');
+                                for (const script of scripts) {
+                                    const match = script.textContent.match(/"uid":"([a-f0-9]{32})"/i);
+                                    if (match && match[1]) {
+                                        console.log('[UID Search] Found in script:', match[1]);
+                                        return match[1];
+                                    }
+                                }
+
+                                // Способ 3: поиск по всему HTML (32 hex подряд, но не в URL)
+                                const allHexMatches = html.match(/[a-f0-9]{32}/gi);
+                                if (allHexMatches) {
+                                    // Фильтруем - UID обычно не содержит только цифры
+                                    for (const hex of allHexMatches) {
+                                        if (/[a-f]/i.test(hex)) {
+                                            console.log('[UID Search] Found hex:', hex);
+                                            return hex;
+                                        }
+                                    }
+                                }
+
+                                // Способ 4: window объекты (Next.js data)
+                                if (window.__NEXT_DATA__ && window.__NEXT_DATA__.props) {
+                                    const str = JSON.stringify(window.__NEXT_DATA__.props);
+                                    const match = str.match(/[a-f0-9]{32}/gi);
+                                    if (match && match[0]) {
+                                        console.log('[UID Search] Found in window.__NEXT_DATA__.props:', match[0]);
+                                        return match[0];
+                                    }
+                                }
+
+                                return null;
+                            })()
+                        `);
+
+                        if (foundUid && foundUid.length === 32) {
+                            composeUid = foundUid;
+                            console.log(`[Photo WebView] UID найден на странице: ${composeUid}`);
+                        }
+                    } catch (jsErr) {
+                        console.error(`[Photo WebView] Ошибка executeJavaScript:`, jsErr.message);
+                    }
+                }
+
+                console.log(`[Photo WebView] Финальный UID: ${composeUid}`);
 
                 if (!composeUid || composeUid.length !== 32) {
-                    throw new Error(`Не удалось извлечь UID из URL: ${currentUrl}`);
+                    throw new Error(`Не удалось извлечь UID. URL: ${currentUrl}`);
                 }
 
                 // ШАГ 5: Загружаем фото через IPC (обходим CSP)
