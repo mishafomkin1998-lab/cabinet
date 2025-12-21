@@ -1495,63 +1495,75 @@ class AccountBot {
                             let uid = '${composeUid}';
 
                             // Проверяем что UID - это UUID, а не числовой ID пользователя
-                            const isUuid = /^[a-f0-9-]{20,}$/i.test(uid);
+                            const isUuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(uid);
 
                             if (!isUuid) {
-                                console.log('[WebView JS] URL содержит ID пользователя, ищем UID на странице...');
+                                console.log('[WebView JS] URL содержит ID пользователя (' + uid + '), ищем compose UID...');
 
-                                // Способ 1: ищем в глобальных переменных React/Next.js
-                                if (window.__NEXT_DATA__?.props?.pageProps?.uid) {
-                                    uid = window.__NEXT_DATA__.props.pageProps.uid;
-                                    console.log('[WebView JS] UID from __NEXT_DATA__:', uid);
+                                // Ждём 1 секунду для инициализации React/Vue
+                                await new Promise(r => setTimeout(r, 1000));
+
+                                let foundUid = null;
+
+                                // Способ 1: ищем UUID формат в HTML страницы
+                                const html = document.documentElement.innerHTML;
+                                const uuidRegex = /[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi;
+                                const uuids = html.match(uuidRegex);
+                                if (uuids && uuids.length > 0) {
+                                    // Берём первый уникальный UUID
+                                    foundUid = uuids[0];
+                                    console.log('[WebView JS] Found UUIDs on page:', uuids.length, 'using:', foundUid);
                                 }
 
-                                // Способ 2: ищем UUID в HTML страницы
-                                if (!uid || !/^[a-f0-9-]{20,}$/i.test(uid)) {
-                                    const html = document.body.innerHTML;
-                                    const uuidMatch = html.match(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/i);
-                                    if (uuidMatch) {
-                                        uid = uuidMatch[0];
-                                        console.log('[WebView JS] UID from HTML:', uid);
+                                // Способ 2: ищем в React/Next state
+                                if (!foundUid) {
+                                    const nextData = document.getElementById('__NEXT_DATA__');
+                                    if (nextData) {
+                                        try {
+                                            const data = JSON.parse(nextData.textContent);
+                                            console.log('[WebView JS] __NEXT_DATA__ found, searching...');
+                                            const dataStr = JSON.stringify(data);
+                                            const match = dataStr.match(uuidRegex);
+                                            if (match) {
+                                                foundUid = match[0];
+                                                console.log('[WebView JS] UID from __NEXT_DATA__:', foundUid);
+                                            }
+                                        } catch(e) {}
                                     }
                                 }
 
-                                // Способ 3: ищем в inline scripts
-                                if (!uid || !/^[a-f0-9-]{20,}$/i.test(uid)) {
-                                    const scripts = document.querySelectorAll('script:not([src])');
-                                    for (const s of scripts) {
-                                        const m = s.textContent.match(/"uid"\\s*:\\s*"([a-f0-9-]{20,})"/i) ||
-                                                  s.textContent.match(/"messageUid"\\s*:\\s*"([a-f0-9-]{20,})"/i) ||
-                                                  s.textContent.match(/"composeId"\\s*:\\s*"([a-f0-9-]{20,})"/i);
-                                        if (m) {
-                                            uid = m[1];
-                                            console.log('[WebView JS] UID from script:', uid);
-                                            break;
-                                        }
+                                // Способ 3: ищем в window объектах
+                                if (!foundUid) {
+                                    for (const key of Object.keys(window)) {
+                                        try {
+                                            const val = window[key];
+                                            if (val && typeof val === 'object') {
+                                                const str = JSON.stringify(val).substring(0, 5000);
+                                                const match = str.match(uuidRegex);
+                                                if (match) {
+                                                    foundUid = match[0];
+                                                    console.log('[WebView JS] UID from window.' + key + ':', foundUid);
+                                                    break;
+                                                }
+                                            }
+                                        } catch(e) {}
                                     }
                                 }
 
-                                // Способ 4: ищем в data-атрибутах
-                                if (!uid || !/^[a-f0-9-]{20,}$/i.test(uid)) {
-                                    const el = document.querySelector('[data-uid], [data-message-uid], [data-compose-id]');
-                                    if (el) {
-                                        uid = el.dataset.uid || el.dataset.messageUid || el.dataset.composeId;
-                                        console.log('[WebView JS] UID from data-attr:', uid);
-                                    }
-                                }
+                                if (foundUid) {
+                                    uid = foundUid;
+                                } else {
+                                    // Выводим отладочную информацию
+                                    console.log('[WebView DEBUG] No UUID found on page');
+                                    console.log('[WebView DEBUG] Page title:', document.title);
+                                    console.log('[WebView DEBUG] Scripts count:', document.querySelectorAll('script').length);
+                                    console.log('[WebView DEBUG] Body length:', document.body.innerHTML.length);
 
-                                // Способ 5: смотрим в console что есть на странице
-                                if (!uid || !/^[a-f0-9-]{20,}$/i.test(uid)) {
-                                    // Выводим отладку
-                                    console.log('[WebView DEBUG] window keys:', Object.keys(window).filter(k => k.includes('uid') || k.includes('Uid') || k.includes('UID')));
-                                    console.log('[WebView DEBUG] __NEXT_DATA__:', window.__NEXT_DATA__ ? JSON.stringify(window.__NEXT_DATA__).substring(0, 500) : 'not found');
+                                    // Пробуем найти любые длинные hex строки
+                                    const hexMatches = html.match(/[a-f0-9]{20,}/gi);
+                                    console.log('[WebView DEBUG] Long hex strings:', hexMatches?.slice(0, 5));
 
-                                    // Ищем все что похоже на uid в JSON на странице
-                                    const allScripts = Array.from(document.querySelectorAll('script')).map(s => s.textContent).join('');
-                                    const uidMatches = allScripts.match(/uid['"\\s:]+['"]([^'"]{10,})['"]/gi);
-                                    console.log('[WebView DEBUG] uid matches in scripts:', uidMatches?.slice(0, 5));
-
-                                    return { success: false, step: 'uid', error: 'UID не найден (URL=' + window.location.href + ')' };
+                                    return { success: false, step: 'uid', error: 'Compose UID не найден на странице' };
                                 }
                             }
 
