@@ -612,13 +612,8 @@ ipcMain.handle('upload-photo-internal', async (event, { filePath, hash, uid, bot
             contentType: 'image/jpeg'
         });
 
-        // Получаем прокси для бота
-        let proxyAgent = null;
-        if (botId && botProxies[botId]) {
-            const proxyUrl = botProxies[botId];
-            const { HttpsProxyAgent } = require('https-proxy-agent');
-            proxyAgent = new HttpsProxyAgent(proxyUrl);
-        }
+        // НЕ используем прокси - WebView работает без прокси, cookies привязаны к этому IP
+        // Если использовать прокси - получим 407 (Proxy Auth Required) или несовпадение cookies
 
         const axiosConfig = {
             method: 'POST',
@@ -627,15 +622,11 @@ ipcMain.handle('upload-photo-internal', async (event, { filePath, hash, uid, bot
                 ...formData.getHeaders(),
                 'Cookie': cookieString,
                 'Origin': 'https://ladadate.com',
-                'Referer': 'https://ladadate.com/'
+                'Referer': `https://ladadate.com/message-compose/${uid}`
             },
             data: formData,
             timeout: 60000
         };
-
-        if (proxyAgent) {
-            axiosConfig.httpsAgent = proxyAgent;
-        }
 
         console.log('[Photo Upload MAIN] Отправляем запрос на:', axiosConfig.url);
         const response = await axios(axiosConfig);
@@ -662,13 +653,7 @@ ipcMain.handle('send-message-internal', async (event, { uid, body, botId }) => {
         const cookieString = allCookies.map(c => `${c.name}=${c.value}`).join('; ');
         console.log(`[Message Send MAIN] Cookies из wv_${botId}:`, allCookies.length, 'шт');
 
-        // Получаем прокси для бота
-        let proxyAgent = null;
-        if (botId && botProxies[botId]) {
-            const proxyUrl = botProxies[botId];
-            const { HttpsProxyAgent } = require('https-proxy-agent');
-            proxyAgent = new HttpsProxyAgent(proxyUrl);
-        }
+        // НЕ используем прокси - WebView работает без прокси, cookies привязаны к этому IP
 
         const axiosConfig = {
             method: 'POST',
@@ -677,16 +662,12 @@ ipcMain.handle('send-message-internal', async (event, { uid, body, botId }) => {
                 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                 'Cookie': cookieString,
                 'Origin': 'https://ladadate.com',
-                'Referer': 'https://ladadate.com/',
+                'Referer': `https://ladadate.com/message-compose/${uid}`,
                 'X-Requested-With': 'XMLHttpRequest'
             },
             data: `uid=${encodeURIComponent(uid)}&body=${encodeURIComponent(body)}`,
             timeout: 30000
         };
-
-        if (proxyAgent) {
-            axiosConfig.httpsAgent = proxyAgent;
-        }
 
         const response = await axios(axiosConfig);
         console.log('[Message Send MAIN] Response:', response.data);
