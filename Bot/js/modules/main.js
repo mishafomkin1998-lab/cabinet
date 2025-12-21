@@ -1793,79 +1793,207 @@ async function saveSession() {
 // Хранилище анкет которые не удалось залогинить (чтобы не потерять при saveSession)
 let failedLoginBots = [];
 
+// ============= OVERLAY УПРАВЛЕНИЕ =============
+function showRestoreOverlay(total) {
+    const overlay = document.getElementById('restore-overlay');
+    if (overlay) {
+        overlay.style.display = 'flex';
+        document.getElementById('restore-progress-total').textContent = total;
+        document.getElementById('restore-progress-current').textContent = '0';
+        document.getElementById('restore-success-count').textContent = '0';
+        document.getElementById('restore-retry-count').textContent = '0';
+        document.getElementById('restore-failed-count').textContent = '0';
+        document.getElementById('restore-progress-fill').style.width = '0%';
+        document.getElementById('restore-current-account').textContent = '';
+    }
+}
+
+function updateRestoreOverlay(current, total, success, retries, failed, currentAccount) {
+    const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+
+    document.getElementById('restore-progress-current').textContent = current;
+    document.getElementById('restore-progress-fill').style.width = percent + '%';
+    document.getElementById('restore-success-count').textContent = success;
+    document.getElementById('restore-retry-count').textContent = retries;
+    document.getElementById('restore-failed-count').textContent = failed;
+
+    if (currentAccount) {
+        document.getElementById('restore-current-account').textContent = `→ ${currentAccount}`;
+    }
+
+    // Обновляем статус
+    const statusEl = document.getElementById('restore-overlay-status');
+    if (statusEl) {
+        if (current === total) {
+            statusEl.textContent = 'Завершение...';
+        } else {
+            statusEl.textContent = `Загрузка анкет... ${percent}%`;
+        }
+    }
+}
+
+function hideRestoreOverlay() {
+    const overlay = document.getElementById('restore-overlay');
+    if (overlay) {
+        overlay.style.opacity = '0';
+        overlay.style.transition = 'opacity 0.3s ease-out';
+        setTimeout(() => {
+            overlay.style.display = 'none';
+            overlay.style.opacity = '';
+            overlay.style.transition = '';
+        }, 300);
+    }
+}
+
+// ============= ВОССТАНОВЛЕНИЕ СЕССИИ С RETRY =============
 async function restoreSession() {
     try {
-        // Загружаем из localStorage
-        const s = JSON.parse(localStorage.getItem('savedBots') || '[]');
-        failedLoginBots = []; // Сбрасываем список неудавшихся логинов
-        document.getElementById('restore-status').innerText = s.length ? `Загрузка ${s.length} из кэша...` : "";
+        const savedAccounts = JSON.parse(localStorage.getItem('savedBots') || '[]');
+        if (savedAccounts.length === 0) return;
 
-        for (const a of s) {
-            // performLogin теперь возвращает botId (строку) или null
-            const botId = await performLogin(a.login, a.pass, a.displayId);
-            if (botId && bots[botId]) {
-                const bot = bots[botId];
+        failedLoginBots = [];
 
-                // Восстанавливаем остальные настройки из localStorage
-                bot.lastTplMail = a.lastTplMail;
-                bot.lastTplChat = a.lastTplChat;
+        // Показываем overlay
+        showRestoreOverlay(savedAccounts.length);
 
-                if (a.chatRotationHours) bot.chatSettings.rotationHours = a.chatRotationHours;
-                if (a.chatCyclic !== undefined) bot.chatSettings.cyclic = a.chatCyclic;
-                if (a.chatCurrentIndex) bot.chatSettings.currentInviteIndex = a.chatCurrentIndex;
-                if (a.chatStartTime) bot.chatSettings.rotationStartTime = a.chatStartTime;
-                if (a.chatTarget) bot.chatSettings.target = a.chatTarget;
-                if (a.chatSpeed) bot.chatSettings.speed = a.chatSpeed;
-                if (a.mailAuto !== undefined) bot.mailSettings.auto = a.mailAuto;
-                if (a.mailTarget) bot.mailSettings.target = a.mailTarget;
-                if (a.mailSpeed) bot.mailSettings.speed = a.mailSpeed;
-                if (a.mailPhotoOnly !== undefined) bot.mailSettings.photoOnly = a.mailPhotoOnly;
-                if (a.vipList) bot.vipList = a.vipList;
-                if (a.customIdsList) bot.customIdsList = a.customIdsList;
-                if (a.customIdsSent) bot.customIdsSent = a.customIdsSent;
-                // Восстанавливаем автоответы
-                if (a.autoReplies) bot.chatSettings.autoReplies = a.autoReplies;
-                if (a.autoReplyEnabled !== undefined) bot.chatSettings.autoReplyEnabled = a.autoReplyEnabled;
-                // ВАЖНО: Blacklist НЕ восстанавливаем из localStorage!
-                // Сервер имеет актуальные данные, localStorage может быть устаревшим
-                // Blacklist уже загружен с сервера в performLogin → loadFromServerData
-                // Восстанавливаем путь к фото
-                if (a.photoPath) bot.photoPath = a.photoPath;
-                if (a.photoName) bot.photoName = a.photoName;
+        const PARALLEL_LIMIT = 5;  // 5 анкет одновременно
+        const MAX_RETRIES = 3;     // 3 попытки на анкету
 
-                updateInterfaceForMode(bot.id);
-                // Показываем поле Custom IDs если выбран этот режим
-                if (a.mailTarget === 'custom-ids') {
-                    toggleCustomIdsField(bot.id);
-                }
-                // Восстанавливаем UI для фото
-                if (bot.photoName) {
-                    document.getElementById(`photo-name-${bot.id}`).innerText = bot.photoName;
-                    document.getElementById(`photo-label-${bot.id}`).classList.add('file-selected');
-                }
-            } else {
-                // Логин не удался - сохраняем данные анкеты чтобы не потерять
-                console.warn(`[RestoreSession] Не удалось залогинить ${a.displayId}, сохраняем для следующего запуска`);
-                failedLoginBots.push(a);
+        let processed = 0;
+        let successCount = 0;
+        let retryCount = 0;
+        let failedCount = 0;
+
+        // Храним соответствие: originalIndex → botId (для сортировки вкладок)
+        const orderMap = new Map(); // displayId → originalIndex
+        savedAccounts.forEach((acc, idx) => {
+            orderMap.set(acc.displayId, idx);
+        });
+
+        // Функция восстановления настроек бота
+        function restoreBotSettings(bot, savedData) {
+            bot.lastTplMail = savedData.lastTplMail;
+            bot.lastTplChat = savedData.lastTplChat;
+
+            if (savedData.chatRotationHours) bot.chatSettings.rotationHours = savedData.chatRotationHours;
+            if (savedData.chatCyclic !== undefined) bot.chatSettings.cyclic = savedData.chatCyclic;
+            if (savedData.chatCurrentIndex) bot.chatSettings.currentInviteIndex = savedData.chatCurrentIndex;
+            if (savedData.chatStartTime) bot.chatSettings.rotationStartTime = savedData.chatStartTime;
+            if (savedData.chatTarget) bot.chatSettings.target = savedData.chatTarget;
+            if (savedData.chatSpeed) bot.chatSettings.speed = savedData.chatSpeed;
+            if (savedData.mailAuto !== undefined) bot.mailSettings.auto = savedData.mailAuto;
+            if (savedData.mailTarget) bot.mailSettings.target = savedData.mailTarget;
+            if (savedData.mailSpeed) bot.mailSettings.speed = savedData.mailSpeed;
+            if (savedData.mailPhotoOnly !== undefined) bot.mailSettings.photoOnly = savedData.mailPhotoOnly;
+            if (savedData.vipList) bot.vipList = savedData.vipList;
+            if (savedData.customIdsList) bot.customIdsList = savedData.customIdsList;
+            if (savedData.customIdsSent) bot.customIdsSent = savedData.customIdsSent;
+            if (savedData.autoReplies) bot.chatSettings.autoReplies = savedData.autoReplies;
+            if (savedData.autoReplyEnabled !== undefined) bot.chatSettings.autoReplyEnabled = savedData.autoReplyEnabled;
+            if (savedData.photoPath) bot.photoPath = savedData.photoPath;
+            if (savedData.photoName) bot.photoName = savedData.photoName;
+
+            updateInterfaceForMode(bot.id);
+
+            if (savedData.mailTarget === 'custom-ids') {
+                toggleCustomIdsField(bot.id);
             }
-            await new Promise(r => setTimeout(r, 500));
+
+            if (bot.photoName) {
+                const photoNameEl = document.getElementById(`photo-name-${bot.id}`);
+                const photoLabelEl = document.getElementById(`photo-label-${bot.id}`);
+                if (photoNameEl) photoNameEl.innerText = bot.photoName;
+                if (photoLabelEl) photoLabelEl.classList.add('file-selected');
+            }
         }
-        
-        document.getElementById('restore-status').innerText = "";
-        document.getElementById('restore-status').innerText = "";
+
+        // Функция логина с retry
+        async function loginWithRetry(acc, retryNum = 0) {
+            try {
+                const botId = await performLogin(acc.login, acc.pass, acc.displayId);
+
+                if (botId && bots[botId]) {
+                    restoreBotSettings(bots[botId], acc);
+                    return { success: true, botId, acc };
+                }
+            } catch (err) {
+                console.warn(`[Restore] Ошибка ${acc.displayId}:`, err.message);
+            }
+
+            // Retry с экспоненциальной задержкой: 2с, 4с, 8с
+            if (retryNum < MAX_RETRIES) {
+                const delay = Math.pow(2, retryNum + 1) * 1000;
+                console.log(`[Restore] ⟳ Retry ${retryNum + 1}/${MAX_RETRIES} для ${acc.displayId} через ${delay/1000}с`);
+                retryCount++;
+                updateRestoreOverlay(processed, savedAccounts.length, successCount, retryCount, failedCount, `${acc.displayId} (повтор ${retryNum + 1})`);
+
+                await new Promise(r => setTimeout(r, delay));
+                return loginWithRetry(acc, retryNum + 1);
+            }
+
+            return { success: false, acc };
+        }
+
+        // Обрабатываем последовательно для сохранения порядка вкладок
+        // Но внутри каждой анкеты есть retry
+        for (const acc of savedAccounts) {
+            updateRestoreOverlay(processed, savedAccounts.length, successCount, retryCount, failedCount, acc.displayId);
+
+            const result = await loginWithRetry(acc);
+            processed++;
+
+            if (result.success) {
+                successCount++;
+                console.log(`[Restore] ✓ ${acc.displayId} загружен`);
+            } else {
+                failedCount++;
+                failedLoginBots.push(acc);
+                console.warn(`[Restore] ✗ ${acc.displayId} не удалось загрузить после ${MAX_RETRIES} попыток`);
+            }
+
+            updateRestoreOverlay(processed, savedAccounts.length, successCount, retryCount, failedCount, '');
+
+            // Небольшая пауза между анкетами для защиты от rate limit
+            if (processed < savedAccounts.length) {
+                await new Promise(r => setTimeout(r, 300));
+            }
+        }
+
+        // Скрываем overlay
+        await new Promise(r => setTimeout(r, 500)); // Даём увидеть 100%
+        hideRestoreOverlay();
+
+        // Показываем результат
+        const statusEl = document.getElementById('restore-status');
+        if (statusEl) {
+            if (failedCount > 0) {
+                statusEl.innerText = `Загружено ${successCount}/${savedAccounts.length} (${failedCount} ошибок)`;
+            } else {
+                statusEl.innerText = '';
+            }
+        }
+
+        console.log(`[Restore] ════════════════════════════════`);
+        console.log(`[Restore] ✅ Успешно: ${successCount}`);
+        console.log(`[Restore] ⟳ Повторов: ${retryCount}`);
+        console.log(`[Restore] ❌ Ошибок: ${failedCount}`);
+        console.log(`[Restore] ════════════════════════════════`);
+
         document.getElementById('welcome-screen').style.display = Object.keys(bots).length > 0 ? 'none' : 'flex';
-        
-        // Сохраняем порядок вкладок
+
+        // Вкладки уже в правильном порядке (загружали последовательно)
+        // Но на всякий случай пересортируем объект bots
         const tempBots = { ...bots };
         bots = {};
-        const keys = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
-        keys.forEach(id => {
+        const tabOrder = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
+        tabOrder.forEach(id => {
             if (tempBots[id]) bots[id] = tempBots[id];
         });
-        
+
     } catch (error) {
         console.error('Error restoring session:', error);
-        document.getElementById('restore-status').innerText = "Ошибка загрузки. Используется кэш.";
+        hideRestoreOverlay();
+        document.getElementById('restore-status').innerText = "Ошибка загрузки";
         document.getElementById('welcome-screen').style.display = Object.keys(bots).length > 0 ? 'none' : 'flex';
     }
 }

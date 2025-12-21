@@ -666,6 +666,43 @@
         </div>
     </div>
 
+    <!-- Loading Overlay для восстановления сессии -->
+    <div id="restore-overlay" class="restore-overlay" style="display: none;">
+        <div class="restore-overlay-content">
+            <div class="restore-logo">
+                <i class="fa fa-rocket"></i>
+            </div>
+            <h2 class="restore-title">Novabot</h2>
+            <p class="restore-subtitle" id="restore-overlay-status">Загрузка анкет...</p>
+
+            <div class="restore-progress-container">
+                <div class="restore-progress-bar">
+                    <div class="restore-progress-fill" id="restore-progress-fill"></div>
+                </div>
+                <div class="restore-progress-text">
+                    <span id="restore-progress-current">0</span> / <span id="restore-progress-total">0</span>
+                </div>
+            </div>
+
+            <div class="restore-details" id="restore-details">
+                <div class="restore-detail-item restore-success">
+                    <i class="fa fa-check-circle"></i>
+                    <span id="restore-success-count">0</span> успешно
+                </div>
+                <div class="restore-detail-item restore-retry">
+                    <i class="fa fa-sync"></i>
+                    <span id="restore-retry-count">0</span> повтор
+                </div>
+                <div class="restore-detail-item restore-failed">
+                    <i class="fa fa-times-circle"></i>
+                    <span id="restore-failed-count">0</span> ошибок
+                </div>
+            </div>
+
+            <div class="restore-current-account" id="restore-current-account"></div>
+        </div>
+    </div>
+
     <!-- Модули (разделённый bot.js) - порядок загрузки критичен! -->
     <script src="js/modules/config.js"></script>      <!-- 1. Глобальные переменные и константы -->
     <script src="js/modules/utils.js"></script>       <!-- 2. Утилиты, parseProxy, validateInput -->
