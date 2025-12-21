@@ -8,7 +8,7 @@ function createInterface(bot) {
     // ОБНОВЛЕНИЕ 2: Привязка нового события DragNDrop
     tab.onmousedown = (e) => startTabDrag(e, tab);
 
-    tab.innerHTML = `<div class="status-bar"><div class="status-bar-mail"></div><div class="status-bar-chat"></div></div><span class="tab-id">${bot.displayId}</span><span class="tab-spinner"><i class="fa fa-sync fa-spin"></i></span><span class="tab-close" onclick="closeTab(event, '${bot.id}')"><i class="fa fa-times"></i></span>`;
+    tab.innerHTML = `<span class="tab-id">${bot.displayId}</span><span class="tab-spinner"><i class="fa fa-sync fa-spin"></i></span><span class="tab-close" onclick="closeTab(event, '${bot.id}')"><i class="fa fa-times"></i></span>`;
     document.getElementById('tabs-bar').appendChild(tab);
 
     const ws = document.createElement('div');

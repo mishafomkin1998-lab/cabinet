@@ -1208,10 +1208,11 @@
         }
         .tab-item {
             background: #fff; padding: 3px 10px; border-radius: 50rem; font-size: 12px; font-weight: 600;
-            cursor: pointer; position: relative; min-width: 0; color: #555; display: flex; align-items: center; gap: 5px; 
+            cursor: pointer; position: relative; min-width: 0; color: #555; display: flex; align-items: center; gap: 5px;
             border: 1px solid #ddd; transition: all 0.1s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.03);
             /* ОБНОВЛЕНИЕ 2: Улучшенные стили для перетаскивания */
             user-select: none;
+            overflow: hidden; /* Для обрезки ::before по контуру */
         }
         
         .tab-item.tab-green { background: #d1e7dd !important; border-color: #badbcc !important; color: #0f5132 !important; }
@@ -1244,42 +1245,49 @@
         .tab-close { font-size: 14px; margin-left: 2px; opacity: 0.5; width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
         .tab-close:hover { background: #ff4d4d; color: white !important; opacity: 1; }
 
-        /* === Полоска статуса сверху вкладки === */
-        .status-bar {
+        /* === Полоска статуса сверху вкладки (::before псевдоэлемент) === */
+        .tab-item::before {
+            content: '';
             position: absolute;
             top: 0;
             left: 0;
             right: 0;
             height: 3px;
-            display: flex;
-            border-radius: 50rem 50rem 0 0;
-            overflow: hidden;
-        }
-        .status-bar-mail,
-        .status-bar-chat {
-            height: 100%;
-            flex: 0;
-            transition: all 0.3s ease;
+            background: transparent;
+            transition: background 0.3s ease;
+            pointer-events: none;
         }
         /* Mail активен - зелёный */
-        .status-bar-mail.active {
+        .tab-item.mail-active::before {
             background: #28a745;
-            flex: 1;
         }
         /* Mail ждёт - жёлтый */
-        .status-bar-mail.waiting {
+        .tab-item.mail-waiting::before {
             background: #ffc107;
-            flex: 1;
         }
         /* Chat активен - фиолетовый */
-        .status-bar-chat.active {
+        .tab-item.chat-active::before {
             background: #9c27b0;
-            flex: 1;
         }
         /* Chat ждёт - жёлтый */
-        .status-bar-chat.waiting {
+        .tab-item.chat-waiting::before {
             background: #ffc107;
-            flex: 1;
+        }
+        /* Оба активны - градиент */
+        .tab-item.mail-active.chat-active::before {
+            background: linear-gradient(to right, #28a745 50%, #9c27b0 50%);
+        }
+        /* Mail активен + Chat ждёт */
+        .tab-item.mail-active.chat-waiting::before {
+            background: linear-gradient(to right, #28a745 50%, #ffc107 50%);
+        }
+        /* Mail ждёт + Chat активен */
+        .tab-item.mail-waiting.chat-active::before {
+            background: linear-gradient(to right, #ffc107 50%, #9c27b0 50%);
+        }
+        /* Оба ждут */
+        .tab-item.mail-waiting.chat-waiting::before {
+            background: #ffc107;
         }
 
         /* Стили для "призрака" перетаскивания */
