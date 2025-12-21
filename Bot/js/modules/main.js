@@ -1514,7 +1514,9 @@ async function performLogin(login, pass, displayId) {
 
             // ВАЖНО: Запускаем мониторинг ПОСЛЕ загрузки данных с сервера!
             // Иначе входящие письма добавятся в blacklist, который потом перезапишется
-            bot.startMonitoring();
+            if (!bot.isMonitoring) {
+                bot.startMonitoring();
+            }
 
             // Запускаем SharedPool если ещё не запущен
             if (!SharedPool.timer) {
