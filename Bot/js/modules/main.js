@@ -2083,44 +2083,34 @@ async function handleFullImport(input) {
             try {
                 const data = JSON.parse(e.target.result);
 
-                // Импортируем ботов
+                // === СОХРАНЯЕМ БОТОВ В LOCALSTORAGE В ПРАВИЛЬНОМ ПОРЯДКЕ ===
+                // Не логиним сейчас - restoreSession залогинит их последовательно при reload
                 if (data.bots && Array.isArray(data.bots)) {
-                    for (const botData of data.bots) {
-                        if (botData.login && botData.displayId) {
-                            // performLogin возвращает botId (строку) или null
-                            const botId = await performLogin(botData.login, botData.pass || 'password', botData.displayId);
-
-                            // Восстанавливаем дополнительные данные после успешного логина
-                            if (botId && bots[botId]) {
-                                const bot = bots[botId];
-                                if (bot) {
-                                    // Восстанавливаем настройки Mail
-                                    if (botData.mailSettings) {
-                                        bot.mailSettings = { ...bot.mailSettings, ...botData.mailSettings };
-                                    }
-                                    // Восстанавливаем настройки Chat (включая autoReplies)
-                                    if (botData.chatSettings) {
-                                        bot.chatSettings = { ...bot.chatSettings, ...botData.chatSettings };
-                                    }
-                                    // Восстанавливаем VIP список
-                                    if (botData.vipList) bot.vipList = botData.vipList;
-                                    // Восстанавливаем Custom IDs
-                                    if (botData.customIdsList) bot.customIdsList = botData.customIdsList;
-                                    if (botData.customIdsSent) bot.customIdsSent = botData.customIdsSent;
-                                    // Восстанавливаем игнор-листы
-                                    if (botData.ignoredUsersMail) bot.ignoredUsersMail = botData.ignoredUsersMail;
-                                    if (botData.ignoredUsersChat) bot.ignoredUsersChat = botData.ignoredUsersChat;
-                                    // Восстанавливаем путь к фото (если файл существует - будет использован)
-                                    if (botData.photoPath) bot.photoPath = botData.photoPath;
-                                    if (botData.photoName) bot.photoName = botData.photoName;
-
-                                    console.log(`[Import] Восстановлены данные для ${botData.displayId}`);
-                                }
-                            }
-                            // Задержка между логинами для сохранения порядка вкладок
-                            await new Promise(r => setTimeout(r, 500));
-                        }
-                    }
+                    const savedBotsData = data.bots.map(botData => ({
+                        login: botData.login,
+                        pass: botData.pass || 'password',
+                        displayId: botData.displayId,
+                        // Настройки для восстановления
+                        mailTarget: botData.mailSettings?.target,
+                        mailSpeed: botData.mailSettings?.speed,
+                        mailAuto: botData.mailSettings?.auto,
+                        mailPhotoOnly: botData.mailSettings?.photoOnly,
+                        chatTarget: botData.chatSettings?.target,
+                        chatSpeed: botData.chatSettings?.speed,
+                        chatRotationHours: botData.chatSettings?.rotationHours,
+                        chatCyclic: botData.chatSettings?.cyclic,
+                        chatCurrentIndex: botData.chatSettings?.currentInviteIndex,
+                        chatStartTime: botData.chatSettings?.rotationStartTime,
+                        autoReplies: botData.chatSettings?.autoReplies || [],
+                        autoReplyEnabled: botData.chatSettings?.autoReplyEnabled || false,
+                        vipList: botData.vipList || [],
+                        customIdsList: botData.customIdsList || [],
+                        customIdsSent: botData.customIdsSent || [],
+                        photoPath: botData.photoPath || null,
+                        photoName: botData.photoName || null
+                    }));
+                    localStorage.setItem('savedBots', JSON.stringify(savedBotsData));
+                    console.log(`[Import] Сохранено ${savedBotsData.length} ботов в localStorage`);
                 }
 
                 // Импортируем шаблоны
