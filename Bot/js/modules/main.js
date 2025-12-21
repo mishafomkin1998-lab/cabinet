@@ -2117,6 +2117,8 @@ async function handleFullImport(input) {
                                     console.log(`[Import] Восстановлены данные для ${botData.displayId}`);
                                 }
                             }
+                            // Задержка между логинами для сохранения порядка вкладок
+                            await new Promise(r => setTimeout(r, 500));
                         }
                     }
                 }
