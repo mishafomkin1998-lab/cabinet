@@ -1,5 +1,27 @@
 # CLAUDE.md - Документация для Claude Code
 
+---
+
+## ⛔ КРИТИЧЕСКИЕ ПРАВИЛА РАЗРАБОТКИ ⛔
+
+### ЗАПРЕЩЕНО РЕДАКТИРОВАТЬ (PRODUCTION):
+```
+/home/user/cabinet/Bot/        ← НЕ ТРОГАТЬ!
+/home/user/cabinet/Server/     ← НЕ ТРОГАТЬ!
+```
+
+### РАЗРЕШЕНО РЕДАКТИРОВАТЬ (DEVELOPMENT):
+```
+/home/user/cabinet/Bot_v2/     ← Работаем здесь
+/home/user/cabinet/Server_v2/  ← Работаем здесь
+```
+
+**Перед любым Edit/Write проверяй путь! Если путь содержит `/Bot/` или `/Server/` (без _v2) - ОТКАЗАТЬСЯ от редактирования!**
+
+Подробности: см. файл `DEVELOPMENT_RULES.md`
+
+---
+
 ## Обзор проекта
 
 **Novabot** - Electron приложение для управления анкетами на платформе LadaDate.
