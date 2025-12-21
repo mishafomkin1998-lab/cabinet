@@ -34,6 +34,15 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
+
+// Папка для релизов (вне git репозитория, чтобы файлы не удалялись при git pull)
+// Windows: C:\NovaBot-Releases\
+// Linux: /var/novabot-releases/
+const releasesFolder = process.platform === 'win32'
+    ? 'C:\\NovaBot-Releases'
+    : '/var/novabot-releases';
+app.use('/download', express.static(releasesFolder));
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.static(__dirname));
 
