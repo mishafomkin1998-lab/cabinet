@@ -722,12 +722,15 @@ ipcMain.handle('get-compose-uid', async (event, { recipientId, botId }) => {
         // Если 400 - проверяем на ошибку лимита
         if (response.status === 400) {
             const html = response.data || '';
+            // Логируем первые 500 символов ответа чтобы понять что вернул сервер
+            console.log(`[Compose UID] ❌ Ошибка 400. Ответ сервера (первые 500 символов):`);
+            console.log(html.substring(0, 500));
+
             if (html.includes('limit') || html.includes('exceeded')) {
-                console.log(`[Compose UID] ❌ Лимит сообщений превышен`);
+                console.log(`[Compose UID] ❌ Обнаружен лимит сообщений`);
                 return { success: false, error: 'Лимит сообщений для этого пользователя превышен' };
             }
-            console.log(`[Compose UID] ❌ Ошибка 400`);
-            return { success: false, error: 'Сервер вернул 400 (возможно лимит)' };
+            return { success: false, error: 'Ошибка 400: ' + html.substring(0, 100) };
         }
 
         // Финальный URL после редиректов
