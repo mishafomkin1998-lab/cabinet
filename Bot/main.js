@@ -712,30 +712,66 @@ ipcMain.handle('get-compose-uid', async (event, { recipientId, botId }) => {
                 'Upgrade-Insecure-Requests': '1'
             },
             maxRedirects: 5,
-            timeout: 15000
+            timeout: 15000,
+            // Принимаем 200 и 400 - оба содержат полезную информацию
+            validateStatus: (status) => status === 200 || status === 400
         });
 
-        // Финальный URL после редиректов должен содержать UID
+        console.log(`[Compose UID] Response status: ${response.status}`);
+
+        // Если 400 - проверяем на ошибку лимита
+        if (response.status === 400) {
+            const html = response.data || '';
+            if (html.includes('limit') || html.includes('exceeded')) {
+                console.log(`[Compose UID] ❌ Лимит сообщений превышен`);
+                return { success: false, error: 'Лимит сообщений для этого пользователя превышен' };
+            }
+            console.log(`[Compose UID] ❌ Ошибка 400`);
+            return { success: false, error: 'Сервер вернул 400 (возможно лимит)' };
+        }
+
+        // Финальный URL после редиректов
         const finalUrl = response.request.res.responseUrl || response.config.url;
         console.log(`[Compose UID] Финальный URL: ${finalUrl}`);
 
-        // Извлекаем UID из URL
+        // Способ 1: UID из URL (если был HTTP redirect)
         const uidMatch = finalUrl.match(/message-compose\/([a-f0-9]{32})/i);
         if (uidMatch) {
-            console.log(`[Compose UID] ✅ UID найден: ${uidMatch[1]}`);
+            console.log(`[Compose UID] ✅ UID найден в URL: ${uidMatch[1]}`);
             return { success: true, uid: uidMatch[1] };
         }
 
-        // Если URL числовой - ищем UID в HTML странице
-        const html = response.data;
-        const htmlUidMatch = html.match(/"uid"\s*:\s*"([a-f0-9]{32})"/i);
-        if (htmlUidMatch) {
-            console.log(`[Compose UID] ✅ UID из HTML: ${htmlUidMatch[1]}`);
-            return { success: true, uid: htmlUidMatch[1] };
+        // Способ 2: UID из JavaScript redirect в HTML
+        const html = response.data || '';
+
+        // Ищем паттерны JS redirect: window.location, location.href, location.replace
+        const jsRedirectPatterns = [
+            /window\.location\s*=\s*['"]\/message-compose\/([a-f0-9]{32})['"]/i,
+            /location\.href\s*=\s*['"]\/message-compose\/([a-f0-9]{32})['"]/i,
+            /location\.replace\s*\(\s*['"]\/message-compose\/([a-f0-9]{32})['"]\s*\)/i,
+            /['"]\/message-compose\/([a-f0-9]{32})['"]/i,  // любой URL с UID
+            /message-compose\/([a-f0-9]{32})/i  // UID в любом контексте
+        ];
+
+        for (const pattern of jsRedirectPatterns) {
+            const match = html.match(pattern);
+            if (match && match[1]) {
+                console.log(`[Compose UID] ✅ UID найден в HTML: ${match[1]}`);
+                return { success: true, uid: match[1] };
+            }
         }
 
-        console.log(`[Compose UID] ❌ UID не найден в URL: ${finalUrl}`);
-        return { success: false, error: 'UID не найден в redirect URL' };
+        // Способ 3: UID в JSON данных
+        const jsonUidMatch = html.match(/"uid"\s*:\s*"([a-f0-9]{32})"/i);
+        if (jsonUidMatch) {
+            console.log(`[Compose UID] ✅ UID из JSON: ${jsonUidMatch[1]}`);
+            return { success: true, uid: jsonUidMatch[1] };
+        }
+
+        console.log(`[Compose UID] ❌ UID не найден. HTML length: ${html.length}`);
+        // Логируем первые 500 символов для отладки
+        console.log(`[Compose UID] HTML preview: ${html.substring(0, 500)}`);
+        return { success: false, error: 'UID не найден в ответе сервера' };
 
     } catch (err) {
         console.error(`[Compose UID] Ошибка:`, err.message);
