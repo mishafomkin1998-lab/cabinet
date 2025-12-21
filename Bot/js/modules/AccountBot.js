@@ -1662,7 +1662,8 @@ class AccountBot {
                             console.log('[WebView JS] Upload response:', uploadData);
 
                             if (uploadData.IsSuccess === false) {
-                                return { success: false, step: 'upload', error: uploadData.Message || uploadData.Reason };
+                                // Возвращаем полный текст ошибки (как в REST API)
+                                return { success: false, step: 'upload', error: uploadData.Error || uploadData.Message || uploadData.Reason || JSON.stringify(uploadData) };
                             }
 
                             // Отправляем письмо
@@ -1679,7 +1680,8 @@ class AccountBot {
                             console.log('[WebView JS] Send response:', sendData);
 
                             if (sendData.IsSuccess === false) {
-                                return { success: false, step: 'send', error: sendData.Message || sendData.Reason };
+                                // Возвращаем полный текст ошибки (как в REST API)
+                                return { success: false, step: 'send', error: sendData.Error || sendData.Message || sendData.Reason || JSON.stringify(sendData) };
                             }
 
                             return { success: true, data: sendData };
