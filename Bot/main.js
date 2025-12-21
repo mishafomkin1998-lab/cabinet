@@ -679,11 +679,58 @@ ipcMain.handle('send-message-internal', async (event, { uid, body, botId }) => {
     }
 });
 
-// Инициализация compose-сессии больше не нужна - WebView делает всё сам
-// Оставляем пустой handler для совместимости
-ipcMain.handle('init-compose-session', async (event, { recipientId, botId }) => {
-    console.log(`[Compose Session] Пропускаем - WebView выполнит всё сам`);
-    return { success: true, recipientId };
+// Получение compose UID через HTTP redirect (обход проблемы с WebView навигацией)
+ipcMain.handle('get-compose-uid', async (event, { recipientId, botId }) => {
+    console.log(`[Compose UID] Получаем UID для recipientId=${recipientId}, botId=${botId}`);
+
+    try {
+        // Получаем cookies из WebView session
+        const ses = session.fromPartition(`persist:wv_${botId}`);
+        const allCookies = await ses.cookies.get({ url: 'https://ladadate.com' });
+        const cookieString = allCookies.map(c => `${c.name}=${c.value}`).join('; ');
+        console.log(`[Compose UID] Cookies: ${allCookies.length} шт`);
+
+        // Делаем запрос с redirect: manual чтобы получить Location header
+        const composeUrl = `https://ladadate.com/message-compose/${recipientId}`;
+        console.log(`[Compose UID] Запрос к ${composeUrl}`);
+
+        const response = await axios({
+            method: 'GET',
+            url: composeUrl,
+            headers: {
+                'Cookie': cookieString,
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            maxRedirects: 5,
+            timeout: 15000
+        });
+
+        // Финальный URL после редиректов должен содержать UID
+        const finalUrl = response.request.res.responseUrl || response.config.url;
+        console.log(`[Compose UID] Финальный URL: ${finalUrl}`);
+
+        // Извлекаем UID из URL
+        const uidMatch = finalUrl.match(/message-compose\/([a-f0-9]{32})/i);
+        if (uidMatch) {
+            console.log(`[Compose UID] ✅ UID найден: ${uidMatch[1]}`);
+            return { success: true, uid: uidMatch[1] };
+        }
+
+        // Если URL числовой - ищем UID в HTML странице
+        const html = response.data;
+        const htmlUidMatch = html.match(/"uid"\s*:\s*"([a-f0-9]{32})"/i);
+        if (htmlUidMatch) {
+            console.log(`[Compose UID] ✅ UID из HTML: ${htmlUidMatch[1]}`);
+            return { success: true, uid: htmlUidMatch[1] };
+        }
+
+        console.log(`[Compose UID] ❌ UID не найден в URL: ${finalUrl}`);
+        return { success: false, error: 'UID не найден в redirect URL' };
+
+    } catch (err) {
+        console.error(`[Compose UID] Ошибка:`, err.message);
+        return { success: false, error: err.message };
+    }
 });
 
 // =====================================================

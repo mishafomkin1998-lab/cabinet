@@ -1464,224 +1464,25 @@ class AccountBot {
 
                 console.log(`[Photo WebView] hash=${photoHash}, file=${fileResult.fileName}`);
 
-                // ШАГ 2: Проверяем готовность WebView
-                if (!this.webviewReady) {
-                    throw new Error('WebView не готов (ожидание авторизации)');
-                }
+                // ШАГ 2: Получаем compose UID через IPC (HTTP redirect)
+                // Это надёжнее чем WebView навигация - axios следует редиректам автоматически
+                console.log(`[Photo IPC] Получаем compose UID для ${user.AccountId}...`);
 
-                // ШАГ 3: Переводим WebView на compose страницу
-                // Добавляем timestamp для предотвращения кэширования (иначе client-side redirect не происходит)
-                const composeUrl = `https://ladadate.com/message-compose/${user.AccountId}?_t=${Date.now()}`;
-                console.log(`[Photo WebView] Переход на ${composeUrl}`);
-
-                this.webview.src = composeUrl;
-
-                // Ждём навигации на URL с UID (сервер редиректит с /885167 на /ff5d7f0be79d4366858af4967719aafb)
-                // UID формат: 32 hex символа БЕЗ дефисов
-                const currentUrl = await new Promise((resolve, reject) => {
-                    const timeout = setTimeout(() => reject(new Error('Timeout loading compose page')), 15000);
-                    let lastUrl = '';
-
-                    const checkUrl = (url) => {
-                        lastUrl = url;
-                        // Проверяем что URL содержит UID (32 hex символа, не числовой ID)
-                        // Формат: /message-compose/ff5d7f0be79d4366858af4967719aafb
-                        const uidMatch = url.match(/message-compose\/([a-f0-9]{32})/i);
-                        if (uidMatch) {
-                            clearTimeout(timeout);
-                            cleanup();
-                            resolve(url);
-                            return true;
-                        }
-                        return false;
-                    };
-
-                    const onNavigate = (e) => {
-                        console.log(`[Photo WebView] did-navigate: ${e.url}`);
-                        checkUrl(e.url);
-                    };
-
-                    const onFinishLoad = () => {
-                        const url = this.webview.getURL();
-                        console.log(`[Photo WebView] did-finish-load, URL: ${url}`);
-                        // Активно проверяем URL несколько раз (Next.js client-side redirect)
-                        if (!checkUrl(url)) {
-                            let attempts = 0;
-                            const maxAttempts = 10;
-                            const checkInterval = setInterval(async () => {
-                                attempts++;
-                                try {
-                                    const realUrl = await this.webview.executeJavaScript('window.location.href');
-                                    console.log(`[Photo WebView] URL check #${attempts}: ${realUrl}`);
-                                    if (checkUrl(realUrl)) {
-                                        clearInterval(checkInterval);
-                                        return; // checkUrl уже вызвал resolve
-                                    }
-                                    if (attempts >= maxAttempts) {
-                                        clearInterval(checkInterval);
-                                        clearTimeout(timeout);
-                                        cleanup();
-                                        resolve(realUrl);
-                                    }
-                                } catch (e) {
-                                    console.log(`[Photo WebView] URL check error:`, e.message);
-                                    if (attempts >= maxAttempts) {
-                                        clearInterval(checkInterval);
-                                        clearTimeout(timeout);
-                                        cleanup();
-                                        resolve(url);
-                                    }
-                                }
-                            }, 500); // Проверяем каждые 500мс, до 5 секунд
-                        }
-                    };
-
-                    const onFailLoad = (e) => {
-                        clearTimeout(timeout);
-                        cleanup();
-                        reject(new Error(`Failed to load: ${e.errorDescription}`));
-                    };
-
-                    const cleanup = () => {
-                        this.webview.removeEventListener('did-navigate', onNavigate);
-                        this.webview.removeEventListener('did-finish-load', onFinishLoad);
-                        this.webview.removeEventListener('did-fail-load', onFailLoad);
-                    };
-
-                    this.webview.addEventListener('did-navigate', onNavigate);
-                    this.webview.addEventListener('did-finish-load', onFinishLoad);
-                    this.webview.addEventListener('did-fail-load', onFailLoad);
+                const uidResult = await ipcRenderer.invoke('get-compose-uid', {
+                    recipientId: user.AccountId,
+                    botId: this.id
                 });
 
-                console.log(`[Photo WebView] Финальный URL: ${currentUrl}`);
+                console.log(`[Photo IPC] Результат получения UID:`, uidResult);
 
-                if (!currentUrl.includes('/message-compose/')) {
-                    // WebView не авторизован - пробуем переавторизоваться
-                    console.log(`[Photo WebView] ⚠️ Редирект! Пробуем переавторизоваться...`);
-
-                    // Возвращаем WebView на логин
-                    this.webview.src = 'https://ladadate.com/login';
-                    this.webviewReady = false;
-
-                    throw new Error(`WebView не авторизован. Перезапустите рассылку через 10 сек.`);
+                if (!uidResult.success || !uidResult.uid) {
+                    throw new Error(`Не удалось получить compose UID: ${uidResult.error || 'Unknown'}`);
                 }
 
-                console.log(`[Photo WebView] Страница compose загружена, извлекаем UID...`);
+                const composeUid = uidResult.uid;
+                console.log(`[Photo IPC] ✅ Compose UID получен: ${composeUid}`);
 
-                // ШАГ 4: Извлекаем uid - сначала из URL (с учётом client-side редиректа)
-                let composeUid = '';
-
-                // Способ 1: Из URL переданного в currentUrl
-                const uidMatchUrl = currentUrl.match(/message-compose\/([a-f0-9]{32})/i);
-                if (uidMatchUrl) {
-                    composeUid = uidMatchUrl[1];
-                    console.log(`[Photo WebView] UID из URL: ${composeUid}`);
-                }
-
-                // Способ 2: Проверяем реальный URL через JS (client-side редирект)
-                if (!composeUid || composeUid.length !== 32) {
-                    try {
-                        const realUrl = await this.webview.executeJavaScript('window.location.href');
-                        console.log(`[Photo WebView] Real URL: ${realUrl}`);
-                        const uidMatchReal = realUrl.match(/message-compose\/([a-f0-9]{32})/i);
-                        if (uidMatchReal) {
-                            composeUid = uidMatchReal[1];
-                            console.log(`[Photo WebView] UID из реального URL: ${composeUid}`);
-                        }
-                    } catch (e) {
-                        console.log(`[Photo WebView] Ошибка получения реального URL:`, e.message);
-                    }
-                }
-
-                // Способ 3: Поиск UID на странице через executeJavaScript
-                if (!composeUid || composeUid.length !== 32) {
-                    console.log(`[Photo WebView] URL числовой, ищем UID на странице...`);
-
-                    try {
-                        const foundUid = await this.webview.executeJavaScript(`
-                            (function() {
-                                // Сначала проверяем URL ещё раз
-                                const urlMatch = window.location.href.match(/message-compose\\/([a-f0-9]{32})/i);
-                                if (urlMatch) {
-                                    console.log('[UID Search] Found in URL:', urlMatch[1]);
-                                    return urlMatch[1];
-                                }
-
-                                // Способ 1: ищем по ключу "uid" в __NEXT_DATA__
-                                const nextData = document.getElementById('__NEXT_DATA__');
-                                if (nextData) {
-                                    try {
-                                        const data = JSON.parse(nextData.textContent);
-                                        // Ищем uid в props.pageProps
-                                        if (data.props?.pageProps?.uid) {
-                                            console.log('[UID Search] Found in pageProps.uid:', data.props.pageProps.uid);
-                                            return data.props.pageProps.uid;
-                                        }
-                                        // Ищем composeUid
-                                        if (data.props?.pageProps?.composeUid) {
-                                            console.log('[UID Search] Found in pageProps.composeUid:', data.props.pageProps.composeUid);
-                                            return data.props.pageProps.composeUid;
-                                        }
-                                        // Ищем в строковом представлении по ключу "uid":"..."
-                                        const str = JSON.stringify(data);
-                                        const uidKeyMatch = str.match(/"uid":"([a-f0-9]{32})"/i);
-                                        if (uidKeyMatch) {
-                                            console.log('[UID Search] Found "uid" key in __NEXT_DATA__:', uidKeyMatch[1]);
-                                            return uidKeyMatch[1];
-                                        }
-                                    } catch (e) {
-                                        console.log('[UID Search] Error parsing __NEXT_DATA__:', e.message);
-                                    }
-                                }
-
-                                // Способ 2: ищем в window.__NEXT_DATA__
-                                if (window.__NEXT_DATA__?.props?.pageProps?.uid) {
-                                    console.log('[UID Search] Found in window pageProps.uid:', window.__NEXT_DATA__.props.pageProps.uid);
-                                    return window.__NEXT_DATA__.props.pageProps.uid;
-                                }
-
-                                // Способ 3: ищем по ключу "uid" в любом script теге
-                                const scripts = document.querySelectorAll('script');
-                                for (const script of scripts) {
-                                    const match = script.textContent.match(/"uid"\\s*:\\s*"([a-f0-9]{32})"/i);
-                                    if (match) {
-                                        console.log('[UID Search] Found "uid" key in script:', match[1]);
-                                        return match[1];
-                                    }
-                                }
-
-                                // Способ 4: последний resort - первый 32-hex (может быть неверным!)
-                                const html = document.documentElement.innerHTML;
-                                const allHexMatches = html.match(/[a-f0-9]{32}/gi);
-                                if (allHexMatches) {
-                                    for (const hex of allHexMatches) {
-                                        if (/[a-f]/i.test(hex)) {
-                                            console.log('[UID Search] WARNING: Using first hex found:', hex);
-                                            return hex;
-                                        }
-                                    }
-                                }
-
-                                return null;
-                            })()
-                        `);
-
-                        if (foundUid && foundUid.length === 32) {
-                            composeUid = foundUid;
-                            console.log(`[Photo WebView] UID найден на странице: ${composeUid}`);
-                        }
-                    } catch (jsErr) {
-                        console.error(`[Photo WebView] Ошибка executeJavaScript:`, jsErr.message);
-                    }
-                }
-
-                console.log(`[Photo WebView] Финальный UID: ${composeUid}`);
-
-                if (!composeUid || composeUid.length !== 32) {
-                    throw new Error(`Не удалось извлечь UID. URL: ${currentUrl}`);
-                }
-
-                // ШАГ 5: Загружаем фото через IPC (обходим CSP)
+                // ШАГ 3: Загружаем фото через IPC
                 console.log(`[Photo IPC] Загрузка фото через main process...`);
                 const uploadResult = await ipcRenderer.invoke('upload-photo-internal', {
                     filePath: this.photoPath,
