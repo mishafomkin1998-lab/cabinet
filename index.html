@@ -69,14 +69,20 @@
             align-items: center;
         }
 
-        .logo {
-            font-size: 24px;
-            font-weight: 800;
-            background: var(--gradient-1);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            letter-spacing: -0.5px;
+        .logo-link {
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+        }
+
+        .logo-img {
+            height: 36px;
+            width: auto;
+            transition: transform 0.3s ease;
+        }
+
+        .logo-img:hover {
+            transform: scale(1.05);
         }
 
         .nav-links {
@@ -116,7 +122,7 @@
         .btn-nav {
             padding: 12px 24px;
             background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-            color: #ffffff;
+            color: #fff !important;
             border-radius: 10px;
             font-size: 14px;
             font-weight: 600;
@@ -124,6 +130,7 @@
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
             border: none;
+            -webkit-text-fill-color: #fff;
         }
 
         .btn-nav:hover {
@@ -774,13 +781,9 @@
             gap: 24px;
         }
 
-        .footer-logo {
-            font-size: 20px;
-            font-weight: 800;
-            background: var(--gradient-1);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
+        .footer-logo-img {
+            height: 28px;
+            width: auto;
         }
 
         .footer-copy {
@@ -921,7 +924,9 @@
     <!-- Navigation -->
     <nav id="navbar">
         <div class="nav-container">
-            <div class="logo">Nova</div>
+            <a href="/" class="logo-link">
+                <img src="logo.png" alt="Nova" class="logo-img">
+            </a>
             <div class="nav-links">
                 <a href="#features">Возможности</a>
                 <a href="#download">Скачать</a>
@@ -1079,7 +1084,7 @@
     <footer>
         <div class="footer-container">
             <div class="footer-left">
-                <span class="footer-logo">Nova</span>
+                <img src="logo.png" alt="Nova" class="footer-logo-img">
                 <span class="footer-copy">© 2025 Nova AI. Все права защищены.</span>
                 <div class="footer-status">
                     <span class="footer-status-dot"></span>
