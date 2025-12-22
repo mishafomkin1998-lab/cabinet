@@ -18,9 +18,12 @@ async function checkProfilePaymentStatus(profileId) {
             ap.is_trial,
             ap.trial_started_at,
             ap.assigned_admin_id,
-            u.is_restricted as admin_is_restricted
+            ap.assigned_translator_id,
+            u.is_restricted as admin_is_restricted,
+            u_trans.is_own_translator as translator_is_own
         FROM allowed_profiles ap
         LEFT JOIN users u ON ap.assigned_admin_id = u.id
+        LEFT JOIN users u_trans ON ap.assigned_translator_id = u_trans.id
         WHERE ap.profile_id = $1
     `, [profileId]);
 
@@ -34,6 +37,11 @@ async function checkProfilePaymentStatus(profileId) {
     // Если админ - "мой админ", оплата не требуется
     if (row.admin_is_restricted) {
         return { isPaid: true, isFree: true, reason: 'my_admin' };
+    }
+
+    // Если переводчик - "мой переводчик", оплата не требуется
+    if (row.translator_is_own) {
+        return { isPaid: true, isFree: true, reason: 'my_translator' };
     }
 
     const paidUntil = row.paid_until ? new Date(row.paid_until) : null;
