@@ -266,7 +266,7 @@
         
         <!-- Форма входа -->
         <div class="px-8 pb-8">
-            <form id="loginForm" onsubmit="return false;">
+            <form id="loginForm">
                 <div class="mb-6">
                     <label class="block text-gray-700 text-sm font-medium mb-2" for="email">
                         Логин или Email
@@ -322,7 +322,7 @@
                     </a>
                 </div>
                 
-                <button type="button" id="submitBtn" onclick="handleLogin()" class="glow-button text-white w-full py-4 rounded-xl font-bold text-lg mb-6">
+                <button type="submit" class="glow-button text-white w-full py-4 rounded-xl font-bold text-lg mb-6">
                     Войти в личный кабинет
                 </button>
                 
@@ -351,121 +351,127 @@
     <div class="absolute bottom-10 right-10 w-80 h-80 rounded-full bg-gradient-to-r from-pink-100 to-blue-100 opacity-30 blur-3xl"></div>
     
     <script>
-        // Конфигурация API
+        // Конфигурация API - автоматически определяет адрес сервера
         const API_BASE = window.location.origin;
 
-        // Проверка авторизации при загрузке
-        (function() {
-            try {
-                const existingUser = localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser');
-                if (existingUser) {
-                    window.location.href = 'dashboard.html';
-                }
-            } catch(e) {}
-        })();
-
-        // Функция показа ошибки
-        function showError(message) {
-            const oldError = document.querySelector('.error-message');
-            if (oldError) oldError.remove();
-
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 flex items-center';
-            errorDiv.innerHTML = '<i class="fas fa-exclamation-circle mr-2"></i><span>' + message + '</span>';
-
-            const submitBtn = document.getElementById('submitBtn');
-            submitBtn.parentNode.insertBefore(errorDiv, submitBtn);
-
-            setTimeout(function() { errorDiv.remove(); }, 5000);
-        }
-
-        // Главная функция логина
-        async function handleLogin() {
-            const username = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value;
-            const remember = document.getElementById('remember').checked;
-            const submitBtn = document.getElementById('submitBtn');
-
-            // Валидация
-            if (!username || !password) {
-                showError('Пожалуйста, заполните все поля');
+        document.addEventListener('DOMContentLoaded', function() {
+            // Если уже авторизован - перенаправляем на dashboard
+            const existingUser = localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser');
+            if (existingUser) {
+                window.location.href = 'dashboard.html';
                 return;
             }
 
-            // Показываем загрузку
-            const originalText = submitBtn.innerHTML;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Вход...';
-            submitBtn.disabled = true;
+            // Переключение видимости пароля
+            const togglePassword = document.getElementById('togglePassword');
+            const passwordInput = document.getElementById('password');
+            const eyeIcon = togglePassword.querySelector('i');
 
-            try {
-                const response = await fetch(API_BASE + '/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: username, password: password })
-                });
+            togglePassword.addEventListener('click', function() {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                eyeIcon.classList.toggle('fa-eye');
+                eyeIcon.classList.toggle('fa-eye-slash');
+            });
 
-                const data = await response.json();
+            // Обработка формы входа
+            const loginForm = document.getElementById('loginForm');
+            loginForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
 
-                if (data.success) {
-                    const userData = {
-                        id: data.user.id,
-                        username: data.user.username,
-                        role: data.user.role,
-                        salary: data.user.salary,
-                        isRestricted: data.user.isRestricted || false,
-                        aiEnabled: data.user.aiEnabled || false,
-                        loggedIn: true,
-                        loginTime: new Date().toISOString()
-                    };
+                const username = document.getElementById('email').value.trim();
+                const password = document.getElementById('password').value;
+                const remember = document.getElementById('remember').checked;
 
-                    if (remember) {
-                        localStorage.setItem('novaUser', JSON.stringify(userData));
+                // Валидация
+                if (!username || !password) {
+                    showError('Пожалуйста, заполните все поля');
+                    return;
+                }
+
+                // Показываем загрузку
+                const submitBtn = loginForm.querySelector('button[type="submit"]');
+                const originalText = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Вход...';
+                submitBtn.disabled = true;
+
+                try {
+                    // Запрос к реальному API сервера
+                    const response = await fetch(`${API_BASE}/api/login`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        // Успешный вход - сохраняем данные пользователя
+                        const userData = {
+                            id: data.user.id,
+                            username: data.user.username,
+                            role: data.user.role,
+                            salary: data.user.salary,
+                            isRestricted: data.user.isRestricted || false,
+                            aiEnabled: data.user.aiEnabled || false,
+                            loggedIn: true,
+                            loginTime: new Date().toISOString()
+                        };
+
+                        // Если "Запомнить меня" - localStorage, иначе sessionStorage
+                        if (remember) {
+                            localStorage.setItem('novaUser', JSON.stringify(userData));
+                        } else {
+                            sessionStorage.setItem('novaUser', JSON.stringify(userData));
+                        }
+
+                        // Перенаправляем на единый dashboard
+                        window.location.href = 'dashboard.html';
                     } else {
-                        sessionStorage.setItem('novaUser', JSON.stringify(userData));
+                        // Ошибка входа
+                        showError(data.error || 'Ошибка авторизации');
+                        submitBtn.innerHTML = originalText;
+                        submitBtn.disabled = false;
                     }
-
-                    window.location.href = 'dashboard.html';
-                } else {
-                    showError(data.error || 'Ошибка авторизации');
+                } catch (error) {
+                    console.error('Login error:', error);
+                    showError('Сервер недоступен. Проверьте подключение.');
                     submitBtn.innerHTML = originalText;
                     submitBtn.disabled = false;
                 }
-            } catch (error) {
-                console.error('Login error:', error);
-                showError('Сервер недоступен. Проверьте подключение.');
-                submitBtn.innerHTML = originalText;
-                submitBtn.disabled = false;
-            }
-        }
-
-        // Инициализация после загрузки DOM
-        document.addEventListener('DOMContentLoaded', function() {
-            // Переключение видимости пароля
-            const togglePassword = document.getElementById('togglePassword');
-            if (togglePassword) {
-                togglePassword.onclick = function() {
-                    const passwordInput = document.getElementById('password');
-                    const eyeIcon = togglePassword.querySelector('i');
-                    if (passwordInput.type === 'password') {
-                        passwordInput.type = 'text';
-                        eyeIcon.classList.remove('fa-eye');
-                        eyeIcon.classList.add('fa-eye-slash');
-                    } else {
-                        passwordInput.type = 'password';
-                        eyeIcon.classList.remove('fa-eye-slash');
-                        eyeIcon.classList.add('fa-eye');
-                    }
-                };
-            }
-
-            // Enter для отправки формы
-            document.getElementById('password').addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    handleLogin();
-                }
             });
 
-            // Снежинки
+            // Функция показа ошибки
+            function showError(message) {
+                // Удаляем старое сообщение если есть
+                const oldError = document.querySelector('.error-message');
+                if (oldError) oldError.remove();
+
+                // Создаем новое сообщение об ошибке
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4 flex items-center';
+                errorDiv.innerHTML = `
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    <span>${message}</span>
+                `;
+
+                // Вставляем перед кнопкой
+                const submitBtn = loginForm.querySelector('button[type="submit"]');
+                submitBtn.parentNode.insertBefore(errorDiv, submitBtn);
+
+                // Автоудаление через 5 секунд
+                setTimeout(() => errorDiv.remove(), 5000);
+            }
+
+            // Анимация появления
+            const elements = document.querySelectorAll('.fade-in');
+            elements.forEach((el, index) => {
+                el.style.animationDelay = `${index * 0.1}s`;
+            });
+
+            // ❄️ Генерация снежинок ❄️
             createSnowflakes();
         });
 
