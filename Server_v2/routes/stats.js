@@ -491,7 +491,7 @@ router.get('/hourly-activity', asyncHandler(async (req, res) => {
          * Умный запрос: определяем ручные сообщения через пинги активности
          *
          * Логика:
-         * 1. Джойним activity_log с user_activity по translator_id
+         * 1. Джойним activity_log с activity_pings по profile_id
          * 2. Проверяем есть ли пинг в пределах ±2 минут от времени отправки
          * 3. Если есть пинг → переводчик был активен → это ручное сообщение
          * 4. Если нет пинга → автоматическая рассылка → не считаем
@@ -509,9 +509,9 @@ router.get('/hourly-activity', asyncHandler(async (req, res) => {
             ${activityFilter}
             ${dateFilter}
             AND EXISTS (
-                SELECT 1 FROM user_activity ua
-                WHERE ua.user_id = a.translator_id
-                AND ua.created_at BETWEEN (a.created_at - INTERVAL '2 minutes')
+                SELECT 1 FROM activity_pings ap
+                WHERE ap.profile_id = a.profile_id::text
+                AND ap.created_at BETWEEN (a.created_at - INTERVAL '2 minutes')
                                       AND (a.created_at + INTERVAL '2 minutes')
             )
             GROUP BY EXTRACT(HOUR FROM a.created_at)
