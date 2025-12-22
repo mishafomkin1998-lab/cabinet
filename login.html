@@ -650,6 +650,9 @@
     </div>
 
     <script>
+        // API URL
+        const API_BASE = window.location.origin;
+
         // Create snowflakes
         function createSnowfall() {
             const snowfall = document.getElementById('snowfall');
@@ -684,6 +687,13 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
+            // Check if already logged in
+            const existingUser = localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser');
+            if (existingUser) {
+                window.location.href = 'dashboard.html';
+                return;
+            }
+
             createSnowfall();
             createParticles();
 
@@ -692,6 +702,7 @@
             const loginForm = document.getElementById('loginForm');
             const submitBtn = document.getElementById('submitBtn');
             const errorMessage = document.getElementById('errorMessage');
+            const errorText = errorMessage.querySelector('span');
 
             // Toggle password visibility
             togglePassword.addEventListener('click', function() {
@@ -701,15 +712,22 @@
                 this.querySelector('i').classList.toggle('fa-eye-slash');
             });
 
+            // Show error function
+            function showError(message) {
+                errorText.textContent = message;
+                errorMessage.classList.add('show');
+            }
+
             // Form submission
-            loginForm.addEventListener('submit', function(e) {
+            loginForm.addEventListener('submit', async function(e) {
                 e.preventDefault();
 
-                const email = document.getElementById('email').value;
+                const username = document.getElementById('email').value.trim();
                 const password = document.getElementById('password').value;
+                const remember = document.getElementById('remember').checked;
 
-                if (!email || !password) {
-                    errorMessage.classList.add('show');
+                if (!username || !password) {
+                    showError('Заполните все поля');
                     return;
                 }
 
@@ -719,10 +737,48 @@
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="fas fa-spinner spinner"></i> Вход...';
 
-                // Simulate login
-                setTimeout(function() {
-                    window.location.href = 'dashboard.html';
-                }, 1500);
+                try {
+                    const response = await fetch(`${API_BASE}/api/login`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ username, password })
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        // Save user data
+                        const userData = {
+                            id: data.user.id,
+                            username: data.user.username,
+                            role: data.user.role,
+                            salary: data.user.salary,
+                            isRestricted: data.user.isRestricted || false,
+                            aiEnabled: data.user.aiEnabled || false,
+                            loggedIn: true,
+                            loginTime: new Date().toISOString()
+                        };
+
+                        if (remember) {
+                            localStorage.setItem('novaUser', JSON.stringify(userData));
+                        } else {
+                            sessionStorage.setItem('novaUser', JSON.stringify(userData));
+                        }
+
+                        window.location.href = 'dashboard.html';
+                    } else {
+                        showError(data.error || 'Ошибка авторизации');
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = '<span>Войти</span><i class="fas fa-arrow-right"></i>';
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    showError('Сервер недоступен');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<span>Войти</span><i class="fas fa-arrow-right"></i>';
+                }
             });
 
             // Hide error on input
