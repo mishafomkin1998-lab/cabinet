@@ -139,6 +139,7 @@ router.get('/', async (req, res) => {
 // Массовое добавление анкет
 router.post('/bulk', async (req, res) => {
     const { profiles, note, adminId, translatorId, userId, userName } = req.body;
+    console.log('📥 /api/profiles/bulk received:', { profiles: profiles?.length, note, adminId, translatorId, userId, userName });
     try {
         for (const id of profiles) {
             if (id.trim().length > 2) {
