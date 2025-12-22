@@ -2062,6 +2062,12 @@ async function closeTab(e, id) {
         clearTimeout(bots[id].chatTimeout);
         clearInterval(bots[id].heartbeatInterval); // legacy
 
+        // Очистка autoSaveTimers для этого бота
+        if (autoSaveTimers[id]) {
+            clearTimeout(autoSaveTimers[id]);
+            delete autoSaveTimers[id];
+        }
+
         // === Удаляем webview ===
         const wv = document.getElementById(`webview-${id}`);
         if(wv) wv.remove();

@@ -466,7 +466,19 @@ async function initDatabase() {
         // Очистка старых данных
         await cleanupOldData();
 
-        console.log('✅ База данных готова к работе (v10.0 - верификация ID анкет)');
+        // === ПОДГОТОВКА К СТАНДАРТИЗАЦИИ ИМЕНОВАНИЯ ===
+        // TODO: В будущем заменить account_id на profile_id везде
+        // Пока добавляем alias колонки для постепенной миграции
+        try {
+            // Добавляем profile_id как alias для account_id в messages (для новых запросов)
+            await pool.query(`ALTER TABLE messages ADD COLUMN IF NOT EXISTS profile_id VARCHAR(50)`);
+            // Синхронизируем существующие данные (однократно)
+            await pool.query(`UPDATE messages SET profile_id = account_id WHERE profile_id IS NULL AND account_id IS NOT NULL`);
+            // Создаём индекс на новую колонку
+            await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_profile_id ON messages(profile_id)`);
+        } catch (e) { /* уже выполнено */ }
+
+        console.log('✅ База данных готова к работе (v10.1 - стандартизация именования)');
     } catch (e) {
         console.error('❌ Ошибка инициализации БД:', e.message);
     }

@@ -124,8 +124,8 @@ router.post('/message_sent', asyncHandler(async (req, res) => {
         const msgType = type || 'outgoing';
         const responseTimeSec = parseResponseTimeToSeconds(responseTime); // Конвертируем в секунды
         await pool.query(
-            `INSERT INTO messages (bot_id, account_id, type, sender_id, timestamp, response_time, is_first_message, is_last_message, conversation_id, message_length, status, message_content_id, error_log_id, admin_id, translator_id)
-             VALUES ($1, $2, $3, $4, NOW(), $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+            `INSERT INTO messages (bot_id, account_id, profile_id, type, sender_id, timestamp, response_time, is_first_message, is_last_message, conversation_id, message_length, status, message_content_id, error_log_id, admin_id, translator_id)
+             VALUES ($1, $2, $2, $3, $4, NOW(), $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
             [botId, accountDisplayId, msgType, recipientId, responseTimeSec, isFirst || false, isLast || false, convId || null, length || 0, status || 'success', contentId, errorLogId, adminId, assignedTranslatorId]
         );
 
@@ -235,8 +235,8 @@ router.post('/log', asyncHandler(async (req, res) => {
         // Также записываем в messages для совместимости
         const msgType = actionType === 'letter' ? 'outgoing' : (actionType === 'chat' ? 'chat_msg' : actionType);
         await pool.query(`
-            INSERT INTO messages (bot_id, account_id, type, sender_id, response_time, status, admin_id, translator_id)
-            VALUES ($1, $2, $3, $4, $5, 'success', $6, $7)
+            INSERT INTO messages (bot_id, account_id, profile_id, type, sender_id, response_time, status, admin_id, translator_id)
+            VALUES ($1, $2, $2, $3, $4, $5, 'success', $6, $7)
         `, [botId || null, profileId, msgType, manId || null, responseTimeSeconds, profile.assigned_admin_id || null, profile.assigned_translator_id || null]);
 
         console.log(`📝 Активность: ${actionType} от ${profileId} (бот: ${botId || 'N/A'})`);

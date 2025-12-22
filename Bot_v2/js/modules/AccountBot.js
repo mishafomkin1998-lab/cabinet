@@ -357,12 +357,14 @@ class AccountBot {
         return generateConvId(this.id, recipientId);
     }
 
-    // Очистка старых диалогов (старше 24 часов) для экономии памяти
+    // Очистка старых данных (старше 24 часов) для экономии памяти
     cleanupConversations() {
         const MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 часа
+        const NOTIFY_MAX_AGE_MS = 60 * 60 * 1000; // 1 час для notify times
         const now = Date.now();
         let cleaned = 0;
 
+        // 1. Очистка старых диалогов
         for (const recipientId in this.conversations) {
             if (now - this.conversations[recipientId].lastMessageTime > MAX_AGE_MS) {
                 delete this.conversations[recipientId];
@@ -370,8 +372,38 @@ class AccountBot {
             }
         }
 
+        // 2. Очистка chatNotifyTimes (записи старше 1 часа)
+        if (this.chatNotifyTimes) {
+            for (const sessionId in this.chatNotifyTimes) {
+                if (now - this.chatNotifyTimes[sessionId] > NOTIFY_MAX_AGE_MS) {
+                    delete this.chatNotifyTimes[sessionId];
+                    cleaned++;
+                }
+            }
+        }
+
+        // 3. Очистка activeChatSoundTimes (записи старше 1 часа)
+        if (this.activeChatSoundTimes) {
+            for (const sessionId in this.activeChatSoundTimes) {
+                if (now - this.activeChatSoundTimes[sessionId] > NOTIFY_MAX_AGE_MS) {
+                    delete this.activeChatSoundTimes[sessionId];
+                    cleaned++;
+                }
+            }
+        }
+
+        // 4. Очистка chatRequestNotified (записи старше 1 часа)
+        if (this.chatRequestNotified) {
+            for (const odId in this.chatRequestNotified) {
+                if (now - this.chatRequestNotified[odId] > NOTIFY_MAX_AGE_MS) {
+                    delete this.chatRequestNotified[odId];
+                    cleaned++;
+                }
+            }
+        }
+
         if (cleaned > 0) {
-            console.log(`[${this.id}] 🧹 Очищено ${cleaned} старых диалогов`);
+            console.log(`[${this.id}] 🧹 Очищено ${cleaned} старых записей из памяти`);
         }
     }
 

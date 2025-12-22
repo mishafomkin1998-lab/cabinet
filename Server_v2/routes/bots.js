@@ -132,23 +132,8 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
         );
     }
 
-    // 3. Обновляем/создаём запись в profiles для dashboard
-    const existsProfile = await pool.query(
-        `SELECT 1 FROM profiles WHERE profile_id = $1`, [accountDisplayId]
-    );
-    if (existsProfile.rows.length === 0) {
-        await pool.query(
-            `INSERT INTO profiles (profile_id, status, last_online, added_at) VALUES ($1, $2, NOW(), NOW())`,
-            [accountDisplayId, profileStatus]
-        );
-    } else {
-        await pool.query(
-            `UPDATE profiles SET status = $1, last_online = NOW() WHERE profile_id = $2`,
-            [profileStatus, accountDisplayId]
-        );
-    }
-
-    // 3.5. ВАЖНО: Также обновляем статус в allowed_profiles (API читает оттуда!)
+    // 3. Обновляем статус в allowed_profiles (единственная таблица анкет)
+    // КОНСОЛИДИРОВАНО: таблица profiles удалена, используем только allowed_profiles
     await pool.query(
         `UPDATE allowed_profiles SET status = $1, last_online = NOW() WHERE profile_id = $2`,
         [profileStatus, accountDisplayId]
