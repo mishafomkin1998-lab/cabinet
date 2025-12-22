@@ -395,9 +395,12 @@ router.post('/profiles-status', asyncHandler(async (req, res) => {
             ap.is_trial,
             ap.trial_started_at,
             ap.assigned_admin_id,
-            u.is_restricted as admin_is_restricted
+            ap.assigned_translator_id,
+            u_admin.is_restricted as admin_is_restricted,
+            u_trans.is_own_translator as translator_is_own
         FROM allowed_profiles ap
-        LEFT JOIN users u ON ap.assigned_admin_id = u.id
+        LEFT JOIN users u_admin ON ap.assigned_admin_id = u_admin.id
+        LEFT JOIN users u_trans ON ap.assigned_translator_id = u_trans.id
         WHERE ap.profile_id = ANY($1)
     `, [limitedIds]);
 
@@ -405,8 +408,8 @@ router.post('/profiles-status', asyncHandler(async (req, res) => {
     const statuses = {};
 
     for (const row of result.rows) {
-        // Если админ - "мой админ", оплата не требуется
-        if (row.admin_is_restricted) {
+        // Если админ - "мой админ" ИЛИ переводчик - "мой переводчик", оплата не требуется
+        if (row.admin_is_restricted || row.translator_is_own) {
             statuses[row.profile_id] = {
                 isPaid: true,
                 isFree: true,

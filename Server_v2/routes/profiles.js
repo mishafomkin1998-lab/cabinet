@@ -90,6 +90,7 @@ router.get('/', async (req, res) => {
                 u_admin.username as admin_name,
                 u_admin.is_restricted as admin_is_restricted,
                 u_trans.username as trans_name,
+                u_trans.is_own_translator as translator_is_own,
                 COALESCE(a.letters_today, m.msg_letters_today, 0) as letters_today,
                 COALESCE(a.chats_today, m.msg_chats_today, 0) as chats_today,
                 COALESCE(a.letters_total, m.msg_letters_total, 0) as letters_total,
@@ -124,6 +125,7 @@ router.get('/', async (req, res) => {
             admin_is_restricted: row.admin_is_restricted || false,
             translator_id: row.translator_id,
             trans_name: row.trans_name,
+            translator_is_own: row.translator_is_own !== false,
             added_at: row.added_at,
             note: row.note,
             paused: row.paused || false
@@ -139,7 +141,6 @@ router.get('/', async (req, res) => {
 // Массовое добавление анкет
 router.post('/bulk', async (req, res) => {
     let { profiles, note, adminId, translatorId, userId, userName } = req.body;
-    console.log('📥 /api/profiles/bulk received:', { profiles: profiles?.length, note, adminId, translatorId, userId, userName });
     try {
         // Если назначен переводчик, но не админ - получаем owner_id переводчика (его админа)
         if (translatorId && !adminId) {
@@ -149,7 +150,6 @@ router.post('/bulk', async (req, res) => {
             );
             if (translatorResult.rows.length > 0 && translatorResult.rows[0].owner_id) {
                 adminId = translatorResult.rows[0].owner_id;
-                console.log('📥 Auto-assigned admin from translator owner:', adminId);
             }
         }
 

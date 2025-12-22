@@ -1472,12 +1472,6 @@
                     let adminId = null;
                     let translatorId = null;
 
-                    console.log('saveAccounts debug:', {
-                        role: this.currentUser.role,
-                        userId: this.currentUser.id,
-                        newAccountAssignTo: this.newAccountAssignTo
-                    });
-
                     if (this.currentUser.role === 'director' && this.newAccountAssignTo) {
                         // Формат: "admin_5" или "translator_10"
                         const parts = this.newAccountAssignTo.split('_');
@@ -1494,8 +1488,6 @@
                         // Админ добавляет - назначаем себе
                         adminId = this.currentUser.id;
                     }
-
-                    console.log('saveAccounts sending:', { adminId, translatorId });
 
                     // Отправляем на сервер
                     fetch(`${API_BASE}/api/profiles/bulk`, {
