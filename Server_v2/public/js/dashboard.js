@@ -391,6 +391,11 @@
                             this.loadControlSettings()  // Настройки управления
                         ];
 
+                        // Для директора загружаем команду сразу (нужна для модалки добавления анкет)
+                        if (this.currentUser.role === 'director') {
+                            essentialPromises.push(this.loadTeam());
+                        }
+
                         await Promise.all(essentialPromises);
 
                         // Помечаем accounts как загруженную вкладку
