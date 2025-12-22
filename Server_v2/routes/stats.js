@@ -454,79 +454,81 @@ router.get('/forecast', asyncHandler(async (req, res) => {
     res.json({ success: true, forecast });
 }));
 
-// Активность по часам (только ручная работа, без автоматических рассылок)
+// Активность по часам (пиковые часы работы по пингам активности)
 router.get('/hourly-activity', asyncHandler(async (req, res) => {
     const { userId, role, filterAdminId, filterTranslatorId, dateFrom, dateTo } = req.query;
     const days = parseInt(req.query.days) || 7;
 
-    // Используем buildStatsFilter для фильтрации по админу/переводчику
-    const activityStatsFilter = buildStatsFilter({
-        role,
-        userId,
-        filterAdminId,
-        filterTranslatorId,
-        table: 'activity',
-        alias: 'a',
-        prefix: 'AND',
-        paramIndex: 2
-    });
-    const activityFilter = activityStatsFilter.filter;
-    let params = [days, ...activityStatsFilter.params];
-    let nextParamIndex = activityStatsFilter.nextParamIndex;
+    // Строим фильтр по анкетам (как в calculateWorkTime)
+    let params = [days];
+    let pingFilter = '';
+    let paramIndex = 2;
+
+    if (filterTranslatorId) {
+        pingFilter = `AND ap.profile_id IN (SELECT profile_id FROM allowed_profiles WHERE assigned_translator_id = $${paramIndex})`;
+        params.push(filterTranslatorId);
+        paramIndex++;
+    } else if (filterAdminId) {
+        pingFilter = `AND ap.profile_id IN (
+            SELECT profile_id FROM allowed_profiles
+            WHERE assigned_admin_id = $${paramIndex}
+               OR assigned_translator_id IN (SELECT id FROM users WHERE owner_id = $${paramIndex})
+        )`;
+        params.push(filterAdminId);
+        paramIndex++;
+    } else if (userId && role === 'translator') {
+        pingFilter = `AND ap.profile_id IN (SELECT profile_id FROM allowed_profiles WHERE assigned_translator_id = $${paramIndex})`;
+        params.push(userId);
+        paramIndex++;
+    } else if (userId && role === 'admin') {
+        pingFilter = `AND ap.profile_id IN (
+            SELECT profile_id FROM allowed_profiles
+            WHERE assigned_admin_id = $${paramIndex}
+               OR assigned_translator_id IN (SELECT id FROM users WHERE owner_id = $${paramIndex})
+        )`;
+        params.push(userId);
+        paramIndex++;
+    }
+    // Директор видит все - фильтр не нужен
 
     // Добавляем фильтры по дате
     let dateFilter = '';
     if (dateFrom) {
-        dateFilter += ` AND a.created_at >= $${nextParamIndex}::date`;
+        dateFilter += ` AND ap.created_at >= $${paramIndex}::date`;
         params.push(dateFrom);
-        nextParamIndex++;
+        paramIndex++;
     }
     if (dateTo) {
-        dateFilter += ` AND a.created_at <= $${nextParamIndex}::date + INTERVAL '1 day'`;
+        dateFilter += ` AND ap.created_at <= $${paramIndex}::date + INTERVAL '1 day'`;
         params.push(dateTo);
-        nextParamIndex++;
+        paramIndex++;
     }
 
-        /**
-         * Умный запрос: определяем ручные сообщения через пинги активности
-         *
-         * Логика:
-         * 1. Джойним activity_log с activity_pings по profile_id
-         * 2. Проверяем есть ли пинг в пределах ±2 минут от времени отправки
-         * 3. Если есть пинг → переводчик был активен → это ручное сообщение
-         * 4. Если нет пинга → автоматическая рассылка → не считаем
-         *
-         * Интервал ±2 минуты выбран потому что:
-         * - Пинги отправляются каждые 30 сек при активности
-         * - 2 минуты = достаточный буфер для учета задержек
-         */
-        const activityQuery = `
-            SELECT
-                EXTRACT(HOUR FROM a.created_at) as hour,
-                COUNT(DISTINCT a.id) as message_count
-            FROM activity_log a
-            WHERE a.created_at >= CURRENT_DATE - INTERVAL '1 day' * $1
-            ${activityFilter}
-            ${dateFilter}
-            AND EXISTS (
-                SELECT 1 FROM activity_pings ap
-                WHERE ap.profile_id = a.profile_id::text
-                AND ap.created_at BETWEEN (a.created_at - INTERVAL '2 minutes')
-                                      AND (a.created_at + INTERVAL '2 minutes')
-            )
-            GROUP BY EXTRACT(HOUR FROM a.created_at)
-            ORDER BY hour
-        `;
+    /**
+     * Простой запрос: считаем пинги активности по часам
+     * Показывает когда переводчик реально работал (клики, печать)
+     */
+    const activityQuery = `
+        SELECT
+            EXTRACT(HOUR FROM ap.created_at) as hour,
+            COUNT(*) as ping_count
+        FROM activity_pings ap
+        WHERE ap.created_at >= CURRENT_DATE - INTERVAL '1 day' * $1
+        ${pingFilter}
+        ${dateFilter}
+        GROUP BY EXTRACT(HOUR FROM ap.created_at)
+        ORDER BY hour
+    `;
 
-        let result = await pool.query(activityQuery, params);
+    let result = await pool.query(activityQuery, params);
 
-        const maxCount = Math.max(...result.rows.map(r => parseInt(r.message_count) || 0), 1);
+    const maxCount = Math.max(...result.rows.map(r => parseInt(r.ping_count) || 0), 1);
 
-        const hourlyData = Array.from({ length: 24 }, (_, hour) => {
-            const hourData = result.rows.find(r => parseInt(r.hour) === hour);
-            const count = hourData ? parseInt(hourData.message_count) : 0;
-            return parseFloat((count / maxCount).toFixed(2));
-        });
+    const hourlyData = Array.from({ length: 24 }, (_, hour) => {
+        const hourData = result.rows.find(r => parseInt(r.hour) === hour);
+        const count = hourData ? parseInt(hourData.ping_count) : 0;
+        return parseFloat((count / maxCount).toFixed(2));
+    });
 
     res.json({ success: true, hourlyData });
 }));
