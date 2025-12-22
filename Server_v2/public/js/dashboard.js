@@ -775,8 +775,10 @@
                                 }));
                                 this.myTranslators = [];
                                 // Для директора: переводчики напрямую под ним (owner_id = директора)
+                                // + "потерянные" переводчики (чей админ был удалён)
+                                const adminIds = adminsList.map(a => a.id);
                                 this.directTranslators = translatorsList
-                                    .filter(t => t.owner_id === this.currentUser.id)
+                                    .filter(t => t.owner_id === this.currentUser.id || !adminIds.includes(t.owner_id))
                                     .map(t => ({
                                         id: t.id,
                                         name: t.username,
@@ -787,7 +789,8 @@
                                         salary: t.salary,
                                         aiEnabled: t.ai_enabled || false,
                                         isOwnTranslator: t.is_own_translator !== false,
-                                        balance: parseFloat(t.balance) || 0
+                                        balance: parseFloat(t.balance) || 0,
+                                        isOrphaned: t.owner_id !== this.currentUser.id && !adminIds.includes(t.owner_id)
                                     }));
                                 // Для директора: все переводчики с информацией об админе
                                 this.allTranslators = translatorsList.map(t => {
