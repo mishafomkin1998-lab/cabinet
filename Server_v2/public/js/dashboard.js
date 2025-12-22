@@ -1017,30 +1017,29 @@
                     return page?.subtitle || '';
                 },
                 
-                getActivityLevel(hour) {
-                    // Используем реальные данные если есть
-                    // API возвращает массив из 24 чисел где индекс = час
+                getActivityMinutes(hour) {
+                    // API возвращает массив из 24 чисел — минуты работы в каждый час
                     if (this.hourlyActivity && this.hourlyActivity.length > 0) {
                         const value = this.hourlyActivity[hour];
                         if (typeof value === 'number') {
-                            return Math.min(value, 1) || 0.05;
-                        }
-                        // Старый формат с объектами
-                        const hourData = this.hourlyActivity.find(h => h.hour === hour);
-                        if (hourData) {
-                            return Math.min(hourData.intensity / 100, 1) || 0.05;
+                            return Math.min(value, 60);
                         }
                     }
-                    // Fallback на минимальные значения
-                    return 0.05;
+                    return 0;
+                },
+
+                getActivityLevel(hour) {
+                    // Для совместимости — конвертируем минуты в уровень 0-1
+                    return this.getActivityMinutes(hour) / 60;
                 },
 
                 getActivityColor(hour) {
-                    const level = this.getActivityLevel(hour);
-                    if (level > 0.8) return 'from-red-400 to-orange-400';
-                    if (level > 0.6) return 'from-yellow-400 to-amber-400';
-                    if (level > 0.4) return 'from-blue-400 to-cyan-400';
-                    return 'from-gray-300 to-gray-400';
+                    const minutes = this.getActivityMinutes(hour);
+                    if (minutes >= 45) return 'from-red-400 to-orange-400';
+                    if (minutes >= 30) return 'from-yellow-400 to-amber-400';
+                    if (minutes >= 15) return 'from-blue-400 to-cyan-400';
+                    if (minutes > 0) return 'from-gray-400 to-gray-500';
+                    return 'from-gray-200 to-gray-300';
                 },
 
                 setDateRange(range) {

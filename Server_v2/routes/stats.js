@@ -505,29 +505,44 @@ router.get('/hourly-activity', asyncHandler(async (req, res) => {
     }
 
     /**
-     * Простой запрос: считаем пинги активности по часам
-     * Показывает когда переводчик реально работал (клики, печать)
+     * Расчёт реальных минут работы по часам
+     * Логика как в calculateWorkTime, но группировка по часам
      */
     const activityQuery = `
-        SELECT
-            EXTRACT(HOUR FROM ap.created_at) as hour,
-            COUNT(*) as ping_count
-        FROM activity_pings ap
-        WHERE ap.created_at >= CURRENT_DATE - INTERVAL '1 day' * $1
-        ${pingFilter}
-        ${dateFilter}
-        GROUP BY EXTRACT(HOUR FROM ap.created_at)
+        WITH pings AS (
+            SELECT
+                EXTRACT(HOUR FROM ap.created_at) as hour,
+                ap.created_at,
+                LAG(ap.created_at) OVER (PARTITION BY ap.profile_id ORDER BY ap.created_at) as prev_created_at
+            FROM activity_pings ap
+            WHERE ap.created_at >= CURRENT_DATE - INTERVAL '1 day' * $1
+            ${pingFilter}
+            ${dateFilter}
+        ),
+        intervals AS (
+            SELECT
+                hour,
+                CASE
+                    WHEN prev_created_at IS NULL THEN 30
+                    WHEN EXTRACT(EPOCH FROM (created_at - prev_created_at)) <= 120
+                        THEN EXTRACT(EPOCH FROM (created_at - prev_created_at))
+                    ELSE 30
+                END as seconds
+            FROM pings
+        )
+        SELECT hour, COALESCE(ROUND(SUM(seconds) / 60), 0) as minutes
+        FROM intervals
+        GROUP BY hour
         ORDER BY hour
     `;
 
     let result = await pool.query(activityQuery, params);
 
-    const maxCount = Math.max(...result.rows.map(r => parseInt(r.ping_count) || 0), 1);
-
+    // Возвращаем реальные минуты (0-60) для каждого часа
     const hourlyData = Array.from({ length: 24 }, (_, hour) => {
         const hourData = result.rows.find(r => parseInt(r.hour) === hour);
-        const count = hourData ? parseInt(hourData.ping_count) : 0;
-        return parseFloat((count / maxCount).toFixed(2));
+        const minutes = hourData ? Math.min(parseInt(hourData.minutes), 60) : 0;
+        return minutes;
     });
 
     res.json({ success: true, hourlyData });

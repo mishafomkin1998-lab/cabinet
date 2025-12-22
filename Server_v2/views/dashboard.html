@@ -401,21 +401,34 @@
                         <button @click="alert('Эта функция пока в разработке')" class="text-sm text-indigo-600 hover:text-indigo-800" x-text="t('stats.advancedStats') + ' →'">
                         </button>
                     </div>
-                    <div class="flex items-end h-20 gap-1">
-                        <template x-for="hour in 24" :key="hour">
-                            <div class="flex-1 rounded-t transition-all bg-gradient-to-t"
-                                 :class="getActivityColor(hour-1)"
-                                 :style="'height:' + Math.max(getActivityLevel(hour-1) * 100, 8) + '%'"
-                                 :title="(hour-1) + ':00 - активность ' + Math.round(getActivityLevel(hour-1) * 100) + '%'">
+                    <div class="flex">
+                        <!-- Y-axis (минуты) -->
+                        <div class="flex flex-col justify-between text-[10px] text-gray-400 pr-2 h-24">
+                            <span>60м</span>
+                            <span>45м</span>
+                            <span>30м</span>
+                            <span>15м</span>
+                            <span>0м</span>
+                        </div>
+                        <!-- График -->
+                        <div class="flex-1">
+                            <div class="flex items-end h-24 gap-1 border-l border-b border-gray-200">
+                                <template x-for="hour in 24" :key="hour">
+                                    <div class="flex-1 rounded-t transition-all bg-gradient-to-t"
+                                         :class="getActivityColor(hour-1)"
+                                         :style="'height:' + Math.max(getActivityMinutes(hour-1) / 60 * 100, 2) + '%'"
+                                         :title="(hour-1) + ':00 — ' + getActivityMinutes(hour-1) + ' мин'">
+                                    </div>
+                                </template>
                             </div>
-                        </template>
-                    </div>
-                    <div class="flex justify-between text-[10px] text-gray-400 mt-1">
-                        <span>0ч</span>
-                        <span>6ч</span>
-                        <span>12ч</span>
-                        <span>18ч</span>
-                        <span>23ч</span>
+                            <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+                                <span>0ч</span>
+                                <span>6ч</span>
+                                <span>12ч</span>
+                                <span>18ч</span>
+                                <span>23ч</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
