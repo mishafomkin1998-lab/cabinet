@@ -16,18 +16,18 @@
         }
 
         :root {
-            --primary: #5e6ad2;
-            --primary-light: #8086f9;
-            --text-primary: #1a1a2e;
-            --text-secondary: #6b7280;
+            --primary: #4f46e5;
+            --primary-light: #6366f1;
+            --text-primary: #111827;
+            --text-secondary: #4b5563;
             --text-tertiary: #9ca3af;
             --bg-primary: #ffffff;
             --bg-secondary: #f9fafb;
             --bg-tertiary: #f3f4f6;
             --border: #e5e7eb;
-            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            --gradient-3: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --gradient-1: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            --gradient-2: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
+            --gradient-3: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
         }
 
         html {
@@ -114,20 +114,22 @@
         }
 
         .btn-nav {
-            padding: 10px 20px;
-            background: var(--gradient-1);
-            color: white;
-            border-radius: 8px;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: #ffffff;
+            border-radius: 10px;
             font-size: 14px;
-            font-weight: 500;
+            font-weight: 600;
             text-decoration: none;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
+            border: none;
         }
 
         .btn-nav:hover {
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 8px 25px rgba(79, 70, 229, 0.5);
+            background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
         }
 
         /* ===== HERO SECTION ===== */
@@ -274,8 +276,8 @@
 
         .btn-primary {
             padding: 16px 32px;
-            background: var(--gradient-1);
-            color: white;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: #ffffff;
             border: none;
             border-radius: 12px;
             font-size: 16px;
@@ -286,12 +288,13 @@
             align-items: center;
             gap: 10px;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 20px rgba(79, 70, 229, 0.4);
         }
 
         .btn-primary:hover {
             transform: translateY(-3px);
-            box-shadow: 0 12px 40px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 12px 40px rgba(79, 70, 229, 0.5);
+            background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
         }
 
         .btn-primary i {
@@ -640,19 +643,20 @@
             align-items: center;
             gap: 10px;
             padding: 14px 28px;
-            background: var(--text-primary);
-            color: white;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: #ffffff;
             border-radius: 12px;
             font-size: 15px;
             font-weight: 600;
             text-decoration: none;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
         }
 
         .download-btn:hover {
-            background: var(--primary);
+            background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
             transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(94, 106, 210, 0.3);
+            box-shadow: 0 10px 30px rgba(79, 70, 229, 0.4);
         }
 
         .download-btn i {
