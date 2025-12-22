@@ -43,24 +43,8 @@ async function initDatabase() {
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS login VARCHAR(100)`);
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS salary DECIMAL(10,2)`);
 
-        // 2. Таблица Анкет (профилей)
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS profiles (
-                id SERIAL PRIMARY KEY,
-                profile_id VARCHAR(100) UNIQUE NOT NULL,
-                login VARCHAR(100),
-                password VARCHAR(100),
-                admin_id INTEGER REFERENCES users(id),
-                translator_id INTEGER REFERENCES users(id),
-                note TEXT,
-                paused BOOLEAN DEFAULT FALSE,
-                status VARCHAR(20) DEFAULT 'offline',
-                last_online TIMESTAMP,
-                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-
-        // Синхронизируем с allowed_profiles для совместимости
+        // 2. Таблица Анкет (единственная таблица - allowed_profiles)
+        // КОНСОЛИДИРОВАНО: таблица "profiles" удалена, используем только allowed_profiles
         await pool.query(`
             CREATE TABLE IF NOT EXISTS allowed_profiles (
                 id SERIAL PRIMARY KEY,
@@ -122,8 +106,7 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_activity_translator ON activity_log(translator_id)`);
         await fixSerialSequence('activity_log');
 
-        // Миграция: Исправляем SERIAL для profiles
-        await fixSerialSequence('profiles');
+        // УДАЛЕНО: fixSerialSequence('profiles') - таблица profiles больше не используется
 
         // 6. Таблица Сообщений
         await pool.query(`
