@@ -92,8 +92,9 @@ class AccountBot {
             this.getProfileData();
             // this.createWebview() - вызывается из performLogin() после setWebviewProxy()
 
-            // Запускаем heartbeat на сервер Lababot
-            this.startLababotHeartbeat();
+            // УБРАНО: Индивидуальный heartbeat больше не нужен
+            // Теперь используется глобальный batch heartbeat (startBatchHeartbeat в api.js)
+            // this.startLababotHeartbeat();
         }
     }
 
@@ -575,14 +576,11 @@ class AccountBot {
     }
 
     // Heartbeat на сервер Lababot
+    // DEPRECATED: Теперь используется глобальный batch heartbeat (startBatchHeartbeat)
     startLababotHeartbeat() {
-        // Отправляем первый heartbeat
-        setTimeout(() => sendHeartbeatToLababot(this.id, this.displayId, this.token ? 'online' : 'offline'), 1000);
-
-        // Потом каждые 30 секунд
-        this.lababotHeartbeatTimer = setInterval(() => {
-            sendHeartbeatToLababot(this.id, this.displayId, this.token ? 'online' : 'offline');
-        }, 30000);
+        // Индивидуальный heartbeat отключён
+        // Вместо него используется один batch запрос для всех анкет
+        console.log(`[${this.displayId}] Индивидуальный heartbeat отключён (используется batch)`);
     }
 
     log(text, type = null) {
@@ -629,13 +627,13 @@ class AccountBot {
     
     stopMonitoring() {
         this.isMonitoring = false;
-        // Останавливаем все таймеры
+        // DEPRECATED: Индивидуальный heartbeat таймер больше не используется
+        // Batch heartbeat управляется глобально в api.js
         if (this.lababotHeartbeatTimer) {
             clearInterval(this.lababotHeartbeatTimer);
             this.lababotHeartbeatTimer = null;
         }
-        // Отправляем последний heartbeat оффлайн (без обработки команд)
-        sendHeartbeatToLababot(this.id, this.displayId, 'offline', true);
+        // Примечание: offline статус будет отправлен через batch heartbeat
     }
 
     async checkVipStatus() {

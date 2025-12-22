@@ -10,6 +10,11 @@ window.onload = async function() {
 
     // Только после установки прокси - восстанавливаем сессию (логины)
     restoreSession();
+
+    // Запускаем глобальный batch heartbeat (один запрос для всех анкет)
+    // Интервал: 60 секунд (можно изменить на 300000 для 5 минут)
+    startBatchHeartbeat(60000);
+
     initHotkeys();
     initTooltips();
     initFocusProtection(); // КРИТИЧНО: Защита от потери фокуса
