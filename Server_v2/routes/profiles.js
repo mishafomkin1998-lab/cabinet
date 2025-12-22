@@ -444,8 +444,17 @@ router.get('/:profileId/ai-status', async (req, res) => {
             return res.json({ success: true, aiEnabled: false, reason: 'no_translator' });
         }
 
-        // "Мой переводчик" - AI всегда включен
+        // "Мой переводчик" - проверяем только галочку AI на переводчике (без проверки владельца-директора)
         if (row.translator_is_own) {
+            if (row.translator_ai_enabled !== true) {
+                return res.json({
+                    success: true,
+                    aiEnabled: false,
+                    reason: 'disabled_for_translator',
+                    translatorId: row.assigned_translator_id,
+                    translatorName: row.translator_name
+                });
+            }
             return res.json({
                 success: true,
                 aiEnabled: true,
@@ -455,7 +464,7 @@ router.get('/:profileId/ai-status', async (req, res) => {
             });
         }
 
-        // Проверяем AI у админа (если есть)
+        // Обычный переводчик - проверяем AI у админа (если есть)
         if (row.translator_owner_id && row.admin_ai_enabled !== true) {
             return res.json({
                 success: true,
