@@ -35,7 +35,7 @@ app.use(cors());
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'views')));
 
 // ==========================================
 // МАРШРУТЫ
@@ -340,9 +340,14 @@ app.listen(PORT, () => {
     console.log(`   • GET /api/activity/recent - последняя активность`);
     console.log(`   • GET /api/history - история переписок`);
     console.log(`   • GET /api/error_logs - логи ошибок`);
-    console.log(`\n📁 Модульная структура:`);
-    console.log(`   • config/database.js - конфигурация БД`);
-    console.log(`   • migrations/index.js - миграции и инициализация`);
-    console.log(`   • routes/ - все маршруты API`);
-    console.log(`   • utils/helpers.js - вспомогательные функции`);
+    console.log(`\n📁 Структура проекта:`);
+    console.log(`   • config/       - конфигурация (database.js)`);
+    console.log(`   • middleware/   - middleware (auth.js)`);
+    console.log(`   • migrations/   - миграции БД`);
+    console.log(`   • routes/       - API маршруты`);
+    console.log(`   • utils/        - вспомогательные функции`);
+    console.log(`   • views/        - HTML страницы`);
+    console.log(`   • public/       - статика (css, js, images)`);
+    console.log(`   • docs/         - документация`);
+    console.log(`   • scripts/      - утилиты и скрипты`);
 });
