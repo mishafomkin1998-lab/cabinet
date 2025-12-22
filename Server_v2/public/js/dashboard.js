@@ -1468,6 +1468,27 @@
                         return;
                     }
 
+                    // Парсим выбранного админа/переводчика из newAccountAssignTo
+                    let adminId = null;
+                    let translatorId = null;
+
+                    if (this.currentUser.role === 'director' && this.newAccountAssignTo) {
+                        // Формат: "admin_5" или "translator_10"
+                        const parts = this.newAccountAssignTo.split('_');
+                        if (parts.length === 2) {
+                            const type = parts[0];
+                            const id = parseInt(parts[1]);
+                            if (type === 'admin') {
+                                adminId = id;
+                            } else if (type === 'translator') {
+                                translatorId = id;
+                            }
+                        }
+                    } else if (this.currentUser.role === 'admin') {
+                        // Админ добавляет - назначаем себе
+                        adminId = this.currentUser.id;
+                    }
+
                     // Отправляем на сервер
                     fetch(`${API_BASE}/api/profiles/bulk`, {
                         method: 'POST',
@@ -1475,7 +1496,8 @@
                         body: JSON.stringify({
                             profiles: ids,
                             note: this.newAccountComment || '',
-                            adminId: this.currentUser.role === 'director' ? null : this.currentUser.id,
+                            adminId: adminId,
+                            translatorId: translatorId,
                             userId: this.currentUser.id,
                             userName: this.currentUser.username
                         })
@@ -1485,6 +1507,7 @@
                         if (data.success) {
                             this.newAccountIds = '';
                             this.newAccountComment = '';
+                            this.newAccountAssignTo = null;
                             this.showAddAccountModal = false;
                             alert(`Добавлено ${ids.length} анкет`);
                             this.loadAccounts(); // Перезагружаем список с сервера
