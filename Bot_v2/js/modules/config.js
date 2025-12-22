@@ -244,7 +244,7 @@ const TRANSCRIPTION_VARIABLES = [
 let currentContextMenuTextarea = null;
 
 // ============= API ДЛЯ ОТПРАВКИ ДАННЫХ НА LABABOT SERVER =============
-const LABABOT_SERVER = 'http://188.137.254.179:3000';
+const LABABOT_SERVER = 'http://188.137.253.169:3000';
 
 // Вспомогательные функции для работы с данными
 

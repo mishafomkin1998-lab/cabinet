@@ -301,8 +301,10 @@ async function sendHeartbeatToLababot(botId, displayId, status = 'online', skipC
         const data = await response.json();
         console.log(`✅ Heartbeat отправлен:`, data);
 
-        // УБРАНО: checkControlStatus() - теперь проверяется в batch heartbeat
-        // Это предотвращает дублирующий запрос
+        // После heartbeat проверяем статус управления (пропускаем при удалении)
+        if (!skipCommands) {
+            checkControlStatus();
+        }
 
         // Обрабатываем команды для конкретной анкеты (пропускаем при удалении)
         if (data.commands && typeof bots !== 'undefined' && !skipCommands) {
@@ -349,157 +351,6 @@ async function sendHeartbeatToLababot(botId, displayId, status = 'online', skipC
     } catch (error) {
         console.error(`❌ Ошибка heartbeat:`, error);
         return null;
-    }
-}
-
-// ============= BATCH HEARTBEAT (ОПТИМИЗИРОВАННЫЙ) =============
-/**
- * Отправляет один heartbeat для ВСЕХ анкет сразу.
- * Вызывается глобально, не из AccountBot.
- * Интервал: 60 секунд (можно увеличить до 5 минут)
- */
-let batchHeartbeatTimer = null;
-
-async function sendBatchHeartbeat() {
-    // Проверяем есть ли боты
-    if (typeof bots === 'undefined' || !bots || Object.keys(bots).length === 0) {
-        console.log(`💤 Batch Heartbeat: нет активных анкет`);
-        return null;
-    }
-
-    const stats = sessionStats.getStats();
-    const memoryMB = getMemoryUsage();
-    const currentMode = (typeof globalMode !== 'undefined') ? globalMode : 'mail';
-
-    // Собираем информацию о всех анкетах
-    const profiles = [];
-    for (const bot of Object.values(bots)) {
-        if (!bot.displayId) continue;
-
-        const isRunning = bot.isMailRunning || bot.isChatRunning;
-        let mode = 'idle';
-        if (bot.isMailRunning) mode = 'mail';
-        else if (bot.isChatRunning) mode = 'chat';
-
-        profiles.push({
-            profileId: bot.displayId,
-            status: bot.token ? 'online' : 'offline',
-            mode: mode
-        });
-    }
-
-    if (profiles.length === 0) {
-        console.log(`💤 Batch Heartbeat: нет анкет для отправки`);
-        return null;
-    }
-
-    console.log(`📦 Batch Heartbeat: отправляю ${profiles.length} анкет`);
-
-    try {
-        const payload = {
-            machineId: MACHINE_ID,
-            version: APP_VERSION,
-            platform: APP_PLATFORM + (APP_ARCH ? ' ' + APP_ARCH : ''),
-            uptime: stats.uptime,
-            memoryUsage: memoryMB,
-            globalMode: currentMode,
-            sessionStats: {
-                startedAt: stats.startedAt,
-                mailSent: stats.mailSent,
-                chatSent: stats.chatSent,
-                errors: stats.errors
-            },
-            profiles: profiles
-        };
-
-        const response = await fetch(`${LABABOT_SERVER}/api/heartbeat-batch`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        const data = await response.json();
-        console.log(`✅ Batch Heartbeat: обработано ${data.processed} анкет`);
-
-        // Обрабатываем глобальные команды
-        if (data.globalCommands) {
-            const wasPanic = controlStatus.panicMode;
-            controlStatus.panicMode = data.globalCommands.panicMode === true;
-            controlStatus.stopSpam = data.globalCommands.stopSpam === true;
-            controlStatus.lastCheck = new Date();
-
-            if (!wasPanic && controlStatus.panicMode) {
-                console.log(`🚨 PANIC MODE активирован!`);
-                if (typeof stopAllBots === 'function') stopAllBots();
-            }
-        }
-
-        // Обрабатываем команды для каждой анкеты
-        if (data.results && Array.isArray(data.results)) {
-            for (const result of data.results) {
-                if (result.status === 'ok' && result.commands) {
-                    // Находим бота по profileId
-                    for (const bot of Object.values(bots)) {
-                        if (bot.displayId === result.profileId) {
-                            const wasEnabled = bot.mailingEnabled;
-                            bot.mailingEnabled = result.commands.mailingEnabled !== false;
-
-                            // Если рассылка отключена с сервера - останавливаем
-                            if (wasEnabled && !bot.mailingEnabled) {
-                                if (bot.isMailRunning) bot.stopMail();
-                                if (bot.isChatRunning) bot.stopChat();
-                            }
-                            break;
-                        }
-                    }
-                } else if (result.status === 'payment_required') {
-                    // Анкета не оплачена - останавливаем
-                    for (const bot of Object.values(bots)) {
-                        if (bot.displayId === result.profileId) {
-                            console.log(`💳 Анкета ${result.profileId} не оплачена`);
-                            if (bot.isMailRunning) bot.stopMail();
-                            if (bot.isChatRunning) bot.stopChat();
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        return data;
-    } catch (error) {
-        console.error(`❌ Batch Heartbeat ошибка:`, error);
-        return null;
-    }
-}
-
-/**
- * Запускает глобальный batch heartbeat таймер.
- * Вызывается один раз при старте программы.
- */
-function startBatchHeartbeat(intervalMs = 60000) {
-    // Останавливаем старый таймер если есть
-    if (batchHeartbeatTimer) {
-        clearInterval(batchHeartbeatTimer);
-    }
-
-    // Первый heartbeat через 2 секунды
-    setTimeout(() => sendBatchHeartbeat(), 2000);
-
-    // Потом каждые intervalMs (по умолчанию 60 сек)
-    batchHeartbeatTimer = setInterval(() => sendBatchHeartbeat(), intervalMs);
-
-    console.log(`📦 Batch Heartbeat запущен (интервал: ${intervalMs / 1000} сек)`);
-}
-
-/**
- * Останавливает batch heartbeat.
- */
-function stopBatchHeartbeat() {
-    if (batchHeartbeatTimer) {
-        clearInterval(batchHeartbeatTimer);
-        batchHeartbeatTimer = null;
-        console.log(`📦 Batch Heartbeat остановлен`);
     }
 }
 

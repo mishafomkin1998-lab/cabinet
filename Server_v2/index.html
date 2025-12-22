@@ -3,1227 +3,409 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nova - Автоматизация для LadaDate</title>
+    <title>Nova - ИИ для автоматизации на LadaDate</title>
+    <link rel="icon" type="image/png" href="logo.png">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.2);
+        }
+        
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
         }
-
-        :root {
-            --primary: #4f46e5;
-            --primary-light: #6366f1;
-            --text-primary: #111827;
-            --text-secondary: #4b5563;
-            --text-tertiary: #9ca3af;
-            --bg-primary: #ffffff;
-            --bg-secondary: #f9fafb;
-            --bg-tertiary: #f3f4f6;
-            --border: #e5e7eb;
-            --gradient-1: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-            --gradient-2: linear-gradient(135deg, #ec4899 0%, #f43f5e 100%);
-            --gradient-3: linear-gradient(135deg, #0ea5e9 0%, #06b6d4 100%);
-        }
-
-        html {
-            scroll-behavior: smooth;
-        }
-
+        
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
+            background: linear-gradient(135deg, #f5f7fa 0%, #f0f4f8 100%);
+            min-height: 100vh;
+            position: relative;
             overflow-x: hidden;
-            line-height: 1.6;
         }
-
-        /* ===== NAVIGATION ===== */
-        nav {
+        
+        body::before {
+            content: '';
             position: fixed;
             top: 0;
             left: 0;
-            right: 0;
-            z-index: 1000;
-            padding: 20px 40px;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(255, 119, 198, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(120, 220, 255, 0.1) 0%, transparent 50%);
+            z-index: -1;
         }
-
-        nav.scrolled {
-            background: rgba(255, 255, 255, 0.8);
+        
+        .glass {
+            background: var(--glass-bg);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border);
-            padding: 16px 40px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.05);
         }
-
-        .nav-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        
+        .glass-dark {
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
-
-        .logo-link {
-            display: flex;
-            align-items: center;
-            text-decoration: none;
+        
+        .glow-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
         }
-
-        .logo-img {
-            height: 36px;
-            width: auto;
-            transition: transform 0.3s ease;
+        
+        .glow-button:hover {
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.6);
+            transform: translateY(-3px);
         }
-
-        .logo-img:hover {
-            transform: scale(1.05);
-        }
-
-        .nav-links {
-            display: flex;
-            align-items: center;
-            gap: 40px;
-        }
-
-        .nav-links a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-            transition: color 0.3s ease;
-            position: relative;
-        }
-
-        .nav-links a:hover {
-            color: var(--text-primary);
-        }
-
-        .nav-links a::after {
-            content: '';
-            position: absolute;
-            bottom: -4px;
-            left: 0;
-            width: 0;
-            height: 2px;
-            background: var(--gradient-1);
-            transition: width 0.3s ease;
-        }
-
-        .nav-links a:hover::after {
-            width: 100%;
-        }
-
-        .btn-nav {
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-            color: #fff !important;
-            border-radius: 10px;
-            font-size: 14px;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
-            border: none;
-            -webkit-text-fill-color: #fff;
-        }
-
-        .btn-nav:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(79, 70, 229, 0.5);
-            background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
-        }
-
-        /* ===== HERO SECTION ===== */
-        .hero {
-            min-height: auto;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 140px 40px 60px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        /* Animated gradient orbs */
-        .orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(80px);
-            opacity: 0.5;
-            animation: float 20s ease-in-out infinite;
-        }
-
-        .orb-1 {
-            width: 600px;
-            height: 600px;
-            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
-            top: -200px;
-            right: -200px;
-            animation-delay: 0s;
-        }
-
-        .orb-2 {
-            width: 500px;
-            height: 500px;
-            background: linear-gradient(135deg, #fce7f3 0%, #fbcfe8 100%);
-            bottom: -150px;
-            left: -150px;
-            animation-delay: -7s;
-        }
-
-        .orb-3 {
-            width: 400px;
-            height: 400px;
-            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            animation-delay: -14s;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0) scale(1); }
-            25% { transform: translate(30px, -30px) scale(1.05); }
-            50% { transform: translate(-20px, 20px) scale(0.95); }
-            75% { transform: translate(20px, 30px) scale(1.02); }
-        }
-
-        .hero-content {
-            text-align: center;
-            max-width: 900px;
-            position: relative;
-            z-index: 10;
-        }
-
-        .hero-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            background: var(--bg-tertiary);
-            border-radius: 50px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            margin-bottom: 20px;
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeInUp 0.8s ease forwards;
-            animation-delay: 0.2s;
-        }
-
-        .hero-badge-dot {
-            width: 8px;
-            height: 8px;
-            background: #10b981;
-            border-radius: 50%;
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.5; transform: scale(1.2); }
-        }
-
-        .hero-title {
-            font-size: clamp(40px, 7vw, 68px);
-            font-weight: 800;
-            line-height: 1.1;
-            letter-spacing: -2px;
-            margin-bottom: 16px;
-            opacity: 0;
-            transform: translateY(30px);
-            animation: fadeInUp 0.8s ease forwards;
-            animation-delay: 0.4s;
-        }
-
-        .hero-title span {
-            background: var(--gradient-1);
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
+            display: inline-block;
         }
-
-        .hero-subtitle {
-            font-size: clamp(18px, 2.5vw, 22px);
-            color: var(--text-secondary);
-            max-width: 600px;
-            margin: 0 auto 32px;
-            font-weight: 400;
-            opacity: 0;
-            transform: translateY(30px);
-            animation: fadeInUp 0.8s ease forwards;
-            animation-delay: 0.6s;
+        
+        .card-hover {
+            transition: all 0.3s ease;
         }
-
-        .hero-buttons {
-            display: flex;
-            gap: 16px;
-            justify-content: center;
-            flex-wrap: wrap;
-            opacity: 0;
-            transform: translateY(30px);
-            animation: fadeInUp 0.8s ease forwards;
-            animation-delay: 0.8s;
+        
+        .card-hover:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.1);
         }
-
-        @keyframes fadeInUp {
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .btn-primary {
-            padding: 16px 32px;
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-            color: #ffffff;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 20px rgba(79, 70, 229, 0.4);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 40px rgba(79, 70, 229, 0.5);
-            background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
-        }
-
-        .btn-primary i {
-            transition: transform 0.3s ease;
-        }
-
-        .btn-primary:hover i {
-            transform: translateX(4px);
-        }
-
-        .btn-secondary {
-            padding: 16px 32px;
-            background: transparent;
-            color: var(--text-primary);
-            border: 2px solid var(--border);
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .btn-secondary:hover {
-            border-color: var(--text-primary);
-            transform: translateY(-3px);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-        }
-
-        /* ===== FEATURES SECTION ===== */
-        .features {
-            padding: 60px 40px;
+        
+        .pulse-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #10b981;
             position: relative;
         }
-
-        .section-header {
-            text-align: center;
-            max-width: 700px;
-            margin: 0 auto 40px;
+        
+        .pulse-dot::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: #10b981;
+            animation: pulse 2s infinite;
         }
-
-        .section-label {
-            font-size: 13px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: var(--primary);
-            margin-bottom: 16px;
-            opacity: 0;
-            transform: translateY(20px);
+        
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(2.5);
+                opacity: 0;
+            }
         }
-
-        .section-label.animate {
-            animation: fadeInUp 0.6s ease forwards;
+        
+        .fade-in {
+            animation: fadeIn 0.8s ease forwards;
         }
-
-        .section-title {
-            font-size: clamp(36px, 5vw, 52px);
-            font-weight: 800;
-            letter-spacing: -1px;
-            margin-bottom: 20px;
-            opacity: 0;
-            transform: translateY(20px);
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
-
-        .section-title.animate {
-            animation: fadeInUp 0.6s ease forwards;
-            animation-delay: 0.1s;
-        }
-
-        .section-desc {
-            font-size: 18px;
-            color: var(--text-secondary);
-            opacity: 0;
-            transform: translateY(20px);
-        }
-
-        .section-desc.animate {
-            animation: fadeInUp 0.6s ease forwards;
-            animation-delay: 0.2s;
-        }
-
-        .features-grid {
+        
+        .bento-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(2, auto);
             gap: 24px;
-            max-width: 1200px;
-            margin: 0 auto;
         }
-
+        
         @media (max-width: 1024px) {
-            .features-grid {
+            .bento-grid {
                 grid-template-columns: repeat(2, 1fr);
             }
         }
-
+        
         @media (max-width: 768px) {
-            .features-grid {
+            .bento-grid {
                 grid-template-columns: 1fr;
             }
         }
-
-        .feature-card {
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            padding: 28px;
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            opacity: 0;
-            transform: translateY(40px);
+        
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+        .delay-5 { animation-delay: 0.5s; }
+        
+        .hero-bg {
             position: relative;
             overflow: hidden;
         }
-
-        .feature-card.animate {
-            animation: fadeInUp 0.6s ease forwards;
-        }
-
-        .feature-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: var(--gradient-1);
-            transform: scaleX(0);
-            transform-origin: left;
-            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .feature-card:hover {
-            transform: translateY(-8px);
-            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.08);
-            border-color: transparent;
-        }
-
-        .feature-card:hover::before {
-            transform: scaleX(1);
-        }
-
-        .feature-card.large {
-            grid-column: span 2;
-        }
-
-        @media (max-width: 768px) {
-            .feature-card.large {
-                grid-column: span 1;
-            }
-        }
-
-        .feature-icon {
-            width: 56px;
-            height: 56px;
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            color: white;
-            margin-bottom: 24px;
-            transition: transform 0.4s ease;
-        }
-
-        .feature-card:hover .feature-icon {
-            transform: scale(1.1) rotate(5deg);
-        }
-
-        .feature-icon.purple { background: var(--gradient-1); }
-        .feature-icon.pink { background: var(--gradient-2); }
-        .feature-icon.blue { background: var(--gradient-3); }
-        .feature-icon.green { background: linear-gradient(135deg, #10b981 0%, #34d399 100%); }
-        .feature-icon.orange { background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); }
-        .feature-icon.indigo { background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%); }
-
-        .feature-title {
-            font-size: 22px;
-            font-weight: 700;
-            margin-bottom: 12px;
-            letter-spacing: -0.5px;
-        }
-
-        .feature-desc {
-            color: var(--text-secondary);
-            font-size: 15px;
-            line-height: 1.7;
-        }
-
-        /* ===== STATS SECTION ===== */
-        .stats {
-            padding: 50px 40px;
-            background: var(--bg-secondary);
-        }
-
-        .stats-container {
-            max-width: 1000px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 40px;
-        }
-
-        @media (max-width: 768px) {
-            .stats-container {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        .stat-item {
-            text-align: center;
-            opacity: 0;
-            transform: translateY(30px);
-        }
-
-        .stat-item.animate {
-            animation: fadeInUp 0.6s ease forwards;
-        }
-
-        .stat-number {
-            font-size: 42px;
-            font-weight: 800;
-            background: var(--gradient-1);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            letter-spacing: -2px;
-            line-height: 1;
-            margin-bottom: 8px;
-        }
-
-        .stat-label {
-            font-size: 15px;
-            color: var(--text-secondary);
-            font-weight: 500;
-        }
-
-        /* ===== DOWNLOAD SECTION ===== */
-        .download {
-            padding: 60px 40px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .download-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 32px;
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        @media (max-width: 768px) {
-            .download-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .download-card {
-            background: var(--bg-primary);
-            border: 1px solid var(--border);
-            border-radius: 24px;
-            padding: 32px;
-            text-align: center;
-            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            opacity: 0;
-            transform: translateY(40px);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .download-card.animate {
-            animation: fadeInUp 0.6s ease forwards;
-        }
-
-        .download-card::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: var(--gradient-1);
-            opacity: 0;
-            transition: opacity 0.4s ease;
-            z-index: 0;
-        }
-
-        .download-card:hover {
-            transform: translateY(-10px) scale(1.02);
-            border-color: transparent;
-            box-shadow: 0 30px 70px rgba(102, 126, 234, 0.15);
-        }
-
-        .download-card:hover::after {
-            opacity: 0.03;
-        }
-
-        .download-card > * {
-            position: relative;
-            z-index: 1;
-        }
-
-        .download-icon {
-            width: 80px;
-            height: 80px;
-            border-radius: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 36px;
-            margin: 0 auto 24px;
-            transition: all 0.4s ease;
-        }
-
-        .download-card:hover .download-icon {
-            transform: scale(1.1);
-        }
-
-        .download-icon.windows {
-            background: linear-gradient(135deg, #0078d4 0%, #00a4ef 100%);
-            color: white;
-        }
-
-        .download-icon.macos {
-            background: linear-gradient(135deg, #1d1d1f 0%, #3a3a3c 100%);
-            color: white;
-        }
-
-        .download-title {
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 12px;
-        }
-
-        .download-desc {
-            color: var(--text-secondary);
-            font-size: 15px;
-            margin-bottom: 28px;
-        }
-
-        .download-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 14px 28px;
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-            color: #ffffff;
-            border-radius: 12px;
-            font-size: 15px;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 15px rgba(79, 70, 229, 0.3);
-        }
-
-        .download-btn:hover {
-            background: linear-gradient(135deg, #4338ca 0%, #6d28d9 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(79, 70, 229, 0.4);
-        }
-
-        .download-btn i {
-            transition: transform 0.3s ease;
-        }
-
-        .download-btn:hover i {
-            transform: translateY(2px);
-        }
-
-        /* ===== CTA SECTION ===== */
-        .cta {
-            padding: 60px 40px;
-            background: var(--text-primary);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .cta::before {
+        
+        .hero-bg::after {
             content: '';
             position: absolute;
             top: -50%;
-            left: -25%;
-            width: 150%;
-            height: 200%;
-            background: radial-gradient(ellipse at center, rgba(102, 126, 234, 0.15) 0%, transparent 70%);
-            animation: ctaGlow 10s ease-in-out infinite;
-        }
-
-        @keyframes ctaGlow {
-            0%, 100% { transform: translate(0, 0); }
-            50% { transform: translate(5%, 5%); }
-        }
-
-        .cta-content {
-            max-width: 700px;
-            margin: 0 auto;
-            text-align: center;
-            position: relative;
-            z-index: 1;
-        }
-
-        .cta-title {
-            font-size: clamp(36px, 5vw, 52px);
-            font-weight: 800;
-            color: white;
-            letter-spacing: -1px;
-            margin-bottom: 20px;
-            opacity: 0;
-            transform: translateY(30px);
-        }
-
-        .cta-title.animate {
-            animation: fadeInUp 0.6s ease forwards;
-        }
-
-        .cta-desc {
-            font-size: 18px;
-            color: rgba(255, 255, 255, 0.7);
-            margin-bottom: 40px;
-            opacity: 0;
-            transform: translateY(30px);
-        }
-
-        .cta-desc.animate {
-            animation: fadeInUp 0.6s ease forwards;
-            animation-delay: 0.1s;
-        }
-
-        .cta-btn {
-            padding: 18px 40px;
-            background: white;
-            color: var(--text-primary);
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            opacity: 0;
-            transform: translateY(30px);
-        }
-
-        .cta-btn.animate {
-            animation: fadeInUp 0.6s ease forwards;
-            animation-delay: 0.2s;
-        }
-
-        .cta-btn:hover {
-            transform: translateY(-3px) scale(1.02);
-            box-shadow: 0 20px 50px rgba(255, 255, 255, 0.2);
-        }
-
-        /* ===== FOOTER ===== */
-        footer {
-            padding: 40px 40px;
-            border-top: 1px solid var(--border);
-        }
-
-        .footer-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 24px;
-        }
-
-        .footer-left {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-        }
-
-        .footer-logo-img {
-            height: 28px;
-            width: auto;
-        }
-
-        .footer-copy {
-            color: var(--text-tertiary);
-            font-size: 14px;
-        }
-
-        .footer-status {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            background: rgba(16, 185, 129, 0.1);
-            border-radius: 50px;
-            font-size: 13px;
-            color: #10b981;
-            font-weight: 500;
-        }
-
-        .footer-status-dot {
-            width: 8px;
-            height: 8px;
-            background: #10b981;
+            right: -20%;
+            width: 600px;
+            height: 600px;
             border-radius: 50%;
-            animation: pulse 2s ease-in-out infinite;
-        }
-
-        .footer-links {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-        }
-
-        .footer-link {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 14px;
-            transition: color 0.3s ease;
-        }
-
-        .footer-link:hover {
-            color: var(--text-primary);
-        }
-
-        .footer-social {
-            display: flex;
-            gap: 12px;
-        }
-
-        .social-btn {
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            border: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-secondary);
-            text-decoration: none;
-            transition: all 0.3s ease;
-        }
-
-        .social-btn:hover {
-            border-color: var(--primary);
-            color: var(--primary);
-            transform: translateY(-3px);
-        }
-
-        /* ===== RESPONSIVE ===== */
-        @media (max-width: 768px) {
-            nav {
-                padding: 16px 20px;
-            }
-
-            .nav-links {
-                display: none;
-            }
-
-            .hero {
-                padding: 100px 20px 40px;
-            }
-
-            .features,
-            .download,
-            .cta {
-                padding: 40px 20px;
-            }
-
-            .stats {
-                padding: 30px 20px;
-            }
-
-            .footer-container {
-                flex-direction: column;
-                text-align: center;
-            }
-
-            .footer-left {
-                flex-direction: column;
-            }
-        }
-
-        /* ===== SMOOTH SCROLL REVEAL ===== */
-        .reveal {
-            opacity: 0;
-            transform: translateY(40px);
-            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .reveal.active {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        /* ===== CURSOR GLOW EFFECT ===== */
-        .cursor-glow {
-            position: fixed;
-            width: 400px;
-            height: 400px;
-            background: radial-gradient(circle, rgba(102, 126, 234, 0.08) 0%, transparent 70%);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 0;
-            transform: translate(-50%, -50%);
-            transition: opacity 0.3s ease;
+            background: radial-gradient(circle, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+            z-index: -1;
         }
     </style>
 </head>
-<body>
-    <!-- Cursor glow effect -->
-    <div class="cursor-glow" id="cursorGlow"></div>
-
-    <!-- Animated background orbs -->
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
-
-    <!-- Navigation -->
-    <nav id="navbar">
-        <div class="nav-container">
-            <a href="/" class="logo-link">
-                <img src="logo.png" alt="Nova" class="logo-img">
+<body class="text-gray-800">
+    <!-- Навигация (Шапка) -->
+    <header class="w-full z-50 p-4 md:p-4">
+        <div class="glass rounded-2xl max-w-5xl mx-auto p-3 flex justify-between items-center">
+            <div class="flex items-center">
+                <img src="nova.png" alt="Nova Logo" class="h-10 md:h-12">
+            </div>
+            <a href="login.html" class="flex items-center space-x-2 px-5 py-2 rounded-xl transition-all duration-300 hover:shadow-lg hover:-translate-y-1" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                <i class="fas fa-user text-white text-sm"></i>
+                <span class="font-medium text-white text-sm">Личный кабинет</span>
             </a>
-            <div class="nav-links">
-                <a href="#features">Возможности</a>
-                <a href="#download">Скачать</a>
-                <a href="login.html" class="btn-nav">Личный кабинет</a>
-            </div>
         </div>
-    </nav>
+    </header>
 
-    <!-- Hero Section -->
-    <section class="hero">
-        <div class="hero-content">
-            <div class="hero-badge">
-                <span class="hero-badge-dot"></span>
-                Доступно для LadaDate
-            </div>
-            <h1 class="hero-title">
-                <span>Умная</span> автоматизация для вашего бизнеса
-            </h1>
-            <p class="hero-subtitle">
-                Nova автоматизирует рутину и увеличивает конверсию. Искусственный интеллект, который работает 24/7.
-            </p>
-            <div class="hero-buttons">
-                <a href="#download" class="btn-primary">
-                    Начать бесплатно
+    <!-- Главный экран (Hero Section) -->
+    <section class="hero-bg pt-8 pb-20 px-4 md:pt-12 md:pb-28">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center fade-in">
+                <h1 class="text-4xl md:text-6xl lg:text-7xl font-black mb-6 leading-tight">
+                    Искусственный интеллект, <br class="hidden md:block"> который зарабатывает
+                </h1>
+                <p class="text-xl md:text-2xl text-gray-600 max-w-3xl mx-auto mb-10">
+                    Автопилот для LadaDate. Умные рассылки, контроль операторов и аналитика в единой экосистеме.
+                </p>
+                <a href="#downloads" class="glow-button text-white font-bold text-lg px-10 py-5 rounded-2xl inline-flex items-center space-x-3" id="try-free-btn">
+                    <span>Попробовать бесплатно (2 дня)</span>
                     <i class="fas fa-arrow-right"></i>
                 </a>
-                <a href="#features" class="btn-secondary">
-                    Узнать больше
-                </a>
+            </div>
+            
+            <!-- Абстрактная стеклянная фигура -->
+            <div class="mt-20 relative flex justify-center">
+                <div class="absolute -top-10 -left-10 w-40 h-40 rounded-full bg-gradient-to-r from-blue-200 to-purple-200 opacity-30 blur-2xl"></div>
+                <div class="absolute -bottom-10 -right-10 w-60 h-60 rounded-full bg-gradient-to-r from-pink-200 to-blue-200 opacity-30 blur-2xl"></div>
+                
+                <div class="glass rounded-3xl p-8 max-w-4xl mx-auto relative z-10">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="p-6 rounded-2xl bg-gradient-to-br from-white to-gray-50 border border-gray-100">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center mb-4">
+                                <i class="fas fa-brain text-white"></i>
+                            </div>
+                            <p class="font-bold mb-2">ИИ в действии</p>
+                            <p class="text-sm text-gray-600">Анализирует поведение пользователей и адаптирует стратегию общения в реальном времени</p>
+                        </div>
+                        <div class="p-6 rounded-2xl bg-gradient-to-br from-white to-gray-50 border border-gray-100">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-green-400 to-blue-500 flex items-center justify-center mb-4">
+                                <i class="fas fa-chart-line text-white"></i>
+                            </div>
+                            <p class="font-bold mb-2">Рост конверсии</p>
+                            <p class="text-sm text-gray-600">До 3.5x увеличение эффективности</p>
+                        </div>
+                        <div class="p-6 rounded-2xl bg-gradient-to-br from-white to-gray-50 border border-gray-100">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-r from-orange-400 to-pink-500 flex items-center justify-center mb-4">
+                                <i class="fas fa-bolt text-white"></i>
+                            </div>
+                            <p class="font-bold mb-2">Скорость работы</p>
+                            <p class="text-sm text-gray-600">Обработка до 1000 анкет в минуту</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- Features Section -->
-    <section class="features" id="features">
-        <div class="section-header">
-            <p class="section-label reveal">Возможности</p>
-            <h2 class="section-title reveal">Всё, что нужно для работы</h2>
-            <p class="section-desc reveal">Полный набор инструментов для автоматизации рассылок и управления коммуникациями</p>
-        </div>
-
-        <div class="features-grid">
-            <div class="feature-card large reveal">
-                <div class="feature-icon purple">
-                    <i class="fas fa-brain"></i>
+    <!-- Выбор платформы (Downloads) -->
+    <section id="downloads" class="py-8 px-4 scroll-mt-24">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-4 fade-in">Выберите вашу платформу</h2>
+            <p class="text-center text-gray-600 mb-12">Текущая версия: <span class="font-bold gradient-text">1.5.0</span> • Регулярные обновления и новые функции</p>
+            
+            <div class="flex flex-col md:flex-row justify-center gap-8 max-w-4xl mx-auto">
+                <!-- Windows Card -->
+                <div class="glass card-hover rounded-2xl p-8 flex-1 fade-in delay-1">
+                    <div class="flex flex-col items-center text-center h-full">
+                        <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center mb-6">
+                            <i class="fab fa-windows text-white text-3xl"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-4">Windows</h3>
+                        <p class="text-gray-600 mb-6 flex-grow">Оптимизированная версия для максимальной производительности</p>
+                        <a href="/download/Novabot Setup 1.5.0.exe" class="w-full py-4 rounded-xl font-medium flex items-center justify-center space-x-3 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 mt-auto" style="background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);">
+                            <span class="text-gray-800">Скачать для Windows</span>
+                            <i class="fas fa-download text-gray-800"></i>
+                        </a>
+                    </div>
                 </div>
-                <h3 class="feature-title">Мощный ИИ</h3>
-                <p class="feature-desc">Генерирует персонализированные сообщения, анализирует поведение пользователей и адаптирует стратегию в реальном времени. Обучен на миллионах успешных диалогов.</p>
-            </div>
 
-            <div class="feature-card reveal">
-                <div class="feature-icon blue">
-                    <i class="fas fa-chart-line"></i>
+                <!-- macOS Card -->
+                <div class="glass card-hover rounded-2xl p-8 flex-1 fade-in delay-2">
+                    <div class="flex flex-col items-center text-center h-full">
+                        <div class="w-20 h-20 rounded-2xl bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center mb-6">
+                            <i class="fab fa-apple text-white text-3xl"></i>
+                        </div>
+                        <h3 class="text-2xl font-bold mb-4">macOS</h3>
+                        <p class="text-gray-600 mb-6 flex-grow">Нативная интеграция с системой Apple</p>
+                        <a href="/download/Novabot-1.4.0.dmg" class="w-full py-4 rounded-xl font-medium flex items-center justify-center space-x-3 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 mt-auto" style="background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);">
+                            <span class="text-gray-800">Скачать для Intel Mac</span>
+                            <i class="fas fa-download text-gray-800"></i>
+                        </a>
+                        <a href="/download/Novabot-1.4.0-arm64.dmg" class="w-full py-3 rounded-xl font-medium flex items-center justify-center space-x-3 transition-all duration-300 hover:shadow-lg hover:-translate-y-1 mt-2" style="background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);">
+                            <span class="text-gray-600">Скачать для M1/M2 Mac</span>
+                            <i class="fas fa-download text-gray-600"></i>
+                        </a>
+                    </div>
                 </div>
-                <h3 class="feature-title">Аналитика</h3>
-                <p class="feature-desc">Детальные отчёты и статистика в реальном времени. Отслеживайте эффективность каждой кампании.</p>
-            </div>
-
-            <div class="feature-card reveal">
-                <div class="feature-icon green">
-                    <i class="fas fa-comments"></i>
-                </div>
-                <h3 class="feature-title">Единое окно</h3>
-                <p class="feature-desc">Письма и чаты в одном интерфейсе. Управляйте всеми каналами коммуникации из одного места.</p>
-            </div>
-
-            <div class="feature-card reveal">
-                <div class="feature-icon orange">
-                    <i class="fas fa-shield-alt"></i>
-                </div>
-                <h3 class="feature-title">Безопасность</h3>
-                <p class="feature-desc">Встроенная защита от блокировок, умная ротация и управление сессиями.</p>
-            </div>
-
-            <div class="feature-card large reveal">
-                <div class="feature-icon indigo">
-                    <i class="fas fa-rocket"></i>
-                </div>
-                <h3 class="feature-title">Высокая производительность</h3>
-                <p class="feature-desc">Обрабатывает тысячи анкет одновременно. Оптимизированный алгоритм рассылки обеспечивает максимальную скорость без риска блокировки. Умное управление нагрузкой.</p>
             </div>
         </div>
     </section>
 
-    <!-- Stats Section -->
-    <section class="stats">
-        <div class="stats-container">
-            <div class="stat-item reveal">
-                <div class="stat-number">3.5x</div>
-                <div class="stat-label">Рост конверсии</div>
-            </div>
-            <div class="stat-item reveal">
-                <div class="stat-number">24/7</div>
-                <div class="stat-label">Работа без перерыва</div>
-            </div>
-            <div class="stat-item reveal">
-                <div class="stat-number">1000+</div>
-                <div class="stat-label">Анкет в минуту</div>
-            </div>
-            <div class="stat-item reveal">
-                <div class="stat-number">99.9%</div>
-                <div class="stat-label">Uptime системы</div>
+    <!-- Функционал (Bento Grid) -->
+    <section class="py-8 px-4">
+        <div class="max-w-6xl mx-auto">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-12 fade-in flex items-end justify-center gap-3">Возможности <img src="nova.png" alt="Nova" class="h-10 md:h-12 inline-block"></h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Карточка 1 -->
+                <div class="glass card-hover rounded-2xl p-8 fade-in delay-1">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center mb-6">
+                        <i class="fas fa-brain text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">Мощный ИИ</h3>
+                    <p class="text-gray-600">Генерирует рассылки, ответы и промты лучше человека. Обучен на миллионах успешных диалогов.</p>
+                </div>
+
+                <!-- Карточка 2 -->
+                <div class="glass card-hover rounded-2xl p-8 fade-in delay-2">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-r from-blue-500 to-cyan-500 flex items-center justify-center mb-6">
+                        <i class="fas fa-chart-pie text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">Личный кабинет</h3>
+                    <p class="text-gray-600">Управление статистикой и финансами. Подробные отчеты и аналитика в реальном времени.</p>
+                </div>
+
+                <!-- Карточка 3 -->
+                <div class="glass card-hover rounded-2xl p-8 fade-in delay-3">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-r from-green-500 to-teal-500 flex items-center justify-center mb-6">
+                        <i class="fas fa-comments text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">Единое окно</h3>
+                    <p class="text-gray-600">Письма и чаты в одном интерфейсе. Удобное управление всеми каналами коммуникации.</p>
+                </div>
+
+                <!-- Карточка 4 -->
+                <div class="glass card-hover rounded-2xl p-8 fade-in delay-4">
+                    <div class="w-14 h-14 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 flex items-center justify-center mb-6">
+                        <i class="fas fa-globe text-white text-xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4">Прокси</h3>
+                    <p class="text-gray-600">Встроенный менеджер для мульти-рассылки и автоматическая ротация.</p>
+                </div>
+
+                <!-- Карточка 5 -->
+                <div class="glass card-hover rounded-2xl p-8 fade-in delay-5 md:col-span-2 lg:col-span-2">
+                    <div class="flex items-start">
+                        <div class="w-16 h-16 rounded-2xl bg-gradient-to-r from-indigo-500 to-blue-500 flex items-center justify-center mr-6 shrink-0">
+                            <i class="fas fa-mail-bulk text-white text-2xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-2xl font-bold mb-4">Умная рассылка</h3>
+                            <p class="text-lg text-gray-600">Высокая конверсия без спама. ИИ анализирует ответы и адаптирует стратегию рассылки для каждого пользователя индивидуально.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- Download Section -->
-    <section class="download" id="download">
-        <div class="section-header">
-            <p class="section-label reveal">Скачать</p>
-            <h2 class="section-title reveal">Выберите платформу</h2>
-            <p class="section-desc reveal">Доступно для Windows и macOS. Начните работу за 2 минуты.</p>
-        </div>
-
-        <div class="download-grid">
-            <div class="download-card reveal">
-                <div class="download-icon windows">
-                    <i class="fab fa-windows"></i>
+    <!-- Подвал (Footer) -->
+    <footer class="py-10 px-4 border-t border-gray-100">
+        <div class="max-w-6xl mx-auto">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-6 md:mb-0">
+                    <p class="text-gray-600 font-medium mb-2">Доступно для LadaDate</p>
+                    <p class="text-gray-500 text-sm">© 2025 Nova AI. Все права защищены.</p>
                 </div>
-                <h3 class="download-title">Windows</h3>
-                <p class="download-desc">Для Windows 10 и выше. Оптимизировано для максимальной производительности.</p>
-                <a href="#" class="download-btn">
-                    <i class="fas fa-download"></i>
-                    Скачать .exe
-                </a>
-            </div>
 
-            <div class="download-card reveal">
-                <div class="download-icon macos">
-                    <i class="fab fa-apple"></i>
-                </div>
-                <h3 class="download-title">macOS</h3>
-                <p class="download-desc">Для macOS 11 и выше. Нативная интеграция с Apple Silicon.</p>
-                <a href="#" class="download-btn">
-                    <i class="fas fa-download"></i>
-                    Скачать .dmg
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- CTA Section -->
-    <section class="cta">
-        <div class="cta-content">
-            <h2 class="cta-title reveal">Готовы начать?</h2>
-            <p class="cta-desc reveal">Попробуйте Nova бесплатно в течение 2 дней. Без карты, без обязательств.</p>
-            <a href="#download" class="cta-btn reveal">
-                Попробовать бесплатно
-                <i class="fas fa-arrow-right"></i>
-            </a>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer>
-        <div class="footer-container">
-            <div class="footer-left">
-                <img src="logo.png" alt="Nova" class="footer-logo-img">
-                <span class="footer-copy">© 2025 Nova AI. Все права защищены.</span>
-                <div class="footer-status">
-                    <span class="footer-status-dot"></span>
-                    Все системы работают
-                </div>
-            </div>
-            <div class="footer-links">
-                <a href="login.html" class="footer-link">Личный кабинет</a>
-                <div class="footer-social">
-                    <a href="#" class="social-btn"><i class="fab fa-telegram"></i></a>
+                <div class="flex items-center">
+                    <a href="https://t.me/S_Shevil" target="_blank" class="glass flex items-center space-x-2 px-5 py-3 rounded-xl transition-all duration-300 hover:shadow-lg">
+                        <i class="fab fa-telegram text-blue-500"></i>
+                        <span class="font-medium">Связаться с нами</span>
+                    </a>
                 </div>
             </div>
         </div>
     </footer>
 
     <script>
-        // ===== NAVBAR SCROLL EFFECT =====
-        const navbar = document.getElementById('navbar');
-        let lastScroll = 0;
+        // Анимация при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            // Добавляем классы fade-in для анимации при прокрутке
+            const observerOptions = {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            };
 
-        window.addEventListener('scroll', () => {
-            const currentScroll = window.pageYOffset;
+            const observer = new IntersectionObserver(function(entries) {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('fade-in');
+                    }
+                });
+            }, observerOptions);
 
-            if (currentScroll > 50) {
-                navbar.classList.add('scrolled');
-            } else {
-                navbar.classList.remove('scrolled');
+            // Наблюдаем за всеми элементами с классами задержки
+            document.querySelectorAll('.delay-1, .delay-2, .delay-3, .delay-4, .delay-5').forEach(el => {
+                observer.observe(el);
+            });
+
+            // Анимация для карточек при наведении
+            const cards = document.querySelectorAll('.card-hover');
+            cards.forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-10px)';
+                });
+
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0)';
+                });
+            });
+
+            // Плавная прокрутка к секции скачивания
+            const tryFreeBtn = document.getElementById('try-free-btn');
+            if (tryFreeBtn) {
+                tryFreeBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const downloadsSection = document.getElementById('downloads');
+                    if (downloadsSection) {
+                        downloadsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
             }
 
-            lastScroll = currentScroll;
-        });
-
-        // ===== SCROLL REVEAL ANIMATION =====
-        const revealElements = document.querySelectorAll('.reveal');
-
-        const revealOnScroll = () => {
-            revealElements.forEach((el, index) => {
-                const elementTop = el.getBoundingClientRect().top;
-                const windowHeight = window.innerHeight;
-
-                if (elementTop < windowHeight - 100) {
-                    setTimeout(() => {
-                        el.classList.add('active');
-                    }, index * 50);
-                }
-            });
-        };
-
-        window.addEventListener('scroll', revealOnScroll);
-        window.addEventListener('load', revealOnScroll);
-
-        // ===== CURSOR GLOW EFFECT =====
-        const cursorGlow = document.getElementById('cursorGlow');
-        let mouseX = 0, mouseY = 0;
-        let glowX = 0, glowY = 0;
-
-        document.addEventListener('mousemove', (e) => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-        });
-
-        const animateGlow = () => {
-            glowX += (mouseX - glowX) * 0.1;
-            glowY += (mouseY - glowY) * 0.1;
-
-            cursorGlow.style.left = glowX + 'px';
-            cursorGlow.style.top = glowY + 'px';
-
-            requestAnimationFrame(animateGlow);
-        };
-
-        animateGlow();
-
-        // Hide glow on mobile
-        if ('ontouchstart' in window) {
-            cursorGlow.style.display = 'none';
-        }
-
-        // ===== SMOOTH SCROLL FOR ANCHOR LINKS =====
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function(e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                }
-            });
-        });
-
-        // ===== BUTTON RIPPLE EFFECT =====
-        document.querySelectorAll('.btn-primary, .btn-secondary, .download-btn').forEach(btn => {
-            btn.addEventListener('click', function(e) {
-                const rect = this.getBoundingClientRect();
-                const ripple = document.createElement('span');
-                const size = Math.max(rect.width, rect.height);
-
-                ripple.style.cssText = `
-                    position: absolute;
-                    border-radius: 50%;
-                    background: rgba(255, 255, 255, 0.3);
-                    width: ${size}px;
-                    height: ${size}px;
-                    left: ${e.clientX - rect.left - size/2}px;
-                    top: ${e.clientY - rect.top - size/2}px;
-                    transform: scale(0);
-                    animation: ripple 0.6s ease-out;
-                    pointer-events: none;
-                `;
-
-                this.style.position = 'relative';
-                this.style.overflow = 'hidden';
-                this.appendChild(ripple);
-
-                setTimeout(() => ripple.remove(), 600);
-            });
-        });
-
-        // Add ripple keyframe
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes ripple {
-                to {
-                    transform: scale(4);
-                    opacity: 0;
-                }
-            }
-        `;
-        document.head.appendChild(style);
-
-        // ===== PARALLAX ORBS ON SCROLL =====
-        window.addEventListener('scroll', () => {
-            const scrolled = window.pageYOffset;
-            document.querySelectorAll('.orb').forEach((orb, i) => {
-                const speed = (i + 1) * 0.05;
-                orb.style.transform = `translateY(${scrolled * speed}px)`;
-            });
+            // Скачивание файлов теперь работает через прямые ссылки
         });
     </script>
 </body>
