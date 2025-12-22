@@ -2735,6 +2735,37 @@
                     }
                 },
 
+                // Удалить выбранные анкеты
+                async deleteSelectedProfiles() {
+                    if (this.selectedProfileIds.length === 0) return;
+
+                    if (!confirm(`Удалить ${this.selectedProfileIds.length} анкет? Это действие нельзя отменить.`)) return;
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/profiles/bulk-delete`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                profileIds: this.selectedProfileIds,
+                                userId: this.currentUser.id,
+                                userName: this.currentUser.username
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert(`Удалено ${data.deleted} анкет`);
+                            this.selectedProfileIds = [];
+                            await this.loadAccounts();
+                            await this.loadProfileHistory();
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось удалить'));
+                        }
+                    } catch (e) {
+                        console.error('deleteSelectedProfiles error:', e);
+                        alert('Ошибка сети');
+                    }
+                },
+
                 // Открыть модал пополнения баланса (для директора)
                 openTopupModal(userId) {
                     this.topupUserId = userId;
