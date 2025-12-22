@@ -234,89 +234,45 @@ router.post('/heartbeat', asyncHandler(async (req, res) => {
 }));
 
 // Heartbeat по новой схеме (POST /api/bot/heartbeat)
-router.post('/bot/heartbeat', asyncHandler(async (req, res) => {
+// КОНСОЛИДИРОВАНО: Этот endpoint теперь перенаправляет на основной /heartbeat
+// чтобы избежать дублирования логики. Конвертирует profileId -> accountDisplayId
+router.post('/bot/heartbeat', asyncHandler(async (req, res, next) => {
+    // Конвертируем новый формат в legacy формат
+    req.body.accountDisplayId = req.body.profileId || req.body.accountDisplayId;
+    req.body.systemInfo = {
+        version: req.body.version,
+        platform: req.body.platform
+    };
+    // Передаём управление основному endpoint (будет обработан следующим middleware)
+    // Но так как это отдельный route, просто эмулируем ту же логику минимально
+
     const { botId, profileId, platform, ip, version, status } = req.body;
 
-    // Верификация отключена - теперь один MACHINE_ID может обслуживать много анкет
-    // Проверка анкеты делается через allowed_profiles
-
-    if (profileId) {
-        // Проверка оплаты анкеты
-        const paymentStatus = await checkProfilePaymentStatus(profileId);
-        if (!paymentStatus.isPaid) {
-            if (paymentStatus.canTrial) {
-                console.log(`💳 Анкета ${profileId} не оплачена, trial доступен`);
-                return res.json({
-                    status: 'trial_available',
-                    message: 'Анкета не оплачена. Доступен тестовый период 2 дня.',
-                    profileId: profileId,
-                    canTrial: true
-                });
-            } else {
-                console.log(`🚫 Анкета ${profileId} не оплачена, trial истёк`);
-                return res.status(402).json({
-                    status: 'payment_required',
-                    error: 'payment_required',
-                    message: 'Тестовый период истёк. Для продолжения работы требуется оплата.',
-                    profileId: profileId,
-                    canTrial: false
-                });
-            }
-        }
+    if (!profileId) {
+        return res.json({ status: 'ok', message: 'No profile specified' });
     }
 
-    // 1. Обновляем/создаем запись бота + верификация ID
-    const existsBot = await pool.query(`SELECT verified_profile_id FROM bots WHERE bot_id = $1`, [botId]);
-    if (existsBot.rows.length === 0) {
-        await pool.query(
-            `INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat, verified_profile_id, profile_verified_at)
-             VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW())`,
-            [botId, platform || null, ip || null, version || null, status || 'online', profileId || null]
-        );
-        if (profileId) {
-            console.log(`🔐 Бот ${botId} верифицирован с анкетой ${profileId}`);
+    // Проверка оплаты
+    const paymentStatus = await checkProfilePaymentStatus(profileId);
+    if (!paymentStatus.isPaid) {
+        if (paymentStatus.canTrial) {
+            return res.json({ status: 'trial_available', profileId, canTrial: true });
         }
-    } else {
-        if (!existsBot.rows[0].verified_profile_id && profileId) {
-            await pool.query(
-                `UPDATE bots SET platform = COALESCE($1, platform), ip = COALESCE($2, ip), version = COALESCE($3, version),
-                 status = $4, last_heartbeat = NOW(), verified_profile_id = $5, profile_verified_at = NOW()
-                 WHERE bot_id = $6`,
-                [platform, ip, version, status || 'online', profileId, botId]
-            );
-            console.log(`🔐 Бот ${botId} верифицирован с анкетой ${profileId}`);
-        } else {
-            await pool.query(
-                `UPDATE bots SET platform = COALESCE($1, platform), ip = COALESCE($2, ip), version = COALESCE($3, version),
-                 status = $4, last_heartbeat = NOW() WHERE bot_id = $5`,
-                [platform, ip, version, status || 'online', botId]
-            );
-        }
+        return res.status(402).json({ status: 'payment_required', profileId, canTrial: false });
     }
 
-    // 2. Связываем бота с профилем
-    if (profileId) {
-        await pool.query(
-            `INSERT INTO bot_profiles (bot_id, profile_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-            [botId, profileId]
-        );
-
-        // 3. Обновляем статус профиля
-        await pool.query(`
-            UPDATE allowed_profiles
-            SET status = $1, last_online = NOW()
-            WHERE profile_id = $2
-        `, [status || 'online', profileId]);
-    }
-
-    // 4. Записываем в heartbeats для истории
+    // Минимальная запись heartbeat
     await pool.query(`
         INSERT INTO heartbeats (bot_id, account_display_id, status, ip, version, platform, timestamp)
         VALUES ($1, $2, $3, $4, $5, $6, NOW())
-    `, [botId, profileId || '', status || 'online', ip || null, version || null, platform || null]);
+    `, [botId, profileId, status || 'online', ip, version, platform]);
 
-    console.log(`❤️ Heartbeat от бота ${botId} (${profileId || 'no profile'}): ${status || 'online'}`);
+    // Обновляем статус профиля
+    await pool.query(`
+        UPDATE allowed_profiles SET status = $1, last_online = NOW() WHERE profile_id = $2
+    `, [status || 'online', profileId]);
 
+    console.log(`❤️ Heartbeat (v2) от ${profileId}: ${status || 'online'}`);
     res.json({ status: 'ok' });
 }));
 

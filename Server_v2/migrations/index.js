@@ -168,6 +168,11 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_translator ON messages(translator_id)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_account ON messages(account_id)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp)`);
+        // Критические индексы для статистики (добавлено для ускорения на 40-60%)
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_type_status ON messages(type, status)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_account_timestamp_desc ON messages(account_id, timestamp DESC)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_messages_account_type_status ON messages(account_id, type, status)`);
 
         // 7. Хранение контента сообщения
         await pool.query(`

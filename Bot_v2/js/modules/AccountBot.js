@@ -1059,6 +1059,12 @@ class AccountBot {
                 // Сохраняем для глобального счётчика
                 this.lastOnlineCount = res.data.Users.length;
             }
+
+            // Очистка памяти: раз в час чистим старые диалоги
+            if (!this.lastCleanupTime || Date.now() - this.lastCleanupTime > 60 * 60 * 1000) {
+                this.cleanupConversations();
+                this.lastCleanupTime = Date.now();
+            }
         } catch (e) { /* Тихая ошибка - doActivity вызывается часто, не спамим в консоль */ }
     }
 

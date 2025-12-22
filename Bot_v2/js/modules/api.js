@@ -89,14 +89,14 @@ function collectBotsInfo() {
     let stopped = 0;
 
     for (const bot of botsList) {
-        const isRunning = bot.mailRunning || bot.chatRunning || false;
+        const isRunning = bot.isMailRunning || bot.isChatRunning || false;
         if (isRunning) running++;
         else stopped++;
 
         list.push({
             profileId: bot.displayId,
             status: isRunning ? 'running' : 'stopped',
-            mode: bot.mailRunning ? 'mail' : (bot.chatRunning ? 'chat' : 'idle')
+            mode: bot.isMailRunning ? 'mail' : (bot.isChatRunning ? 'chat' : 'idle')
         });
     }
 
