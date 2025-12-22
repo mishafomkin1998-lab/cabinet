@@ -134,9 +134,9 @@ router.post('/message_sent', asyncHandler(async (req, res) => {
         const actionType = (msgType === 'chat_msg' || msgType === 'chat') ? 'chat' : 'letter';
 
         await pool.query(
-            `INSERT INTO activity_log (profile_id, bot_id, admin_id, translator_id, action_type, man_id, message_text, response_time_sec, used_ai, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
-            [accountDisplayId, botId, adminId, assignedTranslatorId, actionType, recipientId, textContent || null, responseTimeSec, usedAi || false]
+            `INSERT INTO activity_log (profile_id, bot_id, admin_id, translator_id, action_type, man_id, message_text, response_time_sec, used_ai, is_reply, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
+            [accountDisplayId, botId, adminId, assignedTranslatorId, actionType, recipientId, textContent || null, responseTimeSec, usedAi || false, isReply || false]
         );
 
         // Шаг 6: Трекинг AI массовых рассылок
@@ -256,6 +256,7 @@ router.get('/recent', asyncHandler(async (req, res) => {
         const params = [limitInt, ...activityRoleFilter.params];
 
         // Сначала пробуем activity_log
+        // Добавляем JOIN с incoming_messages для получения текста входящего письма и имени мужчины
         const activityQuery = `
             SELECT
                 a.id,
@@ -267,11 +268,23 @@ router.get('/recent', asyncHandler(async (req, res) => {
                 a.response_time_sec,
                 a.used_ai,
                 a.income,
+                a.is_reply,
                 u_admin.username as admin_name,
-                u_trans.username as translator_name
+                u_trans.username as translator_name,
+                im.message_text as incoming_text,
+                im.man_name
             FROM activity_log a
             LEFT JOIN users u_admin ON a.admin_id = u_admin.id
             LEFT JOIN users u_trans ON a.translator_id = u_trans.id
+            LEFT JOIN LATERAL (
+                SELECT im2.message_text, im2.man_name
+                FROM incoming_messages im2
+                WHERE im2.profile_id = a.profile_id
+                    AND im2.man_id = a.man_id
+                    AND im2.created_at < a.created_at
+                ORDER BY im2.created_at DESC
+                LIMIT 1
+            ) im ON true
             WHERE 1=1 ${activityFilter}
             ORDER BY a.created_at DESC
             LIMIT $1
@@ -321,9 +334,12 @@ router.get('/recent', asyncHandler(async (req, res) => {
             profile_id: row.profile_id,
             action_type: row.action_type,
             man_id: row.man_id,
+            man_name: row.man_name || null,
             message_text: row.message_text ? row.message_text.substring(0, 200) : null,
+            incoming_text: row.incoming_text ? row.incoming_text.substring(0, 200) : null,
             response_time_sec: row.response_time_sec,
             used_ai: row.used_ai,
+            is_reply: row.is_reply || false,
             created_at: row.timestamp,
             admin_name: row.admin_name,
             translator_name: row.translator_name
