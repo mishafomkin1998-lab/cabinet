@@ -985,114 +985,96 @@ router.get('/last-responses', asyncHandler(async (req, res) => {
 
 /**
  * GET /api/stats/ai-usage
- * Возвращает статистику использования AI для массовых рассылок
+ * Возвращает статистику использования AI для рассылок
  *
  * Логика:
- * 1. Группирует сообщения с usedAi=true по text_hash
- * 2. Считает количество получателей для каждого уникального текста
- * 3. Фильтрует только те, где получателей >= 10
- * 4. Показывает только если первая отправка была минимум 10 минут после генерации
- * 5. Возвращает с пагинацией
+ * 1. Берём сообщения из activity_log где used_ai = true
+ * 2. Группируем по тексту сообщения
+ * 3. Фильтруем: рассылка длилась минимум 3 минуты (от первого до последнего)
+ * 4. Возвращаем: текст + количество отправок
  *
  * @query {string} userId - ID пользователя
  * @query {string} role - Роль (translator/admin/director)
- * @query {string} filterAdminId - ID админа для фильтрации (опционально)
- * @query {string} filterTranslatorId - ID переводчика для фильтрации (опционально)
  * @query {string} dateFrom - Начало периода
  * @query {string} dateTo - Конец периода
- * @query {number} limit - Количество записей (по умолчанию 5)
- * @query {number} offset - Смещение для пагинации (по умолчанию 0)
+ * @query {number} limit - Количество записей (по умолчанию 20)
  * @returns {Array} aiUsage - Массив AI рассылок
  */
 router.get('/ai-usage', asyncHandler(async (req, res) => {
-    const { userId, role, filterAdminId, filterTranslatorId, dateFrom, dateTo, limit = 5, offset = 0 } = req.query;
-    const limitInt = parseInt(limit) || 5;
-    const offsetInt = parseInt(offset) || 0;
+    const { userId, role, filterAdminId, filterTranslatorId, dateFrom, dateTo, limit = 20 } = req.query;
+    const limitInt = parseInt(limit) || 20;
 
-    // Фильтр по ролям и выбранному админу/переводчику
+    // Фильтр по ролям
     let roleFilter = '';
-    let params = [limitInt, offsetInt];
-    let paramIndex = 3;
+    let params = [limitInt];
+    let paramIndex = 2;
 
     if (filterTranslatorId) {
-        roleFilter = `AND amm.translator_id = $${paramIndex}`;
+        roleFilter = `AND a.translator_id = $${paramIndex}`;
         params.push(filterTranslatorId);
         paramIndex++;
     } else if (filterAdminId) {
-        // Фильтр по админу: админ напрямую ИЛИ переводчики этого админа
-        roleFilter = `AND (amm.admin_id = $${paramIndex} OR amm.translator_id IN (SELECT id FROM users WHERE owner_id = $${paramIndex}))`;
+        roleFilter = `AND (a.admin_id = $${paramIndex} OR a.translator_id IN (SELECT id FROM users WHERE owner_id = $${paramIndex}))`;
         params.push(filterAdminId);
         paramIndex++;
     } else if (role === 'translator' && userId) {
-        roleFilter = `AND amm.translator_id = $${paramIndex}`;
+        roleFilter = `AND a.translator_id = $${paramIndex}`;
         params.push(userId);
         paramIndex++;
     } else if (role === 'admin' && userId) {
-        roleFilter = `AND amm.admin_id = $${paramIndex}`;
+        roleFilter = `AND (a.admin_id = $${paramIndex} OR a.translator_id IN (SELECT id FROM users WHERE owner_id = $${paramIndex}))`;
         params.push(userId);
         paramIndex++;
     }
     // director видит все
 
-    // Добавляем фильтры по дате
+    // Фильтры по дате
     let dateFilter = '';
     if (dateFrom) {
-        dateFilter += ` AND amm.first_sent_at >= $${paramIndex}::date`;
+        dateFilter += ` AND a.created_at >= $${paramIndex}::date`;
         params.push(dateFrom);
         paramIndex++;
     }
     if (dateTo) {
-        dateFilter += ` AND amm.first_sent_at <= $${paramIndex}::date + INTERVAL '1 day'`;
+        dateFilter += ` AND a.created_at <= $${paramIndex}::date + INTERVAL '1 day'`;
         params.push(dateTo);
         paramIndex++;
     }
 
     /**
-     * Запрос к таблице ai_mass_messages
-     * Фильтрация: recipient_count >= 10
-     * Правило 10 минут: показываем только если разница между генерацией и первой отправкой >= 10 минут
-     * Сортировка: по времени первой отправки (самые новые сверху)
+     * Запрос к activity_log:
+     * - Только сообщения сгенерированные AI (used_ai = true)
+     * - Группируем по тексту
+     * - Фильтруем: рассылка >= 3 минут (от первого до последнего сообщения)
+     * - Сортируем по времени последней отправки
      */
     const query = `
         SELECT
-            amm.id,
-            amm.text_content,
-            amm.recipient_count,
-            amm.recipient_ids,
-            amm.profile_id,
-            amm.first_sent_at,
-            amm.last_sent_at,
-            amm.generation_session_id,
-            amm.generated_at,
-            u_admin.username as admin_name,
-            u_trans.username as translator_name,
-            EXTRACT(EPOCH FROM (amm.first_sent_at - COALESCE(amm.generated_at, amm.first_sent_at)))::INTEGER as seconds_after_generation
-        FROM ai_mass_messages amm
-        LEFT JOIN users u_admin ON amm.admin_id = u_admin.id
-        LEFT JOIN users u_trans ON amm.translator_id = u_trans.id
-        WHERE amm.recipient_count >= 10
-            AND (amm.generated_at IS NULL OR amm.first_sent_at >= amm.generated_at + INTERVAL '10 minutes')
+            a.message_text,
+            COUNT(*) as sent_count,
+            MIN(a.created_at) as first_sent_at,
+            MAX(a.created_at) as last_sent_at,
+            EXTRACT(EPOCH FROM (MAX(a.created_at) - MIN(a.created_at))) as duration_seconds
+        FROM activity_log a
+        WHERE a.used_ai = true
+            AND a.message_text IS NOT NULL
+            AND a.message_text != ''
             ${roleFilter}
             ${dateFilter}
-        ORDER BY amm.first_sent_at DESC
-        LIMIT $1 OFFSET $2
+        GROUP BY a.message_text
+        HAVING EXTRACT(EPOCH FROM (MAX(a.created_at) - MIN(a.created_at))) >= 180
+        ORDER BY MAX(a.created_at) DESC
+        LIMIT $1
     `;
 
     const result = await pool.query(query, params);
 
     const aiUsage = result.rows.map(row => ({
-        id: row.id,
-        textContent: row.text_content,
-        recipientCount: row.recipient_count,
-        recipientIds: row.recipient_ids,
-        profileId: row.profile_id,
+        textContent: row.message_text,
+        sentCount: parseInt(row.sent_count),
         firstSentAt: row.first_sent_at,
         lastSentAt: row.last_sent_at,
-        generationSessionId: row.generation_session_id,
-        generatedAt: row.generated_at,
-        adminName: row.admin_name,
-        translatorName: row.translator_name,
-        secondsAfterGeneration: row.seconds_after_generation
+        durationMinutes: Math.round(parseFloat(row.duration_seconds) / 60)
     }));
 
     res.json({ success: true, aiUsage });

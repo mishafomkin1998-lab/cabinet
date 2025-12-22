@@ -608,7 +608,7 @@
                         <!-- Использование ИИ -->
                         <div x-show="monitoringFunction === 'aiUsage'" x-transition class="space-y-4">
                             <!-- Кнопка экспорта -->
-                            <div class="flex justify-end mb-2" x-show="recentActivity.filter(a => a.used_ai).length > 0">
+                            <div class="flex justify-end mb-2" x-show="aiUsageData.length > 0">
                                 <button @click="exportAiUsage()" class="px-3 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 font-medium transition-all text-xs">
                                     <i class="fas fa-download mr-1"></i>Выгрузить
                                 </button>
@@ -616,28 +616,31 @@
                             <div class="glass p-4 rounded-xl">
                                 <div class="flex justify-between items-center mb-2">
                                     <div class="font-medium" x-text="t('monitoring.aiGenerations')"></div>
-                                    <div class="text-2xl font-bold text-orange-600" x-text="recentActivity.filter(a => a.used_ai).length"></div>
+                                    <div class="text-2xl font-bold text-orange-600" x-text="aiUsageData.length"></div>
                                 </div>
-                                <div class="text-sm text-gray-600" x-text="t('monitoring.recentGenerations')"></div>
+                                <div class="text-sm text-gray-600">AI рассылки (3+ минут)</div>
                             </div>
                             <div class="glass p-4 rounded-xl">
-                                <div class="font-medium mb-2">Последние генерации:</div>
+                                <div class="font-medium mb-2">AI рассылки:</div>
                                 <div class="space-y-2 text-sm">
-                                    <template x-for="activity in recentActivity.filter(a => a.used_ai).slice(0, showAllAiUsage ? undefined : 5)" :key="activity.id">
+                                    <template x-for="(item, index) in aiUsageData.slice(0, showAllAiUsage ? undefined : 5)" :key="index">
                                         <div class="border-l-4 border-orange-400 pl-3 py-2 bg-orange-50 rounded-r hover:bg-orange-100 transition-colors">
-                                            <div x-text="activity.message_text ? activity.message_text.substring(0, 150) + '...' : '(ИИ генерация)'"></div>
-                                            <div class="text-xs text-gray-500 mt-1" x-text="formatActivityTime(activity.created_at)"></div>
+                                            <div class="flex justify-between items-start">
+                                                <div class="flex-1 pr-2" x-text="item.textContent ? (item.textContent.length > 150 ? item.textContent.substring(0, 150) + '...' : item.textContent) : '(текст не сохранён)'"></div>
+                                                <div class="text-orange-600 font-bold whitespace-nowrap" x-text="item.sentCount + ' отпр.'"></div>
+                                            </div>
+                                            <div class="text-xs text-gray-500 mt-1" x-text="'Длительность: ' + item.durationMinutes + ' мин'"></div>
                                         </div>
                                     </template>
-                                    <div x-show="recentActivity.filter(a => a.used_ai).length === 0" class="text-center text-gray-500 py-4">
-                                        Нет данных об использовании ИИ
+                                    <div x-show="aiUsageData.length === 0" class="text-center text-gray-500 py-4">
+                                        Нет AI рассылок (3+ минут)
                                     </div>
                                 </div>
                             </div>
                             <!-- Кнопка Показать еще -->
-                            <div x-show="recentActivity.filter(a => a.used_ai).length > 5" class="text-center mt-3">
+                            <div x-show="aiUsageData.length > 5" class="text-center mt-3">
                                 <button @click="showAllAiUsage = !showAllAiUsage" class="px-4 py-2 text-sm text-orange-600 hover:text-orange-800 font-medium">
-                                    <span x-show="!showAllAiUsage">Показать еще (<span x-text="recentActivity.filter(a => a.used_ai).length - 5"></span>)</span>
+                                    <span x-show="!showAllAiUsage">Показать еще (<span x-text="aiUsageData.length - 5"></span>)</span>
                                     <span x-show="showAllAiUsage">Свернуть</span>
                                 </button>
                             </div>

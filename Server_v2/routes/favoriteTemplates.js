@@ -12,6 +12,7 @@ const router = express.Router();
 /**
  * GET /api/favorite-templates
  * Возвращает избранные шаблоны сообщений пользователя
+ * Фильтрация по доступным анкетам (как в других разделах статистики)
  */
 router.get('/', asyncHandler(async (req, res) => {
     const { userId, role } = req.query;
@@ -23,13 +24,23 @@ router.get('/', asyncHandler(async (req, res) => {
     `;
     let params = [];
 
+    // Фильтруем по доступным анкетам на основе роли
     if (role === 'admin' && userId) {
-        query += ` WHERE ft.admin_id = $1`;
+        // Админ видит шаблоны своих анкет + анкет своих переводчиков
+        query += ` WHERE ft.profile_id IN (
+            SELECT profile_id FROM allowed_profiles
+            WHERE assigned_admin_id = $1
+               OR assigned_translator_id IN (SELECT id FROM users WHERE owner_id = $1)
+        )`;
         params.push(userId);
     } else if (role === 'translator' && userId) {
-        query += ` WHERE ft.translator_id = $1`;
+        // Переводчик видит шаблоны только своих анкет
+        query += ` WHERE ft.profile_id IN (
+            SELECT profile_id FROM allowed_profiles WHERE assigned_translator_id = $1
+        )`;
         params.push(userId);
     }
+    // Директор видит все - фильтр не нужен
 
     query += ` ORDER BY ft.created_at DESC`;
 
