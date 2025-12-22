@@ -229,6 +229,7 @@ router.get('/', asyncHandler(async (req, res) => {
     /**
      * Функция расчета времени работы по пингам активности (SQL-оптимизированная)
      * Использует LAG window function для расчёта интервалов прямо в БД
+     * Читает из activity_pings (привязка к profile_id), не из user_activity
      */
     async function calculateWorkTime(dateFrom, dateTo, options = {}) {
         const { userId, role, filterAdminId, filterTranslatorId } = options;
@@ -236,32 +237,50 @@ router.get('/', asyncHandler(async (req, res) => {
         let workTimeFilter = '';
         let paramIndex = 3;
 
-        // Строим фильтр с учётом выбранного админа/переводчика
+        // Строим фильтр по анкетам (profile_id) с учётом роли пользователя
         if (filterTranslatorId) {
-            workTimeFilter = `AND user_id = $${paramIndex}`;
+            // Фильтр по конкретному переводчику - его анкеты
+            workTimeFilter = `AND ap.profile_id IN (SELECT profile_id FROM allowed_profiles WHERE assigned_translator_id = $${paramIndex})`;
             workTimeParams.push(filterTranslatorId);
             paramIndex++;
         } else if (filterAdminId) {
-            workTimeFilter = `AND (user_id = $${paramIndex} OR user_id IN (SELECT id FROM users WHERE owner_id = $${paramIndex}))`;
+            // Фильтр по админу - его анкеты + анкеты его переводчиков
+            workTimeFilter = `AND ap.profile_id IN (
+                SELECT profile_id FROM allowed_profiles
+                WHERE assigned_admin_id = $${paramIndex}
+                   OR assigned_translator_id IN (SELECT id FROM users WHERE owner_id = $${paramIndex})
+            )`;
             workTimeParams.push(filterAdminId);
             paramIndex++;
-        } else if (userId && (role === 'translator' || role === 'admin')) {
-            workTimeFilter = `AND user_id = $${paramIndex}`;
+        } else if (userId && role === 'translator') {
+            // Переводчик видит только свои анкеты
+            workTimeFilter = `AND ap.profile_id IN (SELECT profile_id FROM allowed_profiles WHERE assigned_translator_id = $${paramIndex})`;
+            workTimeParams.push(userId);
+            paramIndex++;
+        } else if (userId && role === 'admin') {
+            // Админ видит свои анкеты + анкеты своих переводчиков
+            workTimeFilter = `AND ap.profile_id IN (
+                SELECT profile_id FROM allowed_profiles
+                WHERE assigned_admin_id = $${paramIndex}
+                   OR assigned_translator_id IN (SELECT id FROM users WHERE owner_id = $${paramIndex})
+            )`;
             workTimeParams.push(userId);
             paramIndex++;
         }
+        // Директор (role === 'director') видит все анкеты - фильтр не нужен
 
         let workTimeMinutes = 0;
         try {
             // Оптимизированный запрос: весь расчёт в SQL
+            // Читаем из activity_pings (привязка к profile_id)
             const result = await pool.query(`
                 WITH pings AS (
                     SELECT
-                        created_at,
-                        LAG(created_at) OVER (ORDER BY created_at) as prev_created_at
-                    FROM user_activity
-                    WHERE created_at >= $1::date
-                      AND created_at < ($2::date + interval '1 day')
+                        ap.created_at,
+                        LAG(ap.created_at) OVER (PARTITION BY ap.profile_id ORDER BY ap.created_at) as prev_created_at
+                    FROM activity_pings ap
+                    WHERE ap.created_at >= $1::date
+                      AND ap.created_at < ($2::date + interval '1 day')
                       ${workTimeFilter}
                 ),
                 intervals AS (
@@ -279,7 +298,7 @@ router.get('/', asyncHandler(async (req, res) => {
 
             workTimeMinutes = parseInt(result.rows[0]?.work_minutes) || 0;
         } catch (e) {
-            console.log('user_activity query error:', e.message);
+            console.log('activity_pings query error:', e.message);
         }
 
         return workTimeMinutes;
