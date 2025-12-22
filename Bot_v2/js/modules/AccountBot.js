@@ -1003,6 +1003,45 @@ class AccountBot {
                     }
                 }
 
+                // === ПРОВЕРКА ОТВЕТОВ ЧЕРЕЗ САЙТ ===
+                // Если письмо отвечено (IsReplied=true) и у нас есть время входящего —
+                // значит переводчик ответил через сайт, а не через бота
+                msgs.forEach(msg => {
+                    const manIdStr = msg.User.AccountId.toString();
+
+                    if (msg.IsReplied && this.incomingTimes[manIdStr]) {
+                        // Вычисляем время ответа (приблизительно, погрешность до 35 сек)
+                        const incomingTime = this.incomingTimes[manIdStr];
+                        const responseTimeMs = Date.now() - incomingTime;
+                        const responseMinutes = Math.round(responseTimeMs / 60000);
+
+                        console.log(`[Lababot] 🌐 Обнаружен ответ через САЙТ: ${msg.User.Name} — время ответа ~${responseMinutes} мин`);
+
+                        // Отправляем статистику на сервер
+                        sendMessageToLababot({
+                            botId: this.id,
+                            accountDisplayId: this.displayId,
+                            recipientId: msg.User.AccountId,
+                            type: 'outgoing',
+                            textContent: '[Ответ через сайт]',
+                            status: 'success',
+                            responseTime: millisecondsToInterval(responseTimeMs),
+                            isFirst: false,
+                            isLast: false,
+                            convId: null,
+                            mediaUrl: null,
+                            fileName: null,
+                            translatorId: this.translatorId,
+                            errorReason: null,
+                            usedAi: false,
+                            isReply: true
+                        });
+
+                        // Очищаем — ответ учтён
+                        delete this.incomingTimes[manIdStr];
+                    }
+                });
+
                 // === ЗАТЕМ: Уведомления для неотвеченных ===
                 const newMessages = isFirstCheck
                     ? msgs.filter(m => !m.IsReplied) // Первый запуск: только неотвеченные
