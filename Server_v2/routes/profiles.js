@@ -138,9 +138,21 @@ router.get('/', async (req, res) => {
 
 // Массовое добавление анкет
 router.post('/bulk', async (req, res) => {
-    const { profiles, note, adminId, translatorId, userId, userName } = req.body;
+    let { profiles, note, adminId, translatorId, userId, userName } = req.body;
     console.log('📥 /api/profiles/bulk received:', { profiles: profiles?.length, note, adminId, translatorId, userId, userName });
     try {
+        // Если назначен переводчик, но не админ - получаем owner_id переводчика (его админа)
+        if (translatorId && !adminId) {
+            const translatorResult = await pool.query(
+                `SELECT owner_id FROM users WHERE id = $1 AND role = 'translator'`,
+                [translatorId]
+            );
+            if (translatorResult.rows.length > 0 && translatorResult.rows[0].owner_id) {
+                adminId = translatorResult.rows[0].owner_id;
+                console.log('📥 Auto-assigned admin from translator owner:', adminId);
+            }
+        }
+
         for (const id of profiles) {
             if (id.trim().length > 2) {
                 const profileId = id.trim();
