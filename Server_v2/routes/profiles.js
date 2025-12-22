@@ -410,6 +410,7 @@ router.delete('/:profileId', async (req, res) => {
  * GET /api/profiles/:profileId/ai-status
  * Проверяет, включен ли AI для анкеты
  * AI доступен только если включен И у переводчика И у его админа
+ * Исключение: "мой переводчик" - AI всегда включен
  */
 router.get('/:profileId/ai-status', async (req, res) => {
     const { profileId } = req.params;
@@ -423,6 +424,7 @@ router.get('/:profileId/ai-status', async (req, res) => {
                 t.ai_enabled as translator_ai_enabled,
                 t.username as translator_name,
                 t.owner_id as translator_owner_id,
+                t.is_own_translator as translator_is_own,
                 a.ai_enabled as admin_ai_enabled,
                 a.username as admin_name
             FROM allowed_profiles ap
@@ -440,6 +442,17 @@ router.get('/:profileId/ai-status', async (req, res) => {
         // Если нет переводчика - AI недоступен
         if (!row.assigned_translator_id) {
             return res.json({ success: true, aiEnabled: false, reason: 'no_translator' });
+        }
+
+        // "Мой переводчик" - AI всегда включен
+        if (row.translator_is_own) {
+            return res.json({
+                success: true,
+                aiEnabled: true,
+                translatorId: row.assigned_translator_id,
+                translatorName: row.translator_name,
+                reason: 'my_translator'
+            });
         }
 
         // Проверяем AI у админа (если есть)
