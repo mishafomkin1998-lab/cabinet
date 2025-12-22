@@ -67,13 +67,13 @@ function parseResponseTimeToSeconds(responseTime) {
  */
 router.post('/message_sent', asyncHandler(async (req, res) => {
     const { botId, accountDisplayId, recipientId, type, responseTime, isFirst, isLast, convId, length,
-            status, textContent, mediaUrl, fileName, translatorId, errorReason, usedAi, aiSessionId } = req.body;
+            status, textContent, mediaUrl, fileName, translatorId, errorReason, usedAi, aiSessionId, isReply } = req.body;
 
     // Верификация отключена - теперь один MACHINE_ID может обслуживать много анкет
     // Проверка анкеты делается через allowed_profiles
 
-    // Логируем usedAi для отладки
-    console.log(`📥 message_sent: accountDisplayId=${accountDisplayId}, usedAi=${usedAi} (type: ${typeof usedAi})`);
+    // Логируем для отладки
+    console.log(`📥 message_sent: accountDisplayId=${accountDisplayId}, isReply=${isReply}, responseTime=${responseTime}, usedAi=${usedAi}`);
     if (usedAi === true) {
         console.log(`🤖🤖🤖 СЕРВЕР ПОЛУЧИЛ AI СООБЩЕНИЕ! от ${accountDisplayId}`);
     }

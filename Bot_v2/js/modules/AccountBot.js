@@ -78,6 +78,10 @@ class AccountBot {
         this.conversations = {}; // Структура: { recipientId: { firstMessageTime, lastMessageTime, messageCount } }
         this.translatorId = globalSettings.translatorId || null; // ID переводчика из глобальных настроек
 
+        // === Отслеживание времени входящих писем для расчёта responseTime ===
+        // Структура: { recipientId: timestamp } — время ПЕРВОГО неотвеченного письма от мужчины
+        this.incomingTimes = {};
+
         // === Статус разрешения рассылки (управляется с сервера) ===
         this.mailingEnabled = true; // По умолчанию разрешено, сервер может отключить
 
@@ -1020,6 +1024,17 @@ class AccountBot {
                         messageText: mailText
                     });
 
+                    // === Сохраняем время ПЕРВОГО неотвеченного письма для расчёта responseTime ===
+                    // Если уже есть запись — не обновляем (считаем от первого письма)
+                    const partnerIdStr = partnerId.toString();
+                    if (!this.incomingTimes[partnerIdStr]) {
+                        // Используем DatePost из API если есть, иначе текущее время
+                        this.incomingTimes[partnerIdStr] = msg.DatePost
+                            ? new Date(msg.DatePost).getTime()
+                            : Date.now();
+                        console.log(`[Lababot] ⏱️ Записано время входящего от ${partnerName}: ${new Date(this.incomingTimes[partnerIdStr]).toLocaleTimeString()}`);
+                    }
+
                     // Уведомление для неотвеченных писем
                     const avatarUrl = msg.User.Avatar || msg.User.Photo ||
                         (msg.User.Photos && msg.User.Photos[0]) ||
@@ -1770,6 +1785,27 @@ class AccountBot {
             const convData = this.trackConversation(user.AccountId);
             const convId = this.getConvId(user.AccountId);
 
+            // === Определяем: это ОТВЕТ или РАССЫЛКА? ===
+            const isReply = this.mailSettings.target === 'inbox';
+            const recipientIdStr = user.AccountId.toString();
+            let actualResponseTime = null;
+
+            if (isReply && this.incomingTimes[recipientIdStr]) {
+                // Это ответ на входящее письмо — вычисляем реальное время ответа
+                const incomingTime = this.incomingTimes[recipientIdStr];
+                const responseTimeMs = Date.now() - incomingTime;
+                actualResponseTime = millisecondsToInterval(responseTimeMs);
+
+                // Очищаем время входящего — ответ отправлен
+                delete this.incomingTimes[recipientIdStr];
+
+                const responseMinutes = Math.round(responseTimeMs / 60000);
+                console.log(`[Lababot] ⏱️ Ответ на письмо: ${user.Name} — время ответа: ${responseMinutes} мин`);
+            } else if (!isReply) {
+                // Это массовая рассылка — responseTime = null
+                actualResponseTime = null;
+            }
+
             // Отправляем полную статистику на НАШ сервер Lababot
             const lababotResult = await sendMessageToLababot({
                 botId: this.id,
@@ -1778,7 +1814,7 @@ class AccountBot {
                 type: 'outgoing',
                 textContent: msgBody,
                 status: 'success',
-                responseTime: convData.responseTime,
+                responseTime: actualResponseTime,
                 isFirst: convData.isFirst,
                 isLast: false,
                 convId: convId,
@@ -1786,7 +1822,8 @@ class AccountBot {
                 fileName: this.photoName || null,
                 translatorId: this.translatorId,
                 errorReason: null,
-                usedAi: this.usedAi || false
+                usedAi: this.usedAi || false,
+                isReply: isReply  // Флаг: это ответ на входящее или рассылка
             });
 
             if (!lababotResult.success) {

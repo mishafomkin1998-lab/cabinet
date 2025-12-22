@@ -153,7 +153,8 @@ async function sendMessageToLababot(params) {
         mediaUrl = null,
         fileName = null,
         translatorId = null,
-        usedAi = false
+        usedAi = false,
+        isReply = false  // Флаг: это ответ на входящее (target=inbox) или массовая рассылка
     } = params;
 
     console.log(`📤 Отправляю сообщение на Lababot сервер: программа=${MACHINE_ID}, анкета=${accountDisplayId}, получатель=${recipientId}, тип=${type}`);
@@ -175,7 +176,8 @@ async function sendMessageToLababot(params) {
             fileName: fileName,
             translatorId: translatorId,
             errorReason: errorReason,
-            usedAi: usedAi // Флаг использования ИИ генерации
+            usedAi: usedAi, // Флаг использования ИИ генерации
+            isReply: isReply // Флаг: это ответ на входящее (target=inbox) или массовая рассылка
         };
 
         console.log('📦 Payload:', JSON.stringify(payload, null, 2));
