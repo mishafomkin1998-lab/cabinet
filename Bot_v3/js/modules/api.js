@@ -854,25 +854,46 @@ async function checkProfileStatus(profileId) {
     }
 }
 
-// 6. Функция проверки оплаты профиля
+// 6. Функция проверки оплаты профиля (с retry и блокировкой при ошибке)
 async function checkProfilePaymentStatus(profileId) {
-    try {
-        const response = await fetch(`${LABABOT_SERVER}/api/billing/profile-status/${encodeURIComponent(profileId)}`);
-        const data = await response.json();
-        return {
-            isPaid: data.isPaid === true,
-            isFree: data.isFree === true, // "мой админ" - бесплатно
-            isTrial: data.isTrial === true,
-            trialUsed: data.trialUsed === true,
-            canTrial: !data.trialUsed && !data.isPaid, // Можно активировать trial
-            daysLeft: data.daysLeft || 0,
-            reason: data.reason || 'unknown'
-        };
-    } catch (error) {
-        console.error(`❌ Ошибка проверки оплаты профиля:`, error);
-        // При ошибке разрешаем работу
-        return { isPaid: true, isFree: false, isTrial: false, trialUsed: false, canTrial: false, daysLeft: 999 };
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 секунда между попытками
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await fetch(`${LABABOT_SERVER}/api/billing/profile-status/${encodeURIComponent(profileId)}`);
+            const data = await response.json();
+            return {
+                isPaid: data.isPaid === true,
+                isFree: data.isFree === true, // "мой админ" - бесплатно
+                isTrial: data.isTrial === true,
+                trialUsed: data.trialUsed === true,
+                canTrial: !data.trialUsed && !data.isPaid, // Можно активировать trial
+                daysLeft: data.daysLeft || 0,
+                reason: data.reason || 'unknown',
+                serverError: false
+            };
+        } catch (error) {
+            console.error(`❌ Ошибка проверки оплаты (попытка ${attempt}/${maxRetries}):`, error.message);
+
+            if (attempt < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+            }
+        }
     }
+
+    // После всех попыток - БЛОКИРУЕМ работу
+    console.error(`❌ Не удалось проверить оплату после ${maxRetries} попыток`);
+    return {
+        isPaid: false,
+        isFree: false,
+        isTrial: false,
+        trialUsed: false,
+        canTrial: false,
+        daysLeft: 0,
+        reason: 'server_unavailable',
+        serverError: true
+    };
 }
 
 // 7. Функция активации тестового периода

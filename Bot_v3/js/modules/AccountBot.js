@@ -1199,6 +1199,14 @@ class AccountBot {
 
         // Проверяем оплату анкеты
         const paymentStatus = await checkProfilePaymentStatus(this.displayId);
+
+        // Если ошибка сервера - блокируем с понятным сообщением
+        if (paymentStatus.serverError) {
+            this.log(`⛔ Рассылка заблокирована - не удалось проверить оплату`);
+            alert(`Не удалось проверить статус оплаты анкеты.\n\nПроверьте подключение к интернету и попробуйте снова.`);
+            return;
+        }
+
         if (!paymentStatus.isPaid && !paymentStatus.isFree) {
             this.log(`⛔ Рассылка заблокирована - анкета не оплачена`);
 
@@ -2065,6 +2073,14 @@ class AccountBot {
 
         // Проверяем оплату анкеты
         const paymentStatus = await checkProfilePaymentStatus(this.displayId);
+
+        // Если ошибка сервера - блокируем с понятным сообщением
+        if (paymentStatus.serverError) {
+            this.log(`⛔ Чат заблокирован - не удалось проверить оплату`);
+            alert(`Не удалось проверить статус оплаты анкеты.\n\nПроверьте подключение к интернету и попробуйте снова.`);
+            return;
+        }
+
         if (!paymentStatus.isPaid && !paymentStatus.isFree) {
             this.log(`⛔ Чат заблокирован - анкета не оплачена`);
 
