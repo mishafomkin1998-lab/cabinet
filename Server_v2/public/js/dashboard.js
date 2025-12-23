@@ -329,7 +329,7 @@
                                 self.statsFilter.dateFrom = formatDate(selectedDates[0]);
                                 self.statsFilter.dateTo = formatDate(selectedDates[1]);
                                 self.statsFilter.quickRange = '';
-                                self.loadDashboardStats();
+                                self.applyStatsFilter();
                             }
                         }
                     };
