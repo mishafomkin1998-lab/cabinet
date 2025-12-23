@@ -1,0 +1,25 @@
+{
+  "name": "nova",
+  "version": "5.2.0",
+  "description": "CRM System with Bot Integration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "migrate": "node migration_heartbeats.js",
+    "test": "node test_bot_endpoints.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "axios": "^1.13.2",
+    "bcryptjs": "^3.0.3",
+    "body-parser": "^2.2.1",
+    "cors": "^2.8.5",
+    "express": "^5.2.1",
+    "multer": "^2.0.2",
+    "pg": "^8.16.3",
+    "sqlite3": "^5.1.7"
+  }
+}
