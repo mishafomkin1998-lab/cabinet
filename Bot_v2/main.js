@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, Menu, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, session, Menu, dialog, powerMonitor, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
@@ -827,6 +827,58 @@ function createWindow() {
 app.whenReady().then(() => {
     createWindow();
     initAutoUpdater(); // Проверка обновлений при запуске
+
+    // =====================================================
+    // === ВОССТАНОВЛЕНИЕ ОКНА ПОСЛЕ SLEEP ДИСПЛЕЯ ===
+    // =====================================================
+
+    // Сохраняем правильные размеры окна
+    let savedBounds = { width: 1400, height: 900 };
+
+    // Обновляем сохранённые размеры при изменении
+    if (mainWindow) {
+        mainWindow.on('resize', () => {
+            if (!mainWindow.isMaximized() && !mainWindow.isMinimized()) {
+                savedBounds = mainWindow.getBounds();
+            }
+        });
+    }
+
+    // Функция восстановления размеров окна
+    function restoreWindowSize() {
+        if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isMaximized()) {
+            console.log('[PowerMonitor] Восстанавливаю размер окна после wake...');
+            const currentBounds = mainWindow.getBounds();
+            // Восстанавливаем только если размер изменился неправильно
+            if (currentBounds.height < savedBounds.height - 50) {
+                mainWindow.setBounds({
+                    x: currentBounds.x,
+                    y: currentBounds.y,
+                    width: savedBounds.width,
+                    height: savedBounds.height
+                });
+                console.log('[PowerMonitor] Размер восстановлен:', savedBounds);
+            }
+        }
+    }
+
+    // Обработка пробуждения системы из сна
+    powerMonitor.on('resume', () => {
+        console.log('[PowerMonitor] Система проснулась');
+        setTimeout(restoreWindowSize, 500);
+    });
+
+    // Обработка разблокировки экрана
+    powerMonitor.on('unlock-screen', () => {
+        console.log('[PowerMonitor] Экран разблокирован');
+        setTimeout(restoreWindowSize, 500);
+    });
+
+    // Обработка изменения дисплеев (подключение/отключение монитора, изменение DPI)
+    screen.on('display-metrics-changed', (event, display, changedMetrics) => {
+        console.log('[Screen] Метрики дисплея изменились:', changedMetrics);
+        setTimeout(restoreWindowSize, 300);
+    });
 });
 
 app.on('window-all-closed', () => {
