@@ -8,6 +8,9 @@ const axios = require('axios');
 app.commandLine.appendSwitch('high-dpi-support', '1');
 app.commandLine.appendSwitch('force-device-scale-factor', '1');
 
+// Отключение IPv6 - решает проблему ETIMEDOUT к Cloudflare
+app.commandLine.appendSwitch('disable-ipv6');
+
 let mainWindow = null;
 
 // Хранение прокси для каждого бота (для использования в IPC handlers)
