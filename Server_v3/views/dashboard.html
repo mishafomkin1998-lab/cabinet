@@ -776,9 +776,9 @@
                     <!-- Сессии -->
                     <div class="glass rounded-2xl p-6">
                         <h3 class="text-lg font-bold mb-6" x-text="t('control.activeSessions')"></h3>
-                        <div class="space-y-4">
+                        <div class="grid grid-cols-2 gap-4">
                             <!-- Сообщение если ботов нет -->
-                            <div x-show="bots.length === 0" class="text-center py-8 text-gray-500">
+                            <div x-show="bots.length === 0" class="col-span-2 text-center py-8 text-gray-500">
                                 <i class="fas fa-robot text-4xl mb-3 opacity-30"></i>
                                 <p>Нет активных ботов</p>
                                 <p class="text-sm">Боты появятся здесь после подключения</p>
