@@ -273,23 +273,27 @@
                         <div class="text-xs text-gray-500 mt-1">Входящих писем</div>
                     </div>
 
-                    <!-- 3. Входящие чаты -->
+                    <!-- 3. Входящие чаты (сессии в минутах) -->
                     <div class="glass rounded-2xl p-5 flex flex-col justify-center items-center h-28">
                         <div class="w-10 h-10 rounded-xl bg-gradient-to-r from-green-50 to-green-100 flex items-center justify-center mb-2">
                             <i class="fas fa-comments text-green-500"></i>
                         </div>
                         <div class="flex items-center gap-2">
                             <div class="text-center">
-                                <div class="text-3xl font-bold text-green-600" x-text="stats.incomingChatsAnswered || 0">0</div>
-                                <div class="text-[10px] text-gray-500">Отвеченные</div>
+                                <div class="text-3xl font-bold text-green-600" x-text="stats.chatSessions?.replied || 0">0</div>
+                                <div class="text-[10px] text-gray-500">С ответом</div>
                             </div>
-                            <div class="text-3xl font-bold text-gray-400">|</div>
+                            <div class="text-3xl font-bold text-gray-400">/</div>
                             <div class="text-center">
-                                <div class="text-3xl font-bold text-gray-800" x-text="stats.incomingChatsTotal || 0">0</div>
-                                <div class="text-[10px] text-gray-500">Всего</div>
+                                <div class="text-3xl font-bold text-gray-800" x-text="stats.chatSessions?.total || 0">0</div>
+                                <div class="text-[10px] text-gray-500">Сессий</div>
                             </div>
                         </div>
-                        <div class="text-xs text-gray-500 mt-1">Входящих чатов</div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            <span x-text="'~' + (stats.chatSessions?.avgMinutes || 0) + ' мин/сессия'">~0 мин/сессия</span>
+                            <span class="mx-1">•</span>
+                            <span x-text="(stats.chatSessions?.totalMinutes || 0) + ' мин'">0 мин</span>
+                        </div>
                     </div>
 
                     <!-- 4. Медианное время -->

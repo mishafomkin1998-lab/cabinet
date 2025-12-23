@@ -221,6 +221,97 @@ router.get('/', asyncHandler(async (req, res) => {
     const incomingResult = await pool.query(incomingQuery, incomingParams);
     const incoming = incomingResult.rows[0] || {};
 
+    /**
+     * Запрос 7: Статистика чат-сессий (в минутах)
+     *
+     * Логика:
+     * 1. Группируем входящие чаты по (man_id, profile_id)
+     * 2. Если разрыв между сообщениями > 3 минут - это новая сессия
+     * 3. Длительность сессии = CEIL((последнее - первое) / 60) + 1 минута базовая
+     * 4. Проверяем был ли ответ от переводчика в пределах сессии (+5 мин после)
+     */
+    const chatSessionsQuery = `
+        WITH chat_messages AS (
+            -- Входящие чаты с определением разрывов между сообщениями
+            SELECT
+                i.id,
+                i.profile_id,
+                i.man_id,
+                i.created_at,
+                i.translator_id,
+                -- Время предыдущего сообщения от того же мужчины к той же анкете
+                LAG(i.created_at) OVER (
+                    PARTITION BY i.man_id, i.profile_id
+                    ORDER BY i.created_at
+                ) as prev_message_at
+            FROM incoming_messages i
+            WHERE i.type = 'chat'
+              AND i.created_at >= $1::date
+              AND i.created_at < ($2::date + interval '1 day')
+              ${incomingFilter.replace(/\bi\./g, 'i.')}
+        ),
+        session_boundaries AS (
+            -- Определяем границы сессий (новая сессия если разрыв > 3 минут)
+            SELECT
+                *,
+                CASE
+                    WHEN prev_message_at IS NULL THEN 1
+                    WHEN EXTRACT(EPOCH FROM (created_at - prev_message_at)) > 180 THEN 1
+                    ELSE 0
+                END as is_new_session
+            FROM chat_messages
+        ),
+        sessions AS (
+            -- Присваиваем номер сессии
+            SELECT
+                *,
+                SUM(is_new_session) OVER (
+                    PARTITION BY man_id, profile_id
+                    ORDER BY created_at
+                ) as session_num
+            FROM session_boundaries
+        ),
+        session_stats AS (
+            -- Статистика по каждой сессии
+            SELECT
+                profile_id,
+                man_id,
+                session_num,
+                MIN(created_at) as session_start,
+                MAX(created_at) as session_end,
+                COUNT(*) as messages_in_session,
+                -- Длительность = разница времени + 1 минута базовая
+                GREATEST(1, CEIL(EXTRACT(EPOCH FROM (MAX(created_at) - MIN(created_at))) / 60) + 1) as duration_minutes
+            FROM sessions
+            GROUP BY profile_id, man_id, session_num
+        ),
+        sessions_with_replies AS (
+            -- Проверяем был ли ответ от переводчика
+            SELECT
+                ss.*,
+                CASE WHEN EXISTS (
+                    SELECT 1 FROM activity_log a
+                    WHERE a.action_type = 'chat'
+                      AND a.profile_id = ss.profile_id
+                      AND a.man_id = ss.man_id
+                      -- Ответ в пределах сессии или до 5 минут после окончания
+                      AND a.created_at >= ss.session_start
+                      AND a.created_at <= ss.session_end + interval '5 minutes'
+                ) THEN true ELSE false END as was_replied
+            FROM session_stats ss
+        )
+        SELECT
+            COUNT(*) as total_sessions,
+            COALESCE(ROUND(AVG(duration_minutes)::numeric, 1), 0) as avg_duration_minutes,
+            COALESCE(SUM(duration_minutes), 0) as total_minutes,
+            COUNT(*) FILTER (WHERE was_replied = true) as replied_sessions,
+            COUNT(*) FILTER (WHERE was_replied = false) as unreplied_sessions
+        FROM sessions_with_replies
+    `;
+
+    const chatSessionsResult = await pool.query(chatSessionsQuery, incomingParams);
+    const chatSessions = chatSessionsResult.rows[0] || {};
+
     // ========== РАСЧЁТ ВРЕМЕНИ РАБОТЫ ПО ACTIVITY PINGS (ОПТИМИЗИРОВАНО) ==========
     // ОПТИМИЗАЦИЯ: Весь расчёт в SQL вместо загрузки всех записей в JS
     // Было: загрузка N записей + цикл в JS = O(N) память и время
@@ -338,6 +429,13 @@ router.get('/', asyncHandler(async (req, res) => {
     const uniqueMenLetters = parseInt(incoming.unique_men_letters) || 0;
     const uniqueMenChats = parseInt(incoming.unique_men_chats) || 0;
 
+    // Метрики чат-сессий (в минутах)
+    const chatSessionsTotal = parseInt(chatSessions.total_sessions) || 0;
+    const chatSessionsAvgMinutes = parseFloat(chatSessions.avg_duration_minutes) || 0;
+    const chatSessionsTotalMinutes = parseInt(chatSessions.total_minutes) || 0;
+    const chatSessionsReplied = parseInt(chatSessions.replied_sessions) || 0;
+    const chatSessionsUnreplied = parseInt(chatSessions.unreplied_sessions) || 0;
+
     // Формируем ответ с данными за выбранный период
     res.json({
         success: true,
@@ -360,6 +458,17 @@ router.get('/', asyncHandler(async (req, res) => {
             incomingChatsAnswered: incomingChatsAnswered,
             uniqueMenLetters: uniqueMenLetters,
             uniqueMenChats: uniqueMenChats,
+
+            // Статистика чат-сессий (в минутах)
+            // Сессия = группа сообщений от одного мужчины с разрывом < 3 мин
+            chatSessions: {
+                total: chatSessionsTotal,           // Всего сессий
+                avgMinutes: chatSessionsAvgMinutes, // Среднее время сессии (минут)
+                totalMinutes: chatSessionsTotalMinutes, // Всего минут
+                replied: chatSessionsReplied,       // С ответом переводчика
+                unreplied: chatSessionsUnreplied    // Без ответа
+            },
+
             // Метрики
             metrics: {
                 totalProfiles: totalProfiles,
