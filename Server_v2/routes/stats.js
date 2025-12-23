@@ -1044,13 +1044,13 @@ router.get('/ai-usage', asyncHandler(async (req, res) => {
     /**
      * Запрос к activity_log:
      * - Только сообщения сгенерированные AI (used_ai = true)
-     * - Группируем по тексту
+     * - Группируем по шаблону (template_text) или тексту (message_text) как fallback
      * - Фильтруем: рассылка >= 3 минут (от первого до последнего сообщения)
      * - Сортируем по времени последней отправки
      */
     const query = `
         SELECT
-            a.message_text,
+            COALESCE(a.template_text, a.message_text) as grouped_text,
             COUNT(*) as sent_count,
             MIN(a.created_at) as first_sent_at,
             MAX(a.created_at) as last_sent_at,
@@ -1061,7 +1061,7 @@ router.get('/ai-usage', asyncHandler(async (req, res) => {
             AND a.message_text != ''
             ${roleFilter}
             ${dateFilter}
-        GROUP BY a.message_text
+        GROUP BY COALESCE(a.template_text, a.message_text)
         HAVING EXTRACT(EPOCH FROM (MAX(a.created_at) - MIN(a.created_at))) >= 180
         ORDER BY MAX(a.created_at) DESC
         LIMIT $1
@@ -1070,7 +1070,7 @@ router.get('/ai-usage', asyncHandler(async (req, res) => {
     const result = await pool.query(query, params);
 
     const aiUsage = result.rows.map(row => ({
-        textContent: row.message_text,
+        textContent: row.grouped_text,
         sentCount: parseInt(row.sent_count),
         firstSentAt: row.first_sent_at,
         lastSentAt: row.last_sent_at,
