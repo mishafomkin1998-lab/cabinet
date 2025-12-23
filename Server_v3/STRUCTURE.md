@@ -30,7 +30,6 @@ Server_v2/
 │   ├── favoriteTemplates.js
 │   ├── profiles.js         # Управление анкетами
 │   ├── promptTemplates.js  # Шаблоны промптов AI
-│   ├── stats.js            # Статистика (детальная, по дням)
 │   └── team.js             # Команда (админы, переводчики)
 │
 ├── utils/                  # Утилиты
@@ -114,7 +113,6 @@ const pool = new Pool({
 | botData.js | `/api/bot-data` | Данные бота |
 | dashboard.js | `/api/dashboard` | Сводка |
 | profiles.js | `/api/profiles` | Анкеты |
-| stats.js | `/api/stats` | Статистика |
 | team.js | `/api/team`, `/api/users` | Команда |
 
 ### utils/helpers.js
@@ -124,7 +122,6 @@ const pool = new Pool({
 | `asyncHandler(fn)` | Обёртка для async роутов |
 | `errorHandler` | Глобальный обработчик ошибок |
 | `buildRoleFilter(role, userId, opts)` | SQL-фильтр по роли |
-| `buildStatsFilter(opts)` | Фильтр для статистики |
 | `logError(...)` | Логирование ошибок в БД |
 | `PRICE_LETTER` | Цена письма ($1.5) |
 | `PRICE_CHAT` | Цена чата ($0.15) |
@@ -149,8 +146,6 @@ const pool = new Pool({
 | GET | `/api/dashboard` | Сводка |
 | GET | `/api/profiles` | Список анкет |
 | GET | `/api/bots/status` | Статус ботов |
-| GET | `/api/stats/detailed` | Детальная статистика |
-| GET | `/api/stats/daily` | По дням |
 | GET | `/api/team` | Команда |
 
 ## База данных

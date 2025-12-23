@@ -77,11 +77,6 @@ const CONFIG = {
         BOTS_UPDATE_ALL: '/api/bots/update-all',
         BOTS_SYNC_PROMPT: '/api/bots/sync-prompt',
 
-        // Stats
-        STATS_DASHBOARD: '/api/stats/dashboard',
-        STATS_HOURLY: '/api/stats/hourly-activity',
-        STATS_TRANSLATORS: '/api/stats/translators',
-
         // Activity
         ACTIVITY_RECENT: '/api/activity/recent',
         HISTORY: '/api/history',
