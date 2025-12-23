@@ -347,11 +347,6 @@ async function sendHeartbeatToLababot(botId, displayId, status = 'online', skipC
         const data = await response.json();
         console.log(`✅ Heartbeat отправлен:`, data);
 
-        // После heartbeat проверяем статус управления (пропускаем при удалении)
-        if (!skipCommands) {
-            checkControlStatus();
-        }
-
         // Обрабатываем команды для конкретной анкеты (пропускаем при удалении)
         if (data.commands && typeof bots !== 'undefined' && !skipCommands) {
             // Проверяем статус бот-машины (botEnabled) - влияет на ВСЕ анкеты
