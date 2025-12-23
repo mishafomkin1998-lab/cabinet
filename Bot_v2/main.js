@@ -4,6 +4,10 @@ const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 const axios = require('axios');
 
+// Исправление DPI scaling на Windows - предотвращает обрезание окна
+app.commandLine.appendSwitch('high-dpi-support', '1');
+app.commandLine.appendSwitch('force-device-scale-factor', '1');
+
 let mainWindow = null;
 
 // Хранение прокси для каждого бота (для использования в IPC handlers)
