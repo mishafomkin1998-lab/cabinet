@@ -801,13 +801,13 @@
                                     <div class="bg-gradient-to-r rounded-xl p-4 border"
                                          :class="translator.isOwnTranslator ? 'from-purple-50 to-pink-50 border-purple-100' : 'from-yellow-50 to-orange-50 border-yellow-200'">
                                         <div class="flex items-center justify-between">
-                                            <div class="flex items-center">
-                                                <div class="w-12 h-12 rounded-full flex items-center justify-center"
+                                            <div class="flex items-center min-w-0 flex-1">
+                                                <div class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
                                                      :class="translator.isOwnTranslator ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-gradient-to-r from-yellow-500 to-orange-500'">
                                                     <span class="text-white font-bold" x-text="translator.name.charAt(0).toUpperCase()"></span>
                                                 </div>
-                                                <div class="ml-3">
-                                                    <div class="font-semibold text-gray-800" x-text="translator.name"></div>
+                                                <div class="ml-3 min-w-0">
+                                                    <div class="font-semibold text-gray-800 truncate max-w-[120px]" x-text="translator.name" :title="translator.name"></div>
                                                     <div class="text-sm text-gray-500"><span x-text="translator.accountsCount || 0"></span> анкет</div>
                                                     <!-- Баланс для НЕ своего переводчика -->
                                                     <div x-show="!translator.isOwnTranslator" class="text-xs mt-1">
@@ -818,7 +818,7 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div class="flex items-center gap-1 flex-wrap justify-end">
+                                            <div class="flex items-center gap-1 flex-shrink-0">
                                                 <!-- Индикатор "Мой" / toggle -->
                                                 <label class="flex items-center gap-1 px-2 py-1 rounded cursor-pointer"
                                                        :class="translator.isOwnTranslator ? 'bg-purple-100' : 'bg-yellow-100'">
