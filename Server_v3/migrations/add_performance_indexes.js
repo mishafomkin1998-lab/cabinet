@@ -12,7 +12,7 @@ async function migrate() {
     console.log('🚀 Adding performance indexes...\n');
 
     const indexes = [
-        // activity_log indexes - критично для team.js и stats.js
+        // activity_log indexes - критично для team.js и dashboard.js
         {
             name: 'idx_activity_log_admin_id',
             sql: 'CREATE INDEX IF NOT EXISTS idx_activity_log_admin_id ON activity_log(admin_id)'
