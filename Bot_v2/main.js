@@ -730,17 +730,73 @@ const TRANSCRIPTION_VARS = [
 ];
 
 function createWindow() {
+    // Минимальные размеры окна
+    const MIN_WIDTH = 1000;
+    const MIN_HEIGHT = 700;
+    const DEFAULT_WIDTH = 1400;
+    const DEFAULT_HEIGHT = 900;
+
     mainWindow = new BrowserWindow({
-        width: 1400,
-        height: 900,  // Увеличено для Windows
-        minWidth: 1000,
-        minHeight: 700,
+        width: DEFAULT_WIDTH,
+        height: DEFAULT_HEIGHT,
+        minWidth: MIN_WIDTH,
+        minHeight: MIN_HEIGHT,
         useContentSize: true,  // Размер контента, не окна (важно для Windows)
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
             webviewTag: true,
             backgroundThrottling: false // ВАЖНО
+        }
+    });
+
+    // === ЗАЩИТА РАЗМЕРА ОКНА ДЛЯ WINDOWS ===
+    // Принудительно устанавливаем минимальный размер после создания
+    mainWindow.setMinimumSize(MIN_WIDTH, MIN_HEIGHT);
+
+    // Отслеживаем последний валидный размер
+    let lastValidBounds = { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
+
+    // При изменении размера проверяем и сохраняем
+    mainWindow.on('resize', () => {
+        if (mainWindow.isMaximized() || mainWindow.isMinimized()) return;
+
+        const bounds = mainWindow.getBounds();
+        // Если размер валидный - сохраняем
+        if (bounds.height >= MIN_HEIGHT && bounds.width >= MIN_WIDTH) {
+            lastValidBounds = bounds;
+        } else {
+            // Если размер невалидный - восстанавливаем
+            console.log(`[WindowProtection] Невалидный размер ${bounds.width}x${bounds.height}, восстанавливаю...`);
+            mainWindow.setBounds({
+                x: bounds.x,
+                y: bounds.y,
+                width: Math.max(bounds.width, MIN_WIDTH),
+                height: Math.max(bounds.height, MIN_HEIGHT)
+            });
+        }
+    });
+
+    // При восстановлении из свёрнутого состояния проверяем размер
+    mainWindow.on('restore', () => {
+        const bounds = mainWindow.getBounds();
+        if (bounds.height < MIN_HEIGHT) {
+            console.log(`[WindowProtection] После restore: высота ${bounds.height} < ${MIN_HEIGHT}, восстанавливаю...`);
+            mainWindow.setBounds({
+                x: bounds.x,
+                y: bounds.y,
+                width: lastValidBounds.width,
+                height: lastValidBounds.height
+            });
+        }
+    });
+
+    // При показе окна (после скрытия) проверяем размер
+    mainWindow.on('show', () => {
+        const bounds = mainWindow.getBounds();
+        if (bounds.height < MIN_HEIGHT) {
+            console.log(`[WindowProtection] После show: восстанавливаю размер...`);
+            mainWindow.setBounds(lastValidBounds);
         }
     });
 
@@ -829,55 +885,46 @@ app.whenReady().then(() => {
     initAutoUpdater(); // Проверка обновлений при запуске
 
     // =====================================================
-    // === ВОССТАНОВЛЕНИЕ ОКНА ПОСЛЕ SLEEP ДИСПЛЕЯ ===
+    // === ДОПОЛНИТЕЛЬНАЯ ЗАЩИТА: POWERMONITOR СОБЫТИЯ ===
     // =====================================================
+    // Основная защита размера окна реализована в createWindow()
+    // Здесь только дополнительные проверки на системные события
 
-    // Сохраняем правильные размеры окна
-    let savedBounds = { width: 1400, height: 900 };
+    const MIN_HEIGHT = 700;
 
-    // Обновляем сохранённые размеры при изменении
-    if (mainWindow) {
-        mainWindow.on('resize', () => {
-            if (!mainWindow.isMaximized() && !mainWindow.isMinimized()) {
-                savedBounds = mainWindow.getBounds();
-            }
-        });
-    }
-
-    // Функция восстановления размеров окна
-    function restoreWindowSize() {
+    function forceRestoreWindowSize() {
         if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isMaximized()) {
-            console.log('[PowerMonitor] Восстанавливаю размер окна после wake...');
-            const currentBounds = mainWindow.getBounds();
-            // Восстанавливаем только если размер изменился неправильно
-            if (currentBounds.height < savedBounds.height - 50) {
+            const bounds = mainWindow.getBounds();
+            if (bounds.height < MIN_HEIGHT) {
+                console.log(`[PowerMonitor] Принудительное восстановление: ${bounds.height} -> ${MIN_HEIGHT}`);
                 mainWindow.setBounds({
-                    x: currentBounds.x,
-                    y: currentBounds.y,
-                    width: savedBounds.width,
-                    height: savedBounds.height
+                    x: bounds.x,
+                    y: bounds.y,
+                    width: Math.max(bounds.width, 1000),
+                    height: MIN_HEIGHT
                 });
-                console.log('[PowerMonitor] Размер восстановлен:', savedBounds);
             }
         }
     }
 
-    // Обработка пробуждения системы из сна
+    // Пробуждение системы из сна
     powerMonitor.on('resume', () => {
         console.log('[PowerMonitor] Система проснулась');
-        setTimeout(restoreWindowSize, 500);
+        setTimeout(forceRestoreWindowSize, 500);
+        setTimeout(forceRestoreWindowSize, 1500); // Повторная проверка
     });
 
-    // Обработка разблокировки экрана
+    // Разблокировка экрана
     powerMonitor.on('unlock-screen', () => {
         console.log('[PowerMonitor] Экран разблокирован');
-        setTimeout(restoreWindowSize, 500);
+        setTimeout(forceRestoreWindowSize, 500);
     });
 
-    // Обработка изменения дисплеев (подключение/отключение монитора, изменение DPI)
+    // Изменение метрик дисплея (DPI, разрешение)
     screen.on('display-metrics-changed', (event, display, changedMetrics) => {
         console.log('[Screen] Метрики дисплея изменились:', changedMetrics);
-        setTimeout(restoreWindowSize, 300);
+        setTimeout(forceRestoreWindowSize, 300);
+        setTimeout(forceRestoreWindowSize, 1000); // Повторная проверка
     });
 });
 
