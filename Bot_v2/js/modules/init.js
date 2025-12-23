@@ -19,6 +19,7 @@ window.onload = async function() {
     initUpdateHandlers(); // Обработчики обновлений приложения
     initQuitHandler(); // Сохранение сессии при закрытии
     startMemoryCleanup(); // Периодическая очистка памяти
+    startPromptSync(); // Синхронизация промпта для генерации с сервером
 
     // Глобальное отслеживание Shift для bulk-действий
     document.addEventListener('keydown', (e) => { if (e.key === 'Shift') isShiftPressed = true; });

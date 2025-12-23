@@ -376,7 +376,8 @@ async function handleAIAction(botId, action, event) {
             ? improvePromptTemplate.replace('{text}', currentText)
             : `${improvePromptTemplate}\n\nТекст: "${currentText}"`;
     } else if (action === 'generate') {
-        prompt = "Write a creative and engaging opening message for a dating site to start a conversation with a man. Keep it short and intriguing.";
+        // Используем промпт с сервера (синхронизированный из дашборда) или дефолтный
+        prompt = serverGenerationPrompt || DEFAULT_GENERATION_PROMPT;
     }
 
     btn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Loading...`;
@@ -456,8 +457,8 @@ async function generateAIForAll(action) {
                 ? improvePromptTemplate.replace('{text}', currentText)
                 : `${improvePromptTemplate}\n\nТекст: "${currentText}"`;
         } else if (action === 'generate') {
-            // Каждый раз генерируем уникальный текст
-            prompt = "Write a creative and engaging opening message for a dating site to start a conversation with a man. Keep it short and intriguing. Be unique and creative.";
+            // Используем промпт с сервера (синхронизированный из дашборда) или дефолтный
+            prompt = serverGenerationPrompt || DEFAULT_GENERATION_PROMPT;
         }
 
         if (!prompt) continue;

@@ -103,6 +103,10 @@ let controlStatus = {
     lastCheck: null
 };
 
+// Промпт для генерации с сервера (синхронизируется из дашборда)
+let serverGenerationPrompt = '';
+const DEFAULT_GENERATION_PROMPT = 'Write a creative and engaging opening message for a dating site to start a conversation with a man. Keep it short and intriguing.';
+
 // ============= SHARED ONLINE POOL =============
 // Глобальный пул мужчин онлайн, собранный со всех анкет
 const SharedPool = {

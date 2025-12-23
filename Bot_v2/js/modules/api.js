@@ -448,7 +448,42 @@ function stopAllMailingOnBotDisabled() {
     console.log('🔴 Бот отключен администратором! Все рассылки остановлены.');
 }
 
-// 5. Функция отправки ошибки
+// 5. Функция загрузки промпта для генерации с сервера
+async function loadServerGenerationPrompt() {
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/bots/prompt`);
+        const data = await response.json();
+
+        if (data.success && data.prompt) {
+            const oldPrompt = serverGenerationPrompt;
+            serverGenerationPrompt = data.prompt;
+
+            if (oldPrompt !== serverGenerationPrompt && serverGenerationPrompt) {
+                console.log('✅ Промпт для генерации загружен с сервера');
+            }
+        }
+        return serverGenerationPrompt;
+    } catch (error) {
+        console.error('❌ Ошибка загрузки промпта с сервера:', error.message);
+        return serverGenerationPrompt || DEFAULT_GENERATION_PROMPT;
+    }
+}
+
+// Запуск периодической синхронизации промпта (каждые 5 минут)
+let promptSyncInterval = null;
+
+function startPromptSync() {
+    // Загружаем сразу при старте
+    loadServerGenerationPrompt();
+
+    // Затем каждые 5 минут
+    if (promptSyncInterval) clearInterval(promptSyncInterval);
+    promptSyncInterval = setInterval(loadServerGenerationPrompt, 5 * 60 * 1000);
+
+    console.log('🔄 Синхронизация промпта с сервером запущена');
+}
+
+// 6. Функция отправки ошибки
 // ВАЖНО: botId теперь это MACHINE_ID (ID программы)
 async function sendErrorToLababot(botId, accountDisplayId, errorType, errorMessage) {
     console.log(`⚠️ Отправляю ошибку на Lababot сервер: ${errorType}`);
