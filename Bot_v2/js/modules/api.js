@@ -108,15 +108,56 @@ function collectBotsInfo() {
     };
 }
 
-// Получить использование памяти (если доступно)
-function getMemoryUsage() {
+// Получить использование памяти всего Electron приложения (через IPC)
+// Кэшируем значение на 10 секунд чтобы не спамить IPC
+let cachedMemory = null;
+let memoryLastUpdate = 0;
+
+async function getMemoryUsageAsync() {
+    const now = Date.now();
+    // Возвращаем кэш если он свежий (< 10 сек)
+    if (cachedMemory !== null && (now - memoryLastUpdate) < 10000) {
+        return cachedMemory;
+    }
+
+    try {
+        // Используем ipcRenderer для получения памяти из main process
+        if (typeof require !== 'undefined') {
+            const { ipcRenderer } = require('electron');
+            cachedMemory = await ipcRenderer.invoke('get-app-memory');
+            memoryLastUpdate = now;
+            return cachedMemory;
+        }
+    } catch (e) {
+        console.warn('Не удалось получить память через IPC:', e.message);
+    }
+
+    // Fallback на process.memoryUsage (только текущий процесс)
     if (typeof process !== 'undefined' && process.memoryUsage) {
         const mem = process.memoryUsage();
-        // rss = Resident Set Size - реальное потребление RAM процессом
-        return Math.round(mem.rss / 1024 / 1024); // MB
+        return Math.round(mem.rss / 1024 / 1024);
     }
-    if (performance && performance.memory) {
-        return Math.round(performance.memory.totalJSHeapSize / 1024 / 1024); // MB
+
+    return null;
+}
+
+// Синхронная версия - возвращает кэшированное значение
+function getMemoryUsage() {
+    // Асинхронно обновляем кэш
+    getMemoryUsageAsync().then(mem => {
+        cachedMemory = mem;
+        memoryLastUpdate = Date.now();
+    }).catch(() => {});
+
+    // Возвращаем кэш или fallback
+    if (cachedMemory !== null) {
+        return cachedMemory;
+    }
+
+    // Fallback если кэш пуст
+    if (typeof process !== 'undefined' && process.memoryUsage) {
+        const mem = process.memoryUsage();
+        return Math.round(mem.rss / 1024 / 1024);
     }
     return null;
 }

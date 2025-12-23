@@ -132,6 +132,27 @@ ipcMain.handle('get-app-version', () => {
     return app.getVersion();
 });
 
+// IPC: Получить использование памяти всего приложения
+ipcMain.handle('get-app-memory', async () => {
+    try {
+        // app.getAppMetrics() возвращает метрики всех процессов Electron
+        const metrics = app.getAppMetrics();
+        let totalMemory = 0;
+
+        for (const metric of metrics) {
+            // workingSetSize = реальное использование RAM в KB
+            totalMemory += metric.memory.workingSetSize || 0;
+        }
+
+        // Конвертируем KB в MB
+        return Math.round(totalMemory / 1024);
+    } catch (e) {
+        // Fallback на память main процесса
+        const mem = process.memoryUsage();
+        return Math.round(mem.rss / 1024 / 1024);
+    }
+});
+
 // =====================================================
 // === ПРОКСИ ДЛЯ WEBVIEW СЕССИЙ ===
 // =====================================================
