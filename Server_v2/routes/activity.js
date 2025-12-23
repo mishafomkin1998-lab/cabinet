@@ -756,7 +756,6 @@ router.get('/sent-letters-grouped', asyncHandler(async (req, res) => {
         SELECT
             a.profile_id,
             COALESCE(a.template_text, a.message_text) as grouped_text,
-            a.template_text,
             COUNT(*) as sent_count,
             MIN(a.created_at) as first_sent_at,
             MAX(a.created_at) as last_sent_at
@@ -766,7 +765,7 @@ router.get('/sent-letters-grouped', asyncHandler(async (req, res) => {
             AND a.created_at < ($2::date + interval '1 day')
             ${statsFilter.filter}
             AND (a.message_text IS NOT NULL AND a.message_text != '')
-        GROUP BY a.profile_id, COALESCE(a.template_text, a.message_text), a.template_text
+        GROUP BY a.profile_id, COALESCE(a.template_text, a.message_text)
         ORDER BY MAX(a.created_at) DESC
         LIMIT $${limitParamIndex}
     `;
@@ -776,7 +775,6 @@ router.get('/sent-letters-grouped', asyncHandler(async (req, res) => {
     const letters = result.rows.map(row => ({
         profileId: row.profile_id,
         messageText: row.grouped_text,  // Показываем шаблон (или текст если шаблона нет)
-        templateText: row.template_text,
         sentCount: parseInt(row.sent_count),
         firstSentAt: row.first_sent_at,
         lastSentAt: row.last_sent_at
