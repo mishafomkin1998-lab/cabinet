@@ -57,33 +57,33 @@
         .orb {
             position: absolute;
             border-radius: 50%;
-            filter: blur(80px);
-            opacity: 0.5;
+            filter: blur(60px);
+            opacity: 0.7;
             animation: float 20s ease-in-out infinite;
         }
 
         .orb-1 {
-            width: 600px;
-            height: 600px;
-            background: linear-gradient(135deg, #E9D5FF 0%, #C4B5FD 100%);
+            width: 700px;
+            height: 700px;
+            background: linear-gradient(135deg, #C4B5FD 0%, #A78BFA 100%);
             top: -200px;
             right: -100px;
             animation-delay: 0s;
         }
 
         .orb-2 {
-            width: 500px;
-            height: 500px;
-            background: linear-gradient(135deg, #DDD6FE 0%, #A78BFA 100%);
+            width: 600px;
+            height: 600px;
+            background: linear-gradient(135deg, #A78BFA 0%, #8B5CF6 100%);
             bottom: -150px;
             left: -100px;
             animation-delay: -7s;
         }
 
         .orb-3 {
-            width: 400px;
-            height: 400px;
-            background: linear-gradient(135deg, #F3E8FF 0%, #E9D5FF 100%);
+            width: 500px;
+            height: 500px;
+            background: linear-gradient(135deg, #DDD6FE 0%, #C4B5FD 100%);
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
@@ -107,13 +107,13 @@
         }
 
         .glass-strong {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(40px);
-            -webkit-backdrop-filter: blur(40px);
-            border: 1px solid rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.3);
             box-shadow:
-                0 8px 32px rgba(139, 92, 246, 0.08),
-                inset 0 1px 0 rgba(255, 255, 255, 0.8);
+                0 8px 32px rgba(139, 92, 246, 0.12),
+                inset 0 1px 0 rgba(255, 255, 255, 0.6);
         }
 
         /* Container */
@@ -599,7 +599,6 @@
         <div class="header-inner glass-strong">
             <a href="/" class="logo">
                 <img src="/images/nova.png" alt="Nova">
-                <span class="logo-text">Nova</span>
             </a>
             <a href="/login.html" class="btn-purple">
                 <i class="fas fa-arrow-right"></i>
@@ -633,26 +632,6 @@
                 <a href="#features" class="btn-secondary">
                     <span>Узнать больше</span>
                 </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- Stats Section -->
-    <section class="stats">
-        <div class="container">
-            <div class="stats-grid">
-                <div class="stat-card glass-strong reveal">
-                    <div class="stat-number">3.5x</div>
-                    <div class="stat-label">Рост конверсии</div>
-                </div>
-                <div class="stat-card glass-strong reveal">
-                    <div class="stat-number">1000+</div>
-                    <div class="stat-label">Анкет в минуту</div>
-                </div>
-                <div class="stat-card glass-strong reveal">
-                    <div class="stat-number">24/7</div>
-                    <div class="stat-label">Автоматизация</div>
-                </div>
             </div>
         </div>
     </section>
@@ -730,11 +709,7 @@
                     <p class="version">Версия 1.4.0 • 92 MB</p>
                     <a href="/download/Novabot-1.4.0.dmg" class="btn-purple">
                         <i class="fas fa-download"></i>
-                        <span>Intel Mac</span>
-                    </a>
-                    <a href="/download/Novabot-1.4.0-arm64.dmg" class="btn-secondary">
-                        <i class="fas fa-microchip"></i>
-                        <span>Apple Silicon (M1/M2)</span>
+                        <span>Скачать для macOS</span>
                     </a>
                 </div>
             </div>
