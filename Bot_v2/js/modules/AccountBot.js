@@ -1852,6 +1852,7 @@ class AccountBot {
                 recipientId: user.AccountId,
                 type: 'outgoing',
                 textContent: msgBody,
+                templateText: msgTemplate,  // Оригинальный шаблон (до подстановки макросов)
                 status: 'success',
                 responseTime: actualResponseTime,
                 isFirst: convData.isFirst,

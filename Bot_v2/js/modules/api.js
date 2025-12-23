@@ -144,6 +144,7 @@ async function sendMessageToLababot(params) {
         recipientId,
         type,
         textContent = '',
+        templateText = null,  // Оригинальный шаблон (до подстановки макросов) для группировки
         status = 'success',
         responseTime = null,
         errorReason = null,
@@ -177,7 +178,8 @@ async function sendMessageToLababot(params) {
             translatorId: translatorId,
             errorReason: errorReason,
             usedAi: usedAi, // Флаг использования ИИ генерации
-            isReply: isReply // Флаг: это ответ на входящее (target=inbox) или массовая рассылка
+            isReply: isReply, // Флаг: это ответ на входящее (target=inbox) или массовая рассылка
+            templateText: templateText // Оригинальный шаблон (до подстановки) для группировки
         };
 
         console.log('📦 Payload:', JSON.stringify(payload, null, 2));

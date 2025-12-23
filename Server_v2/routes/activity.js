@@ -67,7 +67,7 @@ function parseResponseTimeToSeconds(responseTime) {
  */
 router.post('/message_sent', asyncHandler(async (req, res) => {
     const { botId, accountDisplayId, recipientId, type, responseTime, isFirst, isLast, convId, length,
-            status, textContent, mediaUrl, fileName, translatorId, errorReason, usedAi, aiSessionId, isReply } = req.body;
+            status, textContent, templateText, mediaUrl, fileName, translatorId, errorReason, usedAi, aiSessionId, isReply } = req.body;
 
     // Верификация отключена - теперь один MACHINE_ID может обслуживать много анкет
     // Проверка анкеты делается через allowed_profiles
@@ -134,9 +134,9 @@ router.post('/message_sent', asyncHandler(async (req, res) => {
         const actionType = (msgType === 'chat_msg' || msgType === 'chat') ? 'chat' : 'letter';
 
         await pool.query(
-            `INSERT INTO activity_log (profile_id, bot_id, admin_id, translator_id, action_type, man_id, message_text, response_time_sec, used_ai, is_reply, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
-            [accountDisplayId, botId, adminId, assignedTranslatorId, actionType, recipientId, textContent || null, responseTimeSec, usedAi || false, isReply || false]
+            `INSERT INTO activity_log (profile_id, bot_id, admin_id, translator_id, action_type, man_id, message_text, template_text, response_time_sec, used_ai, is_reply, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
+            [accountDisplayId, botId, adminId, assignedTranslatorId, actionType, recipientId, textContent || null, templateText || null, responseTimeSec, usedAi || false, isReply || false]
         );
 
         // Шаг 6: Трекинг AI массовых рассылок
@@ -745,7 +745,9 @@ router.get('/sent-letters-grouped', asyncHandler(async (req, res) => {
     params.push(limitInt);
 
     /**
-     * Группируем по profile_id + message_text
+     * Группируем по profile_id + template_text (или message_text если шаблон не сохранён)
+     * COALESCE выбирает первое непустое значение: template_text или message_text
+     * Это позволяет группировать письма по оригинальному шаблону (до подстановки макросов)
      * Считаем количество отправленных каждого письма
      * Получаем время первой и последней отправки
      * Сортируем по времени последней отправки (новые сверху)
@@ -753,7 +755,8 @@ router.get('/sent-letters-grouped', asyncHandler(async (req, res) => {
     const query = `
         SELECT
             a.profile_id,
-            a.message_text,
+            COALESCE(a.template_text, a.message_text) as grouped_text,
+            a.template_text,
             COUNT(*) as sent_count,
             MIN(a.created_at) as first_sent_at,
             MAX(a.created_at) as last_sent_at
@@ -762,9 +765,8 @@ router.get('/sent-letters-grouped', asyncHandler(async (req, res) => {
             AND a.created_at >= $1::date
             AND a.created_at < ($2::date + interval '1 day')
             ${statsFilter.filter}
-            AND a.message_text IS NOT NULL
-            AND a.message_text != ''
-        GROUP BY a.profile_id, a.message_text
+            AND (a.message_text IS NOT NULL AND a.message_text != '')
+        GROUP BY a.profile_id, COALESCE(a.template_text, a.message_text), a.template_text
         ORDER BY MAX(a.created_at) DESC
         LIMIT $${limitParamIndex}
     `;
@@ -773,7 +775,8 @@ router.get('/sent-letters-grouped', asyncHandler(async (req, res) => {
 
     const letters = result.rows.map(row => ({
         profileId: row.profile_id,
-        messageText: row.message_text,
+        messageText: row.grouped_text,  // Показываем шаблон (или текст если шаблона нет)
+        templateText: row.template_text,
         sentCount: parseInt(row.sent_count),
         firstSentAt: row.first_sent_at,
         lastSentAt: row.last_sent_at
