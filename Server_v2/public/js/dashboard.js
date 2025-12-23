@@ -454,7 +454,8 @@
                             case 'control':
                                 await Promise.all([
                                     this.loadBotsStatus(),
-                                    this.refreshAllLogs()
+                                    this.refreshAllLogs(),
+                                    this.loadSavedPrompt()  // Загружаем промпт для генерации
                                 ]);
                                 break;
 
@@ -2062,7 +2063,7 @@
                 async saveBotName(bot) {
                     try {
                         const res = await fetch(`${API_BASE}/api/bots/${bot.id}/name`, {
-                            method: 'PUT',
+                            method: 'POST',  // Исправлено: было PUT, сервер ожидает POST
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ name: bot.name })
                         });

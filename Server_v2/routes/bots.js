@@ -381,6 +381,7 @@ router.get('/status', asyncHandler(async (req, res) => {
     const botsQuery = `
         SELECT
             b.bot_id,
+            b.name,
             b.ip,
             b.version,
             b.platform,
@@ -419,6 +420,7 @@ router.get('/status', asyncHandler(async (req, res) => {
 
         return {
             botId: row.bot_id,
+            name: row.name || null,  // Имя бота (сохранённое пользователем)
             ip: row.ip || '-',
             version: row.version || '-',
             platform: row.platform || 'Unknown',
