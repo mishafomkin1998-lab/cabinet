@@ -1562,7 +1562,19 @@
         .textarea-msg { resize: none; flex: 1; font-size: 14px; border-color: #dee2e6; border-radius: 6px; background: #fafafa; }
         .textarea-msg:focus { border-color: var(--mode-color); background: #fff; box-shadow: none; }
         
-        .action-log { font-size: 11px; color: #555; flex: 1; min-height: 80px; max-height: 310px; overflow-y: auto; background: #fafafa; border: 1px solid #eee; padding: 5px; font-family: monospace; border-radius: 4px; }
+        .action-log {
+            font-size: 11px;
+            color: #555;
+            flex: 1;
+            min-height: 0;  /* КРИТИЧНО для Windows - позволяет сжиматься */
+            max-height: 100%;  /* Ограничение внутри wrapper */
+            overflow-y: auto;
+            background: #fafafa;
+            border: 1px solid #eee;
+            padding: 5px;
+            font-family: monospace;
+            border-radius: 4px;
+        }
         
         .stat-line { font-size: 13px; margin-top: 6px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #eee; padding-bottom: 2px; }
         .stat-val { cursor: pointer; text-decoration: none; font-weight: 600; min-width: 40px; text-align: right; display: inline-block; order: 2; }
@@ -2716,6 +2728,8 @@
             display: flex;
             flex-direction: column;
             flex: 1;
+            min-height: 0;  /* КРИТИЧНО для Windows - позволяет сжиматься */
+            overflow: hidden;
         }
 
         .btn-expand-log {
@@ -2728,6 +2742,7 @@
             cursor: pointer;
             color: #666;
             transition: all 0.2s;
+            flex-shrink: 0;  /* Кнопка всегда видна */
         }
 
         .btn-expand-log:hover {
