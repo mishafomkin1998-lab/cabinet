@@ -112,10 +112,11 @@ function collectBotsInfo() {
 function getMemoryUsage() {
     if (typeof process !== 'undefined' && process.memoryUsage) {
         const mem = process.memoryUsage();
-        return Math.round(mem.heapUsed / 1024 / 1024); // MB
+        // rss = Resident Set Size - реальное потребление RAM процессом
+        return Math.round(mem.rss / 1024 / 1024); // MB
     }
     if (performance && performance.memory) {
-        return Math.round(performance.memory.usedJSHeapSize / 1024 / 1024); // MB
+        return Math.round(performance.memory.totalJSHeapSize / 1024 / 1024); // MB
     }
     return null;
 }
