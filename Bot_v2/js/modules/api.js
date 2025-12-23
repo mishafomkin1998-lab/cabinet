@@ -450,6 +450,183 @@ function stopAllMailingOnBotDisabled() {
     console.log('🔴 Бот отключен администратором! Все рассылки остановлены.');
 }
 
+// ============= BATCH SYNC (Оптимизированная синхронизация) =============
+// Один запрос вместо N heartbeat'ов - уменьшает нагрузку в ~100 раз
+
+let batchSyncInterval = null;
+let lastSyncResponse = null;
+
+/**
+ * Собирает информацию о всех анкетах для batch sync
+ */
+function collectProfilesForSync() {
+    const profiles = [];
+
+    if (typeof bots === 'undefined') return profiles;
+
+    for (const botId in bots) {
+        const bot = bots[botId];
+        if (bot && bot.displayId) {
+            profiles.push({
+                id: bot.displayId,
+                status: bot.token ? 'online' : 'offline',
+                mailRunning: bot.isMailRunning || false,
+                chatRunning: bot.isChatRunning || false
+            });
+        }
+    }
+
+    return profiles;
+}
+
+/**
+ * Batch синхронизация всех анкет одним запросом
+ * Заменяет индивидуальные heartbeat для каждой анкеты
+ */
+async function syncAllBotsWithServer() {
+    const profiles = collectProfilesForSync();
+
+    if (profiles.length === 0) {
+        console.log('🔄 Sync: нет анкет для синхронизации');
+        return null;
+    }
+
+    console.log(`🔄 Batch sync: отправляю ${profiles.length} анкет...`);
+
+    try {
+        const stats = sessionStats.getStats();
+        const memoryMB = getMemoryUsage();
+        const currentMode = (typeof globalMode !== 'undefined') ? globalMode : 'mail';
+
+        const payload = {
+            botId: MACHINE_ID,
+            version: APP_VERSION,
+            platform: APP_PLATFORM + (APP_ARCH ? ' ' + APP_ARCH : ''),
+            uptime: stats.uptime,
+            memoryUsage: memoryMB,
+            globalMode: currentMode,
+            profiles: profiles,
+            stats: {
+                startedAt: stats.startedAt,
+                mailSent: stats.mailSent,
+                chatSent: stats.chatSent,
+                errors: stats.errors
+            }
+        };
+
+        const response = await fetch(`${LABABOT_SERVER}/api/bot/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        lastSyncResponse = data;
+
+        if (data.success) {
+            console.log(`✅ Batch sync OK: ${profiles.length} анкет синхронизировано`);
+
+            // Обрабатываем panic mode
+            if (data.panicMode) {
+                if (!controlStatus.panicMode) {
+                    console.log('🚨 PANIC MODE АКТИВИРОВАН!');
+                    controlStatus.panicMode = true;
+                    stopAllMailingOnPanic();
+                }
+            } else if (controlStatus.panicMode) {
+                console.log('✅ Panic Mode отключен');
+                controlStatus.panicMode = false;
+            }
+
+            // Обрабатываем команды для каждой анкеты
+            if (data.profiles && typeof bots !== 'undefined') {
+                for (const botId in bots) {
+                    const bot = bots[botId];
+                    if (bot && bot.displayId && data.profiles[bot.displayId]) {
+                        const profileData = data.profiles[bot.displayId];
+
+                        // Обновляем статус оплаты
+                        bot.isPaid = profileData.isPaid;
+                        bot.canTrial = profileData.canTrial;
+
+                        // Обрабатываем команды
+                        if (profileData.commands) {
+                            const wasEnabled = bot.mailingEnabled !== false;
+                            bot.mailingEnabled = profileData.commands.mailingEnabled !== false;
+
+                            // Если рассылка отключена - останавливаем
+                            if (wasEnabled && !bot.mailingEnabled) {
+                                console.log(`⛔ Рассылка для ${bot.displayId} отключена с сервера`);
+                                if (bot.isMailRunning) bot.stopMail();
+                                if (bot.isChatRunning) bot.stopChat();
+                            }
+
+                            // Обновляем прокси если изменился
+                            if (profileData.commands.proxy !== undefined) {
+                                bot.serverProxy = profileData.commands.proxy;
+                            }
+                        }
+
+                        // Показываем предупреждение если trial или не оплачено
+                        if (profileData.status === 'trial_available' && !bot._trialWarningShown) {
+                            console.log(`⚠️ Анкета ${bot.displayId}: доступен тестовый период`);
+                            bot._trialWarningShown = true;
+                        } else if (profileData.status === 'payment_required' && !bot._paymentWarningShown) {
+                            console.log(`🚫 Анкета ${bot.displayId}: требуется оплата`);
+                            bot._paymentWarningShown = true;
+                        }
+                    }
+                }
+            }
+        } else {
+            console.error('❌ Batch sync ошибка:', data.error);
+        }
+
+        return data;
+    } catch (error) {
+        console.error('❌ Batch sync failed:', error.message);
+
+        // Retry через 5 секунд при ошибке
+        setTimeout(() => {
+            console.log('🔄 Batch sync: повторная попытка...');
+            syncAllBotsWithServer();
+        }, 5000);
+
+        return null;
+    }
+}
+
+/**
+ * Запуск периодической batch синхронизации
+ * Заменяет индивидуальные heartbeat интервалы
+ */
+function startBatchSync() {
+    if (batchSyncInterval) {
+        clearInterval(batchSyncInterval);
+    }
+
+    // Первый sync через 2 секунды после старта
+    setTimeout(() => syncAllBotsWithServer(), 2000);
+
+    // Затем каждую минуту
+    batchSyncInterval = setInterval(() => {
+        syncAllBotsWithServer();
+    }, 60000); // 60 секунд
+
+    console.log('🔄 Batch sync запущен (интервал: 60 сек)');
+}
+
+/**
+ * Остановка batch синхронизации
+ */
+function stopBatchSync() {
+    if (batchSyncInterval) {
+        clearInterval(batchSyncInterval);
+        batchSyncInterval = null;
+        console.log('🔄 Batch sync остановлен');
+    }
+}
+
 // 5. Функция загрузки промпта для генерации с сервера
 async function loadServerGenerationPrompt() {
     try {

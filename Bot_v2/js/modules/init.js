@@ -20,6 +20,7 @@ window.onload = async function() {
     initQuitHandler(); // Сохранение сессии при закрытии
     startMemoryCleanup(); // Периодическая очистка памяти
     startPromptSync(); // Синхронизация промпта для генерации с сервером
+    startBatchSync(); // ОПТИМИЗАЦИЯ: Batch sync вместо индивидуальных heartbeat
 
     // Глобальное отслеживание Shift для bulk-действий
     document.addEventListener('keydown', (e) => { if (e.key === 'Shift') isShiftPressed = true; });

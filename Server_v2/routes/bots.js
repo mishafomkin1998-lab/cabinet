@@ -1158,4 +1158,189 @@ router.delete('/logs/cleanup', asyncHandler(async (req, res) => {
     res.json({ success: true, deleted: result.rowCount });
 }));
 
+// ============= BATCH SYNC (Оптимизированная синхронизация) =============
+
+/**
+ * POST /api/bot/sync
+ * Batch синхронизация - один запрос вместо N heartbeat'ов
+ * Уменьшает нагрузку в ~100 раз при 100 анкетах
+ */
+router.post('/sync', asyncHandler(async (req, res) => {
+    const {
+        botId,           // MACHINE_ID программы
+        version,
+        platform,
+        uptime,
+        memoryUsage,
+        globalMode,
+        profiles,        // Массив анкет [{id, status, mailRunning, chatRunning}, ...]
+        stats            // Статистика сессии {mailSent, chatSent, errors}
+    } = req.body;
+
+    if (!botId || !profiles || !Array.isArray(profiles)) {
+        return res.status(400).json({
+            success: false,
+            error: 'botId и profiles обязательны'
+        });
+    }
+
+    const clientIp = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+                  || req.socket?.remoteAddress
+                  || req.ip
+                  || 'unknown';
+
+    const timestamp = new Date();
+    const profileIds = profiles.map(p => String(p.id));
+
+    console.log(`🔄 Batch sync от ${botId}: ${profiles.length} анкет, IP=${clientIp}`);
+
+    // 1. Проверяем оплату для всех анкет ОДНИМ запросом
+    let paymentResult = { rows: [] };
+    if (profileIds.length > 0) {
+        paymentResult = await pool.query(`
+            SELECT
+                ap.profile_id,
+                ap.paid_until,
+                ap.is_trial,
+                ap.trial_started_at,
+                ap.paused,
+                ap.proxy,
+                u.is_restricted as admin_is_restricted,
+                u_trans.is_own_translator as translator_is_own
+            FROM allowed_profiles ap
+            LEFT JOIN users u ON ap.assigned_admin_id = u.id
+            LEFT JOIN users u_trans ON ap.assigned_translator_id = u_trans.id
+            WHERE ap.profile_id = ANY($1)
+        `, [profileIds]);
+    }
+
+    const paymentMap = {};
+    const commandsMap = {};
+    const now = new Date();
+
+    for (const row of paymentResult.rows) {
+        const profileId = row.profile_id;
+
+        // Определяем статус оплаты
+        let isPaid = false;
+        let canTrial = false;
+        let reason = 'not_found';
+
+        if (row.admin_is_restricted || row.translator_is_own) {
+            isPaid = true;
+            reason = 'free';
+        } else if (row.paid_until && new Date(row.paid_until) > now) {
+            isPaid = true;
+            reason = 'paid';
+        } else if (!row.trial_started_at) {
+            canTrial = true;
+            reason = 'trial_available';
+        } else {
+            reason = 'payment_required';
+        }
+
+        paymentMap[profileId] = { isPaid, canTrial, reason };
+        commandsMap[profileId] = {
+            mailingEnabled: !row.paused,
+            proxy: row.proxy || null
+        };
+    }
+
+    // 2. Для анкет которых нет в БД - создаём автоматически
+    const existingIds = new Set(paymentResult.rows.map(r => r.profile_id));
+    const newProfiles = profileIds.filter(id => !existingIds.has(id));
+
+    for (const id of newProfiles) {
+        try {
+            await pool.query(
+                `INSERT INTO allowed_profiles (profile_id, note, added_at) VALUES ($1, 'Автодобавлено ботом', NOW()) ON CONFLICT DO NOTHING`,
+                [id]
+            );
+        } catch (e) { /* ignore */ }
+
+        // Для новых анкет - trial доступен
+        paymentMap[id] = { isPaid: false, canTrial: true, reason: 'trial_available' };
+        commandsMap[id] = { mailingEnabled: true, proxy: null };
+    }
+
+    // 3. Batch UPDATE статусов анкет
+    const paidProfiles = profiles.filter(p => paymentMap[String(p.id)]?.isPaid);
+
+    for (const p of paidProfiles) {
+        await pool.query(
+            `UPDATE allowed_profiles SET status = $1, last_online = NOW() WHERE profile_id = $2`,
+            [p.status || 'online', String(p.id)]
+        );
+    }
+
+    // 4. Один heartbeat запись для бота (не для каждой анкеты)
+    // Записываем только факт sync от программы
+    if (paidProfiles.length > 0) {
+        await pool.query(`
+            INSERT INTO heartbeats (bot_id, account_display_id, status, ip, version, platform, timestamp)
+            VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        `, [botId, paidProfiles[0]?.id || 'batch', 'online', clientIp, version, platform]);
+    }
+
+    // 5. Обновляем данные бота (программы)
+    const extendedData = {
+        uptime: uptime || 0,
+        memoryUsage: memoryUsage || null,
+        profilesTotal: profiles.length,
+        profilesRunning: profiles.filter(p => p.mailRunning || p.chatRunning).length,
+        profilesStopped: profiles.filter(p => !p.mailRunning && !p.chatRunning).length,
+        globalMode: globalMode || 'mail',
+        sessionStats: stats || null,
+        lastUpdate: timestamp.toISOString()
+    };
+
+    await pool.query(`
+        INSERT INTO bots (bot_id, platform, ip, version, status, last_heartbeat, extended_data)
+        VALUES ($1, $2, $3, $4, 'online', NOW(), $5)
+        ON CONFLICT (bot_id) DO UPDATE SET
+            platform = COALESCE($2, bots.platform),
+            ip = COALESCE($3, bots.ip),
+            version = COALESCE($4, bots.version),
+            status = 'online',
+            last_heartbeat = NOW(),
+            extended_data = $5
+    `, [botId, platform, clientIp, version, JSON.stringify(extendedData)]);
+
+    // 6. Проверяем panic mode
+    let panicMode = false;
+    try {
+        const panicResult = await pool.query(`
+            SELECT COALESCE(bool_or((settings->>'panicMode')::boolean), false) as panic
+            FROM user_settings
+        `);
+        panicMode = panicResult.rows[0]?.panic === true;
+    } catch (e) { /* ignore */ }
+
+    // 7. Формируем ответ с командами для каждой анкеты
+    const response = {
+        success: true,
+        timestamp: timestamp.toISOString(),
+        panicMode: panicMode,
+        profiles: {}
+    };
+
+    for (const p of profiles) {
+        const id = String(p.id);
+        const payment = paymentMap[id] || { isPaid: false, canTrial: true, reason: 'not_found' };
+        const commands = commandsMap[id] || { mailingEnabled: true, proxy: null };
+
+        response.profiles[id] = {
+            status: payment.isPaid ? 'ok' : (payment.canTrial ? 'trial_available' : 'payment_required'),
+            isPaid: payment.isPaid,
+            canTrial: payment.canTrial,
+            reason: payment.reason,
+            commands: panicMode ? { ...commands, mailingEnabled: false } : commands
+        };
+    }
+
+    console.log(`✅ Batch sync завершён: ${paidProfiles.length}/${profiles.length} анкет активны`);
+
+    res.json(response);
+}));
+
 module.exports = router;

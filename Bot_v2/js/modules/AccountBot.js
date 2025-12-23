@@ -611,14 +611,18 @@ class AccountBot {
     }
 
     // Heartbeat на сервер Lababot
+    // DEPRECATED: Теперь используется batch sync (один запрос для всех анкет)
+    // См. api.js -> syncAllBotsWithServer()
     startLababotHeartbeat() {
-        // Отправляем первый heartbeat
-        setTimeout(() => sendHeartbeatToLababot(this.id, this.displayId, this.token ? 'online' : 'offline'), 1000);
+        // Индивидуальные heartbeat отключены - используется batch sync
+        // который запускается глобально в init.js -> startBatchSync()
+        console.log(`📡 Анкета ${this.displayId} добавлена в batch sync`);
 
-        // Потом каждые 30 секунд
-        this.lababotHeartbeatTimer = setInterval(() => {
-            sendHeartbeatToLababot(this.id, this.displayId, this.token ? 'online' : 'offline');
-        }, 30000);
+        // Очищаем старый таймер если был
+        if (this.lababotHeartbeatTimer) {
+            clearInterval(this.lababotHeartbeatTimer);
+            this.lababotHeartbeatTimer = null;
+        }
     }
 
     log(text, type = null) {
