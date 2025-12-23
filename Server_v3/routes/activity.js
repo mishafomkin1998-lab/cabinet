@@ -8,7 +8,6 @@
  * - GET /recent - Последняя активность для ленты в дашборде
  * - POST /profile/status - Обновление статуса профиля
  * - POST /error - Логирование ошибок от бота
- * - GET /error_logs - Получение логов ошибок
  * - GET /history - История переписок с фильтрацией
  */
 
@@ -389,31 +388,6 @@ router.post('/error', asyncHandler(async (req, res) => {
         console.log(`⚠️ Ошибка от бота ${botId} (${accountDisplayId}): ${errorType} - ${message}`);
 
     res.json({ status: 'ok' });
-}));
-
-// Логи ошибок
-router.get('/error_logs', asyncHandler(async (req, res) => {
-    const { userId, role, limit = 50, offset = 0 } = req.query;
-
-    let filter = "WHERE 1=1 ";
-        let params = [limit, offset];
-
-        if (role === 'admin' || role === 'translator') {
-            filter += `AND el.user_id = $3 `;
-            params.push(userId);
-        }
-
-        const query = `
-            SELECT el.*, u.username
-            FROM error_logs el
-            LEFT JOIN users u ON el.user_id = u.id
-            ${filter}
-            ORDER BY el.timestamp DESC
-            LIMIT $1 OFFSET $2
-        `;
-
-    const result = await pool.query(query, params);
-    res.json({ success: true, logs: result.rows });
 }));
 
 // История переписок

@@ -295,7 +295,6 @@ app.listen(PORT, () => {
     console.log(`   • GET /api/team - команда (админы + переводчики)`);
     console.log(`   • GET /api/activity/recent - последняя активность`);
     console.log(`   • GET /api/history - история переписок`);
-    console.log(`   • GET /api/error_logs - логи ошибок`);
     console.log(`\n📁 Структура проекта:`);
     console.log(`   • config/       - конфигурация (database.js)`);
     console.log(`   • middleware/   - middleware (auth.js)`);
