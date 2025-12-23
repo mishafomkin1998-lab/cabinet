@@ -700,6 +700,12 @@
                     return mode === 'mail' ? 'Письма' : (mode === 'chat' ? 'Чаты' : mode);
                 },
 
+                // Очистка IP от ::ffff: префикса (IPv4-mapped IPv6)
+                cleanIP(ip) {
+                    if (!ip) return '-';
+                    return ip.replace(/^::ffff:/i, '');
+                },
+
                 async loadTeam() {
                     try {
                         const res = await fetch(`${API_BASE}/api/team?userId=${this.currentUser.id}&role=${this.currentUser.role}`);

@@ -1311,16 +1311,16 @@
                                             <span x-text="formatMode(bot.globalMode)"></span>
                                         </div>
                                         <div>
-                                            <span class="font-medium">Uptime:</span>
+                                            <span class="font-medium">Время работы:</span>
                                             <span x-text="formatUptime(bot.uptime)"></span>
                                         </div>
                                         <div>
-                                            <span class="font-medium">Память:</span>
+                                            <span class="font-medium">RAM:</span>
                                             <span x-text="bot.memoryUsage ? bot.memoryUsage + ' MB' : '-'"></span>
                                         </div>
                                         <div>
                                             <span class="font-medium">IP:</span>
-                                            <span x-text="bot.ip"></span>
+                                            <span x-text="cleanIP(bot.ip)"></span>
                                         </div>
                                         <div>
                                             <span class="font-medium">Версия:</span>
