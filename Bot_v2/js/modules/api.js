@@ -234,11 +234,6 @@ async function sendMessageToLababot(params) {
             body: JSON.stringify(payload)
         });
 
-        // Проверяем статус ответа перед парсингом JSON
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
         const data = await response.json();
         console.log(`✅ Ответ от Lababot сервера:`, data);
 
@@ -285,10 +280,6 @@ async function sendIncomingMessageToLababot(params) {
                 messageText: messageText || null
             })
         });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
 
         const data = await response.json();
         if (data.isFirstFromMan) {
@@ -353,15 +344,11 @@ async function sendHeartbeatToLababot(botId, displayId, status = 'online', skipC
             body: JSON.stringify(payload)
         });
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
         const data = await response.json();
         console.log(`✅ Heartbeat отправлен:`, data);
 
         // Обрабатываем команды для конкретной анкеты (пропускаем при удалении)
-        if (data && data.commands && typeof bots !== 'undefined' && !skipCommands) {
+        if (data.commands && typeof bots !== 'undefined' && !skipCommands) {
             // Проверяем статус бот-машины (botEnabled) - влияет на ВСЕ анкеты
             const wasBotEnabled = controlStatus.botEnabled !== false;
             controlStatus.botEnabled = data.commands.botEnabled !== false;
@@ -431,7 +418,6 @@ function stopAllMailingOnBotDisabled() {
 
 let batchSyncInterval = null;
 let lastSyncResponse = null;
-let batchSyncRetryCount = 0; // Счётчик retry для batch sync
 
 /**
  * Собирает информацию о всех анкетах для batch sync
@@ -497,14 +483,10 @@ async function syncAllBotsWithServer() {
             body: JSON.stringify(payload)
         });
 
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
         const data = await response.json();
         lastSyncResponse = data;
 
-        if (data && data.success) {
+        if (data.success) {
             console.log(`✅ Batch sync OK: ${profiles.length} анкет синхронизировано`);
 
             // Обрабатываем команды для каждой анкеты
@@ -551,32 +533,15 @@ async function syncAllBotsWithServer() {
             console.error('❌ Batch sync ошибка:', data.error);
         }
 
-        // Сбрасываем счётчик ошибок при успехе
-        batchSyncRetryCount = 0;
         return data;
     } catch (error) {
         console.error('❌ Batch sync failed:', error.message);
 
-        // Ограничиваем количество retry и используем exponential backoff
-        batchSyncRetryCount++;
-        const MAX_RETRIES = 5;
-
-        if (batchSyncRetryCount <= MAX_RETRIES) {
-            // Exponential backoff: 5s, 10s, 20s, 40s, 80s
-            const delay = 5000 * Math.pow(2, batchSyncRetryCount - 1);
-            console.log(`🔄 Batch sync: повторная попытка ${batchSyncRetryCount}/${MAX_RETRIES} через ${delay/1000}сек...`);
-
-            setTimeout(() => {
-                syncAllBotsWithServer();
-            }, delay);
-        } else {
-            console.error(`❌ Batch sync: превышен лимит попыток (${MAX_RETRIES}). Следующая попытка через 5 минут.`);
-            // Сбрасываем счётчик и пробуем снова через 5 минут
-            batchSyncRetryCount = 0;
-            setTimeout(() => {
-                syncAllBotsWithServer();
-            }, 300000); // 5 минут
-        }
+        // Retry через 5 секунд при ошибке
+        setTimeout(() => {
+            console.log('🔄 Batch sync: повторная попытка...');
+            syncAllBotsWithServer();
+        }, 5000);
 
         return null;
     }
@@ -617,14 +582,9 @@ function stopBatchSync() {
 async function loadServerGenerationPrompt() {
     try {
         const response = await fetch(`${LABABOT_SERVER}/api/bots/prompt`);
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
         const data = await response.json();
 
-        if (data && data.success && data.prompt) {
+        if (data.success && data.prompt) {
             const oldPrompt = serverGenerationPrompt;
             serverGenerationPrompt = data.prompt;
 
@@ -674,10 +634,6 @@ async function sendErrorToLababot(botId, accountDisplayId, errorType, errorMessa
                 userId: null
             })
         });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
 
         const data = await response.json();
         console.log(`✅ Ошибка отправлена на сервер:`, data);
@@ -777,14 +733,9 @@ async function loadBotDataFromServer(profileId) {
     try {
         console.log(`🔄 Загрузка данных с сервера для ${profileId}...`);
         const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}`);
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
         const result = await response.json();
         console.log(`📦 Ответ сервера для ${profileId}:`, JSON.stringify(result, null, 2));
-        if (result && result.success) {
+        if (result.success) {
             console.log(`📥 Данные бота загружены для ${profileId}:`, result.data);
             return result.data;
         }
@@ -876,14 +827,9 @@ async function resetStatsOnServer(profileId, type) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type })
         });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
         const result = await response.json();
         console.log(`🔄 Статистика ${type} сброшена для ${profileId}`);
-        return result && result.success;
+        return result.success;
     } catch (error) {
         console.error(`❌ Ошибка сброса статистики:`, error);
         return false;
@@ -894,17 +840,12 @@ async function resetStatsOnServer(profileId, type) {
 async function checkProfileStatus(profileId) {
     try {
         const response = await fetch(`${LABABOT_SERVER}/api/profiles/${encodeURIComponent(profileId)}/status`);
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
         const data = await response.json();
         return {
-            paused: data && data.paused === true,
-            exists: data && data.exists === true,
-            allowed: data && data.allowed === true,
-            reason: (data && data.reason) || null
+            paused: data.paused === true,
+            exists: data.exists === true,
+            allowed: data.allowed === true,
+            reason: data.reason || null
         };
     } catch (error) {
         console.error(`❌ Ошибка проверки статуса профиля:`, error);
@@ -917,20 +858,15 @@ async function checkProfileStatus(profileId) {
 async function checkProfilePaymentStatus(profileId) {
     try {
         const response = await fetch(`${LABABOT_SERVER}/api/billing/profile-status/${encodeURIComponent(profileId)}`);
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
         const data = await response.json();
         return {
-            isPaid: data && data.isPaid === true,
-            isFree: data && data.isFree === true, // "мой админ" - бесплатно
-            isTrial: data && data.isTrial === true,
-            trialUsed: data && data.trialUsed === true,
-            canTrial: data && !data.trialUsed && !data.isPaid, // Можно активировать trial
-            daysLeft: (data && data.daysLeft) || 0,
-            reason: (data && data.reason) || 'unknown'
+            isPaid: data.isPaid === true,
+            isFree: data.isFree === true, // "мой админ" - бесплатно
+            isTrial: data.isTrial === true,
+            trialUsed: data.trialUsed === true,
+            canTrial: !data.trialUsed && !data.isPaid, // Можно активировать trial
+            daysLeft: data.daysLeft || 0,
+            reason: data.reason || 'unknown'
         };
     } catch (error) {
         console.error(`❌ Ошибка проверки оплаты профиля:`, error);
@@ -947,13 +883,8 @@ async function activateTrialPeriod(profileId) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ profileId: profileId })
         });
-
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
         const data = await response.json();
-        return data || { success: false, error: 'Empty response' };
+        return data;
     } catch (error) {
         console.error(`❌ Ошибка активации trial:`, error);
         return { success: false, error: error.message };

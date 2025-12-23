@@ -1,6 +1,3 @@
-// Импорт ipcRenderer для работы с прокси
-const { ipcRenderer } = require('electron');
-
 const forbiddenWords = [
     "Fuck", "Shit", "Ass", "Bitch", "Damn", "Hell", "Dick", "Cunt", "Pussy",
     "Cock", "Tits", "Bastard", "Motherfucker", "Asshole", "Son of a bitch",
