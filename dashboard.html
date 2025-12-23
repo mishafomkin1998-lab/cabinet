@@ -620,9 +620,9 @@
             
             <!-- Управление -->
             <div x-show="activeMenu === 'control'" x-cloak class="fade-in">
-                <div class="grid grid-cols-2 gap-6">
+                <div class="grid grid-cols-3 gap-6">
                     <!-- Сессии -->
-                    <div class="glass rounded-2xl p-6">
+                    <div class="glass rounded-2xl p-6 col-span-2">
                         <h3 class="text-lg font-bold mb-6">Активные сессии</h3>
                         <div class="space-y-4">
                             <template x-for="bot in bots" :key="bot.id">
