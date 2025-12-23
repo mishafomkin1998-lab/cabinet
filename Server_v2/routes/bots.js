@@ -1129,13 +1129,21 @@ router.post('/sync', asyncHandler(async (req, res) => {
         );
     }
 
-    // 4. Один heartbeat запись для бота (не для каждой анкеты)
-    // Записываем только факт sync от программы
+    // 4. Heartbeat для КАЖДОЙ оплаченной анкеты (batch insert)
     if (paidProfiles.length > 0) {
+        const values = paidProfiles.map((p, i) => {
+            const offset = i * 6;
+            return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, NOW())`;
+        }).join(', ');
+
+        const params = paidProfiles.flatMap(p => [
+            botId, String(p.id), p.status || 'online', clientIp, version || null, platform || null
+        ]);
+
         await pool.query(`
             INSERT INTO heartbeats (bot_id, account_display_id, status, ip, version, platform, timestamp)
-            VALUES ($1, $2, $3, $4, $5, $6, NOW())
-        `, [botId, paidProfiles[0]?.id || 'batch', 'online', clientIp, version, platform]);
+            VALUES ${values}
+        `, params);
     }
 
     // 5. Обновляем данные бота (программы)
