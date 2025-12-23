@@ -1,3 +1,6 @@
+// Импорт ipcRenderer для общения с main процессом
+const { ipcRenderer } = require('electron');
+
 class AccountBot {
     constructor(id, login, pass, displayId, token) {
         this.id = id; 
