@@ -1657,6 +1657,8 @@
             flex: 1;
             display: flex;
             overflow: hidden;
+            min-height: 0;  /* ВАЖНО для Windows - позволяет flex-child сжиматься */
+            max-height: 100%;
         }
 
         /* LOGGER COLUMN - 5-я колонка справа */
@@ -1670,6 +1672,9 @@
             flex-direction: column;
             font-family: 'Segoe UI', sans-serif;
             transition: width 0.2s ease;
+            min-height: 0;  /* ВАЖНО для Windows - позволяет flex-child сжиматься */
+            max-height: 100%;
+            overflow: hidden;
         }
         #logger-column.show { display: flex; }
 
@@ -1689,10 +1694,12 @@
         .logger-column-content {
             flex: 1;
             overflow-y: auto;
+            overflow-x: hidden;
             padding: 10px;
             background: #fdfdfd;
             display: flex;
             flex-direction: column;
+            min-height: 0;  /* ВАЖНО для Windows - позволяет flex-child сжиматься */
         }
 
         .log-entry {
