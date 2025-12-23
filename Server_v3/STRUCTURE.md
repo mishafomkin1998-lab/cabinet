@@ -122,6 +122,7 @@ const pool = new Pool({
 | `asyncHandler(fn)` | Обёртка для async роутов |
 | `errorHandler` | Глобальный обработчик ошибок |
 | `buildRoleFilter(role, userId, opts)` | SQL-фильтр по роли |
+| `buildStatsFilter(opts)` | Фильтр для дашборда по админу/переводчику |
 | `logError(...)` | Логирование ошибок в БД |
 | `PRICE_LETTER` | Цена письма ($1.5) |
 | `PRICE_CHAT` | Цена чата ($0.15) |
