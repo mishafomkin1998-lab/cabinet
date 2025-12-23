@@ -732,9 +732,10 @@ const TRANSCRIPTION_VARS = [
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1400,
-        height: 800,
+        height: 900,  // Увеличено для Windows
         minWidth: 1000,
         minHeight: 700,
+        useContentSize: true,  // Размер контента, не окна (важно для Windows)
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
