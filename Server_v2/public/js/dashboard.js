@@ -2068,10 +2068,10 @@
                         });
                         const data = await res.json();
                         if (data.success) {
-                            alert(this.t('messages.botNameSaved'));
+                            console.log('✅ Имя бота сохранено:', bot.name);
                         }
                     } catch (e) {
-                        console.error('Ошибка:', e);
+                        console.error('Ошибка сохранения имени бота:', e);
                     }
                 },
 
