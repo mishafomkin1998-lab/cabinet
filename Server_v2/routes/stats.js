@@ -1045,7 +1045,7 @@ router.get('/ai-usage', asyncHandler(async (req, res) => {
      * Запрос к activity_log:
      * - Только сообщения сгенерированные AI (used_ai = true)
      * - Группируем по шаблону (template_text) или тексту (message_text) как fallback
-     * - Фильтруем: рассылка >= 3 минут (от первого до последнего сообщения)
+     * - Показываем ВСЕ AI рассылки (без минимальной длительности)
      * - Сортируем по времени последней отправки
      */
     const query = `
@@ -1062,7 +1062,6 @@ router.get('/ai-usage', asyncHandler(async (req, res) => {
             ${roleFilter}
             ${dateFilter}
         GROUP BY COALESCE(a.template_text, a.message_text)
-        HAVING EXTRACT(EPOCH FROM (MAX(a.created_at) - MIN(a.created_at))) >= 180
         ORDER BY MAX(a.created_at) DESC
         LIMIT $1
     `;
