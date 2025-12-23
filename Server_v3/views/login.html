@@ -97,13 +97,15 @@
             z-index: 1;
             width: 100%;
             max-width: 420px;
-            background: rgba(255, 255, 255, 0.5);
-            backdrop-filter: blur(24px) saturate(180%);
-            -webkit-backdrop-filter: blur(24px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.4);
+            background: rgba(255, 255, 255, 0.25);
+            backdrop-filter: blur(40px) saturate(180%);
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 28px;
             padding: 48px 40px;
-            box-shadow: 0 8px 32px rgba(139, 92, 246, 0.12);
+            box-shadow:
+                0 8px 32px rgba(139, 92, 246, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.4);
             animation: fadeIn 0.6s ease;
         }
 
@@ -177,8 +179,10 @@
         .input-wrapper input {
             width: 100%;
             padding: 14px 16px 14px 44px;
-            background: rgba(255, 255, 255, 0.7);
-            border: 1px solid rgba(0, 0, 0, 0.08);
+            background: rgba(255, 255, 255, 0.35);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
             border-radius: 12px;
             font-size: 15px;
             font-family: inherit;
@@ -188,29 +192,32 @@
 
         .input-wrapper input:focus {
             outline: none;
-            background: white;
+            background: rgba(255, 255, 255, 0.5);
             border-color: var(--purple-500);
-            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
         }
 
         .input-wrapper input::placeholder {
-            color: #9CA3AF;
+            color: #6B7280;
         }
 
-        .toggle-password {
+        .input-wrapper .toggle-password {
             position: absolute;
-            right: 16px;
+            right: 14px;
             top: 50%;
             transform: translateY(-50%);
             background: none;
             border: none;
-            color: #9CA3AF;
+            color: #6B7280;
             cursor: pointer;
-            padding: 4px;
+            padding: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .toggle-password:hover {
-            color: #6B7280;
+        .input-wrapper .toggle-password:hover {
+            color: var(--purple-600);
         }
 
         /* Options row */
