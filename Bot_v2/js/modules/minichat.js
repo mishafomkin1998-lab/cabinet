@@ -385,6 +385,38 @@ async function sendMiniChatMessage() {
 
         console.log(`[MiniChat] ✅ Сообщение успешно отправлено!`, { type: minichatType, partnerId: minichatPartnerId });
 
+        // === ЛОГИРОВАНИЕ В СТАТИСТИКУ ===
+        // MiniChat используется для ответов на входящие сообщения, поэтому isReply = true
+        try {
+            const msgType = minichatType === 'chat' ? 'chat_msg' : 'outgoing';
+            const lababotResult = await sendMessageToLababot({
+                botId: bot.id,
+                accountDisplayId: bot.displayId,
+                recipientId: minichatPartnerId,
+                type: msgType,
+                textContent: message,
+                status: 'success',
+                responseTime: null,
+                isFirst: false,
+                isLast: false,
+                convId: null,
+                mediaUrl: null,
+                fileName: null,
+                translatorId: bot.translatorId || globalSettings.translatorId || null,
+                errorReason: null,
+                usedAi: false,
+                isReply: true  // MiniChat = ответ на входящее сообщение
+            });
+
+            if (lababotResult.success) {
+                console.log(`[MiniChat] 📊 Статистика записана (isReply=true)`);
+            } else {
+                console.warn(`[MiniChat] ⚠️ Не удалось записать статистику:`, lababotResult.error);
+            }
+        } catch (statError) {
+            console.warn(`[MiniChat] ⚠️ Ошибка записи статистики:`, statError.message);
+        }
+
         const chatHistoryEl = document.getElementById('minichat-history');
         const msgDiv = document.createElement('div');
         msgDiv.className = `chat-msg me`;
