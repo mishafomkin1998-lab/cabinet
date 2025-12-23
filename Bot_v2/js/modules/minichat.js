@@ -386,7 +386,12 @@ async function sendMiniChatMessage() {
         console.log(`[MiniChat] ✅ Сообщение успешно отправлено!`, { type: minichatType, partnerId: minichatPartnerId });
 
         // === ЛОГИРОВАНИЕ В СТАТИСТИКУ ===
-        // MiniChat используется для ответов на входящие сообщения, поэтому isReply = true
+        // Определяем: это ответ на входящее или просто отправка?
+        // isReply = true только если есть запись о входящем письме от этого мужчины
+        const partnerIdStr = minichatPartnerId.toString();
+        const hasIncoming = bot.incomingTimes && bot.incomingTimes[partnerIdStr];
+        const isReply = !!hasIncoming;
+
         try {
             const msgType = minichatType === 'chat' ? 'chat_msg' : 'outgoing';
             const lababotResult = await sendMessageToLababot({
@@ -405,11 +410,11 @@ async function sendMiniChatMessage() {
                 translatorId: bot.translatorId || globalSettings.translatorId || null,
                 errorReason: null,
                 usedAi: false,
-                isReply: true  // MiniChat = ответ на входящее сообщение
+                isReply: isReply  // true только если было входящее от этого мужчины
             });
 
             if (lababotResult.success) {
-                console.log(`[MiniChat] 📊 Статистика записана (isReply=true)`);
+                console.log(`[MiniChat] 📊 Статистика записана (isReply=${isReply})`);
             } else {
                 console.warn(`[MiniChat] ⚠️ Не удалось записать статистику:`, lababotResult.error);
             }
