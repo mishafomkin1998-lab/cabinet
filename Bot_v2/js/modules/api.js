@@ -477,7 +477,7 @@ async function syncAllBotsWithServer() {
             }
         };
 
-        const response = await fetch(`${LABABOT_SERVER}/api/bot/sync`, {
+        const response = await fetch(`${LABABOT_SERVER}/api/bots/sync`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
