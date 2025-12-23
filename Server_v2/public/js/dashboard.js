@@ -2739,7 +2739,7 @@
                         this.profilePayment.profileId = selectedIds;
 
                         // Переход на вкладку Финансы
-                        this.setActiveMenu('finance');
+                        this.setActiveMenu('finances');
 
                         // Сбрасываем выбор
                         this.selectedProfileIds = [];
