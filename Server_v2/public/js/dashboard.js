@@ -241,13 +241,6 @@
 
                 generationPrompt: '',
 
-                // Настройки управления
-                controlSettings: {
-                    mailingEnabled: true,
-                    stopSpam: false,
-                    panicMode: false
-                },
-
                 // Фильтры истории
                 historyFilter: {
                     admin: '',
@@ -387,8 +380,7 @@
                             this.loadAccounts(),        // Список анкет (нужен сразу)
                             this.loadBotsStatus(),      // Статус ботов (нужен сразу)
                             this.loadUserBalance(),     // Баланс пользователя
-                            this.loadPricing(),         // Тарифы (быстро)
-                            this.loadControlSettings()  // Настройки управления
+                            this.loadPricing()          // Тарифы (быстро)
                         ];
 
                         // Для директора загружаем команду сразу (нужна для модалки добавления анкет)
@@ -2092,76 +2084,6 @@
                         }
                     } catch (e) {
                         console.error('Ошибка:', e);
-                    }
-                },
-
-                // === Настройки управления ===
-                async loadControlSettings() {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/control/settings?userId=${this.currentUser.id}`);
-                        const data = await res.json();
-                        if (data.success && data.settings) {
-                            this.controlSettings = data.settings;
-                        }
-                    } catch (e) {
-                        console.error('loadControlSettings error:', e);
-                    }
-                },
-
-                async toggleMailingEnabled() {
-                    this.controlSettings.mailingEnabled = !this.controlSettings.mailingEnabled;
-                    await this.saveControlSettings();
-                },
-
-                async toggleStopSpam() {
-                    this.controlSettings.stopSpam = !this.controlSettings.stopSpam;
-                    await this.saveControlSettings();
-                },
-
-                async saveControlSettings() {
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/control/settings`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                userId: this.currentUser.id,
-                                settings: this.controlSettings
-                            })
-                        });
-                        const data = await res.json();
-                        if (!data.success) {
-                            alert('Ошибка сохранения настроек');
-                        }
-                    } catch (e) {
-                        console.error('saveControlSettings error:', e);
-                        alert('Ошибка сети при сохранении настроек');
-                    }
-                },
-
-                async activatePanicMode() {
-                    if (!confirm('ВНИМАНИЕ! Это остановит ВСЕ боты немедленно. Продолжить?')) {
-                        return;
-                    }
-                    try {
-                        const res = await fetch(`${API_BASE}/api/bots/control/panic`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                userId: this.currentUser.id,
-                                activate: !this.controlSettings.panicMode
-                            })
-                        });
-                        const data = await res.json();
-                        if (data.success) {
-                            this.controlSettings.panicMode = !this.controlSettings.panicMode;
-                            alert(data.message);
-                            await this.loadBotsStatus();
-                        } else {
-                            alert('Ошибка: ' + (data.error || 'Не удалось активировать panic mode'));
-                        }
-                    } catch (e) {
-                        console.error('activatePanicMode error:', e);
-                        alert('Ошибка сети');
                     }
                 },
 

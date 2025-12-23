@@ -1338,38 +1338,6 @@
                         </div>
                     </div>
                     
-                    <!-- Управление -->
-                    <div class="glass rounded-2xl p-6">
-                        <h3 class="text-lg font-bold mb-6" x-text="t('control.mailingSettings')"></h3>
-                        <div class="space-y-4">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <div class="font-medium" x-text="t('control.enableMailing')"></div>
-                                    <div class="text-sm text-gray-500" x-text="t('control.autoMessages')"></div>
-                                </div>
-                                <div class="ios-toggle"
-                                     :class="{ 'active': controlSettings.mailingEnabled }"
-                                     @click="toggleMailingEnabled()"></div>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <div class="font-medium" x-text="t('control.stopSpam')"></div>
-                                    <div class="text-sm text-gray-500" x-text="t('control.onComplaints')"></div>
-                                </div>
-                                <div class="ios-toggle"
-                                     :class="{ 'active': controlSettings.stopSpam }"
-                                     @click="toggleStopSpam()"></div>
-                            </div>
-                        </div>
-
-                        <div class="mt-8">
-                            <button @click="activatePanicMode()"
-                                    class="w-full py-3 rounded-xl text-white font-medium transition-all"
-                                    :class="controlSettings.panicMode ? 'bg-green-500 hover:bg-green-600' : 'bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600'">
-                                <span x-text="controlSettings.panicMode ? '🟢 Отключить Panic Mode' : '🚨 Panic Mode'"></span>
-                            </button>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Промт для генерации -->

@@ -358,80 +358,6 @@ async function sendHeartbeatToLababot(botId, displayId, status = 'online', skipC
     }
 }
 
-// 4. Функция проверки статуса управления (panic mode, stopSpam)
-async function checkControlStatus() {
-    try {
-        const response = await fetch(`${LABABOT_SERVER}/api/bots/control/panic-status`);
-        const data = await response.json();
-
-        if (data.success) {
-            const wasPanic = controlStatus.panicMode;
-            const wasStopSpam = controlStatus.stopSpam;
-
-            controlStatus.panicMode = data.panicMode === true;
-            controlStatus.stopSpam = data.stopSpam === true;
-            controlStatus.lastCheck = new Date();
-
-            // Если включился panic mode - остановить все рассылки (критичный)
-            if (!wasPanic && controlStatus.panicMode) {
-                console.log('🚨 PANIC MODE АКТИВИРОВАН! Останавливаю все рассылки...');
-                stopAllMailingOnPanic();
-            } else if (wasPanic && !controlStatus.panicMode) {
-                console.log('✅ Panic Mode отключен');
-            }
-
-            // Если включился stopSpam - остановить все рассылки (мягкий, можно перезапустить)
-            if (!wasStopSpam && controlStatus.stopSpam) {
-                console.log('⛔ STOP SPAM АКТИВИРОВАН! Останавливаю все рассылки...');
-                stopAllMailingOnStopSpam();
-            } else if (wasStopSpam && !controlStatus.stopSpam) {
-                console.log('✅ Stop Spam отключен - можно запускать рассылки');
-            }
-        }
-
-        return controlStatus;
-    } catch (error) {
-        console.error('❌ Ошибка проверки статуса управления:', error);
-        return controlStatus;
-    }
-}
-
-// Функция остановки всех рассылок при panic mode (критичный - блокирует запуск)
-function stopAllMailingOnPanic() {
-    for (const botId in bots) {
-        const bot = bots[botId];
-        if (bot) {
-            if (bot.isMailRunning) {
-                bot.stopMail();
-                console.log(`⛔ Остановлена Mail рассылка для ${bot.displayId}`);
-            }
-            if (bot.isChatRunning) {
-                bot.stopChat();
-                console.log(`⛔ Остановлена Chat рассылка для ${bot.displayId}`);
-            }
-        }
-    }
-    console.log('🚨 Panic Mode: все рассылки остановлены!');
-}
-
-// Функция остановки всех рассылок при stopSpam (мягкий - можно перезапустить)
-function stopAllMailingOnStopSpam() {
-    for (const botId in bots) {
-        const bot = bots[botId];
-        if (bot) {
-            if (bot.isMailRunning) {
-                bot.stopMail();
-                console.log(`⛔ Остановлена Mail рассылка для ${bot.displayId}`);
-            }
-            if (bot.isChatRunning) {
-                bot.stopChat();
-                console.log(`⛔ Остановлена Chat рассылка для ${bot.displayId}`);
-            }
-        }
-    }
-    console.log('⛔ Stop Spam: все рассылки остановлены администратором');
-}
-
 // Функция остановки всех рассылок при отключении бот-машины (блокирует запуск)
 function stopAllMailingOnBotDisabled() {
     for (const botId in bots) {
@@ -525,18 +451,6 @@ async function syncAllBotsWithServer() {
 
         if (data.success) {
             console.log(`✅ Batch sync OK: ${profiles.length} анкет синхронизировано`);
-
-            // Обрабатываем panic mode
-            if (data.panicMode) {
-                if (!controlStatus.panicMode) {
-                    console.log('🚨 PANIC MODE АКТИВИРОВАН!');
-                    controlStatus.panicMode = true;
-                    stopAllMailingOnPanic();
-                }
-            } else if (controlStatus.panicMode) {
-                console.log('✅ Panic Mode отключен');
-                controlStatus.panicMode = false;
-            }
 
             // Обрабатываем команды для каждой анкеты
             if (data.profiles && typeof bots !== 'undefined') {

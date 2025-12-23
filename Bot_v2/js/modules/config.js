@@ -94,11 +94,9 @@ globalSettings = { ...defaultSettings, ...globalSettings };
 let globalMode = 'mail';
 let activeTabId = null;
 
-// Статус управления с сервера (panic mode, stopSpam, botEnabled, разрешение рассылки)
+// Статус управления с сервера
 let controlStatus = {
-    panicMode: false,
-    stopSpam: false,
-    botEnabled: true, // Статус бот-машины (MACHINE_ID) - может быть выключен админом
+    botEnabled: true, // Статус бот-машины (MACHINE_ID)
     mailingEnabled: true,
     lastCheck: null
 };

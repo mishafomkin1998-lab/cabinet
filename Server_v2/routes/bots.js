@@ -755,84 +755,6 @@ router.get('/:botId/verification', asyncHandler(async (req, res) => {
 }));
 
 // ==========================================
-// НАСТРОЙКИ РАССЫЛКИ И УПРАВЛЕНИЯ
-// ==========================================
-
-// Получить настройки управления
-router.get('/control/settings', asyncHandler(async (req, res) => {
-    const { userId } = req.query;
-
-    // Пытаемся получить настройки из таблицы, если нет - возвращаем дефолт
-    try {
-        const result = await pool.query(
-            `SELECT settings FROM user_settings WHERE user_id = $1`,
-            [userId]
-        );
-
-        if (result.rows.length > 0 && result.rows[0].settings) {
-            res.json({ success: true, settings: result.rows[0].settings });
-        } else {
-            // Дефолтные настройки
-            res.json({
-                success: true,
-                settings: {
-                    mailingEnabled: true,
-                    stopSpam: false,
-                    panicMode: false
-                }
-            });
-        }
-    } catch (e) {
-        // Таблица не существует - возвращаем дефолт
-        res.json({
-            success: true,
-            settings: {
-                mailingEnabled: true,
-                stopSpam: false,
-                panicMode: false
-            }
-        });
-    }
-}));
-
-// Сохранить настройки управления
-router.post('/control/settings', asyncHandler(async (req, res) => {
-    const { userId, settings } = req.body;
-
-    try {
-        // Upsert настроек
-        await pool.query(`
-            INSERT INTO user_settings (user_id, settings, updated_at)
-            VALUES ($1, $2, NOW())
-            ON CONFLICT (user_id)
-            DO UPDATE SET settings = $2, updated_at = NOW()
-        `, [userId, JSON.stringify(settings)]);
-
-        res.json({ success: true });
-    } catch (e) {
-        // Если таблица не существует, создаём её
-        if (e.code === '42P01') { // relation does not exist
-            await pool.query(`
-                CREATE TABLE IF NOT EXISTS user_settings (
-                    user_id INTEGER PRIMARY KEY REFERENCES users(id),
-                    settings JSONB DEFAULT '{}',
-                    updated_at TIMESTAMP DEFAULT NOW()
-                )
-            `);
-            // Повторяем вставку
-            await pool.query(`
-                INSERT INTO user_settings (user_id, settings, updated_at)
-                VALUES ($1, $2, NOW())
-                ON CONFLICT (user_id)
-                DO UPDATE SET settings = $2, updated_at = NOW()
-            `, [userId, JSON.stringify(settings)]);
-            res.json({ success: true });
-        } else {
-            throw e;
-        }
-    }
-}));
-
 // Переключение рассылки для конкретной анкеты
 router.post('/profile/:profileId/toggle-mailing', asyncHandler(async (req, res) => {
     const { profileId } = req.params;
@@ -970,72 +892,6 @@ router.post('/profiles/proxy-bulk', asyncHandler(async (req, res) => {
 
     console.log(`🌐 Массовое обновление прокси: ${updated} анкет`);
     res.json({ success: true, updated });
-}));
-
-// PANIC MODE - экстренная остановка всех ботов
-router.post('/control/panic', asyncHandler(async (req, res) => {
-    const { userId, activate } = req.body;
-
-    // Проверяем права (только директор или админ)
-    const user = await pool.query(`SELECT role FROM users WHERE id = $1`, [userId]);
-    if (user.rows.length === 0 || !['director', 'admin'].includes(user.rows[0].role)) {
-        return res.status(403).json({ success: false, error: 'Недостаточно прав' });
-    }
-
-    if (activate) {
-        // Останавливаем все боты - ставим статус panic
-        await pool.query(`UPDATE bots SET status = 'panic' WHERE status IN ('online', 'active', 'idle')`);
-
-        // Сохраняем panic mode в настройках
-        await pool.query(`
-            INSERT INTO user_settings (user_id, settings, updated_at)
-            VALUES ($1, '{"panicMode": true, "mailingEnabled": false}'::jsonb, NOW())
-            ON CONFLICT (user_id)
-            DO UPDATE SET
-                settings = user_settings.settings || '{"panicMode": true, "mailingEnabled": false}'::jsonb,
-                updated_at = NOW()
-        `, [userId]);
-
-        console.log(`🚨 PANIC MODE активирован пользователем ${userId}`);
-        res.json({ success: true, message: 'Panic mode активирован. Все боты остановлены.' });
-    } else {
-        // Деактивируем panic mode
-        await pool.query(`UPDATE bots SET status = 'offline' WHERE status = 'panic'`);
-
-        await pool.query(`
-            INSERT INTO user_settings (user_id, settings, updated_at)
-            VALUES ($1, '{"panicMode": false}'::jsonb, NOW())
-            ON CONFLICT (user_id)
-            DO UPDATE SET
-                settings = user_settings.settings || '{"panicMode": false}'::jsonb,
-                updated_at = NOW()
-        `, [userId]);
-
-        console.log(`✅ PANIC MODE деактивирован пользователем ${userId}`);
-        res.json({ success: true, message: 'Panic mode деактивирован.' });
-    }
-}));
-
-// Проверка статуса управления (для бота) - panic mode и stopSpam
-router.get('/control/panic-status', asyncHandler(async (req, res) => {
-    try {
-        // Проверяем panic mode и stopSpam у любого пользователя
-        const result = await pool.query(`
-            SELECT
-                COALESCE(bool_or((settings->>'panicMode')::boolean), false) as panic_mode,
-                COALESCE(bool_or((settings->>'stopSpam')::boolean), false) as stop_spam
-            FROM user_settings
-        `);
-
-        const row = result.rows[0] || {};
-        res.json({
-            success: true,
-            panicMode: row.panic_mode === true,
-            stopSpam: row.stop_spam === true
-        });
-    } catch (e) {
-        res.json({ success: true, panicMode: false, stopSpam: false });
-    }
 }));
 
 // ============= BOT LOGS (Операционные логи бота) =============
@@ -1306,21 +1162,10 @@ router.post('/sync', asyncHandler(async (req, res) => {
             extended_data = $5
     `, [botId, platform, clientIp, version, JSON.stringify(extendedData)]);
 
-    // 6. Проверяем panic mode
-    let panicMode = false;
-    try {
-        const panicResult = await pool.query(`
-            SELECT COALESCE(bool_or((settings->>'panicMode')::boolean), false) as panic
-            FROM user_settings
-        `);
-        panicMode = panicResult.rows[0]?.panic === true;
-    } catch (e) { /* ignore */ }
-
-    // 7. Формируем ответ с командами для каждой анкеты
+    // 6. Формируем ответ с командами для каждой анкеты
     const response = {
         success: true,
         timestamp: timestamp.toISOString(),
-        panicMode: panicMode,
         profiles: {}
     };
 
@@ -1334,7 +1179,7 @@ router.post('/sync', asyncHandler(async (req, res) => {
             isPaid: payment.isPaid,
             canTrial: payment.canTrial,
             reason: payment.reason,
-            commands: panicMode ? { ...commands, mailingEnabled: false } : commands
+            commands: commands
         };
     }
 
