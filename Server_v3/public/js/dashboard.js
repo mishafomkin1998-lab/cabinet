@@ -85,8 +85,6 @@
                 controlFilter: { adminId: '', translatorId: '' }, // Фильтры в панели управления
                 newAccountAssignTo: null, // Кому назначить новую анкету
                 profilesWithMailing: [], // Анкеты с рассылкой
-                autoRefreshStats: false, // Автообновление статистики
-                refreshingStats: false, // Индикатор обновления
                 errorLogs: [], // Логи ошибок
                 botLogs: [], // Логи ботов
                 botLogsFilter: '', // Фильтр логов ботов
@@ -110,28 +108,6 @@
                 },
                 settingsSaving: false,
 
-                // Статистика с сервера
-                stats: {
-                    // Новая структура - данные за выбранный период
-                    incomingLetters: 0,
-                    incomingChats: 0,
-                    uniqueMen: 0,
-                    letters: 0,
-                    chats: 0,
-                    errors: 0,
-                    // Новые поля для X/Y отображения
-                    incomingChatsTotal: 0,
-                    incomingChatsAnswered: 0,
-                    uniqueMenLetters: 0,
-                    uniqueMenChats: 0,
-                    // Метрики
-                    metrics: { totalProfiles: 0, profilesOnline: 0, avgResponseTime: 0, medianResponseTime: 0 },
-                    // Для обратной совместимости
-                    today: { letters: 0, chats: 0, uniqueMen: 0, errors: 0, incomingLetters: 0, incomingChats: 0 },
-                    yesterday: { letters: 0, chats: 0 },
-                    week: { letters: 0, chats: 0, uniqueMen: 0, errors: 0 },
-                    month: { letters: 0, chats: 0, uniqueMen: 0, incomingLetters: 0, incomingChats: 0 }
-                },
 
                 // Статус ботов (программ, не анкет!)
                 botsStatus: { online: 0, offline: 0, total: 0 },
@@ -145,28 +121,7 @@
                 // Отправленные письма (сгруппированные)
                 sentLettersGrouped: [],
 
-                // Последние ответы на входящие
-                lastResponses: [],
-                showAllResponses: false,
-
-                // Использование ИИ (массовые рассылки)
-                aiUsageData: [],
-                showAllAiUsage: false,
-
-                // Почасовая активность для графика
-                hourlyActivity: [],
-
-                statsFilter: {
-                    admin: '',
-                    translator: '',
-                    dateRange: 'Текущий месяц',
-                    dateFrom: '',
-                    dateTo: '',
-                    quickRange: 'month'
-                },
-
                 // Календарь
-                showStatsCalendar: false,
                 showAccountsCalendar: false,
                 calendarMonth: new Date().getMonth(),
                 calendarYear: new Date().getFullYear(),
@@ -179,12 +134,8 @@
                     const rect = btn.getBoundingClientRect();
                     this.calendarPosition = `top: ${rect.bottom + 4}px; left: ${rect.left}px;`;
 
-                    if (type === 'stats') {
-                        this.showStatsCalendar = !this.showStatsCalendar;
-                        this.showHistoryCalendar = false;
-                    } else if (type === 'history') {
+                    if (type === 'history') {
                         this.showHistoryCalendar = !this.showHistoryCalendar;
-                        this.showStatsCalendar = false;
                     }
                 },
 
@@ -196,10 +147,8 @@
                 monitoringFunction: 'lastResponses',
 
                 // Показать все элементы в детальной активности
-                showAllResponses: false,
                 showAllLetters: false,
                 showAllTemplates: false,
-                showAllAiUsage: false,
 
                 newAccountIds: '',
                 newAccountComment: '',
@@ -258,7 +207,6 @@
                 team: [],
                 myTranslators: [], // Переводчики текущего админа
                 allTranslators: [], // Все переводчики (для директора)
-                translatorStats: [],
                 historyActions: [],
 
                 // Система оплаты
@@ -301,8 +249,6 @@
                     // Инициализация Flatpickr
                     this.$nextTick(() => this.initFlatpickr());
                     await this.loadAllData();
-                    // Автообновление каждые 30 секунд
-                    setInterval(() => this.loadDashboardStats(), 30000);
                     // ВАЖНО: Пинги активности отправляются только из бота,
                     // когда переводчик реально работает (клики, печать текста).
                     // Автоматические действия бота НЕ должны генерировать пинги.
@@ -311,28 +257,12 @@
                 // Инициализация Flatpickr календарей
                 initFlatpickr() {
                     const self = this;
-                    const config = {
-                        mode: 'range',
-                        dateFormat: 'Y-m-d',
-                        locale: 'ru',
-                        defaultDate: [this.statsFilter.dateFrom, this.statsFilter.dateTo],
-                        onChange: function(selectedDates, dateStr) {
-                            if (selectedDates.length === 2) {
-                                const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                                self.statsFilter.dateFrom = formatDate(selectedDates[0]);
-                                self.statsFilter.dateTo = formatDate(selectedDates[1]);
-                                self.statsFilter.quickRange = '';
-                                self.applyStatsFilter();
-                            }
-                        }
-                    };
-
-                    // Календарь статистики
-                    this.statsDatePicker = flatpickr('#statsDatePicker', config);
 
                     // Календарь истории
                     this.historyDatePicker = flatpickr('#historyDatePicker', {
-                        ...config,
+                        mode: 'range',
+                        dateFormat: 'Y-m-d',
+                        locale: 'ru',
                         defaultDate: [this.historyFilter.dateFrom, this.historyFilter.dateTo],
                         onChange: function(selectedDates) {
                             if (selectedDates.length === 2) {
@@ -356,11 +286,6 @@
                         return `${year}-${month}-${day}`;
                     };
 
-                    // Статистика - только сегодня
-                    this.statsFilter.dateFrom = formatDate(now);
-                    this.statsFilter.dateTo = formatDate(now);
-                    this.statsFilter.quickRange = 'today';
-
                     // Анкеты - только сегодня
                     this.accountsFilter.dateFrom = formatDate(now);
                     this.accountsFilter.dateTo = formatDate(now);
@@ -376,7 +301,6 @@
                         // LAZY LOADING: Загружаем только критичные данные при старте
                         // Остальное грузится при переключении на вкладку
                         const essentialPromises = [
-                            this.loadDashboardStats(),  // Базовая статистика (быстро)
                             this.loadAccounts(),        // Список анкет (нужен сразу)
                             this.loadBotsStatus(),      // Статус ботов (нужен сразу)
                             this.loadUserBalance(),     // Баланс пользователя
@@ -414,18 +338,6 @@
 
                     try {
                         switch (menu) {
-                            case 'stats':
-                                // Статистика - тяжёлые запросы
-                                await Promise.all([
-                                    this.loadSentLettersGrouped(),
-                                    this.loadLastResponses(),
-                                    this.loadHourlyActivity(),
-                                    this.loadAiUsage(),
-                                    this.loadTranslatorStats(),
-                                    this.loadRecentActivity()
-                                ]);
-                                break;
-
                             case 'team':
                                 await this.loadTeam();
                                 break;
@@ -468,64 +380,6 @@
                     }
                 },
 
-                async loadDashboardStats(preserveOnline = false) {
-                    try {
-                        // Сохраняем текущие значения онлайн если есть фильтр по датам
-                        const savedOnline = preserveOnline ? {
-                            totalProfiles: this.stats.metrics?.totalProfiles,
-                            profilesOnline: this.stats.metrics?.profilesOnline
-                        } : null;
-
-                        let url = `${API_BASE}/api/dashboard?userId=${this.currentUser.id}&role=${this.currentUser.role}`;
-                        if (this.statsFilter.dateFrom) {
-                            url += `&dateFrom=${this.statsFilter.dateFrom}`;
-                        }
-                        if (this.statsFilter.dateTo) {
-                            url += `&dateTo=${this.statsFilter.dateTo}`;
-                        }
-                        // Фильтры по админу/переводчику
-                        if (this.statsFilter.admin) {
-                            url += `&filterAdminId=${this.statsFilter.admin}`;
-                        }
-                        if (this.statsFilter.translator) {
-                            url += `&filterTranslatorId=${this.statsFilter.translator}`;
-                        }
-                        const res = await fetch(url);
-                        const data = await res.json();
-                        if (data.success) {
-                            this.stats = data.dashboard;
-
-                            // Восстанавливаем онлайн статус если был фильтр
-                            if (preserveOnline && savedOnline) {
-                                this.stats.metrics.totalProfiles = savedOnline.totalProfiles;
-                                this.stats.metrics.profilesOnline = savedOnline.profilesOnline;
-                            }
-                        }
-                    } catch (e) { console.error('loadDashboardStats error:', e); }
-                },
-
-                // Полное обновление всей статистики (при смене фильтров)
-                async refreshAllStats() {
-                    this.loading = true;
-                    // Сбрасываем кэш вкладки статистики для перезагрузки
-                    this.loadedTabs.stats = false;
-                    try {
-                        await Promise.all([
-                            this.loadDashboardStats(),
-                            this.loadHourlyActivity(),
-                            this.loadTranslatorStats(),
-                            this.loadRecentActivity(),
-                            this.loadSentLettersGrouped(),
-                            this.loadAccounts(),
-                            this.loadBotsStatus()
-                        ]);
-                        this.loadedTabs.stats = true;
-                        console.log('✅ Статистика обновлена');
-                    } catch (e) {
-                        console.error('refreshAllStats error:', e);
-                    }
-                    this.loading = false;
-                },
 
                 async loadAccounts() {
                     try {
@@ -838,19 +692,6 @@
                     this._loadingSentLetters = true;
                     try {
                         let url = `${API_BASE}/api/activity/sent-letters-grouped?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=50`;
-                        if (this.statsFilter.dateFrom) {
-                            url += `&dateFrom=${this.statsFilter.dateFrom}`;
-                        }
-                        if (this.statsFilter.dateTo) {
-                            url += `&dateTo=${this.statsFilter.dateTo}`;
-                        }
-                        // Фильтры по админу/переводчику
-                        if (this.statsFilter.admin) {
-                            url += `&filterAdminId=${this.statsFilter.admin}`;
-                        }
-                        if (this.statsFilter.translator) {
-                            url += `&filterTranslatorId=${this.statsFilter.translator}`;
-                        }
                         const res = await fetch(url);
                         const data = await res.json();
                         if (data.success) {
@@ -860,89 +701,6 @@
                     finally { this._loadingSentLetters = false; }
                 },
 
-                async loadLastResponses() {
-                    try {
-                        let url = `${API_BASE}/api/stats/last-responses?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=100`;
-                        if (this.statsFilter.dateFrom) {
-                            url += `&dateFrom=${this.statsFilter.dateFrom}`;
-                        }
-                        if (this.statsFilter.dateTo) {
-                            url += `&dateTo=${this.statsFilter.dateTo}`;
-                        }
-                        if (this.statsFilter.admin) {
-                            url += `&filterAdminId=${this.statsFilter.admin}`;
-                        }
-                        if (this.statsFilter.translator) {
-                            url += `&filterTranslatorId=${this.statsFilter.translator}`;
-                        }
-                        const res = await fetch(url);
-                        const data = await res.json();
-                        if (data.success) {
-                            this.lastResponses = data.responses;
-                        }
-                    } catch (e) { console.error('loadLastResponses error:', e); }
-                },
-
-                async loadAiUsage() {
-                    try {
-                        let url = `${API_BASE}/api/stats/ai-usage?userId=${this.currentUser.id}&role=${this.currentUser.role}&limit=100`;
-                        if (this.statsFilter.dateFrom) {
-                            url += `&dateFrom=${this.statsFilter.dateFrom}`;
-                        }
-                        if (this.statsFilter.dateTo) {
-                            url += `&dateTo=${this.statsFilter.dateTo}`;
-                        }
-                        if (this.statsFilter.admin) {
-                            url += `&filterAdminId=${this.statsFilter.admin}`;
-                        }
-                        if (this.statsFilter.translator) {
-                            url += `&filterTranslatorId=${this.statsFilter.translator}`;
-                        }
-                        const res = await fetch(url);
-                        const data = await res.json();
-                        if (data.success) {
-                            this.aiUsageData = data.aiUsage;
-                        }
-                    } catch (e) { console.error('loadAiUsage error:', e); }
-                },
-
-                async loadHourlyActivity() {
-                    try {
-                        let url = `${API_BASE}/api/stats/hourly-activity?userId=${this.currentUser.id}&role=${this.currentUser.role}&days=1`;
-                        if (this.statsFilter.dateFrom) {
-                            url += `&dateFrom=${this.statsFilter.dateFrom}`;
-                        }
-                        if (this.statsFilter.dateTo) {
-                            url += `&dateTo=${this.statsFilter.dateTo}`;
-                        }
-                        if (this.statsFilter.admin) {
-                            url += `&filterAdminId=${this.statsFilter.admin}`;
-                        }
-                        if (this.statsFilter.translator) {
-                            url += `&filterTranslatorId=${this.statsFilter.translator}`;
-                        }
-                        const res = await fetch(url);
-                        const data = await res.json();
-                        if (data.success) {
-                            this.hourlyActivity = data.hourlyData;
-                        }
-                    } catch (e) { console.error('loadHourlyActivity error:', e); }
-                },
-
-                // Защита от дублирования запросов
-                _loadingTranslatorStats: false,
-                async loadTranslatorStats() {
-                    if (this._loadingTranslatorStats) return; // Уже загружается
-                    this._loadingTranslatorStats = true;
-                    try {
-                        const res = await fetch(`${API_BASE}/api/stats/translators?userId=${this.currentUser.id}&role=${this.currentUser.role}`);
-                        const data = await res.json();
-                        if (data.success) {
-                            this.translatorStats = data.translators;
-                        }
-                    } catch (e) { console.error('loadTranslatorStats error:', e); }
-                    finally { this._loadingTranslatorStats = false; }
-                },
 
                 async loadHistoryActions() {
                     try {
@@ -1023,105 +781,8 @@
                     const page = this.t('pages.' + this.activeMenu);
                     return page?.subtitle || '';
                 },
-                
-                getActivityMinutes(hour) {
-                    // API возвращает массив из 24 чисел — минуты работы в каждый час
-                    if (this.hourlyActivity && this.hourlyActivity.length > 0) {
-                        const value = this.hourlyActivity[hour];
-                        if (typeof value === 'number') {
-                            return Math.min(value, 60);
-                        }
-                    }
-                    return 0;
-                },
-
-                getActivityLevel(hour) {
-                    // Для совместимости — конвертируем минуты в уровень 0-1
-                    return this.getActivityMinutes(hour) / 60;
-                },
-
-                getActivityColor(hour) {
-                    const minutes = this.getActivityMinutes(hour);
-                    if (minutes >= 45) return 'from-red-400 to-orange-400';
-                    if (minutes >= 30) return 'from-yellow-400 to-amber-400';
-                    if (minutes >= 15) return 'from-blue-400 to-cyan-400';
-                    if (minutes > 0) return 'from-gray-400 to-gray-500';
-                    return 'from-gray-200 to-gray-300';
-                },
-
-                setDateRange(range) {
-                    const now = new Date();
-                    const months = this.t('calendar.months');
-                    const locale = getDateLocale(this.language);
-                    const ranges = {
-                        'month': `${months[now.getMonth()]} ${now.getFullYear()}`,
-                        'week': this.t('common.week'),
-                        'day': now.toLocaleDateString(locale)
-                    };
-                    this.statsFilter.dateRange = ranges[range];
-                    this.showCalendar = false;
-                },
-
-                setQuickDateRange(range) {
-                    const now = new Date();
-                    const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                    let dateFrom, dateTo;
-
-                    this.statsFilter.quickRange = range;
-
-                    if (range === 'today') {
-                        dateFrom = new Date(now);
-                        dateTo = new Date(now);
-                    } else if (range === 'week') {
-                        dateFrom = new Date(now);
-                        dateFrom.setDate(now.getDate() - 7);
-                        dateTo = new Date(now);
-                    } else if (range === 'month') {
-                        // Текущий месяц: с 1 числа до сегодня
-                        dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
-                        dateTo = new Date(now);
-                    }
-
-                    this.statsFilter.dateFrom = formatDate(dateFrom);
-                    this.statsFilter.dateTo = formatDate(dateTo);
-
-                    // Обновить Flatpickr
-                    if (this.statsDatePicker) {
-                        this.statsDatePicker.setDate([dateFrom, dateTo], false);
-                    }
-
-                    this.applyDateFilter();
-                },
-
-                applyDateFilter() {
-                    // Перезагружаем ВСЕ блоки статистики с новым фильтром
-                    this.applyStatsFilter();
-                },
-
-                // Применить фильтры (вызывается при изменении админа/переводчика/дат)
-                applyStatsFilter() {
-                    this.loadDashboardStats(true);
-                    this.loadSentLettersGrouped();
-                    this.loadLastResponses();
-                    this.loadAiUsage();
-                    this.loadHourlyActivity();
-                },
 
                 // Calendar functions
-                getDateRangeText() {
-                    if (!this.statsFilter.dateFrom || !this.statsFilter.dateTo) {
-                        return this.t('common.selectPeriod');
-                    }
-                    const from = new Date(this.statsFilter.dateFrom);
-                    const to = new Date(this.statsFilter.dateTo);
-                    const locale = getDateLocale(this.language);
-                    const formatShort = (d) => d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
-
-                    if (this.statsFilter.dateFrom === this.statsFilter.dateTo) {
-                        return formatShort(from);
-                    }
-                    return `${formatShort(from)} - ${formatShort(to)}`;
-                },
 
                 getCalendarMonthName() {
                     const months = this.t('calendar.months');
@@ -1157,33 +818,6 @@
                     return days;
                 },
 
-                selectCalendarDate(date) {
-                    if (this.calendarSelectingStart || !this.statsFilter.dateFrom) {
-                        this.statsFilter.dateFrom = date;
-                        this.statsFilter.dateTo = date;
-                        this.calendarSelectingStart = false;
-                    } else {
-                        if (date < this.statsFilter.dateFrom) {
-                            this.statsFilter.dateTo = this.statsFilter.dateFrom;
-                            this.statsFilter.dateFrom = date;
-                        } else {
-                            this.statsFilter.dateTo = date;
-                        }
-                        this.calendarSelectingStart = true;
-                        this.statsFilter.quickRange = '';
-                        this.showStatsCalendar = false;
-                        this.applyDateFilter();
-                    }
-                },
-
-                isDateSelected(date) {
-                    return date === this.statsFilter.dateFrom || date === this.statsFilter.dateTo;
-                },
-
-                isDateInRange(date) {
-                    if (!this.statsFilter.dateFrom || !this.statsFilter.dateTo) return false;
-                    return date > this.statsFilter.dateFrom && date < this.statsFilter.dateTo;
-                },
 
                 setMonitoringFunction(func) {
                     this.monitoringFunction = func;
@@ -2178,28 +1812,6 @@
                     return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
                 },
 
-                // === Функции экспорта статистики ===
-                exportStats() {
-                    const dateFrom = this.statsFilter.dateFrom || 'все';
-                    const dateTo = this.statsFilter.dateTo || 'все';
-
-                    // Формируем CSV данные
-                    let csv = 'Статистика Nova\n';
-                    csv += `Период: ${dateFrom} - ${dateTo}\n\n`;
-                    csv += 'Показатель,Сегодня,За месяц\n';
-                    csv += `Письма,${this.stats.today.letters || 0},${this.stats.month.letters || 0}\n`;
-                    csv += `Чаты,${this.stats.today.chats || 0},${this.stats.month.chats || 0}\n`;
-                    csv += `Уникальные мужчины,${this.stats.today.uniqueMen || 0},${this.stats.month.uniqueMen || 0}\n`;
-                    csv += `\nВремя работы сегодня: ${this.stats.metrics.workTime || '0ч 0м'}\n`;
-                    csv += `Время работы за месяц: ${this.stats.metrics.workTimeMonth || '0ч 0м'}\n`;
-
-                    // Скачиваем файл
-                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-                    const link = document.createElement('a');
-                    link.href = URL.createObjectURL(blob);
-                    link.download = `nova_stats_${dateFrom}_${dateTo}.csv`;
-                    link.click();
-                },
 
                 exportFavoriteTemplates() {
                     if (this.favoriteTemplates.length === 0) {
@@ -3137,15 +2749,6 @@
                     }
                 },
 
-                // Обновить статистику профилей
-                async refreshProfileStats() {
-                    this.refreshingStats = true;
-                    try {
-                        await this.loadDashboardStats();
-                    } finally {
-                        this.refreshingStats = false;
-                    }
-                },
 
                 // Обработчик изменения фильтра по админу
                 onAdminFilterChange() {

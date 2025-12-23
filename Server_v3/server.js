@@ -19,7 +19,6 @@ const {
     profilesRoutes,
     botsRoutes,
     activityRoutes,
-    statsRoutes,
     dashboardRoutes,
     favoriteTemplatesRoutes,
     billingRoutes,
@@ -150,7 +149,6 @@ app.use('/api/team', teamRoutes);
 app.use('/api/users', teamRoutes); // alias для совместимости
 app.use('/api/profiles', profilesRoutes);
 app.use('/api/bots', botsRoutes);
-app.use('/api/stats', statsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/favorite-templates', favoriteTemplatesRoutes);
 app.use('/api/billing', billingRoutes);
@@ -212,37 +210,6 @@ app.get('/reset-database', async (req, res) => {
     }
 });
 
-// Пересчет статистики
-app.get('/recalculate-stats', async (req, res) => {
-    try {
-        console.log('🔄 Пересчет ежедневной статистики...');
-
-        await pool.query(`
-            DELETE FROM daily_stats
-            WHERE date >= CURRENT_DATE - INTERVAL '30 days'
-        `);
-
-        await pool.query(`
-            INSERT INTO daily_stats (user_id, date, letters_count, chats_count, unique_men, avg_response_time)
-            SELECT
-                p.assigned_translator_id as user_id,
-                DATE(m.timestamp) as date,
-                COUNT(*) FILTER (WHERE m.type = 'outgoing') as letters_count,
-                COUNT(*) FILTER (WHERE m.type = 'chat_msg') as chats_count,
-                COUNT(DISTINCT m.sender_id) as unique_men,
-                AVG(m.response_time) as avg_response_time
-            FROM messages m
-            JOIN allowed_profiles p ON m.account_id = p.profile_id
-            WHERE m.timestamp >= CURRENT_DATE - INTERVAL '30 days'
-                AND p.assigned_translator_id IS NOT NULL
-            GROUP BY p.assigned_translator_id, DATE(m.timestamp)
-        `);
-
-        res.json({ success: true, message: 'Статистика пересчитана' });
-    } catch(e) {
-        res.status(500).json({ error: e.message });
-    }
-});
 
 // ==========================================
 // ЗАГРУЗКА ФАЙЛОВ
@@ -320,17 +287,6 @@ app.listen(PORT, () => {
     console.log(`   • POST /api/message_sent - отправка сообщений (legacy)`);
     console.log(`   • POST /api/heartbeat - heartbeat (legacy)`);
     console.log(`   • POST /api/error - логирование ошибок`);
-    console.log(`\n📊 Эндпоинты статистики:`);
-    console.log(`   • GET /api/stats/detailed - детальная статистика`);
-    console.log(`   • GET /api/stats/daily - статистика по дням`);
-    console.log(`   • GET /api/stats/top-profiles - топ анкет`);
-    console.log(`   • GET /api/stats/translators - статистика переводчиков`);
-    console.log(`   • GET /api/stats/admins - статистика админов`);
-    console.log(`   • GET /api/stats/by-admin - статистика по админам`);
-    console.log(`   • GET /api/stats/by-translator - статистика по переводчикам`);
-    console.log(`   • GET /api/stats/profile/:id - детали по анкете`);
-    console.log(`   • GET /api/stats/forecast - прогноз дохода`);
-    console.log(`   • GET /api/stats/hourly-activity - активность по часам`);
     console.log(`\n🖥️  API для личного кабинета:`);
     console.log(`   • GET /api/dashboard - сводка для дашборда`);
     console.log(`   • GET /api/profiles - список анкет с статистикой`);

@@ -189,24 +189,6 @@ const api = {
     },
 
     // ============================================
-    // STATS API
-    // ============================================
-
-    stats: {
-        async dashboard(userId, role, params = {}) {
-            return api.get('/api/stats/dashboard', { userId, role, ...params });
-        },
-
-        async hourlyActivity(userId, role, days = 7) {
-            return api.get('/api/stats/hourly-activity', { userId, role, days });
-        },
-
-        async translators(userId, role) {
-            return api.get('/api/stats/translators', { userId, role });
-        }
-    },
-
-    // ============================================
     // ACTIVITY API
     // ============================================
 
