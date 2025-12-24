@@ -217,7 +217,10 @@ router.delete('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
     console.log(`📝 [PUT /api/users/:id] userId=${req.params.id}, body=`, req.body);
     const userId = req.params.id;
-    const { username, password, salary, aiEnabled, is_restricted, isOwnTranslator } = req.body;
+    // Поддерживаем оба варианта: camelCase (isRestricted) и snake_case (is_restricted)
+    const { username, password, salary, aiEnabled, is_restricted, isRestricted, isOwnTranslator } = req.body;
+    // Используем isRestricted если is_restricted не передан
+    const finalIsRestricted = is_restricted !== undefined ? is_restricted : isRestricted;
     try {
         const updates = [];
         const params = [];
@@ -245,9 +248,9 @@ router.put('/:id', async (req, res) => {
             params.push(aiEnabled);
         }
 
-        if (is_restricted !== undefined) {
+        if (finalIsRestricted !== undefined) {
             updates.push(`is_restricted = $${paramIndex++}`);
-            params.push(is_restricted);
+            params.push(finalIsRestricted);
         }
 
         if (isOwnTranslator !== undefined) {

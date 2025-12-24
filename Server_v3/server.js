@@ -53,7 +53,9 @@ app.post('/api/users/:id/update', async (req, res) => {
     console.log(`📝 [POST /api/users/:id/update] userId=${req.params.id}, body=`, req.body);
     const pool = require('./config/database');
     const userId = req.params.id;
-    const { username, password, salary, aiEnabled, is_restricted } = req.body;
+    // Поддерживаем оба варианта: camelCase (isRestricted) и snake_case (is_restricted)
+    const { username, password, salary, aiEnabled, is_restricted, isRestricted } = req.body;
+    const finalIsRestricted = is_restricted !== undefined ? is_restricted : isRestricted;
     try {
         const updates = [];
         const params = [];
@@ -81,9 +83,9 @@ app.post('/api/users/:id/update', async (req, res) => {
             params.push(aiEnabled);
         }
 
-        if (is_restricted !== undefined) {
+        if (finalIsRestricted !== undefined) {
             updates.push(`is_restricted = $${paramIndex++}`);
-            params.push(is_restricted);
+            params.push(finalIsRestricted);
         }
 
         if (updates.length === 0) {
