@@ -396,11 +396,15 @@
                 return;
             }
 
-            // Restore saved login (Remember me)
+            // Restore saved login and password (Remember me)
             const savedLogin = localStorage.getItem('novaRememberLogin');
+            const savedPassword = localStorage.getItem('novaRememberPassword');
             if (savedLogin) {
                 document.getElementById('email').value = savedLogin;
                 document.getElementById('remember').checked = true;
+            }
+            if (savedPassword) {
+                document.getElementById('password').value = savedPassword;
             }
 
             // Toggle password visibility
@@ -457,12 +461,14 @@
 
                         if (remember) {
                             localStorage.setItem('novaUser', JSON.stringify(userData));
-                            // Сохраняем логин отдельно для "Запомнить меня"
+                            // Сохраняем логин и пароль для "Запомнить меня"
                             localStorage.setItem('novaRememberLogin', username);
+                            localStorage.setItem('novaRememberPassword', password);
                         } else {
                             sessionStorage.setItem('novaUser', JSON.stringify(userData));
-                            // Удаляем сохранённый логин если галочка снята
+                            // Удаляем сохранённые данные если галочка снята
                             localStorage.removeItem('novaRememberLogin');
+                            localStorage.removeItem('novaRememberPassword');
                         }
 
                         window.location.href = 'dashboard.html';
