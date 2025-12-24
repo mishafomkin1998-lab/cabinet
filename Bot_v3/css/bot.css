@@ -1235,14 +1235,26 @@
         .tab-item.tab-yellow { background: #fff3cd !important; border-color: #ffecb5 !important; color: #664d03 !important; }
         .tab-item.tab-red { background: #f8d7da !important; border-color: #f5c2c7 !important; color: #842029 !important; }
 
+        /* ID вкладки - фиксированная ширина для 6 цифр */
+        .tab-id {
+            display: inline-block;
+            width: 46px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Спиннер - такая же ширина как ID */
+        .tab-spinner {
+            display: none;
+            width: 46px;
+            text-align: center;
+        }
+
         /* Анимация загрузки вкладки */
         .tab-item.tab-loading {
             animation: tabPulse 1s ease-in-out infinite;
         }
         .tab-item.tab-loading .tab-id {
-            display: none;
-        }
-        .tab-item .tab-spinner {
             display: none;
         }
         .tab-item.tab-loading .tab-spinner {
