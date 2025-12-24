@@ -366,6 +366,8 @@ async function initDatabase() {
         await pool.query(`ALTER TABLE billing_history DROP CONSTRAINT IF EXISTS billing_history_admin_id_fkey`);
         await pool.query(`ALTER TABLE billing_history ALTER COLUMN admin_id DROP NOT NULL`);
         await pool.query(`ALTER TABLE billing_history ADD CONSTRAINT billing_history_admin_id_fkey FOREIGN KEY (admin_id) REFERENCES users(id) ON DELETE SET NULL`);
+        await pool.query(`ALTER TABLE billing_history ADD COLUMN IF NOT EXISTS description TEXT`);
+        await pool.query(`ALTER TABLE billing_history ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'topup'`);
 
         await fixSerialSequence('billing_history');
 
