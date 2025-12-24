@@ -30,7 +30,26 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+// CORS - ограничен только разрешёнными доменами
+const allowedOrigins = [
+    'http://188.137.254.179:3000',
+    'http://188.137.254.179:3001',
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001'
+];
+app.use(cors({
+    origin: function(origin, callback) {
+        // Разрешаем запросы без origin (например, от бота или curl)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error('CORS policy: Origin not allowed'), false);
+    },
+    credentials: true
+}));
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -194,8 +213,19 @@ app.post('/api/error', (req, res, next) => {
 // УТИЛИТЫ
 // ==========================================
 
-// Сброс базы данных
+// Секретный токен для опасных операций
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'novabot-secret-2024';
+
+// Сброс базы данных (ЗАЩИЩЕНО ТОКЕНОМ)
 app.get('/reset-database', async (req, res) => {
+    const { secret } = req.query;
+
+    // Проверка секретного токена
+    if (secret !== ADMIN_SECRET) {
+        console.log(`⚠️ [SECURITY] Попытка доступа к /reset-database без токена с IP: ${req.ip}`);
+        return res.status(403).send('Доступ запрещён');
+    }
+
     try {
         console.log('⚠️ ЗАПУЩЕН СБРОС БАЗЫ ДАННЫХ...');
         await pool.query('DROP TABLE IF EXISTS daily_stats CASCADE');

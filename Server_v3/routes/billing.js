@@ -53,13 +53,23 @@ router.get('/balance/:userId', asyncHandler(async (req, res) => {
 /**
  * POST /api/billing/topup
  * Пополнить баланс пользователя (директор -> админ)
+ * ИСПОЛЬЗУЕТ ТРАНЗАКЦИЮ для целостности данных
  */
 router.post('/topup', asyncHandler(async (req, res) => {
     const { userId, amount, byUserId, note } = req.body;
 
-    if (!userId || !amount || amount <= 0) {
-        return res.status(400).json({ success: false, error: 'Неверные параметры' });
+    // Валидация
+    if (!userId || isNaN(parseInt(userId))) {
+        return res.status(400).json({ success: false, error: 'Неверный userId' });
     }
+    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        return res.status(400).json({ success: false, error: 'Сумма должна быть положительным числом' });
+    }
+    if (!byUserId || isNaN(parseInt(byUserId))) {
+        return res.status(400).json({ success: false, error: 'Неверный byUserId' });
+    }
+
+    const parsedAmount = parseFloat(amount);
 
     // Проверяем права (только директор может пополнять)
     const byUser = await pool.query(`SELECT role FROM users WHERE id = $1`, [byUserId]);
@@ -67,25 +77,37 @@ router.post('/topup', asyncHandler(async (req, res) => {
         return res.status(403).json({ success: false, error: 'Нет прав для пополнения баланса' });
     }
 
-    // Пополняем баланс
-    await pool.query(
-        `UPDATE users SET balance = balance + $1 WHERE id = $2`,
-        [amount, userId]
-    );
+    // === НАЧАЛО ТРАНЗАКЦИИ ===
+    await pool.query('BEGIN');
 
-    // Сохраняем в историю пополнений
-    await pool.query(
-        `INSERT INTO billing_history (admin_id, amount, by_user_id, note) VALUES ($1, $2, $3, $4)`,
-        [userId, amount, byUserId, note || null]
-    );
+    try {
+        // Пополняем баланс
+        await pool.query(
+            `UPDATE users SET balance = balance + $1 WHERE id = $2`,
+            [parsedAmount, userId]
+        );
 
-    // Получаем новый баланс
-    const newBalance = await pool.query(`SELECT balance FROM users WHERE id = $1`, [userId]);
+        // Сохраняем в историю пополнений
+        await pool.query(
+            `INSERT INTO billing_history (admin_id, amount, by_user_id, note) VALUES ($1, $2, $3, $4)`,
+            [userId, parsedAmount, byUserId, note || null]
+        );
 
-    res.json({
-        success: true,
-        newBalance: parseFloat(newBalance.rows[0].balance) || 0
-    });
+        await pool.query('COMMIT');
+        // === КОНЕЦ ТРАНЗАКЦИИ ===
+
+        // Получаем новый баланс
+        const newBalance = await pool.query(`SELECT balance FROM users WHERE id = $1`, [userId]);
+
+        res.json({
+            success: true,
+            newBalance: parseFloat(newBalance.rows[0].balance) || 0
+        });
+    } catch (error) {
+        await pool.query('ROLLBACK');
+        console.error('💥 [BILLING] Ошибка транзакции пополнения:', error.message);
+        res.status(500).json({ success: false, error: 'Ошибка при пополнении баланса' });
+    }
 }));
 
 /**
@@ -533,6 +555,7 @@ router.post('/pay-profile', asyncHandler(async (req, res) => {
 /**
  * POST /api/billing/pay
  * Оплатить анкету со своего баланса (для админов/переводчиков)
+ * ИСПОЛЬЗУЕТ ТРАНЗАКЦИЮ для целостности данных
  */
 router.post('/pay', asyncHandler(async (req, res) => {
     const { profileId, days, userId } = req.body;
@@ -542,6 +565,11 @@ router.post('/pay', asyncHandler(async (req, res) => {
             success: false,
             error: 'Неверные параметры. Доступные периоды: 15, 30, 45, 60 дней'
         });
+    }
+
+    // Валидация userId
+    if (!userId || isNaN(parseInt(userId))) {
+        return res.status(400).json({ success: false, error: 'Неверный userId' });
     }
 
     const cost = PRICING[days];
@@ -576,39 +604,51 @@ router.post('/pay', asyncHandler(async (req, res) => {
         return res.status(404).json({ success: false, error: 'Анкета не найдена' });
     }
 
-    // Списываем с баланса
-    await pool.query(
-        `UPDATE users SET balance = balance - $1 WHERE id = $2`,
-        [cost, userId]
-    );
+    // === НАЧАЛО ТРАНЗАКЦИИ ===
+    await pool.query('BEGIN');
 
-    // Продлеваем анкету
-    await pool.query(`
-        UPDATE allowed_profiles
-        SET paid_until = COALESCE(
-            CASE WHEN paid_until > NOW() THEN paid_until ELSE NOW() END
-        , NOW()) + INTERVAL '${days} days',
-        is_trial = FALSE
-        WHERE profile_id = $1
-    `, [profileId]);
+    try {
+        // Списываем с баланса
+        await pool.query(
+            `UPDATE users SET balance = balance - $1 WHERE id = $2`,
+            [cost, userId]
+        );
 
-    // Сохраняем в историю оплаты
-    await pool.query(
-        `INSERT INTO profile_payment_history (profile_id, days, action_type, by_user_id, amount) VALUES ($1, $2, 'payment', $3, $4)`,
-        [profileId, days, userId, cost]
-    );
+        // Продлеваем анкету (параметризованный запрос для защиты от SQL Injection)
+        await pool.query(`
+            UPDATE allowed_profiles
+            SET paid_until = COALESCE(
+                CASE WHEN paid_until > NOW() THEN paid_until ELSE NOW() END
+            , NOW()) + INTERVAL '1 day' * $2,
+            is_trial = FALSE
+            WHERE profile_id = $1
+        `, [profileId, days]);
 
-    // Сохраняем в историю биллинга
-    await pool.query(
-        `INSERT INTO billing_history (admin_id, amount, description, type) VALUES ($1, $2, $3, 'expense')`,
-        [userId, cost, `Оплата анкеты ${profileId} на ${days} дней`]
-    );
+        // Сохраняем в историю оплаты
+        await pool.query(
+            `INSERT INTO profile_payment_history (profile_id, days, action_type, by_user_id, amount) VALUES ($1, $2, 'payment', $3, $4)`,
+            [profileId, days, userId, cost]
+        );
 
-    res.json({
-        success: true,
-        message: `Анкета #${profileId} оплачена на ${days} дней`,
-        newBalance: balance - cost
-    });
+        // Сохраняем в историю биллинга
+        await pool.query(
+            `INSERT INTO billing_history (admin_id, amount, description, type) VALUES ($1, $2, $3, 'expense')`,
+            [userId, cost, `Оплата анкеты ${profileId} на ${days} дней`]
+        );
+
+        await pool.query('COMMIT');
+        // === КОНЕЦ ТРАНЗАКЦИИ ===
+
+        res.json({
+            success: true,
+            message: `Анкета #${profileId} оплачена на ${days} дней`,
+            newBalance: balance - cost
+        });
+    } catch (error) {
+        await pool.query('ROLLBACK');
+        console.error('💥 [BILLING] Ошибка транзакции оплаты:', error.message);
+        res.status(500).json({ success: false, error: 'Ошибка при оплате. Попробуйте снова.' });
+    }
 }));
 
 /**
