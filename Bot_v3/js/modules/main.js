@@ -35,14 +35,12 @@ function createInterface(bot) {
             </button>
 
             <!-- Карточка профиля анкеты (только в режиме Mail) -->
-            ${SHOW_PROFILE_CARD ? `
-            <div class="profile-card hide-in-chat" id="profile-card-${bot.id}">
+            <div class="profile-card hide-in-chat" id="profile-card-${bot.id}" style="${globalSettings.showProfileCard === false ? 'display:none' : ''}">
                 <img src="" class="profile-photo" id="profile-photo-${bot.id}" onerror="this.style.display='none'">
                 <div class="profile-info">
                     <span class="profile-name" id="profile-name-${bot.id}"></span>
                 </div>
             </div>
-            ` : ''}
 
             <!-- Кнопка SHARE MY CAM (только в режиме Chat) -->
             <button class="btn btn-share-cam w-100 mb-2 hide-in-mail" id="btn-share-cam-${bot.id}" onclick="openVideoChatWindow('${bot.id}')">

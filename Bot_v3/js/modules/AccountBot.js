@@ -727,7 +727,7 @@ class AccountBot {
 
     // === PROFILE CARD: Загрузка фото и имени через WebView ===
     async loadProfileCard() {
-        if (typeof SHOW_PROFILE_CARD === 'undefined' || !SHOW_PROFILE_CARD) return;
+        if (globalSettings.showProfileCard === false) return;
 
         const cacheKey = `profileCard_${this.displayId}`;
         const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 часа

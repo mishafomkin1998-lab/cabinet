@@ -266,6 +266,10 @@
                             <input class="form-check-input" type="checkbox" id="set-keep-logger-entries" onchange="saveGlobalSettings()">
                             <label class="form-check-label small" for="set-keep-logger-entries">Сохранять записи в логгере после просмотра</label>
                         </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="set-show-profile-card" checked onchange="saveGlobalSettings(); toggleProfileCards()">
+                            <label class="form-check-label small" for="set-show-profile-card">Показывать фото анкеты</label>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -16,6 +16,7 @@ function loadGlobalSettingsUI() {
     document.getElementById('set-extended').checked = globalSettings.extendedFeatures;
     document.getElementById('set-skip-delete-confirm').checked = globalSettings.skipDeleteConfirm;
     document.getElementById('set-keep-logger-entries').checked = globalSettings.keepLoggerEntries;
+    document.getElementById('set-show-profile-card').checked = globalSettings.showProfileCard !== false;
     document.getElementById('set-translator-id').value = globalSettings.translatorId || '';
     applyTheme(globalSettings.theme);
 
@@ -76,6 +77,7 @@ function saveGlobalSettings() {
     globalSettings.extendedFeatures = document.getElementById('set-extended').checked;
     globalSettings.skipDeleteConfirm = document.getElementById('set-skip-delete-confirm').checked;
     globalSettings.keepLoggerEntries = document.getElementById('set-keep-logger-entries').checked;
+    globalSettings.showProfileCard = document.getElementById('set-show-profile-card').checked;
 
     // Сохраняем Translator ID
     const translatorIdValue = document.getElementById('set-translator-id').value.trim();
@@ -103,6 +105,18 @@ function saveGlobalSettings() {
     initDefaultProxy();
 }
 
+// Показать/убрать карточки профилей
+function toggleProfileCards() {
+    const show = globalSettings.showProfileCard !== false;
+    document.querySelectorAll('.profile-card').forEach(card => {
+        if (show) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
 function openGlobalSettings() {
     // Загружаем значения в форму
     document.getElementById('set-lang').value = globalSettings.lang;
@@ -122,6 +136,7 @@ function openGlobalSettings() {
     document.getElementById('set-extended').checked = globalSettings.extendedFeatures;
     document.getElementById('set-skip-delete-confirm').checked = globalSettings.skipDeleteConfirm;
     document.getElementById('set-keep-logger-entries').checked = globalSettings.keepLoggerEntries;
+    document.getElementById('set-show-profile-card').checked = globalSettings.showProfileCard !== false;
     document.getElementById('set-translator-id').value = globalSettings.translatorId || '';
 
     // Загружаем прокси для анкет (1-6)
