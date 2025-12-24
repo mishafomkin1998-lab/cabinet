@@ -2065,6 +2065,8 @@
             font-weight: 600;
             min-width: 60px;
             text-align: center;
+            user-select: text;
+            cursor: text;
         }
 
         /* Успешные - зелёный */
