@@ -207,30 +207,7 @@ async function initDatabase() {
             await fixSerialSequence(tableName);
         }
 
-        // 10. Таблица для ежедневной статистики
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS daily_stats (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id),
-                date DATE NOT NULL,
-                letters_count INTEGER DEFAULT 0,
-                chats_count INTEGER DEFAULT 0,
-                unique_men INTEGER DEFAULT 0,
-                total_income DECIMAL(10,2) DEFAULT 0,
-                avg_response_time INTEGER,
-                conversion_rate DECIMAL(5,2) DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(user_id, date)
-            )
-        `);
-
-        try {
-            await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS daily_stats_user_date_unique ON daily_stats(user_id, date)`);
-        } catch (e) {
-            console.log('Миграция daily_stats_user_date_unique уже выполнена');
-        }
-
-        // 11. Таблица входящих сообщений от мужчин
+        // 10. Таблица входящих сообщений от мужчин
         await pool.query(`
             CREATE TABLE IF NOT EXISTS incoming_messages (
                 id SERIAL PRIMARY KEY,
