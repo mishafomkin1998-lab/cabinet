@@ -1869,6 +1869,80 @@
         </div>
     </div>
 
+    <!-- Модальное окно оплаты выбранных анкет -->
+    <div x-show="showPaymentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" x-cloak>
+        <div class="glass rounded-2xl p-6 w-full max-w-md" @click.outside="showPaymentModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">Оплатить анкеты</h3>
+                <button @click="showPaymentModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div class="text-center mb-4">
+                    <div class="text-lg font-medium text-gray-700">
+                        Выбрано анкет: <span class="text-indigo-600 font-bold" x-text="selectedProfileIds.length"></span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-3">Выберите период:</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button @click="paymentDays = 15"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="paymentDays === 15 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">15 дней</div>
+                            <div class="text-green-600 font-medium">$1</div>
+                        </button>
+                        <button @click="paymentDays = 30"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="paymentDays === 30 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">30 дней</div>
+                            <div class="text-green-600 font-medium">$2</div>
+                        </button>
+                        <button @click="paymentDays = 45"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="paymentDays === 45 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">45 дней</div>
+                            <div class="text-green-600 font-medium">$3</div>
+                        </button>
+                        <button @click="paymentDays = 60"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="paymentDays === 60 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">60 дней</div>
+                            <div class="text-green-600 font-medium">$4</div>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 rounded-xl p-4 mt-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">К оплате:</span>
+                        <span class="text-2xl font-bold text-green-600">$<span x-text="(pricing[paymentDays] || 0) * selectedProfileIds.length"></span></span>
+                    </div>
+                    <div class="flex justify-between items-center mt-2 text-sm">
+                        <span class="text-gray-500">Ваш баланс:</span>
+                        <span :class="userBalance >= ((pricing[paymentDays] || 0) * selectedProfileIds.length) ? 'text-green-600' : 'text-red-500'">
+                            $<span x-text="userBalance.toFixed(2)"></span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showPaymentModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
+                        Отмена
+                    </button>
+                    <button @click="confirmPayment"
+                            :disabled="userBalance < ((pricing[paymentDays] || 0) * selectedProfileIds.length)"
+                            class="glow-button px-5 py-2.5 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                        Оплатить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Модальное окно пополнения баланса (для директора) -->
     <div x-show="showTopupModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div class="glass rounded-2xl p-6 w-full max-w-md" @click.outside="showTopupModal = false">

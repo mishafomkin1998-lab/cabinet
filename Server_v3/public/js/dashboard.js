@@ -208,6 +208,8 @@
                 showExtendModal: false,
                 extendingProfile: null,
                 selectedDays: 30,
+                showPaymentModal: false, // Модалка выбора дней для оплаты
+                paymentDays: 30, // Выбранное кол-во дней
                 showTopupModal: false,
                 topupUserId: null,
                 topupAmount: 10,
@@ -2214,20 +2216,21 @@
                         return;
                     }
 
-                    // Для остальных ролей - старая логика с проверкой баланса
+                    // Для остальных ролей - показываем модалку выбора дней
+                    this.paymentDays = 30; // По умолчанию 30 дней
+                    this.showPaymentModal = true;
+                },
+
+                // Подтверждение оплаты из модалки
+                async confirmPayment() {
                     const selectedAccounts = this.accounts.filter(a => this.selectedProfileIds.includes(a.id));
-                    let totalCost = 0;
-                    for (const acc of selectedAccounts) {
-                        const cost = this.pricing[30] || 2;
-                        totalCost += cost;
-                    }
+                    const cost = this.pricing[this.paymentDays] || 2;
+                    const totalCost = selectedAccounts.length * cost;
 
                     if (this.userBalance < totalCost) {
                         alert(`Недостаточно средств. Нужно: $${totalCost}, на балансе: $${this.userBalance.toFixed(2)}`);
                         return;
                     }
-
-                    if (!confirm(`Оплатить ${this.selectedProfileIds.length} анкет на 30 дней за $${totalCost}?`)) return;
 
                     try {
                         let successCount = 0;
@@ -2237,7 +2240,7 @@
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     profileId: profileId,
-                                    days: 30,
+                                    days: this.paymentDays,
                                     userId: this.currentUser.id
                                 })
                             });
@@ -2245,12 +2248,13 @@
                             if (data.success) successCount++;
                         }
 
-                        alert(`Оплачено ${successCount} из ${this.selectedProfileIds.length} анкет`);
+                        alert(`Оплачено ${successCount} из ${this.selectedProfileIds.length} анкет на ${this.paymentDays} дней`);
                         this.selectedProfileIds = [];
+                        this.showPaymentModal = false;
                         await this.loadAccounts();
                         await this.loadUserBalance();
                     } catch (e) {
-                        console.error('paySelectedProfiles error:', e);
+                        console.error('confirmPayment error:', e);
                         alert('Ошибка оплаты');
                     }
                 },

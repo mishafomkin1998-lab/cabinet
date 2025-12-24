@@ -396,6 +396,13 @@
                 return;
             }
 
+            // Restore saved login (Remember me)
+            const savedLogin = localStorage.getItem('novaRememberLogin');
+            if (savedLogin) {
+                document.getElementById('email').value = savedLogin;
+                document.getElementById('remember').checked = true;
+            }
+
             // Toggle password visibility
             const togglePassword = document.getElementById('togglePassword');
             const passwordInput = document.getElementById('password');
@@ -450,8 +457,12 @@
 
                         if (remember) {
                             localStorage.setItem('novaUser', JSON.stringify(userData));
+                            // Сохраняем логин отдельно для "Запомнить меня"
+                            localStorage.setItem('novaRememberLogin', username);
                         } else {
                             sessionStorage.setItem('novaUser', JSON.stringify(userData));
+                            // Удаляем сохранённый логин если галочка снята
+                            localStorage.removeItem('novaRememberLogin');
                         }
 
                         window.location.href = 'dashboard.html';
