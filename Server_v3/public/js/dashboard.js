@@ -9,6 +9,9 @@
                 // Dark mode
                 darkMode: localStorage.getItem('novaDarkMode') === 'true',
 
+                // Snow effect (New Year)
+                snowEnabled: localStorage.getItem('snowEnabled') !== 'false', // Default enabled
+
                 // Toggle dark mode
                 toggleDarkMode() {
                     this.darkMode = !this.darkMode;

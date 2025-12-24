@@ -41,7 +41,39 @@
     <link rel="stylesheet" href="css/dashboard.css">
 </head>
 <body x-data="dashboard()" x-init="init()" :class="{ 'dark': darkMode }" class="text-gray-800">
-    <div class="flex h-screen">
+    <!-- Animated Background Orbs -->
+    <div class="bg-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+        <div class="orb orb-4"></div>
+    </div>
+
+    <!-- Snowfall Effect (New Year) -->
+    <div class="snowfall" :class="{ 'disabled': !snowEnabled }" id="snowfall">
+        <div class="snowflake">❄</div>
+        <div class="snowflake">❅</div>
+        <div class="snowflake">❆</div>
+        <div class="snowflake">❄</div>
+        <div class="snowflake">❅</div>
+        <div class="snowflake">❆</div>
+        <div class="snowflake">❄</div>
+        <div class="snowflake">❅</div>
+        <div class="snowflake">❆</div>
+        <div class="snowflake">❄</div>
+        <div class="snowflake">❅</div>
+        <div class="snowflake">❆</div>
+        <div class="snowflake">❄</div>
+        <div class="snowflake">❅</div>
+        <div class="snowflake">❆</div>
+        <div class="snowflake">❄</div>
+        <div class="snowflake">❅</div>
+        <div class="snowflake">❆</div>
+        <div class="snowflake">❄</div>
+        <div class="snowflake">❅</div>
+    </div>
+
+    <div class="flex h-screen relative z-10">
         <!-- Сайдбар -->
         <aside class="glass-sidebar w-64 flex-shrink-0 flex flex-col p-4">
             <!-- Логотип NOVA -->
@@ -143,6 +175,15 @@
                 </div>
 
                 <div class="flex items-center space-x-3">
+                    <!-- Snow Toggle (New Year) -->
+                    <button @click="snowEnabled = !snowEnabled; localStorage.setItem('snowEnabled', snowEnabled)"
+                            class="snow-toggle"
+                            :class="{ 'active': snowEnabled }"
+                            title="Снежинки">
+                        <i class="fas fa-snowflake"></i>
+                        <span class="hidden md:inline" x-text="snowEnabled ? 'Снег вкл' : 'Снег выкл'"></span>
+                    </button>
+
                     <!-- Balance (only for admins without "мой админ") -->
                     <template x-if="currentUser.role === 'admin' && !isRestricted">
                         <div class="glass px-4 py-2 rounded-xl flex items-center">
