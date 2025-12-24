@@ -607,6 +607,29 @@ ipcMain.handle('read-photo-file', async (event, { filePath }) => {
     }
 });
 
+// Экспорт данных через диалог сохранения
+ipcMain.handle('save-export-file', async (event, { jsonData, defaultFileName }) => {
+    try {
+        const result = await dialog.showSaveDialog(mainWindow, {
+            title: 'Сохранить экспорт',
+            defaultPath: defaultFileName,
+            filters: [
+                { name: 'JSON файлы', extensions: ['json'] }
+            ]
+        });
+
+        if (result.canceled || !result.filePath) {
+            return { success: false, canceled: true };
+        }
+
+        fs.writeFileSync(result.filePath, jsonData, 'utf8');
+        return { success: true, filePath: result.filePath };
+    } catch (err) {
+        console.error('[Export] Ошибка сохранения:', err);
+        return { success: false, error: err.message };
+    }
+});
+
 // Загрузка фото через внутренний API (multipart/form-data)
 ipcMain.handle('upload-photo-internal', async (event, { filePath, hash, uid, botId }) => {
     console.log('[Photo Upload MAIN] === Начало обработки ===');

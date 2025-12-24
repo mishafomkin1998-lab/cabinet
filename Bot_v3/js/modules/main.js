@@ -2253,16 +2253,29 @@ async function exportAllData() {
             });
         });
 
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `lababot_backup_${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+        // Формируем имя файла: save (YYYY-MM-DD).json
+        const dateStr = new Date().toISOString().split('T')[0];
+        const defaultFileName = `save (${dateStr}).json`;
 
-        showToast('Данные экспортированы', 'success');
-        return true;
+        // Используем Electron диалог для выбора пути сохранения
+        const { ipcRenderer } = require('electron');
+        const result = await ipcRenderer.invoke('save-export-file', {
+            jsonData: JSON.stringify(data, null, 2),
+            defaultFileName: defaultFileName
+        });
+
+        if (result.canceled) {
+            // Пользователь отменил - ничего не показываем
+            return false;
+        }
+
+        if (result.success) {
+            showToast('Сохранено', 'success');
+            return true;
+        } else {
+            showToast('Ошибка сохранения: ' + result.error, 'error');
+            return false;
+        }
     } catch (error) {
         console.error('Error exporting data:', error);
         showToast('Ошибка экспорта', 'error');
