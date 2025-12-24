@@ -728,6 +728,29 @@ class AccountBot {
     // === PROFILE CARD: Загрузка фото и имени через WebView ===
     async loadProfileCard() {
         if (typeof SHOW_PROFILE_CARD === 'undefined' || !SHOW_PROFILE_CARD) return;
+
+        const cacheKey = `profileCard_${this.displayId}`;
+        const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 часа
+
+        // Проверяем кэш
+        try {
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                const data = JSON.parse(cached);
+                const age = Date.now() - data.timestamp;
+
+                if (age < CACHE_DURATION) {
+                    // Используем кэш
+                    console.log(`[ProfileCard ${this.displayId}] Используем кэш (${Math.round(age/3600000)}ч назад)`);
+                    this.applyProfileCard(data.photoUrl, data.nameText);
+                    return;
+                }
+            }
+        } catch(e) {
+            console.log(`[ProfileCard ${this.displayId}] Ошибка чтения кэша:`, e.message);
+        }
+
+        // Кэша нет или устарел - загружаем через WebView
         if (!this.webview || !this.webviewReady) {
             console.log(`[ProfileCard ${this.displayId}] WebView не готов, пропускаем`);
             return;
@@ -736,9 +759,6 @@ class AccountBot {
         try {
             console.log(`[ProfileCard ${this.displayId}] Загружаем данные профиля...`);
 
-            // Сохраняем текущий URL
-            const currentUrl = this.webview.src;
-
             // Переходим на страницу профиля
             this.webview.src = 'https://ladadate.com/my-profile';
 
@@ -746,39 +766,26 @@ class AccountBot {
             await new Promise((resolve, reject) => {
                 const timeout = setTimeout(() => reject(new Error('Timeout')), 10000);
 
-                const onNavigate = (e) => {
-                    if (e.url.includes('/my-profile') && !e.url.includes('/my-profile-')) {
-                        clearTimeout(timeout);
-                        this.webview.removeEventListener('did-finish-load', onLoad);
-                        // Даём странице время отрендериться
-                        setTimeout(resolve, 1000);
-                    }
-                };
-
                 const onLoad = () => {
                     if (this.webview.src.includes('/my-profile')) {
                         clearTimeout(timeout);
-                        this.webview.removeEventListener('did-navigate', onNavigate);
+                        this.webview.removeEventListener('did-finish-load', onLoad);
                         setTimeout(resolve, 1000);
                     }
                 };
 
-                this.webview.addEventListener('did-navigate', onNavigate);
                 this.webview.addEventListener('did-finish-load', onLoad);
             });
 
             // Извлекаем данные через JavaScript
             const profileData = await this.webview.executeJavaScript(`
                 (function() {
-                    // Ищем фото профиля
                     const photoEl = document.querySelector('.profile-inner__image img, .profile-photo-item img');
                     const photoUrl = photoEl ? photoEl.src : null;
 
-                    // Ищем имя и возраст
                     const nameEl = document.querySelector('#my_name_age, .profile-inner__main-data');
                     let nameText = '';
                     if (nameEl) {
-                        // Получаем текст, убираем лишние пробелы
                         nameText = nameEl.textContent.trim().split('\\n')[0].trim();
                     }
 
@@ -788,20 +795,18 @@ class AccountBot {
 
             console.log(`[ProfileCard ${this.displayId}] Получено:`, profileData);
 
-            // Обновляем UI
-            const photoEl = document.getElementById(`profile-photo-${this.id}`);
-            const nameEl = document.getElementById(`profile-name-${this.id}`);
-
-            if (photoEl && profileData.photoUrl) {
-                photoEl.src = profileData.photoUrl;
-                photoEl.style.display = 'block';
-                console.log(`[ProfileCard ${this.displayId}] ✅ Фото установлено`);
+            // Сохраняем в кэш
+            if (profileData.photoUrl || profileData.nameText) {
+                localStorage.setItem(cacheKey, JSON.stringify({
+                    photoUrl: profileData.photoUrl,
+                    nameText: profileData.nameText,
+                    timestamp: Date.now()
+                }));
+                console.log(`[ProfileCard ${this.displayId}] ✅ Сохранено в кэш`);
             }
 
-            if (nameEl && profileData.nameText) {
-                nameEl.textContent = profileData.nameText;
-                console.log(`[ProfileCard ${this.displayId}] ✅ Имя установлено: ${profileData.nameText}`);
-            }
+            // Применяем данные
+            this.applyProfileCard(profileData.photoUrl, profileData.nameText);
 
             // Возвращаемся на лёгкую страницу
             setTimeout(() => {
@@ -810,10 +815,23 @@ class AccountBot {
 
         } catch(e) {
             console.error(`[ProfileCard ${this.displayId}] Ошибка:`, e.message);
-            // При ошибке возвращаемся на ignore-list
             if (this.webview) {
                 this.webview.src = 'https://ladadate.com/ignore-list';
             }
+        }
+    }
+
+    applyProfileCard(photoUrl, nameText) {
+        const photoEl = document.getElementById(`profile-photo-${this.id}`);
+        const nameEl = document.getElementById(`profile-name-${this.id}`);
+
+        if (photoEl && photoUrl) {
+            photoEl.src = photoUrl;
+            photoEl.style.display = 'block';
+        }
+
+        if (nameEl && nameText) {
+            nameEl.textContent = nameText;
         }
     }
     
