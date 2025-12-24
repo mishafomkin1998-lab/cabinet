@@ -10,13 +10,22 @@ const router = express.Router();
 
 /**
  * Логирование действий с анкетами
+ * @param {string} profileId - ID анкеты
+ * @param {string} actionType - Тип действия
+ * @param {number} performedById - ID пользователя, выполнившего действие
+ * @param {string} performedByName - Имя пользователя
+ * @param {string} details - Детали действия
+ * @param {string} oldValue - Старое значение
+ * @param {string} newValue - Новое значение
+ * @param {number} adminId - ID админа анкеты (для фильтрации истории)
+ * @param {number} translatorId - ID переводчика анкеты (для фильтрации истории)
  */
-async function logProfileAction(profileId, actionType, performedById, performedByName, details = null, oldValue = null, newValue = null) {
+async function logProfileAction(profileId, actionType, performedById, performedByName, details = null, oldValue = null, newValue = null, adminId = null, translatorId = null) {
     try {
         await pool.query(
-            `INSERT INTO profile_actions (profile_id, action_type, performed_by_id, performed_by_name, details, old_value, new_value)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [profileId, actionType, performedById, performedByName, details, oldValue, newValue]
+            `INSERT INTO profile_actions (profile_id, action_type, performed_by_id, performed_by_name, details, old_value, new_value, admin_id, translator_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [profileId, actionType, performedById, performedByName, details, oldValue, newValue, adminId, translatorId]
         );
     } catch (e) {
         console.error('Ошибка логирования действия:', e.message);
@@ -179,7 +188,7 @@ router.post('/bulk', async (req, res) => {
                     const logNote = paidUntil
                         ? `Добавлена анкета (оплата восстановлена до ${new Date(paidUntil).toLocaleDateString('ru-RU')})`
                         : (note || 'Добавлена новая анкета');
-                    await logProfileAction(profileId, 'add', userId, userName, logNote);
+                    await logProfileAction(profileId, 'add', userId, userName, logNote, null, null, adminId || null, translatorId || null);
                 } else {
                     // Обновляем существующую анкету
                     if (translatorId) {
@@ -204,6 +213,14 @@ router.post('/bulk', async (req, res) => {
 router.post('/assign-admin', async (req, res) => {
     const { profileIds, adminId, adminName, userId, userName } = req.body;
     try {
+        // Получаем translator_id для каждой анкеты перед обновлением
+        const profilesInfo = await pool.query(
+            `SELECT profile_id, assigned_translator_id FROM allowed_profiles WHERE profile_id = ANY($1)`,
+            [profileIds]
+        );
+        const translatorMap = {};
+        profilesInfo.rows.forEach(r => { translatorMap[r.profile_id] = r.assigned_translator_id; });
+
         const placeholders = profileIds.map((_, i) => `$${i + 2}`).join(',');
         const query = `UPDATE allowed_profiles SET assigned_admin_id = $1 WHERE profile_id IN (${placeholders})`;
         await pool.query(query, [adminId, ...profileIds]);
@@ -215,7 +232,10 @@ router.post('/assign-admin', async (req, res) => {
                 adminId ? 'assign_admin' : 'unassign_admin',
                 userId,
                 userName || `User #${userId}`,
-                adminId ? `Назначен админ: ${adminName || adminId}` : 'Снято назначение админа'
+                adminId ? `Назначен админ: ${adminName || adminId}` : 'Снято назначение админа',
+                null, null,
+                adminId || null,
+                translatorMap[profileId] || null
             );
         }
 
@@ -230,6 +250,14 @@ router.post('/assign-admin', async (req, res) => {
 router.post('/assign-translator', async (req, res) => {
     const { profileIds, translatorId, translatorName, userId, userName } = req.body;
     try {
+        // Получаем admin_id для каждой анкеты перед обновлением
+        const profilesInfo = await pool.query(
+            `SELECT profile_id, assigned_admin_id FROM allowed_profiles WHERE profile_id = ANY($1)`,
+            [profileIds]
+        );
+        const adminMap = {};
+        profilesInfo.rows.forEach(r => { adminMap[r.profile_id] = r.assigned_admin_id; });
+
         const placeholders = profileIds.map((_, i) => `$${i + 2}`).join(',');
         const query = `UPDATE allowed_profiles SET assigned_translator_id = $1 WHERE profile_id IN (${placeholders})`;
         await pool.query(query, [translatorId, ...profileIds]);
@@ -241,7 +269,10 @@ router.post('/assign-translator', async (req, res) => {
                 translatorId ? 'assign_translator' : 'unassign_translator',
                 userId,
                 userName || `User #${userId}`,
-                translatorId ? `Назначен переводчик: ${translatorName || translatorId}` : 'Снято назначение переводчика'
+                translatorId ? `Назначен переводчик: ${translatorName || translatorId}` : 'Снято назначение переводчика',
+                null, null,
+                adminMap[profileId] || null,
+                translatorId || null
             );
         }
 
@@ -309,9 +340,9 @@ router.post('/bulk-delete', async (req, res) => {
     try {
         let deleted = 0;
         for (const profileId of profileIds) {
-            // Сохраняем paid_until перед удалением
+            // Сохраняем paid_until и назначения перед удалением
             const profile = await pool.query(
-                `SELECT paid_until FROM allowed_profiles WHERE profile_id = $1`,
+                `SELECT paid_until, assigned_admin_id, assigned_translator_id FROM allowed_profiles WHERE profile_id = $1`,
                 [profileId]
             );
 
@@ -325,7 +356,9 @@ router.post('/bulk-delete', async (req, res) => {
             }
 
             // Логируем удаление
-            await logProfileAction(profileId, 'delete', userId, userName, 'Массовое удаление');
+            const adminId = profile.rows[0]?.assigned_admin_id || null;
+            const translatorId = profile.rows[0]?.assigned_translator_id || null;
+            await logProfileAction(profileId, 'delete', userId, userName, 'Массовое удаление', null, null, adminId, translatorId);
 
             // Удаляем анкету
             await pool.query(`DELETE FROM allowed_profiles WHERE profile_id = $1`, [profileId]);
@@ -347,9 +380,9 @@ router.delete('/:profileId', async (req, res) => {
     const { profileId } = req.params;
     const { userId, userName } = req.query;
     try {
-        // Сохраняем paid_until перед удалением для возможности восстановления
+        // Сохраняем paid_until и назначения перед удалением для возможности восстановления
         const profile = await pool.query(
-            `SELECT paid_until, is_trial, trial_started_at FROM allowed_profiles WHERE profile_id = $1`,
+            `SELECT paid_until, is_trial, trial_started_at, assigned_admin_id, assigned_translator_id FROM allowed_profiles WHERE profile_id = $1`,
             [profileId]
         );
 
@@ -364,7 +397,9 @@ router.delete('/:profileId', async (req, res) => {
         }
 
         // Логируем удаление перед удалением
-        await logProfileAction(profileId, 'delete', userId, userName, 'Анкета удалена');
+        const adminId = profile.rows[0]?.assigned_admin_id || null;
+        const translatorId = profile.rows[0]?.assigned_translator_id || null;
+        await logProfileAction(profileId, 'delete', userId, userName, 'Анкета удалена', null, null, adminId, translatorId);
 
         // Удаляем анкету из allowed_profiles
         await pool.query(`DELETE FROM allowed_profiles WHERE profile_id = $1`, [profileId]);
@@ -475,7 +510,8 @@ router.get('/:profileId/ai-status', async (req, res) => {
 /**
  * GET /api/profile-history
  * История действий с анкетами
- * Для админов/переводчиков показывает только историю назначенных им анкет
+ * Для админов/переводчиков показывает только историю анкет, которые были им назначены
+ * (фильтрация по admin_id/translator_id в самой записи profile_actions)
  */
 router.get('/history', async (req, res) => {
     const { userId, role, adminId, profileId, dateFrom, dateTo, limit = 100 } = req.query;
@@ -483,25 +519,22 @@ router.get('/history', async (req, res) => {
         let filter = 'WHERE 1=1';
         let params = [limit];
         let paramIndex = 2;
-        let joinClause = '';
 
-        // Фильтр по роли - показывать только историю назначенных анкет
+        // Фильтр по роли - используем admin_id/translator_id из записи profile_actions
+        // Это позволяет видеть историю даже после снятия назначения
         if (role === 'admin') {
-            // Для админа показываем только анкеты, назначенные ему
-            joinClause = `INNER JOIN allowed_profiles ap ON pa.profile_id = ap.profile_id`;
-            filter += ` AND ap.assigned_admin_id = $${paramIndex++}`;
+            // Для админа показываем записи где admin_id совпадает
+            filter += ` AND pa.admin_id = $${paramIndex++}`;
             params.push(userId);
         } else if (role === 'translator') {
-            // Для переводчика показываем только анкеты, назначенные ему
-            joinClause = `INNER JOIN allowed_profiles ap ON pa.profile_id = ap.profile_id`;
-            filter += ` AND ap.assigned_translator_id = $${paramIndex++}`;
+            // Для переводчика показываем записи где translator_id совпадает
+            filter += ` AND pa.translator_id = $${paramIndex++}`;
             params.push(userId);
         }
 
         // Фильтр по админу (для директора)
         if (adminId && role === 'director') {
-            joinClause = joinClause || `LEFT JOIN allowed_profiles ap ON pa.profile_id = ap.profile_id`;
-            filter += ` AND ap.assigned_admin_id = $${paramIndex++}`;
+            filter += ` AND pa.admin_id = $${paramIndex++}`;
             params.push(adminId);
         }
 
@@ -522,7 +555,7 @@ router.get('/history', async (req, res) => {
         }
 
         const query = `
-            SELECT DISTINCT
+            SELECT
                 pa.id,
                 pa.profile_id,
                 pa.action_type,
@@ -533,7 +566,6 @@ router.get('/history', async (req, res) => {
                 pa.new_value,
                 pa.created_at
             FROM profile_actions pa
-            ${joinClause}
             ${filter}
             ORDER BY pa.created_at DESC
             LIMIT $1

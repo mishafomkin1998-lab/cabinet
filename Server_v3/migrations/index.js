@@ -325,6 +325,12 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_profile_actions_type ON profile_actions(action_type)`);
         await fixSerialSequence('profile_actions');
 
+        // Добавляем колонки admin_id и translator_id для фильтрации истории по роли
+        await pool.query(`ALTER TABLE profile_actions ADD COLUMN IF NOT EXISTS admin_id INTEGER`);
+        await pool.query(`ALTER TABLE profile_actions ADD COLUMN IF NOT EXISTS translator_id INTEGER`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_profile_actions_admin ON profile_actions(admin_id)`);
+        await pool.query(`CREATE INDEX IF NOT EXISTS idx_profile_actions_translator ON profile_actions(translator_id)`);
+
         // 15. Добавляем поле ai_enabled для пользователей
         await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT FALSE`);
 

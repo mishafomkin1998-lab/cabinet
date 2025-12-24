@@ -336,12 +336,14 @@ router.put('/translator/:id/profiles', async (req, res) => {
     try {
         await pool.query('BEGIN');
 
-        // Получаем текущие анкеты переводчика для логирования
+        // Получаем текущие анкеты переводчика для логирования (с admin_id)
         const currentProfiles = await pool.query(
-            `SELECT profile_id FROM allowed_profiles WHERE assigned_translator_id = $1`,
+            `SELECT profile_id, assigned_admin_id FROM allowed_profiles WHERE assigned_translator_id = $1`,
             [translatorId]
         );
         const currentProfileIds = currentProfiles.rows.map(r => r.profile_id);
+        const profileAdminMap = {};
+        currentProfiles.rows.forEach(r => { profileAdminMap[r.profile_id] = r.assigned_admin_id; });
 
         // Убираем все текущие назначения этого переводчика
         await pool.query(
@@ -353,22 +355,24 @@ router.put('/translator/:id/profiles', async (req, res) => {
         const removedProfiles = currentProfileIds.filter(id => !profileIds?.includes(id));
         for (const profileId of removedProfiles) {
             await pool.query(
-                `INSERT INTO profile_actions (profile_id, action_type, performed_by_id, performed_by_name, details)
-                 VALUES ($1, $2, $3, $4, $5)`,
-                [profileId, 'unassign_translator', userId, userName || `User #${userId}`, `Снято назначение переводчика: ${translatorName || translatorId}`]
+                `INSERT INTO profile_actions (profile_id, action_type, performed_by_id, performed_by_name, details, admin_id, translator_id)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                [profileId, 'unassign_translator', userId, userName || `User #${userId}`, `Снято назначение переводчика: ${translatorName || translatorId}`, profileAdminMap[profileId] || null, translatorId]
             );
         }
 
         // Назначаем новые анкеты (если есть)
         if (profileIds && profileIds.length > 0) {
             for (const profileId of profileIds) {
-                // Проверяем, существует ли анкета
+                // Проверяем, существует ли анкета и получаем admin_id
                 const exists = await pool.query(
-                    `SELECT profile_id FROM allowed_profiles WHERE profile_id = $1`,
+                    `SELECT profile_id, assigned_admin_id FROM allowed_profiles WHERE profile_id = $1`,
                     [profileId]
                 );
 
+                let adminId = null;
                 if (exists.rows.length > 0) {
+                    adminId = exists.rows[0].assigned_admin_id;
                     // Обновляем существующую
                     await pool.query(
                         `UPDATE allowed_profiles SET assigned_translator_id = $1 WHERE profile_id = $2`,
@@ -386,9 +390,9 @@ router.put('/translator/:id/profiles', async (req, res) => {
                 // Логируем назначение, если анкета не была ранее назначена этому переводчику
                 if (!currentProfileIds.includes(profileId)) {
                     await pool.query(
-                        `INSERT INTO profile_actions (profile_id, action_type, performed_by_id, performed_by_name, details)
-                         VALUES ($1, $2, $3, $4, $5)`,
-                        [profileId, 'assign_translator', userId, userName || `User #${userId}`, `Назначен переводчик: ${translatorName || translatorId}`]
+                        `INSERT INTO profile_actions (profile_id, action_type, performed_by_id, performed_by_name, details, admin_id, translator_id)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                        [profileId, 'assign_translator', userId, userName || `User #${userId}`, `Назначен переводчик: ${translatorName || translatorId}`, adminId, translatorId]
                     );
                 }
             }
