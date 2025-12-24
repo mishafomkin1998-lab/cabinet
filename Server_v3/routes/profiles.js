@@ -200,35 +200,6 @@ router.post('/bulk', async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Назначение анкет
-router.post('/assign', async (req, res) => {
-    const { profileIds, targetUserId, roleTarget, targetUserName, userId, userName } = req.body;
-    try {
-        let field = roleTarget === 'admin' ? 'assigned_admin_id' : 'assigned_translator_id';
-        const placeholders = profileIds.map((_, i) => `$${i + 2}`).join(',');
-        const query = `UPDATE allowed_profiles SET ${field} = $1 WHERE id IN (${placeholders})`;
-        await pool.query(query, [targetUserId, ...profileIds]);
-
-        // Логируем назначение для каждой анкеты
-        const profilesResult = await pool.query(
-            `SELECT profile_id FROM allowed_profiles WHERE id IN (${placeholders})`,
-            profileIds
-        );
-        for (const row of profilesResult.rows) {
-            const actionType = roleTarget === 'admin' ? 'assign_admin' : 'assign_translator';
-            await logProfileAction(
-                row.profile_id,
-                actionType,
-                userId,
-                userName,
-                `Назначен ${roleTarget === 'admin' ? 'админ' : 'переводчик'}: ${targetUserName || targetUserId}`
-            );
-        }
-
-        res.json({ success: true });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
 // Массовое назначение анкет админу (по profile_id)
 router.post('/assign-admin', async (req, res) => {
     const { profileIds, adminId, adminName, userId, userName } = req.body;

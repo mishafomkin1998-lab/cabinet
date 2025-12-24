@@ -62,11 +62,9 @@ const CONFIG = {
         // Profiles
         PROFILES: '/api/profiles',
         PROFILES_BULK: '/api/profiles/bulk',
-        PROFILES_ASSIGN: '/api/profiles/assign',
         PROFILES_ASSIGN_ADMIN: '/api/profiles/assign-admin',
         PROFILES_ASSIGN_TRANSLATOR: '/api/profiles/assign-translator',
         PROFILES_TOGGLE_ACCESS: '/api/profiles/toggle-access',
-        PROFILES_HISTORY: '/api/profiles/history',
 
         // Team
         TEAM: '/api/team',
