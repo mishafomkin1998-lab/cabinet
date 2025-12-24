@@ -1589,6 +1589,18 @@
                            x-model="newTranslator.password">
                 </div>
 
+                <!-- Мой переводчик - только для директора и когда переводчик напрямую под ним -->
+                <div x-show="currentUser.role === 'director' && !newTranslator.adminId" class="flex items-center">
+                    <input type="checkbox"
+                           id="isOwnTranslatorCheckbox"
+                           class="rounded"
+                           x-model="newTranslator.isOwnTranslator"
+                           @change="newTranslator.salary = ''">
+                    <label for="isOwnTranslatorCheckbox" class="ml-2 text-sm">
+                        Мой переводчик (без доступа к добавлению анкет и финансам)
+                    </label>
+                </div>
+
                 <div class="flex items-center">
                     <input type="checkbox"
                            id="translatorAiEnabledCheckbox"
@@ -1596,28 +1608,8 @@
                            x-model="newTranslator.aiEnabled">
                     <label for="translatorAiEnabledCheckbox" class="ml-2 text-sm">
                         <i class="fas fa-brain text-orange-500 mr-1"></i>
-                        Расширить AI
+                        Разрешить использование ИИ
                     </label>
-                </div>
-
-                <!-- Мой переводчик - только для директора и когда переводчик напрямую под ним -->
-                <div x-show="currentUser.role === 'director' && !newTranslator.adminId" class="flex items-center p-3 bg-purple-50 rounded-xl">
-                    <input type="checkbox"
-                           id="isOwnTranslatorCheckbox"
-                           class="rounded"
-                           x-model="newTranslator.isOwnTranslator">
-                    <label for="isOwnTranslatorCheckbox" class="ml-2 text-sm">
-                        <i class="fas fa-heart text-purple-500 mr-1"></i>
-                        <span class="font-medium">Мой переводчик</span>
-                        <span class="text-gray-500 ml-1">(бесплатное использование анкет)</span>
-                    </label>
-                </div>
-
-                <!-- Подсказка если НЕ мой переводчик -->
-                <div x-show="currentUser.role === 'director' && !newTranslator.adminId && !newTranslator.isOwnTranslator"
-                     class="p-3 bg-yellow-50 rounded-xl text-sm text-yellow-700">
-                    <i class="fas fa-info-circle mr-1"></i>
-                    Переводчик будет оплачивать использование анкет со своего баланса. Вы сможете пополнять его баланс во вкладке "Финансы".
                 </div>
 
                 <!-- Поле Сумма - только для директора, когда галочка "Мой переводчик" снята -->

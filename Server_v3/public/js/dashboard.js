@@ -165,7 +165,7 @@
                     salary: '',
                     aiEnabled: false,
                     adminId: '',
-                    isOwnTranslator: true // По умолчанию "мой переводчик"
+                    isOwnTranslator: false // По умолчанию НЕ "мой переводчик"
                 },
                 editingTranslator: null,
 
@@ -1638,7 +1638,7 @@
                         salary: translator.salary || '',
                         aiEnabled: translator.aiEnabled || false,
                         adminId: translator.adminId || '',
-                        isOwnTranslator: translator.isOwnTranslator !== false // По умолчанию true
+                        isOwnTranslator: translator.isOwnTranslator || false
                     };
                     this.showAddTranslatorModal = true;
                 },
