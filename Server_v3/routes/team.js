@@ -160,10 +160,36 @@ router.post('/', async (req, res) => {
         const hash = await bcrypt.hash(password, 10);
         // Если login не передан, используем username
         const userLogin = login || username;
+
+        // Определяем is_own_translator для переводчиков
+        let finalIsOwnTranslator = true; // По умолчанию true (бесплатно)
+
+        if (role === 'translator' && ownerId) {
+            // Проверяем владельца (кто создаёт переводчика)
+            const ownerResult = await pool.query(
+                'SELECT role, is_restricted FROM users WHERE id = $1',
+                [ownerId]
+            );
+
+            if (ownerResult.rows.length > 0) {
+                const owner = ownerResult.rows[0];
+
+                if (owner.role === 'admin') {
+                    // Если создаёт админ - наследуем от его is_restricted
+                    // Платный админ (is_restricted=false) → платный переводчик (is_own_translator=false)
+                    // "Мой админ" (is_restricted=true) → бесплатный переводчик (is_own_translator=true)
+                    finalIsOwnTranslator = owner.is_restricted === true;
+                } else if (owner.role === 'director') {
+                    // Если создаёт директор - используем переданное значение
+                    finalIsOwnTranslator = isOwnTranslator !== false;
+                }
+            }
+        }
+
         const result = await pool.query(
             `INSERT INTO users (username, login, password_hash, role, owner_id, salary, is_restricted, ai_enabled, is_own_translator)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
-            [username, userLogin, hash, role, ownerId, isRestricted ? null : salary, isRestricted || false, aiEnabled || false, isOwnTranslator !== false]
+            [username, userLogin, hash, role, ownerId, isRestricted ? null : salary, isRestricted || false, aiEnabled || false, finalIsOwnTranslator]
         );
         res.json({ success: true, userId: result.rows[0].id });
     } catch (e) {
