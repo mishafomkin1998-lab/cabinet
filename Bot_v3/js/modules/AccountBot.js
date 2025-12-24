@@ -18,6 +18,7 @@ class AccountBot {
         this.photoName = null;  // Имя файла для отображения
         this.mailStartTime = null; // Время начала работы Mail
         this.mailTimerInterval = null; // Интервал обновления таймера Mail
+        this.lastMailSentTime = 0; // Время последней отправки письма (защита от спама)
 
         this.isChatRunning = false;
         this.isChatWaiting = false; // true когда рассылка ждёт пользователей
@@ -1537,6 +1538,14 @@ class AccountBot {
 
             msgBody = this.replaceMacros(msgTemplate, user);
 
+            // ============ COOLDOWN: Защита от блокировки IP ============
+            const timeSinceLastSend = Date.now() - this.lastMailSentTime;
+            if (timeSinceLastSend < MIN_MAIL_INTERVAL) {
+                const waitTime = MIN_MAIL_INTERVAL - timeSinceLastSend;
+                this.log(`⏳ Cooldown: ${Math.ceil(waitTime/1000)}с...`);
+                await new Promise(r => setTimeout(r, waitTime));
+            }
+
             // ============ ОТПРАВКА ПИСЬМА ============
             // Если есть фото — используем внутренний API через WebView
             if (this.photoPath) {
@@ -1889,6 +1898,7 @@ class AccountBot {
             this.addToHistory('mail', 'sent', `${user.AccountId} (${user.Name})`);
             this.log(`✅ Письмо отправлено: ${user.Name} (${user.AccountId})`);
             this.networkErrorCount = 0;
+            this.lastMailSentTime = Date.now(); // Обновляем время последней отправки
 
             // Отмечаем Custom ID как отправленный (если это custom-ids режим)
             if (this.mailSettings.target === 'custom-ids') {

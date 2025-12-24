@@ -4,6 +4,9 @@ const APP_VERSION = '1.5.0';
 // Лимит записей в blacklist (предотвращение утечки памяти)
 const BLACKLIST_MAX_SIZE = 5000;
 
+// Минимальный интервал между отправками писем (защита от блокировки IP)
+const MIN_MAIL_INTERVAL = 15000; // 15 секунд
+
 let axios;
 try { axios = require('axios'); } catch(e) { axios = window.axios; }
 
