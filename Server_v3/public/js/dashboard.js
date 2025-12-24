@@ -1947,6 +1947,28 @@
                     }
                 },
 
+                async clearProfileHistory() {
+                    if (!confirm('Вы уверены, что хотите полностью очистить историю? Это действие необратимо.')) {
+                        return;
+                    }
+
+                    try {
+                        const res = await fetch(`${API_BASE}/api/profiles/history/clear`, {
+                            method: 'DELETE'
+                        });
+                        const data = await res.json();
+                        if (data.success) {
+                            alert(`История очищена. Удалено записей: ${data.deletedCount}`);
+                            this.profileHistory = [];
+                        } else {
+                            alert('Ошибка: ' + (data.error || 'Не удалось очистить историю'));
+                        }
+                    } catch (e) {
+                        console.error('clearProfileHistory error:', e);
+                        alert('Ошибка при очистке истории');
+                    }
+                },
+
                 async loadSavedPrompt() {
                     try {
                         const res = await fetch(`${API_BASE}/api/bots/prompt`);

@@ -940,6 +940,13 @@
                         <button @click="loadProfileHistory()" class="px-5 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 font-medium transition-all">
                             <i class="fas fa-sync-alt mr-2"></i><span x-text="t('common.refresh')"></span>
                         </button>
+
+                        <!-- Кнопка очистки истории (только для директора) -->
+                        <button x-show="currentUser.role === 'director'"
+                                @click="clearProfileHistory()"
+                                class="px-5 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-600 font-medium transition-all">
+                            <i class="fas fa-trash-alt mr-2"></i>Очистить историю
+                        </button>
                     </div>
                 </div>
 

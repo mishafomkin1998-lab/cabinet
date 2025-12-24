@@ -592,4 +592,24 @@ router.get('/history', async (req, res) => {
     }
 });
 
+/**
+ * DELETE /api/profile-history/clear
+ * Очистка всей истории действий с анкетами
+ */
+router.delete('/history/clear', async (req, res) => {
+    try {
+        const result = await pool.query('DELETE FROM profile_actions');
+        console.log(`🗑️ История очищена: удалено ${result.rowCount} записей`);
+
+        res.json({
+            success: true,
+            message: `Удалено ${result.rowCount} записей истории`,
+            deletedCount: result.rowCount
+        });
+    } catch (e) {
+        console.error('Clear history error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 module.exports = router;
