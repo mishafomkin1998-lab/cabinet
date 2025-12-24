@@ -3690,6 +3690,7 @@ body.theme-ladadate #restore-progress-current {
 }
 
 .profile-photo {
+    display: block;
     width: 140px;
     height: 180px;
     object-fit: cover;
@@ -3697,15 +3698,12 @@ body.theme-ladadate #restore-progress-current {
     box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 
-.profile-info {
-    text-align: center;
-    margin-top: 4px;
-}
-
 .profile-name {
+    display: block;
     font-size: 18px;
     font-weight: 700;
     color: #333;
+    margin-top: 4px;
 }
 
 /* Dark theme */
