@@ -1199,6 +1199,101 @@
         }
         .men-online-badge i { font-size: 14px; }
 
+        /* ============= TAB SEARCH (Ctrl+F) ============= */
+        .tab-search-box {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            padding: 6px 14px;
+            border-radius: 25px;
+            border: 2px solid #e0e0e0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            animation: tabSearchSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform-origin: left center;
+        }
+        .tab-search-box.show {
+            display: flex;
+        }
+        .tab-search-box.error {
+            border-color: #dc3545;
+            animation: tabSearchShake 0.4s ease;
+        }
+        .tab-search-box.success {
+            border-color: #28a745;
+        }
+        @keyframes tabSearchSlideIn {
+            0% { opacity: 0; transform: scaleX(0.3) translateX(-20px); }
+            100% { opacity: 1; transform: scaleX(1) translateX(0); }
+        }
+        @keyframes tabSearchShake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+        .tab-search-icon {
+            color: #6c757d;
+            font-size: 12px;
+            transition: color 0.2s ease;
+        }
+        .tab-search-box.error .tab-search-icon { color: #dc3545; }
+        .tab-search-box.success .tab-search-icon { color: #28a745; }
+        .tab-search-box input {
+            border: none;
+            outline: none;
+            background: transparent;
+            font-size: 14px;
+            font-weight: 500;
+            width: 80px;
+            color: #333;
+        }
+        .tab-search-box input::placeholder {
+            color: #adb5bd;
+            font-weight: 400;
+        }
+        .tab-search-count {
+            font-size: 11px;
+            color: #6c757d;
+            white-space: nowrap;
+            min-width: 30px;
+            text-align: right;
+        }
+        .tab-search-count.has-matches {
+            color: #28a745;
+            font-weight: 600;
+        }
+
+        /* Подсветка найденных вкладок */
+        .tab-item.search-match {
+            animation: tabMatchPulse 1s ease infinite;
+            box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.6), 0 0 20px rgba(255, 193, 7, 0.4);
+            z-index: 100;
+        }
+        @keyframes tabMatchPulse {
+            0%, 100% { box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.6), 0 0 20px rgba(255, 193, 7, 0.4); }
+            50% { box-shadow: 0 0 0 5px rgba(255, 193, 7, 0.8), 0 0 30px rgba(255, 193, 7, 0.6); }
+        }
+        .tab-item.search-current {
+            animation: tabCurrentPulse 0.8s ease infinite;
+            box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.8), 0 0 25px rgba(40, 167, 69, 0.5);
+        }
+        @keyframes tabCurrentPulse {
+            0%, 100% { box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.8), 0 0 25px rgba(40, 167, 69, 0.5); }
+            50% { box-shadow: 0 0 0 5px rgba(40, 167, 69, 1), 0 0 35px rgba(40, 167, 69, 0.7); }
+        }
+
+        /* Dark theme support */
+        body.theme-dark .tab-search-box {
+            background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
+            border-color: #444;
+        }
+        body.theme-dark .tab-search-box input {
+            color: #f0f0f0;
+        }
+        body.theme-dark .tab-search-icon {
+            color: #888;
+        }
+
         /* Custom IDs поле ввода */
         .custom-ids-field {
             background: #f8f9fa;
