@@ -235,11 +235,12 @@
                                                     <span class="text-sm text-gray-600">AI</span>
                                                 </label>
 
-                                                <!-- Пополнить баланс (если не мой админ) -->
+                                                <!-- Баланс (если не мой админ) - клик для пополнения -->
                                                 <button x-show="!admin.isMyAdmin" @click.stop="openTopupModal(admin.id)"
-                                                        class="w-9 h-9 rounded-lg bg-green-100 hover:bg-green-200 flex items-center justify-center"
+                                                        class="px-3 py-1.5 rounded-lg bg-green-100 hover:bg-green-200 flex items-center gap-1"
                                                         title="Пополнить баланс">
-                                                    <i class="fas fa-dollar-sign text-green-600"></i>
+                                                    <i class="fas fa-wallet text-green-600 text-sm"></i>
+                                                    <span class="text-green-700 font-medium text-sm">$<span x-text="(admin.balance || 0).toFixed(2)"></span></span>
                                                 </button>
 
                                                 <!-- Редактировать -->
