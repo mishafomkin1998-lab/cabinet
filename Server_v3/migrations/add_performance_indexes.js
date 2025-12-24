@@ -49,20 +49,6 @@ async function migrate() {
             sql: 'CREATE INDEX IF NOT EXISTS idx_allowed_profiles_translator_id ON allowed_profiles(assigned_translator_id)'
         },
 
-        // user_activity indexes - для расчёта времени работы
-        {
-            name: 'idx_user_activity_user_id',
-            sql: 'CREATE INDEX IF NOT EXISTS idx_user_activity_user_id ON user_activity(user_id)'
-        },
-        {
-            name: 'idx_user_activity_created_at',
-            sql: 'CREATE INDEX IF NOT EXISTS idx_user_activity_created_at ON user_activity(created_at)'
-        },
-        {
-            name: 'idx_user_activity_user_created',
-            sql: 'CREATE INDEX IF NOT EXISTS idx_user_activity_user_created ON user_activity(user_id, created_at)'
-        },
-
         // incoming_messages indexes
         {
             name: 'idx_incoming_messages_created_at',
@@ -154,7 +140,6 @@ async function migrate() {
     try {
         await pool.query('ANALYZE activity_log');
         await pool.query('ANALYZE allowed_profiles');
-        await pool.query('ANALYZE user_activity');
         await pool.query('ANALYZE incoming_messages');
         await pool.query('ANALYZE messages');
         await pool.query('ANALYZE heartbeats');
