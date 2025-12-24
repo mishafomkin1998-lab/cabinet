@@ -214,14 +214,13 @@ async function sendMessageToLababot(params) {
             convId: convId,
             responseTime: responseTime, // Формат PostgreSQL INTERVAL: "00:05:30"
             status: status, // 'success', 'failed', 'pending'
-            textContent: textContent || '',
+            // textContent и templateText удалены - не нужны для статистики
             mediaUrl: mediaUrl,
             fileName: fileName,
             translatorId: translatorId,
             errorReason: errorReason,
             usedAi: usedAi, // Флаг использования ИИ генерации
-            isReply: isReply, // Флаг: это ответ на входящее (target=inbox) или массовая рассылка
-            templateText: templateText // Оригинальный шаблон (до подстановки) для группировки
+            isReply: isReply // Флаг: это ответ на входящее (target=inbox) или массовая рассылка
         };
 
         console.log('📦 Payload:', JSON.stringify(payload, null, 2));
@@ -263,7 +262,7 @@ async function sendMessageToLababot(params) {
 // 2. Функция отправки входящего сообщения от мужчины
 // ВАЖНО: botId теперь это MACHINE_ID (ID программы)
 async function sendIncomingMessageToLababot(params) {
-    const { botId, profileId, manId, manName, messageId, type = 'letter', messageText } = params;
+    const { botId, profileId, manId, manName, messageId, type = 'letter' } = params;
 
     try {
         const response = await fetch(`${LABABOT_SERVER}/api/incoming_message`, {
@@ -276,8 +275,8 @@ async function sendIncomingMessageToLababot(params) {
                 manName: manName || null,
                 messageId: String(messageId),
                 type: type,
-                timestamp: new Date().toISOString(),
-                messageText: messageText || null
+                timestamp: new Date().toISOString()
+                // messageText удалён - не нужен для статистики
             })
         });
 
