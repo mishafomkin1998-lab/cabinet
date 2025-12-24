@@ -566,20 +566,10 @@ router.post('/pay', asyncHandler(async (req, res) => {
         });
     }
 
-    // Получаем profile_id из allowed_profiles (profileId может быть internal id)
-    let actualProfileId = profileId;
-    const profileCheck = await pool.query(
-        `SELECT profile_id FROM allowed_profiles WHERE id = $1 OR profile_id = $1`,
-        [profileId]
-    );
-    if (profileCheck.rows.length > 0) {
-        actualProfileId = profileCheck.rows[0].profile_id;
-    }
-
-    // Проверяем существование анкеты
+    // Проверяем существование анкеты (profileId - это строковый profile_id)
     const profile = await pool.query(
         `SELECT profile_id, paid_until FROM allowed_profiles WHERE profile_id = $1`,
-        [actualProfileId]
+        [String(profileId)]
     );
 
     if (profile.rows.length === 0) {
@@ -600,23 +590,23 @@ router.post('/pay', asyncHandler(async (req, res) => {
         , NOW()) + INTERVAL '${days} days',
         is_trial = FALSE
         WHERE profile_id = $1
-    `, [actualProfileId]);
+    `, [profileId]);
 
     // Сохраняем в историю оплаты
     await pool.query(
         `INSERT INTO profile_payment_history (profile_id, days, action_type, by_user_id, amount) VALUES ($1, $2, 'payment', $3, $4)`,
-        [actualProfileId, days, userId, cost]
+        [profileId, days, userId, cost]
     );
 
     // Сохраняем в историю биллинга
     await pool.query(
         `INSERT INTO billing_history (admin_id, amount, description, type) VALUES ($1, $2, $3, 'expense')`,
-        [userId, cost, `Оплата анкеты ${actualProfileId} на ${days} дней`]
+        [userId, cost, `Оплата анкеты ${profileId} на ${days} дней`]
     );
 
     res.json({
         success: true,
-        message: `Анкета #${actualProfileId} оплачена на ${days} дней`,
+        message: `Анкета #${profileId} оплачена на ${days} дней`,
         newBalance: balance - cost
     });
 }));
