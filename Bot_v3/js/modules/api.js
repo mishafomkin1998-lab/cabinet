@@ -978,9 +978,9 @@ async function fetchUserProfile(bot, userId, country = '') {
         return cached.data;
     }
 
-    // Проверяем что у бота есть webview
-    if (!bot || !bot.webview) {
-        console.warn(`⚠️ WebView не доступен для загрузки профиля ${userId}`);
+    // Проверяем что у бота есть webview И он авторизован
+    if (!bot || !bot.webview || !bot.webviewReady) {
+        console.warn(`⚠️ WebView не доступен или не авторизован для загрузки профиля ${userId}`);
         return null;
     }
 

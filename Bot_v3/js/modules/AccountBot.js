@@ -1645,7 +1645,9 @@ class AccountBot {
                 const fullProfile = await fetchUserProfile(this, user.AccountId, user.Country);
                 if (fullProfile) {
                     user = { ...user, ...fullProfile };
-                    console.log(`[Profile] ✅ Данные профиля загружены: Occupation=${user.Occupation}, Marital=${user.MaritalStatus}`);
+                    console.log(`[Profile] ✅ Данные профиля загружены: City=${user.City}, Occupation=${user.Occupation}`);
+                } else {
+                    console.warn(`[Profile] ⚠️ Профиль не загружен, используем данные из списка: City=${user.City || 'НЕТ'}`);
                 }
             } catch (profileErr) {
                 console.warn(`⚠️ Не удалось загрузить профиль ${user.AccountId}:`, profileErr.message);
@@ -2370,7 +2372,9 @@ class AccountBot {
                 const fullProfile = await fetchUserProfile(this, user.AccountId, user.Country);
                 if (fullProfile) {
                     user = { ...user, ...fullProfile };
-                    console.log(`[Profile Chat] ✅ Данные профиля загружены`);
+                    console.log(`[Profile Chat] ✅ Данные профиля загружены: City=${user.City}, Occupation=${user.Occupation}`);
+                } else {
+                    console.warn(`[Profile Chat] ⚠️ Профиль не загружен, используем данные из списка: City=${user.City || 'НЕТ'}`);
                 }
             } catch (profileErr) {
                 console.warn(`⚠️ Не удалось загрузить профиль ${user.AccountId}:`, profileErr.message);
