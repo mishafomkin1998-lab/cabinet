@@ -1780,6 +1780,30 @@ async function saveSession() {
 // Хранилище анкет которые не удалось залогинить (чтобы не потерять при saveSession)
 let failedLoginBots = [];
 
+// Флаг отмены восстановления сессии
+let restoreCancelled = false;
+
+// Функция отмены восстановления сессии
+function cancelRestore() {
+    restoreCancelled = true;
+    console.log('[Restore] ⚠️ Отмена загрузки по запросу пользователя');
+    hideRestoreOverlay();
+
+    // Показываем welcome-screen если нет загруженных ботов
+    const welcomeScreen = document.getElementById('welcome-screen');
+    if (welcomeScreen) {
+        welcomeScreen.style.display = Object.keys(bots).length > 0 ? 'none' : 'flex';
+    }
+
+    // Уведомление о частичной загрузке
+    const loadedCount = Object.keys(bots).length;
+    if (loadedCount > 0) {
+        showToast(`Загрузка отменена. Загружено анкет: ${loadedCount}`, 'warning');
+    } else {
+        showToast('Загрузка отменена', 'info');
+    }
+}
+
 // ============= OVERLAY УПРАВЛЕНИЕ =============
 function showRestoreOverlay(total) {
     const overlay = document.getElementById('restore-overlay');
@@ -1839,6 +1863,7 @@ async function restoreSession() {
         if (savedAccounts.length === 0) return;
 
         failedLoginBots = [];
+        restoreCancelled = false; // Сбрасываем флаг отмены
 
         // Показываем overlay
         showRestoreOverlay(savedAccounts.length);
@@ -1896,6 +1921,11 @@ async function restoreSession() {
 
         // Функция логина с retry
         async function loginWithRetry(acc, retryNum = 0) {
+            // Проверяем флаг отмены
+            if (restoreCancelled) {
+                return { success: false, acc, cancelled: true };
+            }
+
             try {
                 const botId = await performLogin(acc.login, acc.pass, acc.displayId);
 
@@ -1905,6 +1935,11 @@ async function restoreSession() {
                 }
             } catch (err) {
                 console.warn(`[Restore] Ошибка ${acc.displayId}:`, err.message);
+            }
+
+            // Проверяем флаг отмены перед retry
+            if (restoreCancelled) {
+                return { success: false, acc, cancelled: true };
             }
 
             // Retry с экспоненциальной задержкой: 2с, 4с, 8с
@@ -1924,9 +1959,22 @@ async function restoreSession() {
         // Обрабатываем последовательно для сохранения порядка вкладок
         // Но внутри каждой анкеты есть retry
         for (const acc of savedAccounts) {
+            // Проверяем флаг отмены перед каждой анкетой
+            if (restoreCancelled) {
+                console.log(`[Restore] ⏹️ Загрузка прервана пользователем. Пропущено анкет: ${savedAccounts.length - processed}`);
+                break;
+            }
+
             updateRestoreOverlay(processed, savedAccounts.length, successCount, retryCount, failedCount, acc.displayId);
 
             const result = await loginWithRetry(acc);
+
+            // Проверяем отмену после логина (может быть отменено во время retry)
+            if (restoreCancelled || result.cancelled) {
+                console.log(`[Restore] ⏹️ Загрузка прервана пользователем`);
+                break;
+            }
+
             processed++;
 
             if (result.success) {
@@ -1944,6 +1992,15 @@ async function restoreSession() {
             if (processed < savedAccounts.length) {
                 await new Promise(r => setTimeout(r, 300));
             }
+        }
+
+        // Если отменено - не продолжаем (overlay уже скрыт в cancelRestore)
+        if (restoreCancelled) {
+            console.log(`[Restore] ════════════════════════════════`);
+            console.log(`[Restore] ⏹️ Загрузка отменена пользователем`);
+            console.log(`[Restore] ✅ Успешно загружено: ${successCount}`);
+            console.log(`[Restore] ════════════════════════════════`);
+            return;
         }
 
         // Скрываем overlay

@@ -632,6 +632,11 @@
 
     <!-- Loading Overlay для восстановления сессии -->
     <div id="restore-overlay" class="restore-overlay" style="display: none;">
+        <!-- Кнопка настроек (справа сверху) -->
+        <button class="restore-settings-btn" onclick="openGlobalSettings()" title="Настройки">
+            <i class="fa fa-cog"></i>
+        </button>
+
         <div class="restore-overlay-content">
             <div class="restore-logo">
                 <img src="assets/logo.png" alt="Nova" class="restore-logo-img">
@@ -663,6 +668,11 @@
                     <span id="restore-failed-count">0</span> ошибок
                 </div>
             </div>
+
+            <!-- Кнопка отмены -->
+            <button class="restore-cancel-btn" onclick="cancelRestore()">
+                <i class="fa fa-times"></i> Отмена
+            </button>
 
             <div class="restore-current-account" id="restore-current-account"></div>
         </div>

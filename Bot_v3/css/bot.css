@@ -3504,6 +3504,59 @@
     font-family: 'Consolas', 'Monaco', monospace;
 }
 
+/* Кнопка настроек на overlay (справа сверху) */
+.restore-settings-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100000;
+}
+
+.restore-settings-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    color: #fff;
+    transform: rotate(90deg);
+}
+
+/* Кнопка отмены загрузки */
+.restore-cancel-btn {
+    margin-top: 20px;
+    padding: 10px 30px;
+    border-radius: 25px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    background: transparent;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.restore-cancel-btn:hover {
+    border-color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.restore-cancel-btn i {
+    font-size: 12px;
+}
+
 /* Dark theme support */
 body.theme-dark .restore-overlay {
     background: linear-gradient(135deg, #0d0d0d 0%, #1a1a1a 50%, #262626 100%);
