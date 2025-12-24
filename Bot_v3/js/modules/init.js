@@ -912,18 +912,6 @@ function cleanupGlobalLimits() {
     }
 }
 
-// Получить размер горячей очереди
-function getHotQueueSize() {
-    cleanupHotQueue();
-    return Object.keys(hotManQueue).length;
-}
-
-// Получить количество глобальных лимитов
-function getGlobalLimitsCount() {
-    cleanupGlobalLimits();
-    return Object.keys(globalLimitedMen).length;
-}
-
 // ============= КОНТЕКСТНОЕ МЕНЮ ТРАНСКРИПЦИИ =============
 
 // Создание контекстного меню при загрузке

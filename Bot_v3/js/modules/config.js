@@ -210,11 +210,6 @@ let currentStatsType = null;
 let isShiftPressed = false; // Глобальное отслеживание Shift для bulk-действий
 let shiftWasPressed = false; // Сохраняет состояние Shift при mousedown (для select/checkbox)
 
-let minichatBotId = null;
-let minichatPartnerId = null;
-let minichatLastMessageId = 0;
-let minichatType = 'mail'; // 'mail' или 'chat'
-
 // ============= ПЕРЕМЕННЫЕ ТРАНСКРИПЦИИ (макросы для подстановки) =============
 const TRANSCRIPTION_VARIABLES = [
     // Базовые данные

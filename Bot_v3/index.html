@@ -15,33 +15,6 @@
     <!-- Контейнер для перетаскиваемых окон ответа -->
     <div id="response-windows-container"></div>
 
-    <div id="minichat-modal" class="modal-overlay" onclick="closeModal('minichat-modal')">
-        <div class="modal-card" onclick="event.stopPropagation()">
-            <h5 id="minichat-title">Чат с ID <span id="minichat-partner-id">...</span> (<span id="minichat-partner-name">...</span>)</h5>
-            <div class="text-muted small mb-2">Анкета: <span id="minichat-bot-display-id">...</span></div>
-            <div class="chat-history" id="minichat-history">
-                <div class="text-center text-muted small mt-5">Загрузка истории...</div>
-            </div>
-
-            <!-- AI генерация ответа -->
-            <div class="mb-2 p-2 rounded" style="background: #f0f7ff; border: 1px solid #cce5ff;">
-                <div class="d-flex gap-2 align-items-center">
-                    <i class="fa fa-robot text-primary"></i>
-                    <input id="minichat-ai-prompt" class="form-control form-control-sm" placeholder="Как ответить? (напр: игриво, романтично)">
-                    <button class="btn btn-primary btn-sm" onclick="generateMiniChatAIReply()" id="minichat-ai-btn" style="white-space: nowrap;">
-                        <i class="fa fa-magic"></i> AI
-                    </button>
-                </div>
-            </div>
-
-            <div class="d-flex gap-2">
-                <textarea id="minichat-input" class="form-control" rows="2" placeholder="Сообщение..."></textarea>
-                <button class="btn btn-primary" onclick="sendMiniChatMessage()"><i class="fa fa-paper-plane"></i></button>
-            </div>
-            <button class="btn btn-cancel-modal w-100 mt-2" onclick="closeModal('minichat-modal')">Закрыть</button>
-        </div>
-    </div>
-
     <div class="global-toolbar">
         <div class="toolbar-left">
             <button class="btn btn-success btn-circle" onclick="openAddModal()" data-tip="Анкеты"><i class="fa fa-plus"></i></button>
@@ -709,11 +682,10 @@
     <script src="js/modules/utils.js"></script>       <!-- 2. Утилиты, parseProxy, validateInput -->
     <script src="js/modules/api.js"></script>         <!-- 3. API функции для Lababot сервера -->
     <script src="js/modules/logger.js"></script>      <!-- 4. Logger, KEEP_ALIVE_SCRIPT -->
-    <script src="js/modules/minichat.js"></script>    <!-- 5. MiniChat функции -->
-    <script src="js/modules/ai.js"></script>          <!-- 6. AI функции -->
-    <script src="js/modules/settings.js"></script>    <!-- 7. Настройки -->
-    <script src="js/modules/AccountBot.js"></script>  <!-- 8. Класс AccountBot -->
-    <script src="js/modules/main.js"></script>        <!-- 9. UI функции и основная логика -->
-    <script src="js/modules/init.js"></script>        <!-- 10. Инициализация (window.onload) -->
+    <script src="js/modules/ai.js"></script>          <!-- 5. AI функции -->
+    <script src="js/modules/settings.js"></script>    <!-- 6. Настройки -->
+    <script src="js/modules/AccountBot.js"></script>  <!-- 7. Класс AccountBot -->
+    <script src="js/modules/main.js"></script>        <!-- 8. UI функции и основная логика -->
+    <script src="js/modules/init.js"></script>        <!-- 9. Инициализация (window.onload) -->
 </body>
 </html>

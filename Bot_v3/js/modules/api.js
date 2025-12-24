@@ -566,17 +566,6 @@ function startBatchSync() {
     console.log('🔄 Batch sync запущен (интервал: 10 мин)');
 }
 
-/**
- * Остановка batch синхронизации
- */
-function stopBatchSync() {
-    if (batchSyncInterval) {
-        clearInterval(batchSyncInterval);
-        batchSyncInterval = null;
-        console.log('🔄 Batch sync остановлен');
-    }
-}
-
 // 5. Функция загрузки промпта для генерации с сервера
 async function loadServerGenerationPrompt() {
     try {

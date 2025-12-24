@@ -879,24 +879,6 @@ function editTemplateNameInline(botId) {
     input.addEventListener('blur', saveNewName);
 }
 
-// Модальное окно теперь только для редактирования (переименования) шаблона
-function openTemplateModal(botId, isEdit) {
-    currentModalBotId = botId;
-    const bot = bots[botId];
-    const isChat = globalMode === 'chat';
-    const tpls = getBotTemplates(bot.login)[isChat ? 'chat' : 'mail'];
-
-    // Модалка только для редактирования
-    const idx = document.getElementById(`tpl-select-${botId}`).value;
-    if(idx === "") return alert("Выберите шаблон для редактирования");
-
-    editingTemplateIndex = idx;
-    document.getElementById('tpl-modal-title').innerText = "Редактировать шаблон";
-    document.getElementById('tpl-modal-name').value = tpls[idx].name;
-    document.getElementById('tpl-modal-text').value = tpls[idx].text;
-    openModal('tpl-modal');
-}
-
 // Генерация текста шаблона с помощью AI
 async function generateTemplateWithAI() {
     const promptInput = document.getElementById('tpl-ai-prompt');
