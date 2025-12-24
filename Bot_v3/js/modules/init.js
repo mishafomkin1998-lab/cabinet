@@ -894,24 +894,6 @@ function cleanupHotQueue() {
     }
 }
 
-// Очистка просроченных глобальных лимитов (старше 1 часа)
-function cleanupGlobalLimits() {
-    const now = Date.now();
-    const ONE_HOUR = 60 * 60 * 1000;
-    let cleaned = 0;
-
-    for (const manId in globalLimitedMen) {
-        if (now - globalLimitedMen[manId].limitedAt > ONE_HOUR) {
-            delete globalLimitedMen[manId];
-            cleaned++;
-        }
-    }
-
-    if (cleaned > 0) {
-        console.log(`[OnlineSmart] 🧹 Очищено ${cleaned} просроченных глобальных лимитов`);
-    }
-}
-
 // ============= КОНТЕКСТНОЕ МЕНЮ ТРАНСКРИПЦИИ =============
 
 // Создание контекстного меню при загрузке
@@ -1036,7 +1018,7 @@ function initTranscriptionContextMenu() {
 function startMemoryCleanup() {
     // Очистка каждые 10 минут для hotManQueue (записи старше 5 мин)
     setInterval(() => {
-        cleanupHotManQueue();
+        cleanupHotQueue();
     }, 10 * 60 * 1000);
 
     // Очистка каждый час для остальных объектов
@@ -1047,24 +1029,6 @@ function startMemoryCleanup() {
     }, 60 * 60 * 1000);
 
     console.log('✅ Периодическая очистка памяти запущена');
-}
-
-// Очистка горячей очереди (записи старше 5 минут)
-function cleanupHotManQueue() {
-    const MAX_AGE_MS = 5 * 60 * 1000; // 5 минут
-    const now = Date.now();
-    let cleaned = 0;
-
-    for (const manId in hotManQueue) {
-        if (now - hotManQueue[manId].addedAt > MAX_AGE_MS) {
-            delete hotManQueue[manId];
-            cleaned++;
-        }
-    }
-
-    if (cleaned > 0) {
-        console.log(`🧹 hotManQueue: очищено ${cleaned} записей`);
-    }
 }
 
 // Очистка глобальных лимитов (записи старше 1 часа)
