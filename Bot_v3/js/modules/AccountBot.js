@@ -976,12 +976,12 @@ class AccountBot {
             const msgs = res.data.Messages || [];
 
             if (msgs.length > 0) {
-                // === СНАЧАЛА: Добавляем в ЧС ВСЕХ отправителей за последние 2 дня (сегодня + вчера) ===
-                const twoDaysAgo = new Date();
-                twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-                twoDaysAgo.setHours(0, 0, 0, 0); // Начало позавчерашнего дня
+                // === СНАЧАЛА: Добавляем в ЧС ВСЕХ отправителей за сегодня и вчера ===
+                const yesterday = new Date();
+                yesterday.setDate(yesterday.getDate() - 1);
+                yesterday.setHours(0, 0, 0, 0); // Начало вчерашнего дня
 
-                const recentMsgs = msgs.filter(m => new Date(m.DatePost) >= twoDaysAgo);
+                const recentMsgs = msgs.filter(m => new Date(m.DatePost) >= yesterday);
                 let blacklistUpdated = false;
 
                 recentMsgs.forEach(msg => {
@@ -995,7 +995,7 @@ class AccountBot {
                         this.mailSettings.blacklist.push(partnerIdStr);
                         blacklistUpdated = true;
                         const partnerName = msg.User.Name || `ID ${partnerId}`;
-                        console.log(`[Lababot] ✅ ${partnerName} (${partnerId}) добавлен в ЧС писем (за 2 дня)`);
+                        console.log(`[Lababot] ✅ ${partnerName} (${partnerId}) добавлен в ЧС писем`);
                     }
                 });
 

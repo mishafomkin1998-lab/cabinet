@@ -1279,7 +1279,12 @@ function renderBlacklist(botId) {
     // Инициализируем массив выбранных если нет
     if (!bot.selectedBlacklistIds) bot.selectedBlacklistIds = [];
 
-    data.forEach((id, index) => {
+    // Отображаем в обратном порядке: старые сверху, новые снизу
+    const displayData = [...data].reverse();
+
+    displayData.forEach((id, displayIndex) => {
+        // Оригинальный индекс в массиве data
+        const index = data.length - 1 - displayIndex;
         const d=document.createElement('div');
         d.className='list-item';
         d.dataset.index = index;
