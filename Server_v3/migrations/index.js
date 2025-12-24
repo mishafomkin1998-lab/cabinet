@@ -384,6 +384,7 @@ async function initDatabase() {
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_profile_payment_history_profile ON profile_payment_history(profile_id)`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_profile_payment_history_date ON profile_payment_history(created_at)`);
         await pool.query(`ALTER TABLE profile_payment_history ADD COLUMN IF NOT EXISTS paid_until_backup TIMESTAMP`);
+        await pool.query(`ALTER TABLE profile_payment_history ADD COLUMN IF NOT EXISTS amount DECIMAL(10,2)`);
         await fixSerialSequence('profile_payment_history');
 
         // 19. Верификация ID анкеты для бота (защита от подмены)
