@@ -253,7 +253,8 @@ function importSettings() {
                     accountPreferences = data.accountPreferences;
                     localStorage.setItem('accountPreferences', JSON.stringify(accountPreferences));
                 }
-                alert('Настройки импортированы! Перезагрузите страницу.');
+                // Тихая перезагрузка без alert
+                location.reload();
             } catch (err) {
                 alert('Ошибка импорта: ' + err.message);
             }

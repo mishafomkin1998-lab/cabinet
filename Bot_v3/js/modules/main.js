@@ -535,8 +535,8 @@ async function handleUniversalImport(input) {
                     localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
                 }
 
-                alert('Данные успешно импортированы! Перезагрузка...');
-                setTimeout(() => location.reload(), 500);
+                // Тихая перезагрузка без alert
+                location.reload();
 
             } catch (error) {
                 console.error('Import error:', error);
@@ -2338,8 +2338,8 @@ async function handleFullImport(input) {
                     localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
                 }
 
-                alert('Данные успешно импортированы! Перезагрузите приложение.');
-                setTimeout(() => location.reload(), 1000);
+                // Тихая перезагрузка без alert
+                location.reload();
 
             } catch (error) {
                 console.error('Import error:', error);
