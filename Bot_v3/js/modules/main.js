@@ -390,8 +390,14 @@ function renderManagerList() {
         list.appendChild(row);
     });
 }
+// Глобальная переменная для хранения ошибок импорта (для функций повтора)
+let importErrorsList = [];
+
 // Функция показа красивого модального окна результатов импорта
 function showImportResult(successList, duplicateList, errorList) {
+    // Сохраняем ошибки глобально для повторных попыток
+    importErrorsList = errorList.map((item, idx) => ({ ...item, idx }));
+
     let html = '';
 
     // Успешные
@@ -418,14 +424,32 @@ function showImportResult(successList, duplicateList, errorList) {
         </div>`;
     }
 
-    // Ошибки
+    // Ошибки - с редактированием и повтором
     if (errorList.length > 0) {
         html += `<div class="import-section import-error">
             <div class="import-section-header">
                 <i class="fa fa-times-circle"></i> Ошибки входа <span class="import-count">${errorList.length}</span>
+                <div class="import-header-buttons">
+                    <button class="btn btn-sm btn-outline-light" onclick="copyImportErrors()" title="Скопировать все ошибки">
+                        <i class="fa fa-copy"></i> Скопировать
+                    </button>
+                    <button class="btn btn-sm btn-warning" onclick="retryAllImportErrors()" title="Повторить вход для всех">
+                        <i class="fa fa-refresh"></i> Повторить все
+                    </button>
+                </div>
             </div>
-            <div class="import-section-list">
-                ${errorList.map(item => `<div class="import-item"><span class="import-id">${item.displayId}</span> ${item.login}</div>`).join('')}
+            <div class="import-section-list" id="import-errors-list">
+                ${errorList.map((item, idx) => `
+                    <div class="import-error-item" id="import-error-${idx}">
+                        <span class="import-id">${item.displayId}</span>
+                        <input type="text" class="import-login" id="import-login-${idx}" value="${item.login}" placeholder="Login">
+                        <input type="text" class="import-pass" id="import-pass-${idx}" value="${item.password || ''}" placeholder="Password">
+                        <button class="btn btn-sm btn-outline-success btn-retry" onclick="retryImportLogin(${idx})" title="Повторить вход">
+                            <i class="fa fa-refresh"></i>
+                        </button>
+                        <span class="import-error-msg">${item.error || 'Ошибка входа'}</span>
+                    </div>
+                `).join('')}
             </div>
         </div>`;
     }
@@ -437,6 +461,102 @@ function showImportResult(successList, duplicateList, errorList) {
 
     document.getElementById('import-result-content').innerHTML = html;
     openModal('import-result-modal');
+}
+
+// Скопировать ошибки в буфер обмена (формат: ID:login:password)
+function copyImportErrors() {
+    const lines = importErrorsList.map(item => {
+        const login = document.getElementById(`import-login-${item.idx}`)?.value || item.login;
+        const pass = document.getElementById(`import-pass-${item.idx}`)?.value || item.password || '';
+        return `${item.displayId}:${login}:${pass}`;
+    });
+
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+        showToast(`📋 Скопировано ${lines.length} записей`, 'success');
+    }).catch(err => {
+        console.error('Ошибка копирования:', err);
+        showToast('Ошибка копирования', 'error');
+    });
+}
+
+// Повторить вход для одной анкеты
+async function retryImportLogin(idx) {
+    const item = importErrorsList.find(e => e.idx === idx);
+    if (!item) return;
+
+    const loginInput = document.getElementById(`import-login-${idx}`);
+    const passInput = document.getElementById(`import-pass-${idx}`);
+    const btn = document.querySelector(`#import-error-${idx} .btn-retry`);
+    const row = document.getElementById(`import-error-${idx}`);
+
+    const login = loginInput?.value?.trim() || item.login;
+    const password = passInput?.value?.trim() || item.password;
+
+    if (!login || !password) {
+        showToast('Введите логин и пароль', 'warning');
+        return;
+    }
+
+    // Проверяем дубликат
+    if (checkDuplicate(login, item.displayId)) {
+        showToast(`${item.displayId} уже добавлен`, 'warning');
+        return;
+    }
+
+    // Показываем загрузку
+    btn.classList.add('loading');
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i>';
+
+    try {
+        const result = await addBot(login, password, item.displayId);
+        if (result && result.success !== false) {
+            // Успех - убираем строку и показываем уведомление
+            row.style.transition = 'all 0.3s';
+            row.style.opacity = '0';
+            row.style.transform = 'translateX(20px)';
+            setTimeout(() => row.remove(), 300);
+
+            // Убираем из списка ошибок
+            importErrorsList = importErrorsList.filter(e => e.idx !== idx);
+
+            // Обновляем счётчик
+            const countEl = document.querySelector('.import-error .import-count');
+            if (countEl) countEl.textContent = importErrorsList.length;
+
+            showToast(`✅ ${item.displayId} успешно добавлен`, 'success');
+        } else {
+            throw new Error(result?.error || 'Ошибка входа');
+        }
+    } catch (err) {
+        btn.classList.remove('loading');
+        btn.innerHTML = '<i class="fa fa-refresh"></i>';
+        const msgEl = row.querySelector('.import-error-msg');
+        if (msgEl) msgEl.textContent = err.message || 'Ошибка входа';
+        showToast(`❌ ${item.displayId}: ${err.message}`, 'error');
+    }
+}
+
+// Повторить вход для всех ошибок
+async function retryAllImportErrors() {
+    if (importErrorsList.length === 0) {
+        showToast('Нет ошибок для повтора', 'info');
+        return;
+    }
+
+    showToast(`🔄 Повторяем вход для ${importErrorsList.length} анкет...`, 'info');
+
+    // Последовательно повторяем для каждой анкеты
+    const idxList = [...importErrorsList.map(e => e.idx)];
+    for (const idx of idxList) {
+        await retryImportLogin(idx);
+        await new Promise(r => setTimeout(r, 500)); // Пауза между попытками
+    }
+
+    if (importErrorsList.length === 0) {
+        showToast('✅ Все анкеты успешно добавлены!', 'success');
+    } else {
+        showToast(`⚠️ Осталось ${importErrorsList.length} ошибок`, 'warning');
+    }
 }
 
 async function handleUniversalImport(input) {
@@ -472,7 +592,12 @@ async function handleUniversalImport(input) {
                 if (success) {
                     successList.push({ login: acc.login, displayId: acc.displayId });
                 } else {
-                    errorList.push({ login: acc.login, displayId: acc.displayId });
+                    errorList.push({
+                        login: acc.login,
+                        displayId: acc.displayId,
+                        password: acc.pass,
+                        error: 'Неверный логин или пароль'
+                    });
                 }
             });
         }

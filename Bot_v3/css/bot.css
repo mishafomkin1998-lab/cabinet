@@ -2003,11 +2003,11 @@
 
         /* IMPORT RESULT MODAL - Результаты импорта */
         .import-result-card {
-            width: 500px;
+            width: 800px;
             max-width: 95vw;
         }
         .import-result-body {
-            max-height: 400px;
+            max-height: 70vh;
             overflow-y: auto;
         }
         .import-section {
@@ -2026,17 +2026,25 @@
         .import-section-header i {
             font-size: 16px;
         }
+        .import-header-buttons {
+            margin-left: auto;
+            display: flex;
+            gap: 6px;
+        }
+        .import-header-buttons .btn {
+            padding: 2px 8px;
+            font-size: 11px;
+        }
         .import-count {
             background: rgba(255,255,255,0.3);
             padding: 2px 8px;
             border-radius: 12px;
             font-size: 12px;
-            margin-left: auto;
         }
         .import-section-list {
             padding: 8px 14px;
             font-size: 12px;
-            max-height: 120px;
+            max-height: 250px;
             overflow-y: auto;
         }
         .import-item {
@@ -2044,7 +2052,7 @@
             border-bottom: 1px solid rgba(0,0,0,0.05);
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
         .import-item:last-child {
             border-bottom: none;
@@ -2099,6 +2107,45 @@
         .import-error .import-id {
             background: #dc3545;
             color: white;
+        }
+
+        /* Ошибки импорта - inline редактирование */
+        .import-error-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+        .import-error-item:last-child {
+            border-bottom: none;
+        }
+        .import-error-item input {
+            padding: 3px 6px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        .import-error-item input.import-login {
+            width: 180px;
+        }
+        .import-error-item input.import-pass {
+            width: 120px;
+        }
+        .import-error-item .import-error-msg {
+            flex: 1;
+            font-size: 11px;
+            color: #721c24;
+            opacity: 0.8;
+        }
+        .import-error-item .btn-retry {
+            padding: 2px 8px;
+            font-size: 11px;
+        }
+        .import-error-item .btn-retry.loading {
+            pointer-events: none;
+            opacity: 0.6;
         }
 
         /* RESPONSE WINDOWS - перетаскиваемые окна ответа */
