@@ -7,6 +7,9 @@ const BLACKLIST_MAX_SIZE = 5000;
 // Минимальный интервал между отправками писем (защита от блокировки IP)
 const MIN_MAIL_INTERVAL = 15000; // 15 секунд
 
+// Показывать карточку профиля с фото (под кнопкой Inbox)
+const SHOW_PROFILE_CARD = true; // false чтобы отключить
+
 let axios;
 try { axios = require('axios'); } catch(e) { axios = window.axios; }
 

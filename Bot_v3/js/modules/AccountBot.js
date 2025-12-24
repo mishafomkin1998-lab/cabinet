@@ -711,11 +711,41 @@ class AccountBot {
         try {
             const res = await makeApiRequest(this, 'GET', '/my-profile-preview');
             const html = res.data;
-            const regex = /Birthday<\/div>[\s\S]*?<div[^>]*>\s*([0-9]{1,2}\s+[A-Za-z]+\s+[0-9]{4})\s*<\/div>/i;
-            const match = html.match(regex);
-            if(match && match[1]) {
-                this.myBirthday = match[1];
+
+            // Парсим день рождения
+            const bdayRegex = /Birthday<\/div>[\s\S]*?<div[^>]*>\s*([0-9]{1,2}\s+[A-Za-z]+\s+[0-9]{4})\s*<\/div>/i;
+            const bdayMatch = html.match(bdayRegex);
+            if(bdayMatch && bdayMatch[1]) {
+                this.myBirthday = bdayMatch[1];
                 this.checkBirthdayComing();
+            }
+
+            // === PROFILE CARD: Парсим фото и имя ===
+            if (typeof SHOW_PROFILE_CARD !== 'undefined' && SHOW_PROFILE_CARD) {
+                // Парсим имя и возраст (формат: "Angela, 47")
+                const nameRegex = /<div[^>]*class="[^"]*"[^>]*>\s*([A-Za-z]+),\s*(\d+)\s*<\/div>/i;
+                const nameMatch = html.match(nameRegex);
+
+                // Парсим URL фото
+                const photoRegex = /<img[^>]*src="([^"]*\/photos\/[^"]+)"/i;
+                const photoMatch = html.match(photoRegex);
+
+                // Обновляем UI
+                const photoEl = document.getElementById(`profile-photo-${this.id}`);
+                const nameEl = document.getElementById(`profile-name-${this.id}`);
+
+                if (photoEl && photoMatch && photoMatch[1]) {
+                    let photoUrl = photoMatch[1];
+                    if (!photoUrl.startsWith('http')) {
+                        photoUrl = 'https://ladadate.com' + photoUrl;
+                    }
+                    photoEl.src = photoUrl;
+                    photoEl.style.display = 'block';
+                }
+
+                if (nameEl && nameMatch) {
+                    nameEl.textContent = `${nameMatch[1]}, ${nameMatch[2]}`;
+                }
             }
         } catch(e) { console.error(`[Bot ${this.displayId}] getProfileData error:`, e.message); }
     }
