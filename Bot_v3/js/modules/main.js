@@ -176,8 +176,8 @@ function createInterface(bot) {
                 <button class="btn btn-success btn-sm" onclick="addBlacklistFromInput('${bot.id}')" title="1 ID = этому боту, несколько = всем">+</button>
             </div>
             <div class="bl-actions">
-                <button class="btn btn-outline-danger btn-sm flex-fill" onclick="removeSelectedBlacklist('${bot.id}')" data-tip="Удалить выбранные"><i class="fa fa-trash"></i></button>
                 <button class="btn btn-outline-warning btn-sm flex-fill" onclick="toggleVipStatus('${bot.id}')" data-tip="VIP Клиент (Отслеживать онлайн)"><i class="fa fa-star"></i></button>
+                <button class="btn btn-outline-danger btn-sm flex-fill" onclick="removeSelectedBlacklist('${bot.id}')" data-tip="Удалить выбранные"><i class="fa fa-trash"></i></button>
             </div>
         </div>`;
     row.appendChild(col4);
