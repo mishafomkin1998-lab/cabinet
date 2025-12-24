@@ -709,7 +709,8 @@ class AccountBot {
 
     async getProfileData() {
         try {
-            const res = await makeApiRequest(this, 'GET', '/my-profile-preview');
+            // Используем /my-profile для получения фото и имени
+            const res = await makeApiRequest(this, 'GET', '/my-profile');
             const html = res.data;
 
             // Парсим день рождения
@@ -722,24 +723,20 @@ class AccountBot {
 
             // === PROFILE CARD: Парсим фото и имя ===
             if (typeof SHOW_PROFILE_CARD !== 'undefined' && SHOW_PROFILE_CARD) {
-                // Парсим имя и возраст (формат: "Angela, 47")
-                const nameRegex = /<div[^>]*class="[^"]*"[^>]*>\s*([A-Za-z]+),\s*(\d+)\s*<\/div>/i;
-                const nameMatch = html.match(nameRegex);
-
-                // Парсим URL фото
-                const photoRegex = /<img[^>]*src="([^"]*\/photos\/[^"]+)"/i;
+                // Парсим URL фото (формат: https://ladadate.com/content/photos/...)
+                const photoRegex = /<img[^>]*src="(https?:\/\/[^"]*\/content\/photos\/[^"]+)"/i;
                 const photoMatch = html.match(photoRegex);
+
+                // Парсим имя и возраст из блока my_name_age (формат: "Angela, 47")
+                const nameRegex = /id="my_name_age"[^>]*>[\s\S]*?([A-Za-z]+),\s*(\d+)/i;
+                const nameMatch = html.match(nameRegex);
 
                 // Обновляем UI
                 const photoEl = document.getElementById(`profile-photo-${this.id}`);
                 const nameEl = document.getElementById(`profile-name-${this.id}`);
 
                 if (photoEl && photoMatch && photoMatch[1]) {
-                    let photoUrl = photoMatch[1];
-                    if (!photoUrl.startsWith('http')) {
-                        photoUrl = 'https://ladadate.com' + photoUrl;
-                    }
-                    photoEl.src = photoUrl;
+                    photoEl.src = photoMatch[1];
                     photoEl.style.display = 'block';
                 }
 
