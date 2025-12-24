@@ -637,46 +637,6 @@ router.delete('/favorite_template', asyncHandler(async (req, res) => {
 }));
 
 /**
- * GET /api/favorite_templates
- * Получить избранные шаблоны с фильтрацией по роли
- */
-router.get('/favorite_templates', asyncHandler(async (req, res) => {
-    const { userId, role } = req.query;
-
-    let query = `
-        SELECT ft.*, ap.login as profile_login
-        FROM favorite_templates ft
-        LEFT JOIN allowed_profiles ap ON ft.profile_id = ap.profile_id
-    `;
-    let params = [];
-
-    if (role === 'admin' && userId) {
-        query += ` WHERE ft.admin_id = $1`;
-        params.push(userId);
-    } else if (role === 'translator' && userId) {
-        query += ` WHERE ft.translator_id = $1`;
-        params.push(userId);
-    }
-
-    query += ` ORDER BY ft.created_at DESC`;
-
-    const result = await pool.query(query, params);
-
-    res.json({
-        success: true,
-        templates: result.rows.map(t => ({
-            id: t.id,
-            profileId: t.profile_id,
-            profileLogin: t.profile_login,
-            templateName: t.template_name,
-            templateText: t.template_text,
-            type: t.type,
-            createdAt: t.created_at
-        }))
-    });
-}));
-
-/**
  * GET /api/activity/sent-letters-grouped
  * Возвращает отправленные письма с группировкой по анкете + текст письма
  * Показывает количество отправленных и время последней отправки

@@ -385,19 +385,6 @@ async function initDatabase() {
         await pool.query(`ALTER TABLE bots ADD COLUMN IF NOT EXISTS profile_verified_at TIMESTAMP`);
         await pool.query(`CREATE INDEX IF NOT EXISTS idx_bots_verified_profile ON bots(verified_profile_id)`);
 
-        // 20. Таблица активности пользователей (пинги для расчёта времени работы)
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS user_activity (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                activity_type VARCHAR(20) DEFAULT 'active',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
-        await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_activity_user ON user_activity(user_id)`);
-        await pool.query(`CREATE INDEX IF NOT EXISTS idx_user_activity_date ON user_activity(created_at)`);
-        await fixSerialSequence('user_activity');
-
         // 21. Таблица AI массовых рассылок (для блока "Использование ИИ")
         await pool.query(`
             CREATE TABLE IF NOT EXISTS ai_mass_messages (
@@ -516,22 +503,6 @@ async function migrateBotsTable() {
         await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS bots_bot_id_unique ON bots(bot_id) WHERE bot_id IS NOT NULL`);
     } catch (e) { /* Индекс уже существует */ }
 
-    // Таблица логов бота (операционные логи: старт/стоп, ошибки, события)
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS bot_logs (
-            id SERIAL PRIMARY KEY,
-            bot_id VARCHAR(100) NOT NULL,
-            profile_id VARCHAR(100),
-            log_type VARCHAR(50) NOT NULL,
-            message TEXT NOT NULL,
-            details JSONB,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    `);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_bot_logs_profile ON bot_logs(profile_id)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_bot_logs_type ON bot_logs(log_type)`);
-    await pool.query(`CREATE INDEX IF NOT EXISTS idx_bot_logs_created ON bot_logs(created_at)`);
-
     // 21. Поле "Мой переводчик" для переводчиков напрямую под директором
     // is_own_translator = true означает бесплатное использование анкет (без баланса)
     await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_own_translator BOOLEAN DEFAULT TRUE`);
@@ -574,19 +545,6 @@ async function cleanupOldData() {
         }
     } catch (e) {
         console.log('Очистка heartbeats:', e.message);
-    }
-
-    // Удаляем старые пинги активности (старше 60 дней)
-    try {
-        const activityCleanup = await pool.query(`
-            DELETE FROM user_activity
-            WHERE created_at < NOW() - INTERVAL '60 days'
-        `);
-        if (activityCleanup.rowCount > 0) {
-            console.log(`🧹 Очищено ${activityCleanup.rowCount} старых пингов активности`);
-        }
-    } catch (e) {
-        console.log('Очистка user_activity:', e.message);
     }
 }
 

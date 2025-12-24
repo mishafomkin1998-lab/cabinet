@@ -115,7 +115,6 @@
                 sentLettersGrouped: [],
 
                 // Календарь
-                showAccountsCalendar: false,
                 calendarMonth: new Date().getMonth(),
                 calendarYear: new Date().getFullYear(),
                 calendarSelectingStart: true,
@@ -2683,10 +2682,6 @@
                     window.location.href = 'login.html';
                 }
             }
-        }
-        
-        function toggleActive(element) {
-            element.classList.toggle('active');
         }
 
         // Компонент Клиенты (CRM)
