@@ -194,8 +194,17 @@ const SharedPool = {
 let hotManQueue = {};
 // Структура: { manId: { addedAt: timestamp, sentBy: ['bot_123', 'bot_456'], name: 'John' } }
 
+// ============= ONLINE SMART - Fresh Online (новые онлайн) =============
+// Мужчины, которые ТОЛЬКО ЧТО появились онлайн (приоритет над всеми!)
+let freshOnlineUsers = new Map();
+// Структура: Map<AccountId, { firstSeen: timestamp, user: userData }>
+
+let previousOnlineIds = new Set();
+// ID мужчин которые были онлайн при прошлой проверке
+
 // Константы для Online Smart
 const HOT_QUEUE_EXPIRY_MS = 5 * 60 * 1000;  // 5 минут - время жизни в горячей очереди
+const FRESH_ONLINE_EXPIRY_MS = 5 * 60 * 1000;  // 5 минут - время жизни в списке свежих
 
 let currentModalBotId = null;
 let editingTemplateIndex = null;
