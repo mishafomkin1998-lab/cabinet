@@ -3684,63 +3684,36 @@ body.theme-ladadate #restore-progress-current {
 /* ============= PROFILE CARD (карточка профиля анкеты) ============= */
 .profile-card {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 12px;
-    padding: 10px;
-    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-    border-radius: 10px;
-    margin-bottom: 10px;
-    border: 1px solid #dee2e6;
+    margin-bottom: 15px;
 }
 
 .profile-photo {
-    width: 60px;
-    height: 80px;
+    width: 140px;
+    height: 180px;
     object-fit: cover;
-    border-radius: 8px;
-    border: 2px solid #fff;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
 
 .profile-info {
-    flex: 1;
-    min-width: 0;
+    text-align: center;
+    margin-top: 10px;
 }
 
 .profile-name {
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 18px;
+    font-weight: 700;
     color: #333;
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 /* Dark theme */
-body.theme-dark .profile-card {
-    background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
-    border-color: #444;
-}
-
 body.theme-dark .profile-name {
     color: #e0e0e0;
 }
 
-body.theme-dark .profile-photo {
-    border-color: #444;
-}
-
 /* LadaDate theme */
-body.theme-ladadate .profile-card {
-    background: linear-gradient(135deg, #2d1a2d 0%, #1a0a1a 100%);
-    border-color: #4a2a4a;
-}
-
 body.theme-ladadate .profile-name {
     color: #f0d0f0;
-}
-
-body.theme-ladadate .profile-photo {
-    border-color: #ec4899;
 }
