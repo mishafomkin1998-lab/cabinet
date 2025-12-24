@@ -127,7 +127,11 @@ async function handleAIActionWithTemplate(botId, action, templateId, event) {
         }
     }
 
-    if(!globalSettings.apiKey) { showToast("Введите OpenAI API Key в настройках!"); return; }
+    if(!globalSettings.apiKey) {
+        btn.innerHTML = originalHtml;
+        showToast("Введите OpenAI API Key в настройках!");
+        return;
+    }
 
     const txtArea = document.getElementById(`msg-${botId}`);
     const currentText = txtArea.value;
@@ -160,7 +164,11 @@ async function handleAIActionWithTemplate(botId, action, templateId, event) {
                 : `Write an engaging letter for a dating site. Keep it warm and personal. Original text: "${currentText}"`;
         }
     } else if (action === 'improve') {
-        if(!currentText) { showToast("Напишите что-то, чтобы улучшить!"); return; }
+        if(!currentText) {
+            btn.innerHTML = originalHtml;
+            showToast("Напишите что-то, чтобы улучшить!");
+            return;
+        }
 
         // Получаем промпт из шаблона или настроек
         let improvePromptValue = '';
@@ -350,7 +358,11 @@ async function handleAIAction(botId, action, event) {
         }
     }
 
-    if(!globalSettings.apiKey) { showToast("Введите OpenAI API Key в настройках!"); return; }
+    if(!globalSettings.apiKey) {
+        btn.innerHTML = originalHtml;
+        showToast("Введите OpenAI API Key в настройках!");
+        return;
+    }
 
     const txtArea = document.getElementById(`msg-${botId}`);
     const currentText = txtArea.value;
@@ -364,10 +376,18 @@ async function handleAIAction(botId, action, event) {
         const myPromptValue = isChat ? globalSettings.myPromptChat : globalSettings.myPrompt;
         const promptName = isChat ? "My Prompt (Chat)" : "My Prompt";
 
-        if(!myPromptValue) { showToast(`Заполните '${promptName}' в настройках!`); return; }
+        if(!myPromptValue) {
+            btn.innerHTML = originalHtml;
+            showToast(`Заполните '${promptName}' в настройках!`);
+            return;
+        }
         prompt = `${myPromptValue}. \n\nOriginal text: "${currentText}"`;
     } else if (action === 'improve') {
-        if(!currentText) { showToast("Напишите что-то, чтобы улучшить!"); return; }
+        if(!currentText) {
+            btn.innerHTML = originalHtml;
+            showToast("Напишите что-то, чтобы улучшить!");
+            return;
+        }
         // Используем пользовательский промпт из настроек или стандартный
         const defaultImprovePrompt = `Исправь грамматику, сделай текст более человечным и женским. Оставь текст на русском, сохрани естественность и не используй "Приветствие" или подпись. Текст: "{text}"`;
         const improvePromptTemplate = globalSettings.improvePrompt || defaultImprovePrompt;
