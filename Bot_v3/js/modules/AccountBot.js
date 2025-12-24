@@ -1942,12 +1942,6 @@ class AccountBot {
                     markCustomIdSent(this.id, user.AccountId.toString());
                 }
 
-                // ============ ONLINE SMART: Проверка глобального лимита ============
-                // Если ошибка "hourly incoming message limit" - обрабатываем глобально (ТОЛЬКО для online-smart!)
-                if (this.mailSettings.target === 'online-smart' && user && user.AccountId && errorReason.includes(LIMIT_ERROR_TEXT)) {
-                    handleGlobalLimit(user.AccountId, user.Name, this.id);
-                }
-
                 // Отправляем ошибку на сервер (с защитой от падения)
                 try {
                     await sendErrorToLababot(

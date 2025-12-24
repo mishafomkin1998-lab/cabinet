@@ -9,30 +9,11 @@ function startMemoryCleanup() {
 
     // Очистка каждый час для остальных объектов
     setInterval(() => {
-        cleanupGlobalLimitedMen();
         cleanupLoggerTracking();
         cleanupAllConversations();
     }, 60 * 60 * 1000);
 
     console.log('✅ Периодическая очистка памяти запущена');
-}
-
-// Очистка глобальных лимитов (записи старше 1 часа)
-function cleanupGlobalLimitedMen() {
-    const MAX_AGE_MS = 60 * 60 * 1000; // 1 час
-    const now = Date.now();
-    let cleaned = 0;
-
-    for (const manId in globalLimitedMen) {
-        if (now - globalLimitedMen[manId].limitedAt > MAX_AGE_MS) {
-            delete globalLimitedMen[manId];
-            cleaned++;
-        }
-    }
-
-    if (cleaned > 0) {
-        console.log(`🧹 globalLimitedMen: очищено ${cleaned} записей`);
-    }
 }
 
 // Очистка логгера (сбрасываем Set уведомлений каждый час)

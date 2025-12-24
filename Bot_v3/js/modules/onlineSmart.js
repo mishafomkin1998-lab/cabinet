@@ -1,4 +1,4 @@
-// ============= ONLINE SMART - Горячая очередь и глобальные лимиты =============
+// ============= ONLINE SMART - Горячая очередь =============
 
 // Добавить мужчину в горячую очередь (вызывается при успешной отправке)
 function addToHotQueue(manId, manName, botId) {
@@ -42,9 +42,6 @@ function getFromHotQueue(botId, bot) {
         // Пропускаем если в blacklist, sent или errors этого бота
         if (!bot.canSendMailTo(parseInt(manId))) continue;
 
-        // Пропускаем если в глобальных лимитах (2+ анкеты получили лимит)
-        if (globalLimitedMen[manId] && globalLimitedMen[manId].failedBots.length >= 2) continue;
-
         return {
             manId: parseInt(manId),
             name: entry.name
@@ -52,48 +49,6 @@ function getFromHotQueue(botId, bot) {
     }
 
     return null;
-}
-
-// Обработать ошибку глобального лимита
-function handleGlobalLimit(manId, manName, botId) {
-    const manIdStr = manId.toString();
-    const now = Date.now();
-
-    if (!globalLimitedMen[manIdStr]) {
-        globalLimitedMen[manIdStr] = {
-            failedBots: [botId],
-            limitedAt: now,
-            name: manName || `ID ${manId}`
-        };
-    } else {
-        if (!globalLimitedMen[manIdStr].failedBots.includes(botId)) {
-            globalLimitedMen[manIdStr].failedBots.push(botId);
-        }
-    }
-
-    const failedCount = globalLimitedMen[manIdStr].failedBots.length;
-    console.log(`[OnlineSmart] ⚠️ Лимит для ${manName || manId}: ${failedCount} анкет не смогли отправить`);
-
-    // Если 2+ анкеты получили лимит - добавляем в errors ВСЕХ ботов
-    if (failedCount >= 2) {
-        console.log(`[OnlineSmart] 🚫 ${manName || manId}: глобальный лимит! Добавляем в ошибки всех анкет`);
-
-        Object.values(bots).forEach(bot => {
-            const errorEntry = `${manId}: Global hourly limit`;
-            // Проверяем что ещё не в ошибках
-            const alreadyInErrors = bot.mailHistory.errors.some(e => e.startsWith(`${manId}:`));
-            if (!alreadyInErrors) {
-                bot.mailHistory.errors.push(errorEntry);
-                bot.mailStats.errors++;
-                bot.updateUI();
-            }
-        });
-
-        // Удаляем из горячей очереди
-        delete hotManQueue[manIdStr];
-
-        showToast(`🚫 ID ${manId}: глобальный лимит (добавлен в ошибки всех анкет)`, 'warning');
-    }
 }
 
 // Очистка просроченных записей в горячей очереди (старше 5 минут)

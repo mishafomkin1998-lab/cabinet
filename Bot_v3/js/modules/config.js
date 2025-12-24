@@ -188,20 +188,14 @@ const SharedPool = {
     }
 };
 
-// ============= ONLINE SMART - Горячая очередь и глобальные лимиты =============
+// ============= ONLINE SMART - Горячая очередь =============
 // Горячая очередь: мужчины, которым недавно успешно отправили (активны сейчас)
 // Другие анкеты приоритетно отправят им в течение 5 минут
 let hotManQueue = {};
 // Структура: { manId: { addedAt: timestamp, sentBy: ['bot_123', 'bot_456'], name: 'John' } }
 
-// Глобальные лимиты: мужчины с ошибкой "hourly limit exceeded"
-// Если 2+ анкеты получили лимит - добавляем в errors всех ботов
-let globalLimitedMen = {};
-// Структура: { manId: { failedBots: ['bot_123', 'bot_456'], limitedAt: timestamp } }
-
 // Константы для Online Smart
 const HOT_QUEUE_EXPIRY_MS = 5 * 60 * 1000;  // 5 минут - время жизни в горячей очереди
-const LIMIT_ERROR_TEXT = "The user's hourly incoming message limit has been exceeded";
 
 let currentModalBotId = null;
 let editingTemplateIndex = null;
