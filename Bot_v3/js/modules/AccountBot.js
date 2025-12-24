@@ -1389,7 +1389,10 @@ class AccountBot {
                 } else {
                     this.log(`✅ Custom IDs: все ID из списка обработаны`);
                     if (this.mailSettings.auto) {
-                        const newTarget = getNextActiveStatus('payers');
+                        // Начинаем с payers (если не отключен), иначе ищем следующий
+                        const newTarget = (!globalSettings.disabledStatuses || !globalSettings.disabledStatuses.includes('payers'))
+                            ? 'payers'
+                            : getNextActiveStatus('payers');
 
                         // Получаем статистику по custom-ids и количество в новом статусе
                         const statusStats = this.getStatusStats();
