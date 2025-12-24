@@ -723,25 +723,34 @@ class AccountBot {
 
             // === PROFILE CARD: Парсим фото и имя ===
             if (typeof SHOW_PROFILE_CARD !== 'undefined' && SHOW_PROFILE_CARD) {
+                // DEBUG: выводим часть HTML для отладки
+                console.log(`[ProfileCard ${this.displayId}] HTML length: ${html.length}`);
+                console.log(`[ProfileCard ${this.displayId}] HTML sample:`, html.substring(0, 500));
+
                 // Парсим URL фото (формат: https://ladadate.com/content/photos/...)
                 const photoRegex = /<img[^>]*src="(https?:\/\/[^"]*\/content\/photos\/[^"]+)"/i;
                 const photoMatch = html.match(photoRegex);
+                console.log(`[ProfileCard ${this.displayId}] Photo match:`, photoMatch ? photoMatch[1] : 'NOT FOUND');
 
                 // Парсим имя и возраст из блока my_name_age (формат: "Angela, 47")
                 const nameRegex = /id="my_name_age"[^>]*>[\s\S]*?([A-Za-z]+),\s*(\d+)/i;
                 const nameMatch = html.match(nameRegex);
+                console.log(`[ProfileCard ${this.displayId}] Name match:`, nameMatch ? `${nameMatch[1]}, ${nameMatch[2]}` : 'NOT FOUND');
 
                 // Обновляем UI
                 const photoEl = document.getElementById(`profile-photo-${this.id}`);
                 const nameEl = document.getElementById(`profile-name-${this.id}`);
+                console.log(`[ProfileCard ${this.displayId}] Elements: photo=${!!photoEl}, name=${!!nameEl}`);
 
                 if (photoEl && photoMatch && photoMatch[1]) {
                     photoEl.src = photoMatch[1];
                     photoEl.style.display = 'block';
+                    console.log(`[ProfileCard ${this.displayId}] ✅ Photo set`);
                 }
 
                 if (nameEl && nameMatch) {
                     nameEl.textContent = `${nameMatch[1]}, ${nameMatch[2]}`;
+                    console.log(`[ProfileCard ${this.displayId}] ✅ Name set`);
                 }
             }
         } catch(e) { console.error(`[Bot ${this.displayId}] getProfileData error:`, e.message); }
