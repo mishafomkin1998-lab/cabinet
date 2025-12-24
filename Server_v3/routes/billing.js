@@ -204,10 +204,10 @@ router.post('/extend-profile', asyncHandler(async (req, res) => {
             UPDATE allowed_profiles
             SET paid_until = COALESCE(
                 CASE WHEN paid_until > NOW() THEN paid_until ELSE NOW() END
-            , NOW()) + INTERVAL '${days} days',
+            , NOW()) + INTERVAL '1 day' * $2,
             is_trial = FALSE
             WHERE profile_id = $1
-        `, [profileId]);
+        `, [profileId, days]);
 
         return res.json({
             success: true,
@@ -237,10 +237,10 @@ router.post('/extend-profile', asyncHandler(async (req, res) => {
         UPDATE allowed_profiles
         SET paid_until = COALESCE(
             CASE WHEN paid_until > NOW() THEN paid_until ELSE NOW() END
-        , NOW()) + INTERVAL '${days} days',
+        , NOW()) + INTERVAL '1 day' * $2,
         is_trial = FALSE
         WHERE profile_id = $1
-    `, [profileId]);
+    `, [profileId, days]);
 
     // Получаем новый баланс
     const newBalance = await pool.query(`SELECT balance FROM users WHERE id = $1`, [userId]);
@@ -513,10 +513,10 @@ router.post('/pay-profile', asyncHandler(async (req, res) => {
         UPDATE allowed_profiles
         SET paid_until = COALESCE(
             CASE WHEN paid_until > NOW() THEN paid_until ELSE NOW() END
-        , NOW()) + INTERVAL '${days} days',
+        , NOW()) + INTERVAL '1 day' * $2,
         is_trial = FALSE
         WHERE profile_id = $1
-    `, [profileId]);
+    `, [profileId, days]);
 
     // Сохраняем в историю оплаты анкет
     await pool.query(
