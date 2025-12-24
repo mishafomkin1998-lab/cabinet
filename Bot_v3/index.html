@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Novabot v1.5.0</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link rel="stylesheet" href="css/bot.css">
+</head>
+<body class="mode-mail"> 
+    <div id="error-toast" class="error-toast"><i class="fa fa-exclamation-circle"></i> <span id="error-toast-text">Ошибка</span></div>
+    <div id="tooltip-popup" class="custom-tooltip-popup"></div>
+
+    <!-- Контейнер для перетаскиваемых окон ответа -->
+    <div id="response-windows-container"></div>
+
+    <div class="global-toolbar">
+        <div class="toolbar-left">
+            <button class="btn btn-success btn-circle" onclick="openAddModal()" data-tip="Анкеты"><i class="fa fa-plus"></i></button>
+            <span id="global-men-online" class="men-online-badge" data-tip="Мужчин онлайн (от случайной анкеты)"><i class="fa fa-male"></i> <span id="global-men-count">0</span></span>
+        </div>
+        <div class="toolbar-center">
+            <button class="btn btn-circle btn-logger" id="btn-logger-main" onclick="toggleLogger()" data-tip="Открыть Логгер"><i class="fa fa-list-alt"></i></button>
+            <button class="btn btn-circle btn-play" onclick="startAll()" data-tip="Старт (Текущий режим)"><i class="fa fa-play"></i></button>
+            
+            <button class="btn btn-circle btn-stop" onclick="stopAll()" data-tip="Стоп (Текущий режим)"><i class="fa fa-stop"></i></button>
+            <button class="btn btn-circle btn-clear" onclick="clearAllStats()" oncontextmenu="openAutoClearSettings(event)" data-tip="ЛКМ: Сбросить статистику | ПКМ: Автоочистка"><i class="fa fa-eraser"></i></button>
+            <button class="btn btn-circle btn-mode-switch active-mail" id="btn-mode-toggle" onclick="toggleGlobalMode()" data-tip="Переключить режим (Mail/Chat)"><i class="fa fa-envelope"></i></button>
+            <button class="btn btn-circle btn-refresh" onclick="reloginAllBots()" data-tip="Перелогинить все анкеты"><i class="fa fa-sync"></i></button>
+            
+            <div class="status-group-wrapper">
+                <button class="btn-group-toggle" id="btn-group-toggle" onclick="toggleStatusGroup()" data-tip="Показать/Скрыть статусы">
+                    <i class="fa fa-caret-right"></i>
+                </button>
+                <div class="status-buttons-container" id="status-buttons-container">
+                    <button class="btn btn-circle btn-status-circle btn-online-smart-color" data-status="online-smart" onclick="setGlobalTarget('online-smart')" oncontextmenu="toggleStatusDisabled('online-smart', event)" data-tip="Online Smart | Горячая очередь + глобальные лимиты | ЛКМ: Установить всем | ПКМ: Вкл/Выкл"><i class="fa fa-bolt"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-shared-online-color" data-status="shared-online" onclick="setGlobalTarget('shared-online')" oncontextmenu="toggleStatusDisabled('shared-online', event)" data-tip="Online Shared | ЛКМ: Установить всем | ПКМ: Вкл/Выкл"><i class="fa fa-users"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-online-color" data-status="online" onclick="setGlobalTarget('online')" oncontextmenu="toggleStatusDisabled('online', event)" data-tip="Online | ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-globe"></i></button>
+                    <span class="status-divider"></span>
+                    <button class="btn btn-circle btn-status-circle btn-fav-of-color" data-status="favorites" onclick="setGlobalTarget('favorites')" oncontextmenu="toggleStatusDisabled('favorites', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-star"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-my-fav-color" data-status="my-favorites" onclick="setGlobalTarget('my-favorites')" oncontextmenu="toggleStatusDisabled('my-favorites', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-heart"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-inbox-color" data-status="inbox" onclick="setGlobalTarget('inbox')" oncontextmenu="toggleStatusDisabled('inbox', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-inbox"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-payers-color" data-status="payers" onclick="setGlobalTarget('payers')" oncontextmenu="toggleStatusDisabled('payers', event)" data-tip="ЛКМ: Установить всем | ПКМ: Вкл/Выкл в авто"><i class="fa fa-credit-card"></i></button>
+                    <button class="btn btn-circle btn-status-circle btn-custom-ids-color" onclick="openGlobalCustomIdsModal()" data-tip="Custom IDs: Рассылка по конкретным ID для всех анкет"><i class="fa fa-list-ol"></i></button>
+                </div>
+            </div>
+        </div>
+        <div class="toolbar-right">
+            <span id="global-bot-count" class="bot-counter">Анкет: 0</span>
+            <button class="btn btn-circle btn-settings" onclick="openGlobalSettings()" data-tip="Глобальные настройки"><i class="fa fa-cog"></i></button>
+        </div>
+    </div>
+
+    <div class="tabs-container" id="tabs-bar"></div>
+
+    <div id="main-content-wrapper">
+        <div id="panels-container">
+            <div id="welcome-screen">
+                <p>Нажмите <strong class="text-success">+</strong> чтобы войти.</p>
+                <small class="text-muted" id="restore-status"></small>
+            </div>
+        </div>
+
+        <!-- 5-я колонка: Logger -->
+        <div id="logger-column">
+            <div class="logger-column-header">
+                <span><i class="fa fa-list"></i> Лог событий</span>
+                <div class="logger-header-buttons">
+                    <button class="btn btn-sm btn-link text-muted p-0" onclick="toggleLoggerSearch()" title="Поиск (Ctrl+F)"><i class="fa fa-search"></i></button>
+                    <button class="btn btn-sm btn-link text-muted p-0" onclick="toggleLogger()"><i class="fa fa-times"></i></button>
+                </div>
+            </div>
+            <div id="logger-search-box" class="logger-search-box" style="display: none;">
+                <input type="text" id="logger-search-input" placeholder="Поиск..." oninput="searchLoggerEntries(this.value)">
+                <span id="logger-search-count"></span>
+                <div class="logger-search-nav">
+                    <button onclick="navigateLoggerSearch(-1)" title="Предыдущее (↑)"><i class="fa fa-chevron-up"></i></button>
+                    <button onclick="navigateLoggerSearch(1)" title="Следующее (↓)"><i class="fa fa-chevron-down"></i></button>
+                </div>
+                <button class="logger-search-close" onclick="closeLoggerSearch()"><i class="fa fa-times"></i></button>
+            </div>
+            <div class="logger-column-content" id="logger-content">
+                <div class="text-center text-muted small mt-5">Событий пока нет...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- === ВАЖНОЕ ДОБАВЛЕНИЕ: Контейнер для скрытых браузеров === -->
+    <div id="browsers-container"></div>
+
+    <div id="add-modal" class="modal-overlay">
+        <div class="modal-card" style="width: 450px;">
+            <h5>Анкеты</h5>
+
+            <!-- Список анкет -->
+            <div id="manager-list" class="mb-3" style="max-height: 150px; overflow-y: auto;"></div>
+
+            <hr>
+
+            <!-- Добавление новой анкеты -->
+            <h6 id="add-modal-title"><i class="fa fa-plus text-success"></i> Добавить анкету</h6>
+            <input id="newLogin" class="form-control form-control-sm mb-2" placeholder="Email">
+            <input id="newPass" class="form-control form-control-sm mb-2" placeholder="Пароль">
+            <input id="newId" class="form-control form-control-sm mb-2" placeholder="ID (вид)">
+            <button id="btnLogin" class="btn btn-success btn-sm w-100 mb-2" onclick="handleLoginOrUpdate()">
+                <div class="spinner" id="loginSpinner"></div>
+                <span id="btnLoginText">Добавить</span>
+            </button>
+            <div id="loginError" class="text-danger small text-center"></div>
+
+            <hr>
+
+            <!-- Импорт / Экспорт -->
+            <div class="d-flex gap-2 mb-3">
+                <button class="btn btn-outline-success btn-sm flex-fill" onclick="exportAllData()">
+                    <i class="fa fa-download"></i> Экспорт
+                </button>
+                <button class="btn btn-outline-primary btn-sm flex-fill" onclick="document.getElementById('importFile').click()">
+                    <i class="fa fa-upload"></i> Импорт
+                </button>
+                <input type="file" id="importFile" hidden accept=".txt,.json" onchange="handleUniversalImport(this)">
+            </div>
+            <div class="alert alert-light p-2 small text-muted border">
+                <b>Импорт:</b> TXT (ID Логин Пароль) или JSON (полный бекап)
+            </div>
+
+            <button class="btn btn-cancel-modal w-100 mt-3" onclick="closeModal('add-modal')">Закрыть</button>
+        </div>
+    </div>
+
+    <div id="tpl-modal" class="modal-overlay">
+        <div class="modal-card" style="width: 550px;">
+            <h5 id="tpl-modal-title">Новый шаблон</h5>
+            <div class="mb-2"><input id="tpl-modal-name" class="form-control" placeholder="Название"></div>
+
+            <!-- AI генерация -->
+            <div class="mb-2 p-2 rounded" style="background: #f0f7ff; border: 1px solid #cce5ff;">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="fa fa-robot text-primary"></i>
+                    <small class="text-primary fw-bold">Генерация с помощью AI</small>
+                </div>
+                <div class="d-flex gap-2">
+                    <input id="tpl-ai-prompt" class="form-control form-control-sm" placeholder="Опишите какой текст нужен (например: приглашение на свидание, романтичное)">
+                    <button class="btn btn-primary btn-sm" onclick="generateTemplateWithAI()" id="tpl-ai-btn" style="white-space: nowrap;">
+                        <i class="fa fa-magic"></i> Сгенерировать
+                    </button>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <textarea id="tpl-modal-text" class="form-control" rows="5" placeholder="Текст..." oninput="validateInput(this)"></textarea>
+            </div>
+            <div class="alert alert-info small p-1 hide-in-mail" style="display:none;" id="chat-hint">
+                В чате разделяйте инвайты через <b>__</b> (два подчеркивания) между абзацами.
+            </div>
+            <button class="btn btn-success w-100 mb-2" onclick="saveTemplateFromModal()">Сохранить</button>
+            <button class="btn btn-cancel-modal w-100" onclick="closeModal('tpl-modal')">Отмена</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно: Выбор камеры для видеочата -->
+    <div id="camera-select-modal" class="modal-overlay">
+        <div class="modal-card" style="width: 400px;">
+            <h5><i class="fa fa-video-camera text-info"></i> Выберите камеру</h5>
+            <p class="text-muted small mb-3">Выберите камеру для видеочата</p>
+            <select id="camera-select-list" class="form-select mb-3">
+                <option value="">Загрузка...</option>
+            </select>
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="camera-remember-choice">
+                <label class="form-check-label" for="camera-remember-choice">Запомнить выбор для этой анкеты</label>
+            </div>
+            <input type="hidden" id="camera-select-bot-id">
+            <button class="btn btn-info w-100 mb-2" onclick="confirmCameraSelection()"><i class="fa fa-check"></i> Открыть видеочат</button>
+            <button class="btn btn-cancel-modal w-100" onclick="closeModal('camera-select-modal')">Отмена</button>
+        </div>
+    </div>
+
+    <!-- Модальное окно: Global Custom IDs -->
+    <div id="global-custom-ids-modal" class="modal-overlay">
+        <div class="modal-card" style="width: 450px;">
+            <h5><i class="fa fa-list-ol text-primary"></i> Custom IDs для всех анкет</h5>
+            <p class="text-muted small mb-3">Введите ID мужчин для рассылки. Эти ID будут применены ко ВСЕМ анкетам (заменяют индивидуальные).</p>
+            <textarea id="global-custom-ids-input" class="form-control mb-3" rows="6" placeholder="ID через запятую, пробел или каждый в новой строке&#10;Пример: 12345, 67890, 11111"></textarea>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <small class="text-muted">Распознано ID: <b id="global-custom-ids-count">0</b></small>
+                <button class="btn btn-sm btn-outline-secondary" onclick="clearGlobalCustomIds()"><i class="fa fa-eraser"></i> Очистить</button>
+            </div>
+            <button class="btn btn-primary w-100 mb-2" onclick="applyGlobalCustomIds()"><i class="fa fa-check"></i> Применить ко всем анкетам</button>
+            <button class="btn btn-cancel-modal w-100" onclick="closeModal('global-custom-ids-modal')">Отмена</button>
+        </div>
+    </div>
+
+    <div id="stats-modal" class="modal-overlay">
+        <div class="modal-card">
+            <h5 id="stats-title">Список ID</h5>
+            <div id="stats-list-content" class="scroll-list" style="height: 200px;"></div>
+            <div class="d-flex gap-2 mt-2">
+                <button class="btn btn-outline-primary flex-fill" onclick="copyStats()">Копировать все</button>
+                <button class="btn btn-outline-danger flex-fill" onclick="clearStats(event)">Очистить</button>
+            </div>
+            <button class="btn btn-cancel-modal w-100 mt-2" onclick="closeModal('stats-modal')">Закрыть</button>
+        </div>
+    </div>
+    
+    <div id="settings-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="m-0"><i class="fa fa-cog"></i> Глобальные настройки</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeModal('settings-modal')"><i class="fa fa-times"></i></button>
+            </div>
+
+            <!-- Вкладки -->
+            <div class="settings-tabs">
+                <button class="settings-tab active" onclick="switchSettingsTab('interface')"><i class="fa fa-palette"></i> Интерфейс</button>
+                <button class="settings-tab" onclick="switchSettingsTab('proxy')"><i class="fa fa-globe"></i> Прокси</button>
+                <button class="settings-tab" onclick="switchSettingsTab('ai')"><i class="fa fa-robot"></i> AI функции</button>
+                <button class="settings-tab" onclick="switchSettingsTab('other')"><i class="fa fa-ellipsis-h"></i> Другое</button>
+            </div>
+
+            <!-- Панель: Интерфейс -->
+            <div id="settings-panel-interface" class="settings-panel active">
+                <div class="settings-grid">
+                    <div class="settings-section">
+                        <div class="settings-section-title"><i class="fa fa-language"></i> Язык и тема</div>
+                        <div class="mb-2">
+                            <label class="form-label small">Язык интерфейса</label>
+                            <select id="set-lang" class="form-select" onchange="saveGlobalSettings()">
+                                <option value="ru">Русский</option>
+                                <option value="en">English</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Тема оформления</label>
+                            <select id="set-theme" class="form-select" onchange="saveGlobalSettings()">
+                                <option value="light">Светлая</option>
+                                <option value="dark">Тёмная</option>
+                                <option value="ladadate">LadaDate</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title"><i class="fa fa-sliders-h"></i> Поведение</div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="set-sounds" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-sounds">Звуковые уведомления</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="set-desktop-notifications" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-desktop-notifications">Системные уведомления Windows</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="set-confirm-close" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-confirm-close">Подтверждать закрытие вкладки</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="set-hotkeys" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-hotkeys">Горячие клавиши (Ctrl+Tab)</label>
+                        </div>
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="set-extended" onchange="saveGlobalSettings(); toggleExtendedFeatures()">
+                            <label class="form-check-label small" for="set-extended">Расширить возможности (AI)</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="set-skip-delete-confirm" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-skip-delete-confirm">Не спрашивать об удалении шаблона</label>
+                        </div>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="set-keep-logger-entries" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-keep-logger-entries">Сохранять записи в логгере после просмотра</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Панель: Прокси -->
+            <div id="settings-panel-proxy" class="settings-panel">
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-network-wired"></i> Прокси для анкет (по позиции вкладки)</div>
+                    <small class="text-muted d-block mb-3">Формат: <code>ip:port</code> или <code>domain:port:user:pass</code> — Прокси применяется к анкетам по их позиции в списке вкладок</small>
+
+                    <div class="proxy-row">
+                        <label>Анкеты 1-25:</label>
+                        <input id="set-proxy-1" class="form-control form-control-sm" placeholder="ip:port или domain:port:user:pass" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(1)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-1" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 26-50:</label>
+                        <input id="set-proxy-2" class="form-control form-control-sm" placeholder="ip:port или domain:port:user:pass" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(2)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-2" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 51-75:</label>
+                        <input id="set-proxy-3" class="form-control form-control-sm" placeholder="ip:port или domain:port:user:pass" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(3)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-3" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 76-100:</label>
+                        <input id="set-proxy-4" class="form-control form-control-sm" placeholder="ip:port или domain:port:user:pass" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(4)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-4" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 101-125:</label>
+                        <input id="set-proxy-5" class="form-control form-control-sm" placeholder="ip:port или domain:port:user:pass" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(5)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-5" class="proxy-status"></span>
+                    </div>
+                    <div class="proxy-row">
+                        <label>Анкеты 126-150:</label>
+                        <input id="set-proxy-6" class="form-control form-control-sm" placeholder="ip:port или domain:port:user:pass" onchange="saveGlobalSettings()">
+                        <button class="btn btn-outline-primary btn-test-proxy" onclick="testProxy(6)"><i class="fa fa-check"></i> Тест</button>
+                        <span id="proxy-status-6" class="proxy-status"></span>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-server"></i> Прокси для .exe (общий)</div>
+                    <small class="text-muted d-block mb-2">Формат: <code>http://user:pass@ip:port</code></small>
+                    <input id="set-proxy-url" class="form-control" placeholder="URL вашего прокси-сервера для .exe" onchange="saveGlobalSettings()">
+                </div>
+            </div>
+
+            <!-- Панель: AI функции -->
+            <div id="settings-panel-ai" class="settings-panel">
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-key"></i> OpenAI API</div>
+                    <div class="mb-2">
+                        <label class="form-label small">API Key (sk-...)</label>
+                        <input id="set-apikey" class="form-control" type="password" placeholder="Вставьте ключ здесь" onchange="saveGlobalSettings()">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Прокси для AI (http://user:pass@ip:port)</label>
+                        <input id="set-proxy-ai" class="form-control" placeholder="URL промежуточного прокси для OpenAI" onchange="saveGlobalSettings()">
+                        <small class="text-muted" style="font-size:10px">Опционально: для обхода блокировок OpenAI</small>
+                    </div>
+                </div>
+
+                <!-- Improve Prompt с шаблонами -->
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-magic"></i> Improve Prompt</div>
+                    <div class="prompt-template-selector">
+                        <select id="select-improvePrompt" class="form-control form-control-sm" onchange="selectPromptTemplate('improvePrompt')">
+                            <option value="">-- Без шаблона --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-success" onclick="addPromptTemplate('improvePrompt')" title="Добавить шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('improvePrompt')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
+                    </div>
+                    <textarea id="set-improve-prompt" class="form-control mt-2" rows="3" placeholder="Промпт для улучшения текста. Используйте {text} для вставки текущего текста." onchange="savePromptText('improvePrompt')"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется для кнопки "Improve" (улучшение текста). {text} = текущий текст</small>
+                </div>
+
+                <!-- My Prompt с шаблонами -->
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-comment-dots"></i> My Prompt</div>
+                    <div class="prompt-template-selector">
+                        <select id="select-myPrompt" class="form-control form-control-sm" onchange="selectPromptTemplate('myPrompt')">
+                            <option value="">-- Без шаблона --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-success" onclick="addPromptTemplate('myPrompt')" title="Добавить шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('myPrompt')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
+                    </div>
+                    <textarea id="set-prompt" class="form-control mt-2" rows="3" placeholder="Напиши здесь промт для AI..." onchange="savePromptText('myPrompt')"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется для кнопки "My Prompt" в режиме Mail</small>
+                </div>
+
+                <!-- My Prompt (Chat) с шаблонами -->
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-comments"></i> My Prompt (Chat)</div>
+                    <div class="prompt-template-selector">
+                        <select id="select-myPromptChat" class="form-control form-control-sm" onchange="selectPromptTemplate('myPromptChat')">
+                            <option value="">-- Без шаблона --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-success" onclick="addPromptTemplate('myPromptChat')" title="Добавить шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('myPromptChat')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
+                    </div>
+                    <textarea id="set-prompt-chat" class="form-control mt-2" rows="3" placeholder="Напиши здесь промт для AI (Chat)..." onchange="savePromptText('myPromptChat')"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется для кнопки "My Prompt" в режиме Chat</small>
+                </div>
+
+                <!-- Промпт для ответов на письма -->
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-envelope"></i> Промпт для писем</div>
+                    <div class="prompt-template-selector">
+                        <select id="select-replyPrompt" class="form-control form-control-sm" onchange="selectPromptTemplate('replyPrompt')">
+                            <option value="">-- Без шаблона --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-success" onclick="addPromptTemplate('replyPrompt')" title="Добавить шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('replyPrompt')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
+                    </div>
+                    <textarea id="set-ai-reply-prompt" class="form-control mt-2" rows="2" placeholder="Напр: отвечай романтично, с комплиментами" onchange="savePromptText('replyPrompt')"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется в MiniChat для ответов на письма</small>
+                </div>
+
+                <!-- Промпт для чатов (новый) -->
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-comments"></i> Промпт для чатов</div>
+                    <div class="prompt-template-selector">
+                        <select id="select-chatPrompt" class="form-control form-control-sm" onchange="selectPromptTemplate('chatPrompt')">
+                            <option value="">-- Без шаблона --</option>
+                        </select>
+                        <button class="btn btn-sm btn-outline-success" onclick="addPromptTemplate('chatPrompt')" title="Добавить шаблон"><i class="fa fa-plus"></i></button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deletePromptTemplate('chatPrompt')" title="Удалить шаблон"><i class="fa fa-trash"></i></button>
+                    </div>
+                    <textarea id="set-chat-prompt" class="form-control mt-2" rows="2" placeholder="Напр: пиши коротко, игриво, задавай вопросы" onchange="savePromptText('chatPrompt')"></textarea>
+                    <small class="text-muted" style="font-size:10px">Используется для AI ответов в чатах</small>
+                </div>
+            </div>
+
+            <!-- Панель: Другое -->
+            <div id="settings-panel-other" class="settings-panel">
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-chart-bar"></i> Статистика Lababot</div>
+                    <label class="form-label small">Translator ID</label>
+                    <input id="set-translator-id" class="form-control" type="number" placeholder="Введите ID переводчика (опционально)" onchange="saveGlobalSettings()">
+                    <small class="text-muted" style="font-size:10px">Этот ID будет отправляться в статистике на сервер Lababot</small>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-info-circle"></i> Инструкция</div>
+                    <div class="text-muted small">
+                        <p><b>1.</b> Для браузера: установите расширение <b>Proxy SwitchyOmega</b></p>
+                        <p><b>2.</b> Для .exe: заполните "Прокси для .exe" на вкладке Прокси</p>
+                        <p><b>3.</b> Для AI: получите ключ на <b>platform.openai.com</b></p>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-section-title"><i class="fa fa-database"></i> Данные</div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-secondary btn-sm" onclick="exportSettings()"><i class="fa fa-download"></i> Экспорт настроек</button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="importSettings()"><i class="fa fa-upload"></i> Импорт настроек</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Скрытое поле для совместимости -->
+            <input type="hidden" id="set-proxy" value="">
+
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-success flex-fill" onclick="saveGlobalSettings(); closeModal('settings-modal')"><i class="fa fa-save"></i> Сохранить</button>
+                <button class="btn btn-outline-secondary flex-fill" onclick="closeModal('settings-modal')">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно для ввода имени шаблона промпта -->
+    <div id="prompt-name-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h5><i class="fa fa-plus"></i> Новый шаблон промпта</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeModal('prompt-name-modal')"><i class="fa fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label">Название шаблона:</label>
+                <input id="prompt-name-input" class="form-control" type="text" placeholder="Например: Романтичный стиль" onkeydown="if(event.key==='Enter') confirmAddPromptTemplate()">
+            </div>
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-success flex-fill" onclick="confirmAddPromptTemplate()"><i class="fa fa-check"></i> Создать</button>
+                <button class="btn btn-outline-secondary flex-fill" onclick="closeModal('prompt-name-modal')">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно результатов импорта -->
+    <div id="import-result-modal" class="modal-overlay">
+        <div class="modal-card import-result-card">
+            <div class="modal-header">
+                <h5><i class="fa fa-download"></i> Результат импорта</h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeModal('import-result-modal')"><i class="fa fa-times"></i></button>
+            </div>
+            <div class="modal-body import-result-body">
+                <div id="import-result-content"></div>
+            </div>
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-primary flex-fill" onclick="closeModal('import-result-modal')"><i class="fa fa-check"></i> Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно: Автоочистка -->
+    <div id="auto-clear-modal" class="modal-overlay">
+        <div class="modal-card" style="width: 400px;">
+            <h5><i class="fa fa-eraser text-warning"></i> Автоочистка</h5>
+            <p class="text-muted small mb-3">Режим: <b id="auto-clear-mode-label">Mail</b></p>
+
+            <!-- Секция: Автоочистка отправленных -->
+            <div class="mb-3 p-2 border rounded bg-light">
+                <div class="fw-bold small text-success mb-2"><i class="fa fa-paper-plane"></i> Автоочистка отправленных</div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="auto-clear-sent-by-time-enabled" onchange="saveAutoClearSettings()">
+                    <label class="form-check-label" for="auto-clear-sent-by-time-enabled">
+                        Автоочистка через
+                        <input type="number" id="auto-clear-sent-time-value" class="form-control form-control-sm d-inline-block" style="width: 70px;" placeholder="" min="1" onchange="saveAutoClearSettings()">
+                        минут
+                    </label>
+                </div>
+                <small class="text-muted d-block ms-4 mb-2">От момента нажатия "Старт"</small>
+
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="auto-clear-sent-by-count-enabled" onchange="saveAutoClearSettings()">
+                    <label class="form-check-label" for="auto-clear-sent-by-count-enabled">
+                        Автоочистка через
+                        <input type="number" id="auto-clear-sent-count-value" class="form-control form-control-sm d-inline-block" style="width: 70px;" placeholder="" min="1" onchange="saveAutoClearSettings()">
+                        отправленных
+                    </label>
+                </div>
+                <small class="text-muted d-block ms-4">Когда накопится указанное количество</small>
+            </div>
+
+            <!-- Секция: Автоочистка ошибок -->
+            <div class="mb-3 p-2 border rounded bg-light">
+                <div class="fw-bold small text-danger mb-2"><i class="fa fa-exclamation-triangle"></i> Автоочистка ошибок</div>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="auto-clear-by-time-enabled" onchange="saveAutoClearSettings()">
+                    <label class="form-check-label" for="auto-clear-by-time-enabled">
+                        Автоочистка через
+                        <input type="number" id="auto-clear-time-value" class="form-control form-control-sm d-inline-block" style="width: 70px;" placeholder="" min="1" onchange="saveAutoClearSettings()">
+                        минут
+                    </label>
+                </div>
+                <small class="text-muted d-block ms-4 mb-2">От момента нажатия "Старт"</small>
+
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="auto-clear-by-errors-enabled" onchange="saveAutoClearSettings()">
+                    <label class="form-check-label" for="auto-clear-by-errors-enabled">
+                        Автоочистка через
+                        <input type="number" id="auto-clear-errors-value" class="form-control form-control-sm d-inline-block" style="width: 70px;" placeholder="" min="1" onchange="saveAutoClearSettings()">
+                        ошибок
+                    </label>
+                </div>
+                <small class="text-muted d-block ms-4">Когда накопится указанное количество</small>
+            </div>
+
+            <div class="alert alert-info small p-2">
+                <i class="fa fa-info-circle"></i> Очистка произойдёт если <b>хотя бы одно</b> условие выполнено
+            </div>
+
+            <button class="btn btn-primary w-100 mb-2" onclick="closeModal('auto-clear-modal')"><i class="fa fa-check"></i> Готово</button>
+        </div>
+    </div>
+
+    <!-- Custom Confirm Modal -->
+    <div id="confirm-modal" class="confirm-modal-overlay">
+        <div class="confirm-modal-box">
+            <div class="confirm-modal-header">
+                <div id="confirm-modal-icon" class="confirm-modal-icon warning">⚠️</div>
+                <h4 class="confirm-modal-title">Подтверждение</h4>
+            </div>
+            <div class="confirm-modal-body">
+                <p id="confirm-modal-message" class="confirm-modal-message">Вы уверены?</p>
+            </div>
+            <div class="confirm-modal-footer">
+                <button id="confirm-modal-cancel" class="confirm-modal-btn cancel">Отмена</button>
+                <button id="confirm-modal-ok" class="confirm-modal-btn ok">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Modal - развернутый лог действий -->
+    <div id="log-modal" class="log-modal" onclick="closeLogModal()">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h5><i class="fa fa-list-alt"></i> Лог действий - Анкета <span id="log-modal-bot-id">...</span></h5>
+                <button class="btn btn-sm btn-outline-secondary" onclick="closeLogModal()"><i class="fa fa-times"></i></button>
+            </div>
+            <div id="log-modal-search-box" class="log-modal-search-box">
+                <i class="fa fa-search"></i>
+                <input type="text" id="log-modal-search-input" placeholder="Поиск..." oninput="searchLogModalEntries(this.value)">
+                <span id="log-modal-search-count"></span>
+                <div class="log-modal-search-nav">
+                    <button onclick="navigateLogModalSearch(-1)" title="Предыдущее (↑)"><i class="fa fa-chevron-up"></i></button>
+                    <button onclick="navigateLogModalSearch(1)" title="Следующее (↓)"><i class="fa fa-chevron-down"></i></button>
+                </div>
+                <button class="log-modal-search-clear" onclick="clearLogModalSearch()" title="Очистить"><i class="fa fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="log-modal-content" class="log-modal-content">Лог пуст...</div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-secondary btn-sm" onclick="copyAllLogs()" title="Копировать весь лог">
+                    <i class="fa fa-copy"></i> Копировать всё
+                </button>
+                <button class="btn btn-outline-danger btn-sm" onclick="clearCurrentLogs()" title="Очистить лог">
+                    <i class="fa fa-trash"></i> Очистить
+                </button>
+                <button class="btn btn-primary btn-sm" onclick="closeLogModal()">
+                    <i class="fa fa-check"></i> Закрыть
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно обновления приложения -->
+    <div id="update-modal" class="modal-overlay">
+        <div class="modal-card" style="width: 400px;">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+                <h5 style="margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fa fa-cloud-download" style="color: #28a745;"></i>
+                    <span id="update-modal-title">Доступно обновление</span>
+                </h5>
+            </div>
+            <div class="modal-body" style="padding: 20px; text-align: center;">
+                <div id="update-modal-content">
+                    <p style="font-size: 16px; margin-bottom: 15px;">
+                        Найдена новая версия: <strong id="update-new-version">...</strong>
+                    </p>
+                    <p style="color: #6c757d; font-size: 13px;">
+                        Текущая версия: <span id="update-current-version">...</span>
+                    </p>
+                </div>
+                <div id="update-progress-container" style="display: none; margin-top: 15px;">
+                    <div style="background: #e9ecef; border-radius: 8px; height: 20px; overflow: hidden;">
+                        <div id="update-progress-bar" style="background: linear-gradient(90deg, #28a745, #20c997); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                    </div>
+                    <p style="margin-top: 10px; color: #6c757d;" id="update-progress-text">Скачивание: 0%</p>
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 15px; border-top: 1px solid var(--border-color, #dee2e6); display: flex; gap: 10px; justify-content: center;">
+                <button id="update-btn-primary" class="btn btn-success" onclick="handleUpdateAction('download')" style="min-width: 120px;">
+                    <i class="fa fa-download"></i> Скачать
+                </button>
+                <button id="update-btn-secondary" class="btn btn-outline-secondary" onclick="handleUpdateAction('later')" style="min-width: 120px;">
+                    Позже
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay для восстановления сессии -->
+    <div id="restore-overlay" class="restore-overlay" style="display: none;">
+        <div class="restore-overlay-content">
+            <div class="restore-logo">
+                <img src="assets/logo.png" alt="Nova" class="restore-logo-img">
+                <div class="restore-logo-glow"></div>
+            </div>
+            <h2 class="restore-title">Novabot</h2>
+            <p class="restore-subtitle" id="restore-overlay-status">Загрузка анкет...</p>
+
+            <div class="restore-progress-container">
+                <div class="restore-progress-bar">
+                    <div class="restore-progress-fill" id="restore-progress-fill"></div>
+                </div>
+                <div class="restore-progress-text">
+                    <span id="restore-progress-current">0</span> / <span id="restore-progress-total">0</span>
+                </div>
+            </div>
+
+            <div class="restore-details" id="restore-details">
+                <div class="restore-detail-item restore-success">
+                    <i class="fa fa-check-circle"></i>
+                    <span id="restore-success-count">0</span> успешно
+                </div>
+                <div class="restore-detail-item restore-retry">
+                    <i class="fa fa-sync"></i>
+                    <span id="restore-retry-count">0</span> повтор
+                </div>
+                <div class="restore-detail-item restore-failed">
+                    <i class="fa fa-times-circle"></i>
+                    <span id="restore-failed-count">0</span> ошибок
+                </div>
+            </div>
+
+            <div class="restore-current-account" id="restore-current-account"></div>
+        </div>
+    </div>
+
+    <!-- Модули (разделённый bot.js) - порядок загрузки критичен! -->
+    <script src="js/modules/config.js"></script>      <!-- 1. Глобальные переменные и константы -->
+    <script src="js/modules/utils.js"></script>       <!-- 2. Утилиты, parseProxy, validateInput -->
+    <script src="js/modules/api.js"></script>         <!-- 3. API функции для Lababot сервера -->
+    <script src="js/modules/logger.js"></script>      <!-- 4. Logger, KEEP_ALIVE_SCRIPT -->
+    <script src="js/modules/ai.js"></script>          <!-- 5. AI функции -->
+    <script src="js/modules/settings.js"></script>    <!-- 6. Настройки -->
+    <script src="js/modules/AccountBot.js"></script>  <!-- 7. Класс AccountBot -->
+    <script src="js/modules/main.js"></script>        <!-- 8. UI функции и основная логика -->
+    <script src="js/modules/hotkeys.js"></script>     <!-- 9. Горячие клавиши -->
+    <script src="js/modules/memoryCleanup.js"></script> <!-- 10. Очистка памяти -->
+    <script src="js/modules/autoClear.js"></script>   <!-- 11. Автоочистка -->
+    <script src="js/modules/transcription.js"></script> <!-- 12. Транскрипция -->
+    <script src="js/modules/onlineSmart.js"></script> <!-- 13. OnlineSmart -->
+    <script src="js/modules/customIds.js"></script>  <!-- 14. Custom IDs -->
+    <script src="js/modules/init.js"></script>        <!-- 15. Инициализация (window.onload) -->
+</body>
+</html>
