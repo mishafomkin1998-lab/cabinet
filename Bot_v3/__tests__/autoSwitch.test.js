@@ -3,8 +3,8 @@
  *
  * Ожидаемое поведение:
  * - Порядок: payers → inbox → my-favorites → favorites → [первый доступный онлайн]
- * - После favorites переключается на первый доступный онлайн и ОСТАЁТСЯ там
- * - С онлайна на онлайн НЕ переключается
+ * - После favorites переключается на первый доступный онлайн (online → shared-online → online-smart)
+ * - С онлайна на онлайн НЕ переключается (остаётся на текущем)
  * - Отключённые статусы пропускаются
  *
  * Запуск: npm test
@@ -15,10 +15,16 @@ let globalSettings = {
     disabledStatuses: []
 };
 
-// Копия функции из init.js (ТЕКУЩАЯ ВЕРСИЯ)
+// Копия ИСПРАВЛЕННОЙ функции из init.js
 function getNextActiveStatus(currentStatus) {
-    const statusOrder = ['payers', 'inbox', 'my-favorites', 'favorites', 'online'];
+    const statusOrder = ['payers', 'inbox', 'my-favorites', 'favorites'];
+    const onlineStatuses = ['online', 'shared-online', 'online-smart'];
     const currentIdx = statusOrder.indexOf(currentStatus);
+
+    // Если текущий статус - один из онлайнов, остаёмся на нём
+    if (onlineStatuses.includes(currentStatus)) {
+        return currentStatus;
+    }
 
     // Ищем следующий не отключенный статус
     for (let i = currentIdx + 1; i < statusOrder.length; i++) {
@@ -28,8 +34,15 @@ function getNextActiveStatus(currentStatus) {
         }
     }
 
-    // Если все следующие отключены, возвращаем online (он всегда доступен как fallback)
-    return 'online';
+    // После favorites переключаемся на первый доступный онлайн
+    for (const onlineStatus of onlineStatuses) {
+        if (!globalSettings.disabledStatuses || !globalSettings.disabledStatuses.includes(onlineStatus)) {
+            return onlineStatus;
+        }
+    }
+
+    // Fallback: online-smart (всегда доступен)
+    return 'online-smart';
 }
 
 // ============= ТЕСТЫ =============
@@ -81,60 +94,72 @@ describe('getNextActiveStatus - Пропуск отключённых стату
 
 });
 
-describe('getNextActiveStatus - Три типа онлайна (ОЖИДАЕМОЕ ПОВЕДЕНИЕ)', () => {
+describe('getNextActiveStatus - Три типа онлайна', () => {
 
     beforeEach(() => {
         globalSettings.disabledStatuses = [];
     });
 
-    // Эти тесты показывают ОЖИДАЕМОЕ поведение, которого нет в текущем коде
-
     test('favorites → online (все онлайны включены)', () => {
-        // Текущий код: возвращает 'online' ✅
         expect(getNextActiveStatus('favorites')).toBe('online');
     });
 
     test('favorites → shared-online (online отключён)', () => {
-        // ОЖИДАНИЕ: должен вернуть 'shared-online'
-        // ТЕКУЩИЙ КОД: вернёт 'online' (БАГ - shared-online нет в statusOrder)
         globalSettings.disabledStatuses = ['online'];
-        const result = getNextActiveStatus('favorites');
-
-        // Этот тест покажет баг:
-        // expect(result).toBe('shared-online'); // Это ДОЛЖНО быть
-        expect(result).toBe('online'); // Это ЕСТЬ сейчас (БАГ!)
+        expect(getNextActiveStatus('favorites')).toBe('shared-online');
     });
 
     test('favorites → online-smart (online и shared-online отключены)', () => {
-        // ОЖИДАНИЕ: должен вернуть 'online-smart'
-        // ТЕКУЩИЙ КОД: вернёт 'online' (БАГ)
         globalSettings.disabledStatuses = ['online', 'shared-online'];
-        const result = getNextActiveStatus('favorites');
+        expect(getNextActiveStatus('favorites')).toBe('online-smart');
+    });
 
-        // Этот тест покажет баг:
-        // expect(result).toBe('online-smart'); // Это ДОЛЖНО быть
-        expect(result).toBe('online'); // Это ЕСТЬ сейчас (БАГ!)
+    test('favorites → online-smart (все три онлайна отключены - fallback)', () => {
+        globalSettings.disabledStatuses = ['online', 'shared-online', 'online-smart'];
+        expect(getNextActiveStatus('favorites')).toBe('online-smart');
     });
 
 });
 
-describe('getNextActiveStatus - Онлайн НЕ переключается на другой онлайн', () => {
+describe('getNextActiveStatus - Онлайн остаётся на месте', () => {
 
     beforeEach(() => {
         globalSettings.disabledStatuses = [];
     });
 
-    test('online → остаётся online (не переключается)', () => {
-        // С онлайна никуда не переключаемся
-        // Текущий код: вернёт 'online' ✅
+    test('online → остаётся online', () => {
         expect(getNextActiveStatus('online')).toBe('online');
     });
 
-    test('shared-online → остаётся (не в statusOrder)', () => {
-        // shared-online нет в statusOrder, поэтому вернёт 'online'
-        // Это может быть проблемой
-        const result = getNextActiveStatus('shared-online');
-        expect(result).toBe('online'); // Текущее поведение
+    test('shared-online → остаётся shared-online', () => {
+        expect(getNextActiveStatus('shared-online')).toBe('shared-online');
+    });
+
+    test('online-smart → остаётся online-smart', () => {
+        expect(getNextActiveStatus('online-smart')).toBe('online-smart');
+    });
+
+});
+
+describe('getNextActiveStatus - Комплексные сценарии', () => {
+
+    beforeEach(() => {
+        globalSettings.disabledStatuses = [];
+    });
+
+    test('inbox → online (my-favorites и favorites отключены)', () => {
+        globalSettings.disabledStatuses = ['my-favorites', 'favorites'];
+        expect(getNextActiveStatus('inbox')).toBe('online');
+    });
+
+    test('inbox → shared-online (my-favorites, favorites, online отключены)', () => {
+        globalSettings.disabledStatuses = ['my-favorites', 'favorites', 'online'];
+        expect(getNextActiveStatus('inbox')).toBe('shared-online');
+    });
+
+    test('payers → online-smart (всё кроме online-smart отключено)', () => {
+        globalSettings.disabledStatuses = ['inbox', 'my-favorites', 'favorites', 'online', 'shared-online'];
+        expect(getNextActiveStatus('payers')).toBe('online-smart');
     });
 
 });

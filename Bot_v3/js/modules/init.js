@@ -295,10 +295,16 @@ function updateDisabledStatusesUI() {
 }
 
 // Получить следующий активный статус (пропуская отключенные)
-// Порядок снизу вверх по списку: Payers → Inbox → My favorite → I am a favorite of → Online
+// Порядок снизу вверх по списку: Payers → Inbox → My favorite → I am a favorite of → Online/Shared/Smart
 function getNextActiveStatus(currentStatus) {
-    const statusOrder = ['payers', 'inbox', 'my-favorites', 'favorites', 'online'];
+    const statusOrder = ['payers', 'inbox', 'my-favorites', 'favorites'];
+    const onlineStatuses = ['online', 'shared-online', 'online-smart'];
     const currentIdx = statusOrder.indexOf(currentStatus);
+
+    // Если текущий статус - один из онлайнов, остаёмся на нём
+    if (onlineStatuses.includes(currentStatus)) {
+        return currentStatus;
+    }
 
     // Ищем следующий не отключенный статус
     for (let i = currentIdx + 1; i < statusOrder.length; i++) {
@@ -308,8 +314,15 @@ function getNextActiveStatus(currentStatus) {
         }
     }
 
-    // Если все следующие отключены, возвращаем online (он всегда доступен как fallback)
-    return 'online';
+    // После favorites переключаемся на первый доступный онлайн
+    for (const onlineStatus of onlineStatuses) {
+        if (!globalSettings.disabledStatuses || !globalSettings.disabledStatuses.includes(onlineStatus)) {
+            return onlineStatus;
+        }
+    }
+
+    // Fallback: online-smart (всегда доступен)
+    return 'online-smart';
 }
 
 // ============= МУЖЧИНЫ ОНЛАЙН (ГЛОБАЛЬНО) =============
