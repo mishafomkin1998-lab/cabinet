@@ -35,7 +35,7 @@ function createInterface(bot) {
             </button>
 
             <!-- Карточка профиля анкеты (только в режиме Mail) -->
-            <div class="profile-card hide-in-chat" id="profile-card-${bot.id}" style="${globalSettings.showProfileCard === false ? 'display:none' : ''}">
+            <div class="profile-card hide-in-chat" id="profile-card-${bot.id}">
                 <img src="" class="profile-photo" id="profile-photo-${bot.id}" onerror="this.style.display='none'">
                 <div class="profile-info">
                     <span class="profile-name" id="profile-name-${bot.id}"></span>

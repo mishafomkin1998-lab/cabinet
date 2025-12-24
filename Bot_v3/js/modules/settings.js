@@ -19,6 +19,7 @@ function loadGlobalSettingsUI() {
     document.getElementById('set-show-profile-card').checked = globalSettings.showProfileCard !== false;
     document.getElementById('set-translator-id').value = globalSettings.translatorId || '';
     applyTheme(globalSettings.theme);
+    toggleProfileCards(); // Применяем настройку видимости карточек профиля
 
     // Загружаем шаблоны промптов с сервера
     loadPromptTemplates();
@@ -105,16 +106,13 @@ function saveGlobalSettings() {
     initDefaultProxy();
 }
 
-// Показать/убрать карточки профилей
+// Показать/убрать карточки профилей (через CSS класс на body)
 function toggleProfileCards() {
-    const show = globalSettings.showProfileCard !== false;
-    document.querySelectorAll('.profile-card').forEach(card => {
-        if (show) {
-            card.style.display = '';
-        } else {
-            card.style.display = 'none';
-        }
-    });
+    if (globalSettings.showProfileCard === false) {
+        document.body.classList.add('hide-profile-cards');
+    } else {
+        document.body.classList.remove('hide-profile-cards');
+    }
 }
 
 function openGlobalSettings() {

@@ -3715,3 +3715,8 @@ body.theme-dark .profile-name {
 body.theme-ladadate .profile-name {
     color: #f0d0f0;
 }
+
+/* Скрытие карточек профиля через настройки */
+body.hide-profile-cards .profile-card {
+    display: none !important;
+}
