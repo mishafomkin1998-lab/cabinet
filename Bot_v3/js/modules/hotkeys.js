@@ -181,9 +181,10 @@ function searchTabs(query) {
                 closeTabSearch();
             }, 500);
         } else if (matches.length === 1) {
-            // Если одно совпадение - делаем его текущим
+            // Если одно совпадение - переключаемся на него
             matches[0].tab.classList.remove('search-match');
             matches[0].tab.classList.add('search-current');
+            selectTab(matches[0].tabId);
         }
     }
 
