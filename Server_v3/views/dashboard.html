@@ -1531,31 +1531,6 @@
                            x-model="newAdmin.salary">
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium mb-2">ID анкет (через запятую или с новой строки)</label>
-
-                    <!-- Выбор анкет по комментарию -->
-                    <div class="flex items-center gap-2 mb-2" x-show="uniqueProfileNotes.length > 0">
-                        <select class="glass flex-1 px-3 py-2 rounded-lg text-sm" x-model="selectedProfileNote">
-                            <option value="">Выбрать по комментарию...</option>
-                            <template x-for="note in uniqueProfileNotes" :key="note">
-                                <option :value="note" x-text="note + ' (' + getProfileIdsByNote(note).length + ' анкет)'"></option>
-                            </template>
-                        </select>
-                        <button type="button" @click="selectProfilesByNote()"
-                                class="px-3 py-2 bg-indigo-100 text-indigo-700 rounded-lg text-sm hover:bg-indigo-200"
-                                :disabled="!selectedProfileNote">
-                            <i class="fas fa-plus mr-1"></i>Добавить
-                        </button>
-                    </div>
-
-                    <textarea class="glass w-full px-4 py-3 rounded-xl resize-none"
-                              rows="3"
-                              placeholder="Например: 123456, 789012&#10;или каждый ID с новой строки"
-                              x-model="newAdmin.profileIds"></textarea>
-                    <p class="text-xs text-gray-500 mt-1">Оставьте пустым, чтобы не назначать анкеты сейчас</p>
-                </div>
-
                 <div class="flex justify-end space-x-3 pt-4">
                     <button @click="showAddAdminModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
                         Отмена
