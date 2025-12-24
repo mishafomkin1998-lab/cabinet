@@ -1,0 +1,1201 @@
+// ============= ИНФОРМАЦИЯ О ПРОГРАММЕ =============
+// APP_VERSION определена в config.js (загружается раньше)
+let APP_PLATFORM = 'Unknown';
+let APP_ARCH = '';
+
+// Получаем информацию о платформе и архитектуре
+try {
+    if (typeof process !== 'undefined') {
+        // process.platform: 'win32', 'darwin', 'linux'
+        // process.arch: 'x64', 'ia32', 'arm', 'arm64'
+        const platformNames = {
+            'win32': 'Windows',
+            'darwin': 'macOS',
+            'linux': 'Linux'
+        };
+        const archNames = {
+            'x64': '64-bit',
+            'ia32': '32-bit',
+            'arm': 'ARM',
+            'arm64': 'ARM64'
+        };
+        APP_PLATFORM = platformNames[process.platform] || process.platform;
+        APP_ARCH = archNames[process.arch] || process.arch;
+    } else {
+        // Fallback для браузера
+        APP_PLATFORM = navigator.platform || 'Unknown';
+    }
+} catch (e) {
+    APP_PLATFORM = navigator.platform || 'Unknown';
+}
+
+console.log(`📦 Версия приложения: ${APP_VERSION}, Платформа: ${APP_PLATFORM} ${APP_ARCH}`);
+
+// ============= MACHINE ID (уникальный ID программы-бота) =============
+// Генерируется один раз при первом запуске и сохраняется в localStorage
+function getMachineId() {
+    let machineId = localStorage.getItem('machineId');
+    if (!machineId) {
+        // Генерируем уникальный ID для этой установки программы
+        machineId = 'machine_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
+        localStorage.setItem('machineId', machineId);
+        console.log(`🆔 Сгенерирован новый machineId: ${machineId}`);
+    }
+    return machineId;
+}
+const MACHINE_ID = getMachineId();
+console.log(`🤖 Программа запущена с machineId: ${MACHINE_ID}`);
+
+// ============= СТАТИСТИКА СЕССИИ =============
+// Отслеживает статистику с момента запуска программы
+const sessionStats = {
+    startedAt: new Date().toISOString(),
+    mailSent: 0,
+    chatSent: 0,
+    errors: 0,
+
+    // Методы для обновления статистики
+    addMailSent() { this.mailSent++; },
+    addChatSent() { this.chatSent++; },
+    addError() { this.errors++; },
+
+    // Получить uptime в секундах
+    getUptime() {
+        return Math.floor((Date.now() - new Date(this.startedAt).getTime()) / 1000);
+    },
+
+    // Получить статистику для отправки
+    getStats() {
+        return {
+            startedAt: this.startedAt,
+            mailSent: this.mailSent,
+            chatSent: this.chatSent,
+            errors: this.errors,
+            uptime: this.getUptime()
+        };
+    }
+};
+
+// Функция сбора информации о всех ботах (анкетах)
+function collectBotsInfo() {
+    // bots - глобальная переменная из config.js
+    if (typeof bots === 'undefined' || !bots) {
+        return { total: 0, running: 0, stopped: 0, list: [] };
+    }
+
+    const botsList = Object.values(bots);
+    const list = [];
+    let running = 0;
+    let stopped = 0;
+
+    for (const bot of botsList) {
+        const isRunning = bot.isMailRunning || bot.isChatRunning || false;
+        if (isRunning) running++;
+        else stopped++;
+
+        list.push({
+            profileId: bot.displayId,
+            status: isRunning ? 'running' : 'stopped',
+            mode: bot.isMailRunning ? 'mail' : (bot.isChatRunning ? 'chat' : 'idle')
+        });
+    }
+
+    return {
+        total: botsList.length,
+        running: running,
+        stopped: stopped,
+        list: list
+    };
+}
+
+// Получить использование памяти всего Electron приложения (через IPC)
+// Кэшируем значение на 10 секунд чтобы не спамить IPC
+let cachedMemory = null;
+let memoryLastUpdate = 0;
+
+async function getMemoryUsageAsync() {
+    const now = Date.now();
+    // Возвращаем кэш если он свежий (< 10 сек)
+    if (cachedMemory !== null && (now - memoryLastUpdate) < 10000) {
+        return cachedMemory;
+    }
+
+    try {
+        // Используем ipcRenderer для получения памяти из main process
+        if (typeof require !== 'undefined') {
+            const { ipcRenderer } = require('electron');
+            cachedMemory = await ipcRenderer.invoke('get-app-memory');
+            memoryLastUpdate = now;
+            return cachedMemory;
+        }
+    } catch (e) {
+        console.warn('Не удалось получить память через IPC:', e.message);
+    }
+
+    // Fallback на process.memoryUsage (только текущий процесс)
+    if (typeof process !== 'undefined' && process.memoryUsage) {
+        const mem = process.memoryUsage();
+        return Math.round(mem.rss / 1024 / 1024);
+    }
+
+    return null;
+}
+
+// Синхронная версия - возвращает кэшированное значение
+function getMemoryUsage() {
+    // Асинхронно обновляем кэш
+    getMemoryUsageAsync().then(mem => {
+        cachedMemory = mem;
+        memoryLastUpdate = Date.now();
+    }).catch(() => {});
+
+    // Возвращаем кэш или fallback
+    if (cachedMemory !== null) {
+        return cachedMemory;
+    }
+
+    // Fallback если кэш пуст
+    if (typeof process !== 'undefined' && process.memoryUsage) {
+        const mem = process.memoryUsage();
+        return Math.round(mem.rss / 1024 / 1024);
+    }
+    return null;
+}
+
+// Конвертация миллисекунд в формат PostgreSQL INTERVAL (HH:MM:SS)
+function millisecondsToInterval(ms) {
+    if (!ms || ms <= 0) return null;
+
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+// 1. Функция отправки сообщения на Lababot сервер (ПОЛНАЯ СПЕЦИФИКАЦИЯ)
+// ВАЖНО: botId теперь это MACHINE_ID (ID программы), accountDisplayId - ID анкеты
+async function sendMessageToLababot(params) {
+    // Параметры: botId (игнорируется, используется MACHINE_ID), accountDisplayId, recipientId, type, textContent, status,
+    // responseTime, errorReason, isFirst, isLast, convId, mediaUrl, fileName, translatorId, usedAi
+
+    const {
+        botId,  // Оставляем для совместимости, но используем MACHINE_ID
+        accountDisplayId,
+        recipientId,
+        type,
+        textContent = '',
+        templateText = null,  // Оригинальный шаблон (до подстановки макросов) для группировки
+        status = 'success',
+        responseTime = null,
+        errorReason = null,
+        isFirst = false,
+        isLast = false,
+        convId = null,
+        mediaUrl = null,
+        fileName = null,
+        translatorId = null,
+        usedAi = false,
+        isReply = false  // Флаг: это ответ на входящее (target=inbox) или массовая рассылка
+    } = params;
+
+    console.log(`📤 Отправляю сообщение на Lababot сервер: программа=${MACHINE_ID}, анкета=${accountDisplayId}, получатель=${recipientId}, тип=${type}`);
+
+    try {
+        const payload = {
+            botId: MACHINE_ID,  // ID программы-бота (один на всю программу)
+            accountDisplayId: accountDisplayId,
+            recipientId: String(recipientId),
+            type: type, // 'outgoing' (письмо $1.5) или 'chat_msg' (чат $0.15)
+            length: textContent.length || 0,
+            isFirst: isFirst,
+            isLast: isLast,
+            convId: convId,
+            responseTime: responseTime, // Формат PostgreSQL INTERVAL: "00:05:30"
+            status: status, // 'success', 'failed', 'pending'
+            // textContent и templateText удалены - не нужны для статистики
+            mediaUrl: mediaUrl,
+            fileName: fileName,
+            translatorId: translatorId,
+            errorReason: errorReason,
+            usedAi: usedAi, // Флаг использования ИИ генерации
+            isReply: isReply // Флаг: это ответ на входящее (target=inbox) или массовая рассылка
+        };
+
+        console.log('📦 Payload:', JSON.stringify(payload, null, 2));
+
+        const response = await fetch(`${LABABOT_SERVER}/api/message_sent`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        console.log(`✅ Ответ от Lababot сервера:`, data);
+
+        if (data.status === 'ok' || data.status === 'ignored') {
+            // Обновляем статистику сессии
+            if (status === 'success') {
+                if (type === 'outgoing') {
+                    sessionStats.addMailSent();
+                } else if (type === 'chat_msg') {
+                    sessionStats.addChatSent();
+                }
+            } else if (status === 'failed') {
+                sessionStats.addError();
+            }
+            return { success: true, data: data };
+        } else {
+            console.warn(`⚠️ Lababot сервер вернул:`, data);
+            return { success: false, error: data.error || 'Unknown error' };
+        }
+    } catch (error) {
+        console.error(`❌ Ошибка отправки на Lababot сервер:`, error);
+        sessionStats.addError();
+        return { success: false, error: error.message };
+    }
+}
+
+// 2. Функция отправки входящего сообщения от мужчины
+// ВАЖНО: botId теперь это MACHINE_ID (ID программы)
+async function sendIncomingMessageToLababot(params) {
+    const { botId, profileId, manId, manName, messageId, type = 'letter' } = params;
+
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/incoming_message`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                botId: MACHINE_ID,  // ID программы-бота
+                profileId: profileId,
+                manId: String(manId),
+                manName: manName || null,
+                messageId: String(messageId),
+                type: type,
+                timestamp: new Date().toISOString()
+                // messageText удалён - не нужен для статистики
+            })
+        });
+
+        const data = await response.json();
+        if (data.isFirstFromMan) {
+            console.log(`📨 Новый уникальный мужчина: ${manName || manId} → ${profileId}`);
+        }
+        return { success: true, data: data };
+    } catch (error) {
+        console.error(`❌ Ошибка отправки входящего на Lababot:`, error);
+        return { success: false, error: error.message };
+    }
+}
+
+// 3. Функция отправки heartbeat с расширенной статистикой
+// ВАЖНО: botId теперь это MACHINE_ID (ID программы), а не ID анкеты!
+async function sendHeartbeatToLababot(botId, displayId, status = 'online', skipCommands = false) {
+    console.log(`❤️ Отправляю heartbeat для анкеты ${displayId} (программа: ${MACHINE_ID})`);
+
+    try {
+        // Собираем информацию о всех анкетах
+        const botsInfo = collectBotsInfo();
+        const stats = sessionStats.getStats();
+        const memoryMB = getMemoryUsage();
+
+        // Определяем текущий глобальный режим
+        const currentMode = (typeof globalMode !== 'undefined') ? globalMode : 'mail';
+
+        const payload = {
+            botId: MACHINE_ID,  // ID программы-бота (один на всю программу)
+            accountDisplayId: displayId,  // ID анкеты (для совместимости)
+            status: status,
+            timestamp: new Date().toISOString(),
+
+            // Расширенная информация о программе
+            version: APP_VERSION,
+            platform: APP_PLATFORM + (APP_ARCH ? ' ' + APP_ARCH : ''),
+            uptime: stats.uptime,  // Секунды с запуска
+            memoryUsage: memoryMB,  // MB
+
+            // Информация об анкетах
+            profilesTotal: botsInfo.total,
+            profilesRunning: botsInfo.running,
+            profilesStopped: botsInfo.stopped,
+            profilesList: botsInfo.list,  // Список всех анкет с их статусами
+
+            // Статистика за сессию
+            sessionStats: {
+                startedAt: stats.startedAt,
+                mailSent: stats.mailSent,
+                chatSent: stats.chatSent,
+                errors: stats.errors
+            },
+
+            // Текущий режим работы
+            globalMode: currentMode
+        };
+
+        const response = await fetch(`${LABABOT_SERVER}/api/heartbeat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        console.log(`✅ Heartbeat отправлен:`, data);
+
+        // Обрабатываем команды для конкретной анкеты (пропускаем при удалении)
+        if (data.commands && typeof bots !== 'undefined' && !skipCommands) {
+            // Проверяем статус бот-машины (botEnabled) - влияет на ВСЕ анкеты
+            const wasBotEnabled = controlStatus.botEnabled !== false;
+            controlStatus.botEnabled = data.commands.botEnabled !== false;
+
+            // Если бот-машина была отключена - останавливаем ВСЕ рассылки
+            if (wasBotEnabled && !controlStatus.botEnabled) {
+                console.log(`🔴 Бот-машина отключена администратором! Останавливаю все рассылки...`);
+                stopAllMailingOnBotDisabled();
+            } else if (!wasBotEnabled && controlStatus.botEnabled) {
+                console.log(`🟢 Бот-машина включена администратором`);
+            }
+
+            // Ищем бота по displayId для обновления mailingEnabled (per-profile)
+            for (const botId in bots) {
+                const bot = bots[botId];
+                if (bot && bot.displayId === displayId) {
+                    // Обновляем статус mailingEnabled для этой анкеты
+                    const wasEnabled = bot.mailingEnabled !== false; // По умолчанию true
+                    bot.mailingEnabled = data.commands.mailingEnabled !== false;
+
+                    // Если рассылка была отключена с сервера - останавливаем
+                    if (wasEnabled && !bot.mailingEnabled) {
+                        console.log(`⛔ Рассылка для ${displayId} отключена с сервера`);
+                        if (bot.isMailRunning) {
+                            bot.stopMail();
+                            console.log(`⛔ Mail остановлен для ${displayId}`);
+                        }
+                        if (bot.isChatRunning) {
+                            bot.stopChat();
+                            console.log(`⛔ Chat остановлен для ${displayId}`);
+                        }
+                    } else if (!wasEnabled && bot.mailingEnabled) {
+                        console.log(`✅ Рассылка для ${displayId} включена с сервера`);
+                    }
+                    break;
+                }
+            }
+        }
+
+        return data;
+    } catch (error) {
+        console.error(`❌ Ошибка heartbeat:`, error);
+        return null;
+    }
+}
+
+// Функция остановки всех рассылок при отключении бот-машины (блокирует запуск)
+function stopAllMailingOnBotDisabled() {
+    for (const botId in bots) {
+        const bot = bots[botId];
+        if (bot) {
+            if (bot.isMailRunning) {
+                bot.stopMail();
+                console.log(`🔴 Mail остановлен для ${bot.displayId} (бот отключен)`);
+            }
+            if (bot.isChatRunning) {
+                bot.stopChat();
+                console.log(`🔴 Chat остановлен для ${bot.displayId} (бот отключен)`);
+            }
+        }
+    }
+    console.log('🔴 Бот отключен администратором! Все рассылки остановлены.');
+}
+
+// ============= BATCH SYNC (Оптимизированная синхронизация) =============
+// Один запрос вместо N heartbeat'ов - уменьшает нагрузку в ~100 раз
+
+let batchSyncInterval = null;
+let lastSyncResponse = null;
+
+/**
+ * Собирает информацию о всех анкетах для batch sync
+ */
+function collectProfilesForSync() {
+    const profiles = [];
+
+    if (typeof bots === 'undefined') return profiles;
+
+    for (const botId in bots) {
+        const bot = bots[botId];
+        if (bot && bot.displayId) {
+            profiles.push({
+                id: bot.displayId,
+                status: bot.token ? 'online' : 'offline',
+                mailRunning: bot.isMailRunning || false,
+                chatRunning: bot.isChatRunning || false
+            });
+        }
+    }
+
+    return profiles;
+}
+
+/**
+ * Batch синхронизация всех анкет одним запросом
+ * Заменяет индивидуальные heartbeat для каждой анкеты
+ */
+async function syncAllBotsWithServer() {
+    const profiles = collectProfilesForSync();
+
+    if (profiles.length === 0) {
+        console.log('🔄 Sync: нет анкет для синхронизации');
+        return null;
+    }
+
+    console.log(`🔄 Batch sync: отправляю ${profiles.length} анкет...`);
+
+    try {
+        const stats = sessionStats.getStats();
+        const memoryMB = getMemoryUsage();
+        const currentMode = (typeof globalMode !== 'undefined') ? globalMode : 'mail';
+
+        const payload = {
+            botId: MACHINE_ID,
+            version: APP_VERSION,
+            platform: APP_PLATFORM + (APP_ARCH ? ' ' + APP_ARCH : ''),
+            uptime: stats.uptime,
+            memoryUsage: memoryMB,
+            globalMode: currentMode,
+            profiles: profiles,
+            stats: {
+                startedAt: stats.startedAt,
+                mailSent: stats.mailSent,
+                chatSent: stats.chatSent,
+                errors: stats.errors
+            }
+        };
+
+        const response = await fetch(`${LABABOT_SERVER}/api/bots/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        lastSyncResponse = data;
+
+        if (data.success) {
+            console.log(`✅ Batch sync OK: ${profiles.length} анкет синхронизировано`);
+
+            // Обрабатываем команды для каждой анкеты
+            if (data.profiles && typeof bots !== 'undefined') {
+                for (const botId in bots) {
+                    const bot = bots[botId];
+                    if (bot && bot.displayId && data.profiles[bot.displayId]) {
+                        const profileData = data.profiles[bot.displayId];
+
+                        // Обновляем статус оплаты
+                        bot.isPaid = profileData.isPaid;
+                        bot.canTrial = profileData.canTrial;
+
+                        // Обрабатываем команды
+                        if (profileData.commands) {
+                            const wasEnabled = bot.mailingEnabled !== false;
+                            bot.mailingEnabled = profileData.commands.mailingEnabled !== false;
+
+                            // Если рассылка отключена - останавливаем
+                            if (wasEnabled && !bot.mailingEnabled) {
+                                console.log(`⛔ Рассылка для ${bot.displayId} отключена с сервера`);
+                                if (bot.isMailRunning) bot.stopMail();
+                                if (bot.isChatRunning) bot.stopChat();
+                            }
+
+                            // Обновляем прокси если изменился
+                            if (profileData.commands.proxy !== undefined) {
+                                bot.serverProxy = profileData.commands.proxy;
+                            }
+                        }
+
+                        // Показываем предупреждение если trial или не оплачено
+                        if (profileData.status === 'trial_available' && !bot._trialWarningShown) {
+                            console.log(`⚠️ Анкета ${bot.displayId}: доступен тестовый период`);
+                            bot._trialWarningShown = true;
+                        } else if (profileData.status === 'payment_required' && !bot._paymentWarningShown) {
+                            console.log(`🚫 Анкета ${bot.displayId}: требуется оплата`);
+                            bot._paymentWarningShown = true;
+                        }
+                    }
+                }
+            }
+        } else {
+            console.error('❌ Batch sync ошибка:', data.error);
+        }
+
+        return data;
+    } catch (error) {
+        console.error('❌ Batch sync failed:', error.message);
+
+        // Retry через 5 секунд при ошибке
+        setTimeout(() => {
+            console.log('🔄 Batch sync: повторная попытка...');
+            syncAllBotsWithServer();
+        }, 5000);
+
+        return null;
+    }
+}
+
+/**
+ * Запуск периодической batch синхронизации
+ * Заменяет индивидуальные heartbeat интервалы
+ */
+function startBatchSync() {
+    if (batchSyncInterval) {
+        clearInterval(batchSyncInterval);
+    }
+
+    // Первый sync через 2 секунды после старта
+    setTimeout(() => syncAllBotsWithServer(), 2000);
+
+    // Затем каждые 10 минут
+    batchSyncInterval = setInterval(() => {
+        syncAllBotsWithServer();
+    }, 600000); // 10 минут
+
+    console.log('🔄 Batch sync запущен (интервал: 10 мин)');
+}
+
+// 5. Функция загрузки промпта для генерации с сервера
+async function loadServerGenerationPrompt() {
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/bots/prompt`);
+        const data = await response.json();
+
+        if (data.success && data.prompt) {
+            const oldPrompt = serverGenerationPrompt;
+            serverGenerationPrompt = data.prompt;
+
+            if (oldPrompt !== serverGenerationPrompt && serverGenerationPrompt) {
+                console.log('✅ Промпт для генерации загружен с сервера');
+            }
+        }
+        return serverGenerationPrompt;
+    } catch (error) {
+        console.error('❌ Ошибка загрузки промпта с сервера:', error.message);
+        return serverGenerationPrompt || DEFAULT_GENERATION_PROMPT;
+    }
+}
+
+// Запуск периодической синхронизации промпта (каждые 5 минут)
+let promptSyncInterval = null;
+
+function startPromptSync() {
+    // Загружаем сразу при старте
+    loadServerGenerationPrompt();
+
+    // Затем каждые 5 минут
+    if (promptSyncInterval) clearInterval(promptSyncInterval);
+    promptSyncInterval = setInterval(loadServerGenerationPrompt, 5 * 60 * 1000);
+
+    console.log('🔄 Синхронизация промпта с сервером запущена');
+}
+
+// 6. Функция отправки ошибки
+// ВАЖНО: botId теперь это MACHINE_ID (ID программы)
+async function sendErrorToLababot(botId, accountDisplayId, errorType, errorMessage) {
+    console.log(`⚠️ Отправляю ошибку на Lababot сервер: ${errorType}`);
+
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/error`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                botId: MACHINE_ID,  // ID программы-бота
+                accountDisplayId: accountDisplayId,
+                endpoint: 'bot_send_message',
+                errorType: errorType,
+                message: errorMessage.substring(0, 200) || 'Unknown error',
+                rawData: null,
+                userId: null
+            })
+        });
+
+        const data = await response.json();
+        console.log(`✅ Ошибка отправлена на сервер:`, data);
+        return data;
+    } catch (error) {
+        console.error(`❌ Ошибка отправки ошибки:`, error);
+        return null;
+    }
+}
+
+// 4. Функция отправки activity ping (трекинг активности оператора)
+// ВАЖНО: Отправляет пинг только когда переводчик РЕАЛЬНО работает (клики, печать).
+// Автоматические действия бота НЕ должны вызывать эту функцию!
+// Привязка к анкете (profileId), не к переводчику — не требует настройки ID переводчика.
+async function sendActivityPingToLababot(botId, profileId) {
+    try {
+        if (!profileId) {
+            console.warn('⚠️ profileId не указан. Пинг не отправлен.');
+            return null;
+        }
+
+        // Отправляем на endpoint который пишет в activity_pings по profile_id
+        const response = await fetch(`${LABABOT_SERVER}/api/activity_ping`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                botId: botId,
+                profileId: profileId,
+                timestamp: Date.now()
+            })
+        });
+        return await response.json();
+    } catch (error) {
+        console.error(`❌ Ошибка activity ping:`, error);
+        return null;
+    }
+}
+
+// ============= СИСТЕМА ТРЕКИНГА АКТИВНОСТИ ОПЕРАТОРА =============
+const activityTracker = {
+    lastActivityTime: 0,
+    lastPingTime: 0,
+    pingInterval: 30000, // Отправлять ping каждые 30 секунд
+    inactivityTimeout: 120000, // 2 минуты без активности = не работает
+    isTracking: false,
+
+    // Регистрация активности (клик или печать)
+    recordActivity() {
+        this.lastActivityTime = Date.now();
+
+        // Если давно не отправляли ping и есть активный бот - отправляем
+        const now = Date.now();
+        if (now - this.lastPingTime >= this.pingInterval) {
+            this.sendPingForActiveBot();
+        }
+    },
+
+    // Отправить ping для активного бота
+    sendPingForActiveBot() {
+        const activeBot = this.getActiveBot();
+        if (activeBot && activeBot.displayId) {
+            this.lastPingTime = Date.now();
+            sendActivityPingToLababot(activeBot.id, activeBot.displayId);
+        }
+    },
+
+    // Получить активного бота (текущий выбранный таб)
+    getActiveBot() {
+        if (typeof activeTabId !== 'undefined' && activeTabId && typeof bots !== 'undefined') {
+            return bots[activeTabId];
+        }
+        return null;
+    },
+
+    // Запуск трекинга
+    startTracking() {
+        if (this.isTracking) return;
+        this.isTracking = true;
+
+        // Слушаем клики
+        document.addEventListener('mousedown', () => this.recordActivity(), true);
+
+        // Слушаем печать
+        document.addEventListener('keydown', () => this.recordActivity(), true);
+
+        console.log('%c[Lababot] Activity tracking started', 'color: green; font-weight: bold');
+    }
+};
+
+// Запускаем трекинг активности
+activityTracker.startTracking();
+
+// ============= API ДЛЯ РАБОТЫ С ДАННЫМИ БОТА (шаблоны, blacklist, статистика) =============
+
+// Загрузка данных бота с сервера
+async function loadBotDataFromServer(profileId) {
+    try {
+        console.log(`🔄 Загрузка данных с сервера для ${profileId}...`);
+        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}`);
+        const result = await response.json();
+        console.log(`📦 Ответ сервера для ${profileId}:`, JSON.stringify(result, null, 2));
+        if (result.success) {
+            console.log(`📥 Данные бота загружены для ${profileId}:`, result.data);
+            return result.data;
+        }
+        console.warn(`⚠️ Сервер вернул success=false для ${profileId}`);
+        return null;
+    } catch (error) {
+        console.error(`❌ Ошибка загрузки данных бота:`, error);
+        return null;
+    }
+}
+
+// Счётчик ошибок сохранения (для предупреждений пользователю)
+let saveErrorCount = 0;
+const SAVE_ERROR_THRESHOLD = 3; // После 3 ошибок показываем предупреждение
+
+// Сохранение шаблонов на сервер
+async function saveTemplatesToServer(profileId, type, templates) {
+    try {
+        const body = type === 'chat'
+            ? { templatesChat: templates }
+            : { templatesMail: templates };
+
+        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        if (result.success) {
+            console.log(`💾 Шаблоны ${type} сохранены для ${profileId} (${templates.length} шт.)`);
+            saveErrorCount = 0; // Сброс счётчика при успехе
+            return true;
+        } else {
+            throw new Error(result.error || 'Сервер вернул success=false');
+        }
+    } catch (error) {
+        saveErrorCount++;
+        console.error(`❌ [Ошибка #${saveErrorCount}] Сохранение шаблонов ${type} для ${profileId}:`, error.message);
+
+        // Показываем предупреждение пользователю после нескольких ошибок
+        if (saveErrorCount >= SAVE_ERROR_THRESHOLD) {
+            showToast(`⚠️ Проблема с сервером! Шаблоны сохраняются только локально`, 'warning');
+            saveErrorCount = 0; // Сброс чтобы не спамить
+        }
+        return false;
+    }
+}
+
+// Сохранение blacklist на сервер
+async function saveBlacklistToServer(profileId, type, blacklist) {
+    try {
+        const body = type === 'chat'
+            ? { blacklistChat: blacklist }
+            : { blacklistMail: blacklist };
+
+        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        if (result.success) {
+            console.log(`📝 Blacklist ${type} сохранён для ${profileId} (${blacklist.length} записей)`);
+            return true;
+        } else {
+            throw new Error(result.error || 'Сервер вернул success=false');
+        }
+    } catch (error) {
+        console.error(`❌ Ошибка сохранения blacklist ${type} для ${profileId}:`, error.message);
+        return false;
+    }
+}
+
+// Сброс статистики на сервере
+async function resetStatsOnServer(profileId, type) {
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/bot-data/${encodeURIComponent(profileId)}/reset-stats`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type })
+        });
+        const result = await response.json();
+        console.log(`🔄 Статистика ${type} сброшена для ${profileId}`);
+        return result.success;
+    } catch (error) {
+        console.error(`❌ Ошибка сброса статистики:`, error);
+        return false;
+    }
+}
+
+// 5. Функция проверки статуса профиля (paused и allowed)
+async function checkProfileStatus(profileId) {
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/profiles/${encodeURIComponent(profileId)}/status`);
+        const data = await response.json();
+        return {
+            paused: data.paused === true,
+            exists: data.exists === true,
+            allowed: data.allowed === true,
+            reason: data.reason || null
+        };
+    } catch (error) {
+        console.error(`❌ Ошибка проверки статуса профиля:`, error);
+        // При ошибке разрешаем работу чтобы не блокировать
+        return { paused: false, exists: true, allowed: true };
+    }
+}
+
+// 6. Функция проверки оплаты профиля (с retry и блокировкой при ошибке)
+async function checkProfilePaymentStatus(profileId) {
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 секунда между попытками
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await fetch(`${LABABOT_SERVER}/api/billing/profile-status/${encodeURIComponent(profileId)}`);
+            const data = await response.json();
+            return {
+                isPaid: data.isPaid === true,
+                isFree: data.isFree === true, // "мой админ" - бесплатно
+                isTrial: data.isTrial === true,
+                trialUsed: data.trialUsed === true,
+                canTrial: !data.trialUsed && !data.isPaid, // Можно активировать trial
+                daysLeft: data.daysLeft || 0,
+                reason: data.reason || 'unknown',
+                serverError: false
+            };
+        } catch (error) {
+            console.error(`❌ Ошибка проверки оплаты (попытка ${attempt}/${maxRetries}):`, error.message);
+
+            if (attempt < maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+            }
+        }
+    }
+
+    // После всех попыток - БЛОКИРУЕМ работу
+    console.error(`❌ Не удалось проверить оплату после ${maxRetries} попыток`);
+    return {
+        isPaid: false,
+        isFree: false,
+        isTrial: false,
+        trialUsed: false,
+        canTrial: false,
+        daysLeft: 0,
+        reason: 'server_unavailable',
+        serverError: true
+    };
+}
+
+// 7. Функция активации тестового периода
+async function activateTrialPeriod(profileId) {
+    try {
+        const response = await fetch(`${LABABOT_SERVER}/api/bots/activate-trial`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profileId: profileId })
+        });
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error(`❌ Ошибка активации trial:`, error);
+        return { success: false, error: error.message };
+    }
+}
+
+// 8. Функция показа диалога оплаты/trial
+function showPaymentDialog(profileId, canTrial) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+
+        const dialog = document.createElement('div');
+        dialog.style.cssText = 'background:white;border-radius:8px;padding:20px;max-width:400px;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
+
+        let html = `
+            <h3 style="margin:0 0 15px 0;font-size:16px;">ladabot</h3>
+            <p style="margin:0 0 10px 0;">Анкета ${profileId} не оплачена.${canTrial ? '' : ' Тестовый период истёк.'}</p>
+            <p style="margin:0 0 20px 0;color:#666;font-size:14px;">Обратитесь за пополнением в телеграм к пользователю @S_Shevil</p>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+        `;
+
+        if (canTrial) {
+            html += `<button id="trialBtn" style="padding:8px 16px;background:#4CAF50;color:white;border:none;border-radius:4px;cursor:pointer;">Получить 2 тестовых дня</button>`;
+        }
+        html += `<button id="cancelBtn" style="padding:8px 16px;background:#f0f0f0;border:1px solid #ccc;border-radius:4px;cursor:pointer;">OK</button>`;
+        html += '</div>';
+
+        dialog.innerHTML = html;
+        overlay.appendChild(dialog);
+        document.body.appendChild(overlay);
+
+        dialog.querySelector('#cancelBtn').onclick = () => {
+            document.body.removeChild(overlay);
+            resolve({ action: 'cancel' });
+        };
+
+        if (canTrial) {
+            dialog.querySelector('#trialBtn').onclick = async () => {
+                const btn = dialog.querySelector('#trialBtn');
+                btn.disabled = true;
+                btn.textContent = 'Активация...';
+
+                const result = await activateTrialPeriod(profileId);
+                document.body.removeChild(overlay);
+
+                if (result.success) {
+                    alert('✅ Тестовый период активирован на 2 дня!');
+                    resolve({ action: 'trial_activated' });
+                } else {
+                    alert('❌ Ошибка: ' + (result.message || result.error || 'Не удалось активировать'));
+                    resolve({ action: 'error', error: result.error });
+                }
+            };
+        }
+    });
+}
+
+// ============= ПОЛУЧЕНИЕ ПОЛНОГО ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ =============
+// Кэш профилей (чтобы не запрашивать повторно)
+const userProfileCache = new Map();
+const PROFILE_CACHE_TTL = 30 * 60 * 1000; // 30 минут
+
+// Очистка устаревших записей кэша
+function cleanProfileCache() {
+    const now = Date.now();
+    for (const [key, value] of userProfileCache.entries()) {
+        if (now - value.timestamp > PROFILE_CACHE_TTL) {
+            userProfileCache.delete(key);
+        }
+    }
+}
+setInterval(cleanProfileCache, 5 * 60 * 1000); // Очищаем каждые 5 минут
+
+// Получение полного профиля пользователя через WebView
+async function fetchUserProfile(bot, userId, country = '') {
+    // Проверяем кэш
+    const cacheKey = `${userId}`;
+    const cached = userProfileCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < PROFILE_CACHE_TTL)) {
+        console.log(`📋 Профиль ${userId} из кэша`);
+        return cached.data;
+    }
+
+    // Проверяем что у бота есть webview
+    if (!bot || !bot.webview) {
+        console.warn(`⚠️ WebView не доступен для загрузки профиля ${userId}`);
+        return null;
+    }
+
+    try {
+        console.log(`🔍 Загрузка профиля ${userId} через WebView (country: ${country})...`);
+
+        // Формируем slug из country: "United States" -> "united-states"
+        const countrySlug = country ? country.toLowerCase().replace(/\s+/g, '-') : '';
+
+        // Правильный формат URL: /profile/{id}-men-from-{country}
+        const profileUrl = countrySlug
+            ? `https://ladadate.com/profile/${userId}-men-from-${countrySlug}`
+            : `https://ladadate.com/profile/${userId}`;
+
+        console.log(`[Profile] Загрузка через WebView: ${profileUrl}`);
+
+        // Загружаем HTML через WebView (который авторизован)
+        const html = await bot.webview.executeJavaScript(`
+            (async () => {
+                try {
+                    const res = await fetch('${profileUrl}', { credentials: 'include' });
+                    if (!res.ok) return { error: 'HTTP ' + res.status };
+                    return { html: await res.text() };
+                } catch (e) {
+                    return { error: e.message };
+                }
+            })()
+        `);
+
+        if (html.error) {
+            throw new Error(html.error);
+        }
+
+        if (!html.html || html.html.length < 100) {
+            throw new Error('Пустой ответ');
+        }
+
+        console.log(`[Profile HTML] Получено ${html.html.length} символов через WebView`);
+
+        // Логируем первые 500 символов для отладки
+        console.log(`[Profile HTML] Первые 500 символов: ${html.html.substring(0, 500)}`);
+
+        // Парсим HTML страницу профиля
+        const profile = parseProfileHtml(html.html, userId);
+
+        // Сохраняем в кэш
+        userProfileCache.set(cacheKey, {
+            data: profile,
+            timestamp: Date.now()
+        });
+
+        console.log(`✅ Профиль ${userId} загружен:`, {
+            Name: profile.Name,
+            Age: profile.Age,
+            City: profile.City,
+            Occupation: profile.Occupation,
+            MaritalStatus: profile.MaritalStatus,
+            Children: profile.Children,
+            Zodiac: profile.Zodiac,
+            Height: profile.Height
+        });
+        return profile;
+
+    } catch (error) {
+        console.error(`❌ Ошибка загрузки профиля ${userId}:`, error);
+        return null;
+    }
+}
+
+// Парсинг HTML страницы профиля
+function parseProfileHtml(html, userId) {
+    const profile = {
+        AccountId: userId,
+        Name: '',
+        Age: '',
+        City: '',
+        Country: '',
+        Occupation: '',
+        MaritalStatus: '',
+        Children: '',
+        WantChildren: '',
+        Height: '',
+        Weight: '',
+        HairColor: '',
+        HairStyle: '',
+        EyesColor: '',
+        BodyType: '',
+        Zodiac: '',
+        Birthday: '',
+        Religion: '',
+        Ethnicity: '',
+        Education: '',
+        Smoke: '',
+        Drink: '',
+        EnglishLevel: '',
+        Languages: '',
+        Hobby: '',
+        AboutMe: '',
+        AboutPartner: ''
+    };
+
+    try {
+        // Имя и возраст из хлебных крошек или заголовка
+        const nameAgeMatch = html.match(/<b>([^<]+)<\/b>,\s*<span>(\d+)<\/span>/);
+        if (nameAgeMatch) {
+            profile.Name = nameAgeMatch[1]
+                .replace(/&nbsp;/gi, ' ')
+                .replace(/&amp;/gi, '&')
+                .replace(/&#\d+;/g, '')
+                .trim();
+            profile.Age = nameAgeMatch[2].trim();
+            console.log(`[Parse] Найдено имя: ${profile.Name}, возраст: ${profile.Age}`);
+        } else {
+            console.log(`[Parse] Имя/возраст не найдены в стандартном формате`);
+        }
+
+        // Парсим поля из user_row-inner блоков
+        const extractField = (label) => {
+            // Ищем паттерн: <div class="name_row...">Label</div> ... <div class="value_row...">Value</div>
+            const regex = new RegExp(
+                `<div[^>]*class="name_row[^"]*"[^>]*>\\s*${label}\\s*</div>[\\s\\S]*?<div[^>]*class="value_row[^"]*"[^>]*>([\\s\\S]*?)</div>`,
+                'i'
+            );
+            const match = html.match(regex);
+            if (match && match[1]) {
+                // Очищаем от HTML тегов и лишних пробелов
+                let value = match[1].replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+                return value;
+            }
+            return '';
+        };
+
+        // Location (город и страна)
+        const locationMatch = html.match(/<div[^>]*class="name_row[^"]*"[^>]*>\s*Location\s*<\/div>[\s\S]*?<div[^>]*class="value_row[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+        if (locationMatch) {
+            const locHtml = locationMatch[1];
+            const cityMatch = locHtml.match(/<span>([^<,]+)/);
+            if (cityMatch) {
+                profile.City = cityMatch[1]
+                    .replace(/&nbsp;/gi, ' ')
+                    .replace(/&amp;/gi, '&')
+                    .replace(/&#\d+;/g, '')
+                    .trim()
+                    .replace(',', '');
+            }
+
+            const countryMatch = locHtml.match(/<a[^>]*>([^<]+)/);
+            if (countryMatch) {
+                // Очистка от HTML entities (&nbsp; и подобных)
+                profile.Country = countryMatch[1]
+                    .replace(/&nbsp;/gi, ' ')
+                    .replace(/&amp;/gi, '&')
+                    .replace(/&lt;/gi, '<')
+                    .replace(/&gt;/gi, '>')
+                    .replace(/&#\d+;/g, '')
+                    .trim();
+            }
+        }
+
+        // Остальные поля
+        profile.Occupation = extractField('Occupation');
+        profile.MaritalStatus = extractField('Marital Status');
+        profile.Children = extractField('Children');
+        profile.WantChildren = extractField('Want Children') || extractField('Want children');
+        profile.Height = extractField('Height');
+        profile.Weight = extractField('Weight');
+        profile.HairColor = extractField('Hair Color');
+        profile.HairStyle = extractField('Hair Style');
+        profile.EyesColor = extractField('Eyes Color');
+        profile.BodyType = extractField('Body Type');
+        profile.Religion = extractField('Religion');
+        profile.Ethnicity = extractField('Ethnicity');
+        profile.Education = extractField('Education');
+        profile.Smoke = extractField('Smoke');
+        profile.Drink = extractField('Drink');
+        profile.EnglishLevel = extractField('Level of English');
+        profile.Languages = extractField('Languages') || extractField('Language');
+
+        console.log(`[Parse] Извлечённые поля: Occupation=${profile.Occupation}, Marital=${profile.MaritalStatus}, Children=${profile.Children}, Height=${profile.Height}`);
+
+        // Birthday и Zodiac
+        const birthdayMatch = html.match(/<div[^>]*class="name_row[^"]*"[^>]*>\s*Birthday\s*<\/div>[\s\S]*?<div[^>]*class="value_row[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
+        if (birthdayMatch) {
+            const bdHtml = birthdayMatch[1];
+            // Зодиак
+            const zodiacMatch = bdHtml.match(/<a[^>]*>([^<]+)<\/a>/);
+            if (zodiacMatch) profile.Zodiac = zodiacMatch[1].trim();
+            // Дата рождения
+            const dateMatch = bdHtml.match(/(\d{1,2}\s+[A-Za-z]+\s+\d{4})/);
+            if (dateMatch) profile.Birthday = dateMatch[1].trim();
+        }
+
+        // Hobby
+        const hobbyMatch = html.match(/<h2[^>]*>Hobby<\/h2>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i);
+        if (hobbyMatch) {
+            profile.Hobby = hobbyMatch[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+        }
+
+        // About Myself
+        const aboutMatch = html.match(/<h2[^>]*>About Myself<\/h2>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i);
+        if (aboutMatch) {
+            profile.AboutMe = aboutMatch[1].replace(/<[^>]+>/g, '').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+        }
+
+        // About Partner
+        const partnerMatch = html.match(/<h2[^>]*>About Partner[^<]*<\/h2>[\s\S]*?<p[^>]*>([\s\S]*?)<\/p>/i);
+        if (partnerMatch) {
+            profile.AboutPartner = partnerMatch[1].replace(/<[^>]+>/g, '').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+        }
+
+    } catch (e) {
+        console.error('Ошибка парсинга профиля:', e);
+    }
+
+    return profile;
+}
+
+// === КРИТИЧЕСКИ ВАЖНО: Скрипт "Анти-сон" ===

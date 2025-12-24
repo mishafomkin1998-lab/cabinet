@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+
+# Build
+dist/
+build/
+
+# Backup files
+Server/backup_before_merge/
+Bot/Sound/1
+
+# Release files (large binaries)
+Server/public/download/*.exe
+Server/public/download/*.dmg
+Server/public/download/*.blockmap
+Server/public/download/*.yml
+Server/public/download/*.zip
+!Server/public/download/.gitkeep
