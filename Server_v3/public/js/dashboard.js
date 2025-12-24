@@ -2234,28 +2234,37 @@
 
                     try {
                         let successCount = 0;
-                        for (const profileId of this.selectedProfileIds) {
+                        let errors = [];
+                        for (const acc of selectedAccounts) {
                             const res = await fetch(`${API_BASE}/api/billing/pay`, {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
-                                    profileId: profileId,
+                                    profileId: acc.profile_id, // Используем profile_id, не internal id
                                     days: this.paymentDays,
                                     userId: this.currentUser.id
                                 })
                             });
                             const data = await res.json();
-                            if (data.success) successCount++;
+                            if (data.success) {
+                                successCount++;
+                            } else {
+                                errors.push(data.error || 'Неизвестная ошибка');
+                            }
                         }
 
-                        alert(`Оплачено ${successCount} из ${this.selectedProfileIds.length} анкет на ${this.paymentDays} дней`);
+                        if (errors.length > 0) {
+                            alert(`Оплачено ${successCount} из ${selectedAccounts.length} анкет.\nОшибки: ${errors.join(', ')}`);
+                        } else {
+                            alert(`Оплачено ${successCount} из ${selectedAccounts.length} анкет на ${this.paymentDays} дней`);
+                        }
                         this.selectedProfileIds = [];
                         this.showPaymentModal = false;
                         await this.loadAccounts();
                         await this.loadUserBalance();
                     } catch (e) {
                         console.error('confirmPayment error:', e);
-                        alert('Ошибка оплаты');
+                        alert('Ошибка оплаты: ' + e.message);
                     }
                 },
 

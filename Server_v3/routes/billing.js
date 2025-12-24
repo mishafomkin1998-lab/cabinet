@@ -531,6 +531,97 @@ router.post('/pay-profile', asyncHandler(async (req, res) => {
 }));
 
 /**
+ * POST /api/billing/pay
+ * Оплатить анкету со своего баланса (для админов/переводчиков)
+ */
+router.post('/pay', asyncHandler(async (req, res) => {
+    const { profileId, days, userId } = req.body;
+
+    if (!profileId || !days || !PRICING[days]) {
+        return res.status(400).json({
+            success: false,
+            error: 'Неверные параметры. Доступные периоды: 15, 30, 45, 60 дней'
+        });
+    }
+
+    const cost = PRICING[days];
+
+    // Получаем пользователя и его баланс
+    const userResult = await pool.query(
+        `SELECT id, balance, role FROM users WHERE id = $1`,
+        [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Пользователь не найден' });
+    }
+
+    const user = userResult.rows[0];
+    const balance = parseFloat(user.balance) || 0;
+
+    if (balance < cost) {
+        return res.status(400).json({
+            success: false,
+            error: `Недостаточно средств. Нужно: $${cost}, на балансе: $${balance.toFixed(2)}`
+        });
+    }
+
+    // Получаем profile_id из allowed_profiles (profileId может быть internal id)
+    let actualProfileId = profileId;
+    const profileCheck = await pool.query(
+        `SELECT profile_id FROM allowed_profiles WHERE id = $1 OR profile_id = $1`,
+        [profileId]
+    );
+    if (profileCheck.rows.length > 0) {
+        actualProfileId = profileCheck.rows[0].profile_id;
+    }
+
+    // Проверяем существование анкеты
+    const profile = await pool.query(
+        `SELECT profile_id, paid_until FROM allowed_profiles WHERE profile_id = $1`,
+        [actualProfileId]
+    );
+
+    if (profile.rows.length === 0) {
+        return res.status(404).json({ success: false, error: 'Анкета не найдена' });
+    }
+
+    // Списываем с баланса
+    await pool.query(
+        `UPDATE users SET balance = balance - $1 WHERE id = $2`,
+        [cost, userId]
+    );
+
+    // Продлеваем анкету
+    await pool.query(`
+        UPDATE allowed_profiles
+        SET paid_until = COALESCE(
+            CASE WHEN paid_until > NOW() THEN paid_until ELSE NOW() END
+        , NOW()) + INTERVAL '${days} days',
+        is_trial = FALSE
+        WHERE profile_id = $1
+    `, [actualProfileId]);
+
+    // Сохраняем в историю оплаты
+    await pool.query(
+        `INSERT INTO profile_payment_history (profile_id, days, action_type, by_user_id, amount) VALUES ($1, $2, 'payment', $3, $4)`,
+        [actualProfileId, days, userId, cost]
+    );
+
+    // Сохраняем в историю биллинга
+    await pool.query(
+        `INSERT INTO billing_history (admin_id, amount, description, type) VALUES ($1, $2, $3, 'expense')`,
+        [userId, cost, `Оплата анкеты ${actualProfileId} на ${days} дней`]
+    );
+
+    res.json({
+        success: true,
+        message: `Анкета #${actualProfileId} оплачена на ${days} дней`,
+        newBalance: balance - cost
+    });
+}));
+
+/**
  * POST /api/billing/remove-payment
  * Убрать оплату с анкеты (только директор)
  */
