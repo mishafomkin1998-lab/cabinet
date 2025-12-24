@@ -223,6 +223,14 @@
                                             </div>
 
                                             <div class="flex items-center gap-2">
+                                                <!-- Баланс (если не мой админ) - клик для пополнения -->
+                                                <button x-show="!admin.isMyAdmin" @click.stop="openTopupModal(admin.id)"
+                                                        class="px-3 py-1.5 rounded-lg bg-green-100 hover:bg-green-200 flex items-center gap-1"
+                                                        title="Пополнить баланс">
+                                                    <i class="fas fa-wallet text-green-600 text-sm"></i>
+                                                    <span class="text-green-700 font-medium text-sm">$<span x-text="(admin.balance || 0).toFixed(2)"></span></span>
+                                                </button>
+
                                                 <!-- Мой админ -->
                                                 <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/50 cursor-pointer" @click.stop>
                                                     <input type="checkbox" :checked="admin.isMyAdmin" @change="toggleIsRestricted(admin)" class="w-4 h-4 text-indigo-600 rounded">
@@ -234,14 +242,6 @@
                                                     <input type="checkbox" :checked="admin.aiEnabled" @change="toggleAiEnabled(admin)" class="w-4 h-4 text-purple-600 rounded">
                                                     <span class="text-sm text-gray-600">AI</span>
                                                 </label>
-
-                                                <!-- Баланс (если не мой админ) - клик для пополнения -->
-                                                <button x-show="!admin.isMyAdmin" @click.stop="openTopupModal(admin.id)"
-                                                        class="px-3 py-1.5 rounded-lg bg-green-100 hover:bg-green-200 flex items-center gap-1"
-                                                        title="Пополнить баланс">
-                                                    <i class="fas fa-wallet text-green-600 text-sm"></i>
-                                                    <span class="text-green-700 font-medium text-sm">$<span x-text="(admin.balance || 0).toFixed(2)"></span></span>
-                                                </button>
 
                                                 <!-- Редактировать -->
                                                 <button @click.stop="editAdmin(admin)"
