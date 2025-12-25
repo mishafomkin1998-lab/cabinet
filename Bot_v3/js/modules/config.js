@@ -238,8 +238,6 @@ const TRANSCRIPTION_VARIABLES = [
     { name: '{children}', desc: 'Дети', example: 'No' },
     { name: '{wantchildren}', desc: 'Хочет детей', example: 'Yes' },
     { name: '{languages}', desc: 'Языки', example: 'English, Spanish' },
-    { name: '{about}', desc: 'О себе', example: 'I love traveling...' },
-    { name: '{lookingfor}', desc: 'Ищу', example: 'Serious relationship' },
     { name: '{interests}', desc: 'Интересы', example: 'Music, Sports' }
 ];
 

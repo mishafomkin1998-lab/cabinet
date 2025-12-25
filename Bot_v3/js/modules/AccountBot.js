@@ -2703,8 +2703,6 @@ class AccountBot {
         res = res.replace(/{languages}/gi, getField('Languages', 'Language', 'languages'));
         res = res.replace(/{hobby}/gi, getField('Hobby', 'Hobbies', 'Interests', 'hobby', 'interests'));
         res = res.replace(/{interests}/gi, getField('Hobby', 'Hobbies', 'Interests', 'hobby', 'interests'));
-        res = res.replace(/{about}/gi, getField('AboutMe', 'About', 'Description', 'aboutMe'));
-        res = res.replace(/{lookingfor}/gi, getField('AboutPartner', 'LookingFor', 'lookingFor'));
 
         // === ФИНАЛЬНАЯ ОЧИСТКА ОТ HTML ENTITIES ===
         // Убираем &nbsp; и другие entities которые могут остаться в данных профиля
