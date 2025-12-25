@@ -1043,28 +1043,25 @@
 
         /* === ТЕМА NovaBot (iOS 26 Glass Style) === */
         body.theme-novabot {
-            --bg-color: #f5f3ff;
-            --text-color: #1e1b4b;
-            --panel-bg: rgba(255, 255, 255, 0.7);
-            --tab-bg-active: linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%);
-            --tab-text-active: #fff;
-            --mode-color: #8B5CF6;
-            --border-color: rgba(139, 92, 246, 0.2);
-            --hover-bg: rgba(139, 92, 246, 0.1);
-            --input-bg: rgba(255, 255, 255, 0.8);
-            --input-border: rgba(139, 92, 246, 0.3);
-            --secondary-text: #6b7280;
-            --glass-bg: rgba(255, 255, 255, 0.65);
-            --glass-border: rgba(255, 255, 255, 0.3);
+            --bg-color: #1e1b4b;
+            --text-color: #f8fafc;
+            --panel-bg: rgba(255, 255, 255, 0.1);
+            --tab-bg-active: rgba(255, 255, 255, 0.95);
+            --tab-text-active: #7c3aed;
+            --mode-color: #a78bfa;
+            --border-color: rgba(255, 255, 255, 0.15);
+            --hover-bg: rgba(255, 255, 255, 0.1);
+            --input-bg: rgba(255, 255, 255, 0.95);
+            --input-border: rgba(139, 92, 246, 0.4);
+            --secondary-text: #c4b5fd;
             --purple-primary: #8B5CF6;
             --purple-secondary: #A855F7;
-            --purple-light: #DDD6FE;
         }
 
         body.theme-novabot {
-            background: linear-gradient(135deg, #EDE9FE 0%, #F5F3FF 25%, #FFFFFF 50%, #F5F3FF 75%, #EDE9FE 100%);
-            background-size: 200% 200%;
-            animation: novabotGradient 20s ease infinite;
+            background: linear-gradient(135deg, #1e1b4b 0%, #312e81 25%, #4c1d95 50%, #5b21b6 75%, #6d28d9 100%);
+            background-size: 300% 300%;
+            animation: novabotGradient 25s ease infinite;
         }
 
         @keyframes novabotGradient {
@@ -1073,121 +1070,147 @@
             100% { background-position: 0% 50%; }
         }
 
+        /* NovaBot - Toolbar */
         body.theme-novabot .global-toolbar {
-            background: rgba(255, 255, 255, 0.7);
+            background: linear-gradient(90deg, rgba(91, 33, 182, 0.9) 0%, rgba(109, 40, 217, 0.9) 50%, rgba(124, 58, 237, 0.9) 100%);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border-bottom: 1px solid rgba(139, 92, 246, 0.2);
-            box-shadow: 0 4px 30px rgba(139, 92, 246, 0.1);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
         }
 
         body.theme-novabot .global-toolbar .bot-counter {
-            background: linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%);
-            color: #fff;
-            font-weight: 600;
+            background: rgba(255, 255, 255, 0.95);
+            color: #7c3aed;
+            font-weight: 700;
             border-radius: 20px;
-            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
         }
 
         body.theme-novabot .btn-circle {
-            background: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(139, 92, 246, 0.2);
-            color: #1e1b4b;
-            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         body.theme-novabot .btn-circle:hover {
             transform: translateY(-2px) scale(1.05);
-            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.25);
-            border-color: rgba(139, 92, 246, 0.4);
+            background: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
         }
 
         body.theme-novabot .btn-play {
-            background: linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%);
-            color: #fff;
+            background: rgba(255, 255, 255, 0.95);
+            color: #16a34a;
             border: none;
         }
 
         body.theme-novabot .btn-play:hover {
-            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.5);
+            box-shadow: 0 8px 25px rgba(255, 255, 255, 0.3);
         }
 
         body.theme-novabot .btn-stop {
-            background: linear-gradient(135deg, #EF4444 0%, #F87171 100%);
-            color: #fff;
+            background: rgba(255, 255, 255, 0.95);
+            color: #dc2626;
             border: none;
         }
 
         body.theme-novabot .btn-refresh {
-            background: linear-gradient(135deg, #3B82F6 0%, #60A5FA 100%);
-            color: #fff;
+            background: rgba(255, 255, 255, 0.95);
+            color: #2563eb;
             border: none;
         }
 
         body.theme-novabot .btn-logger {
-            background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
-            color: #fff;
+            background: rgba(255, 255, 255, 0.95);
+            color: #d97706;
             border: none;
         }
 
         body.theme-novabot .btn-settings {
-            background: linear-gradient(135deg, #6B7280 0%, #9CA3AF 100%);
-            color: #fff;
+            background: rgba(255, 255, 255, 0.95);
+            color: #6b7280;
             border: none;
         }
 
         body.theme-novabot .btn-mode-switch {
-            background: linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%);
-            color: #fff;
+            background: rgba(255, 255, 255, 0.95);
+            color: #7c3aed;
             border: none;
         }
 
+        /* NovaBot - Tabs */
         body.theme-novabot .tabs-container {
-            background: rgba(255, 255, 255, 0.5);
+            background: linear-gradient(90deg, rgba(76, 29, 149, 0.8) 0%, rgba(91, 33, 182, 0.8) 100%);
             backdrop-filter: blur(15px);
             -webkit-backdrop-filter: blur(15px);
-            border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         body.theme-novabot .tab-item {
-            background: rgba(255, 255, 255, 0.6);
+            background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(139, 92, 246, 0.15);
-            color: #4b5563;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: rgba(255, 255, 255, 0.8);
             border-radius: 12px 12px 0 0;
             margin: 0 3px;
             transition: all 0.3s ease;
         }
 
         body.theme-novabot .tab-item:hover {
-            background: rgba(255, 255, 255, 0.85);
-            color: #1e1b4b;
-            border-color: rgba(139, 92, 246, 0.3);
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
         }
 
         body.theme-novabot .tab-item.active {
-            background: linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%);
-            color: #fff;
+            background: rgba(255, 255, 255, 0.95);
+            color: #7c3aed;
+            font-weight: 600;
             border-color: transparent;
-            box-shadow: 0 -4px 20px rgba(139, 92, 246, 0.4);
+            box-shadow: 0 -4px 20px rgba(255, 255, 255, 0.2);
         }
 
+        /* NovaBot - Main Content Area */
+        body.theme-novabot .main-content,
+        body.theme-novabot .bot-content {
+            background: transparent;
+        }
+
+        body.theme-novabot .bl-panel,
+        body.theme-novabot .bl-left,
+        body.theme-novabot .bl-mid,
+        body.theme-novabot .bl-right {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        body.theme-novabot .bl-header {
+            color: rgba(255, 255, 255, 0.9);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* NovaBot - Modal */
         body.theme-novabot .modal-content {
             border-radius: 24px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
-            box-shadow: 0 25px 60px rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            background: rgba(30, 27, 75, 0.95);
+            backdrop-filter: blur(30px);
+            -webkit-backdrop-filter: blur(30px);
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
             overflow: hidden;
         }
 
         body.theme-novabot .modal-header {
-            background: linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%);
+            background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%);
             color: #fff;
             border: none;
             padding: 20px 24px;
@@ -1202,24 +1225,22 @@
             opacity: 0.8;
         }
 
-        body.theme-novabot .modal-header .btn-close:hover {
-            opacity: 1;
-        }
-
         body.theme-novabot .modal-body {
-            background: rgba(255, 255, 255, 0.9);
+            background: rgba(30, 27, 75, 0.98);
             padding: 24px;
+            color: #f8fafc;
         }
 
         body.theme-novabot .modal-footer {
-            background: rgba(245, 243, 255, 0.9);
-            border-top: 1px solid rgba(139, 92, 246, 0.1);
+            background: rgba(30, 27, 75, 0.98);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
 
+        /* NovaBot - Forms */
         body.theme-novabot .form-control,
         body.theme-novabot .form-select {
-            background: rgba(255, 255, 255, 0.9);
-            border: 2px solid rgba(139, 92, 246, 0.2);
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid rgba(139, 92, 246, 0.3);
             border-radius: 12px;
             padding: 10px 16px;
             transition: all 0.3s ease;
@@ -1229,10 +1250,19 @@
         body.theme-novabot .form-control:focus,
         body.theme-novabot .form-select:focus {
             border-color: #8B5CF6;
-            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15);
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.3);
             background: #fff;
         }
 
+        body.theme-novabot .form-control::placeholder {
+            color: #9ca3af;
+        }
+
+        body.theme-novabot .form-label {
+            color: #c4b5fd;
+        }
+
+        /* NovaBot - Buttons */
         body.theme-novabot .btn-primary {
             background: linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%);
             border: none;
@@ -1253,7 +1283,6 @@
             border: none;
             border-radius: 12px;
             font-weight: 600;
-            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
         }
 
         body.theme-novabot .btn-danger {
@@ -1263,56 +1292,96 @@
         }
 
         body.theme-novabot .btn-secondary {
-            background: rgba(107, 114, 128, 0.1);
-            border: 1px solid rgba(107, 114, 128, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 12px;
-            color: #4b5563;
+            color: #fff;
         }
 
         body.theme-novabot .btn-secondary:hover {
-            background: rgba(107, 114, 128, 0.2);
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
         }
 
+        body.theme-novabot .btn-outline-secondary {
+            border-color: rgba(255, 255, 255, 0.3);
+            color: #c4b5fd;
+        }
+
+        body.theme-novabot .btn-outline-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        /* NovaBot - Text */
+        body.theme-novabot .text-muted {
+            color: #a5b4fc !important;
+        }
+
+        body.theme-novabot .text-secondary {
+            color: #c4b5fd !important;
+        }
+
+        body.theme-novabot h1, body.theme-novabot h2, body.theme-novabot h3,
+        body.theme-novabot h4, body.theme-novabot h5, body.theme-novabot h6 {
+            color: #f8fafc;
+        }
+
+        /* NovaBot - Cards & Panels */
+        body.theme-novabot .card,
+        body.theme-novabot .panel {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+        }
+
+        body.theme-novabot .settings-section {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+        }
+
+        body.theme-novabot .settings-section-title {
+            color: #a78bfa;
+            font-weight: 600;
+        }
+
+        /* NovaBot - Backgrounds */
         body.theme-novabot .bg-light {
-            background: rgba(255, 255, 255, 0.7) !important;
+            background: rgba(255, 255, 255, 0.1) !important;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
             border-radius: 12px;
         }
 
         body.theme-novabot .alert-light {
-            background: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 12px;
+            color: #f8fafc;
         }
 
+        body.theme-novabot .border {
+            border-color: rgba(255, 255, 255, 0.15) !important;
+        }
+
+        /* NovaBot - Welcome Screen */
         body.theme-novabot #welcome-screen {
-            color: #1e1b4b;
+            color: #fff;
         }
 
         body.theme-novabot #welcome-screen p {
             font-size: 1.2em;
-            color: #6b7280;
+            color: #c4b5fd;
         }
 
-        body.theme-novabot .btn-group-toggle {
-            color: #6b7280;
-        }
-
-        body.theme-novabot .btn-group-toggle:hover {
-            color: #1e1b4b;
-        }
-
-        body.theme-novabot .text-muted {
-            color: #6b7280 !important;
-        }
-
-        body.theme-novabot .border {
-            border-color: rgba(139, 92, 246, 0.15) !important;
-        }
-
+        /* NovaBot - Selection */
         body.theme-novabot ::selection {
             background: #8B5CF6;
             color: #fff;
@@ -1325,7 +1394,7 @@
         }
 
         body.theme-novabot ::-webkit-scrollbar-track {
-            background: rgba(139, 92, 246, 0.05);
+            background: rgba(255, 255, 255, 0.05);
             border-radius: 4px;
         }
 
@@ -1338,84 +1407,80 @@
             background: linear-gradient(135deg, #7C3AED 0%, #9333EA 100%);
         }
 
-        /* NovaBot - Cards & Panels */
-        body.theme-novabot .card,
-        body.theme-novabot .panel,
-        body.theme-novabot .settings-section {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.1);
-        }
-
-        body.theme-novabot .settings-section-title {
-            color: #8B5CF6;
-            font-weight: 600;
-        }
-
-        /* NovaBot - Bot List */
-        body.theme-novabot .bot-list-item {
-            background: rgba(255, 255, 255, 0.6);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border: 1px solid rgba(139, 92, 246, 0.1);
-            border-radius: 12px;
-            transition: all 0.3s ease;
-        }
-
-        body.theme-novabot .bot-list-item:hover {
-            background: rgba(255, 255, 255, 0.85);
-            border-color: rgba(139, 92, 246, 0.3);
-            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.15);
-        }
-
-        body.theme-novabot .bot-list-item.active {
-            background: rgba(139, 92, 246, 0.1);
-            border-color: rgba(139, 92, 246, 0.4);
-        }
-
-        /* NovaBot - Logger */
-        body.theme-novabot .logger-panel {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-
-        body.theme-novabot .logger-entry {
-            background: rgba(255, 255, 255, 0.5);
-            border-radius: 8px;
-            border-left: 3px solid #8B5CF6;
-        }
-
         /* NovaBot - Form Switches */
+        body.theme-novabot .form-check-input {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
         body.theme-novabot .form-check-input:checked {
             background-color: #8B5CF6;
             border-color: #8B5CF6;
         }
 
         body.theme-novabot .form-check-input:focus {
-            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.2);
+            box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.3);
+        }
+
+        body.theme-novabot .form-check-label {
+            color: #e2e8f0;
+        }
+
+        /* NovaBot - Tables */
+        body.theme-novabot table {
+            color: #f8fafc;
+        }
+
+        body.theme-novabot th {
+            color: #c4b5fd;
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        body.theme-novabot td {
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        /* NovaBot - Inbox Button */
+        body.theme-novabot .btn-inbox {
+            background: rgba(255, 255, 255, 0.95);
+            color: #7c3aed;
+            font-weight: 600;
+        }
+
+        body.theme-novabot .btn-inbox:hover {
+            box-shadow: 0 4px 15px rgba(255, 255, 255, 0.3);
+        }
+
+        /* NovaBot - Toast */
+        body.theme-novabot #toast {
+            background: rgba(30, 27, 75, 0.95);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #f8fafc;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
         }
 
         /* NovaBot - Auto Reply Section */
         body.theme-novabot .auto-reply-section {
-            background: rgba(255, 255, 255, 0.6);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 12px;
         }
 
+        body.theme-novabot .auto-reply-header .form-check-label {
+            color: #c4b5fd;
+        }
+
         body.theme-novabot .auto-reply-item {
-            background: rgba(255, 255, 255, 0.7);
-            border: 1px solid rgba(139, 92, 246, 0.1);
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 10px;
         }
 
         body.theme-novabot .auto-reply-item:hover {
-            border-color: rgba(139, 92, 246, 0.3);
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(255, 255, 255, 0.2);
         }
 
         body.theme-novabot .auto-reply-number {
@@ -1423,39 +1488,59 @@
             color: #fff;
         }
 
-        /* NovaBot - Inbox Button */
-        body.theme-novabot .btn-inbox {
-            background: linear-gradient(135deg, #8B5CF6 0%, #A855F7 100%);
-        }
-
-        body.theme-novabot .btn-inbox:hover {
-            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
-        }
-
-        /* NovaBot - Toast */
-        body.theme-novabot #toast {
-            background: rgba(255, 255, 255, 0.9);
+        /* NovaBot - Logger */
+        body.theme-novabot .logger-panel {
+            background: rgba(30, 27, 75, 0.9);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(139, 92, 246, 0.2);
-            color: #1e1b4b;
-            box-shadow: 0 8px 30px rgba(139, 92, 246, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        body.theme-novabot .logger-entry {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border-left: 3px solid #8B5CF6;
+            color: #f8fafc;
+        }
+
+        /* NovaBot - Photo attachment */
+        body.theme-novabot .photo-attachment {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 10px;
+            color: #c4b5fd;
+        }
+
+        /* NovaBot - Blacklist */
+        body.theme-novabot .blacklist-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #f8fafc;
+        }
+
+        /* NovaBot - Stats */
+        body.theme-novabot .stats-sent {
+            color: #34d399;
+        }
+
+        body.theme-novabot .stats-errors {
+            color: #f87171;
         }
 
         /* NovaBot - Prompt Template Selector */
         body.theme-novabot .prompt-template-selector select {
-            background: rgba(255, 255, 255, 0.9);
-            border-color: rgba(139, 92, 246, 0.3);
+            background: rgba(255, 255, 255, 0.95);
+            color: #1e1b4b;
         }
 
         body.theme-novabot .prompt-template-selector .btn-outline-success {
-            border-color: #10B981;
-            color: #10B981;
+            border-color: #34d399;
+            color: #34d399;
         }
 
         body.theme-novabot .prompt-template-selector .btn-outline-danger {
-            border-color: #EF4444;
-            color: #EF4444;
+            border-color: #f87171;
+            color: #f87171;
         }
 
         /* === КОНЕЦ ТЕМЫ NovaBot === */
