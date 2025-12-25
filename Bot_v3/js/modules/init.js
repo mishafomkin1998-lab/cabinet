@@ -269,7 +269,8 @@ function toggleStatusDisabled(status, event) {
 function getFirstEnabledStatus() {
     const disabledList = getDisabledStatuses();
     // Статусы только для Mail (в Chat их пропускаем)
-    const mailOnlyStatuses = ['inbox', 'payers'];
+    // Chat: только online-smart, shared-online, online, payers
+    const mailOnlyStatuses = ['inbox', 'favorites', 'my-favorites', 'custom-ids'];
     // Порядок статусов сверху вниз в выпадающем списке
     const statusOrder = ['online-smart', 'shared-online', 'online', 'favorites', 'my-favorites', 'inbox', 'payers', 'custom-ids'];
 
@@ -304,7 +305,8 @@ function updateDisabledStatusesUI() {
 
     // 2. Обновляем опции в select для всех ботов - СКРЫВАЕМ отключённые
     // Статусы только для Mail (в Chat их не показываем вообще)
-    const mailOnlyStatuses = ['inbox', 'payers'];
+    // Chat: только online-smart, shared-online, online, payers
+    const mailOnlyStatuses = ['inbox', 'favorites', 'my-favorites', 'custom-ids'];
 
     const selects = document.querySelectorAll('[id^="target-select-"]');
     selects.forEach(select => {
@@ -365,7 +367,8 @@ function updateDisabledStatusesUI() {
 function getNextActiveStatus(currentStatus) {
     const disabledList = getDisabledStatuses();
     // Статусы только для Mail (в Chat их пропускаем)
-    const mailOnlyStatuses = ['inbox', 'payers'];
+    // Chat: только online-smart, shared-online, online, payers
+    const mailOnlyStatuses = ['inbox', 'favorites', 'my-favorites', 'custom-ids'];
     const statusOrder = ['payers', 'inbox', 'my-favorites', 'favorites'];
     const onlineStatuses = ['online', 'shared-online', 'online-smart'];
     const currentIdx = statusOrder.indexOf(currentStatus);
