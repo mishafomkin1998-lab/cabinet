@@ -8,8 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
     <link rel="stylesheet" href="css/bot.css">
 </head>
-<body class="mode-mail"> 
-    <div id="error-toast" class="error-toast"><i class="fa fa-exclamation-circle"></i> <span id="error-toast-text">Ошибка</span></div>
+<body class="mode-mail">
     <div id="tooltip-popup" class="custom-tooltip-popup"></div>
 
     <!-- Контейнер для перетаскиваемых окон ответа -->
@@ -699,5 +698,8 @@
     <script src="js/modules/onlineSmart.js"></script> <!-- 13. OnlineSmart -->
     <script src="js/modules/customIds.js"></script>  <!-- 14. Custom IDs -->
     <script src="js/modules/init.js"></script>        <!-- 15. Инициализация (window.onload) -->
+
+    <!-- Toast уведомления - в конце body чтобы быть поверх всех модалок и не размываться -->
+    <div id="error-toast" class="error-toast"><i class="fa fa-exclamation-circle"></i> <span id="error-toast-text">Ошибка</span></div>
 </body>
 </html>
