@@ -712,6 +712,9 @@ async function performLoginFast(login, pass, displayId) {
     try {
         const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: login, Password: pass });
 
+        // DEBUG: Показываем что возвращает API логина
+        console.log('%c[LOGIN DEBUG] Полный ответ API:', 'color: yellow; font-weight: bold', res.data);
+
         if(res.data.Token) {
             const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
             const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
@@ -1635,6 +1638,9 @@ async function performLogin(login, pass, displayId) {
     const e=document.getElementById('loginError'); const s=document.getElementById('loginSpinner'); if(s) s.style.display='inline-block';
     try {
         const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: login, Password: pass });
+
+        // DEBUG: Показываем что возвращает API логина
+        console.log('%c[LOGIN DEBUG] Полный ответ API:', 'color: yellow; font-weight: bold', res.data);
 
         if(res.data.Token) {
             const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
