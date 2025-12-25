@@ -1757,8 +1757,8 @@ class AccountBot {
 
                     const checkUrl = (url) => {
                         lastUrl = url;
-                        // Проверяем что URL содержит UUID (не просто числовой ID)
-                        const uidMatch = url.match(/message-compose\/([a-f0-9-]{20,})/i);
+                        // Проверяем что URL содержит /message-compose/ с любым ID (UUID или числовой)
+                        const uidMatch = url.match(/message-compose\/([a-f0-9-]+|\d+)/i);
                         if (uidMatch) {
                             clearTimeout(timeout);
                             cleanup();
