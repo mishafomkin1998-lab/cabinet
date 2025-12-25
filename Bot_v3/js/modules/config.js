@@ -118,7 +118,11 @@ let serverGenerationPrompt = '';
 const DEFAULT_GENERATION_PROMPT = 'Write a creative and engaging opening message for a dating site to start a conversation with a man. Keep it short and intriguing.';
 
 // ============= SHARED ONLINE POOL =============
-// Глобальный пул мужчин онлайн, собранный со всех анкет
+// ПРОЦЕСС: Глобальный пул мужчин онлайн, собранный со всех анкет
+// ЗА ЧТО ОТВЕЧАЕТ: Собирает список онлайн-мужчин со ВСЕХ анкет для Online Smart режима
+// НАГРУЗКА: ⚠️ КРИТИЧНО! Делает /api/users/online запрос для КАЖДОГО бота каждые 30 сек
+// МАСШТАБИРОВАНИЕ: При 3000 анкет = 6000 запросов/мин к LadaDate API
+// РЕКОМЕНДАЦИЯ: Для масштабирования нужно получать данные с центрального сервера
 const SharedPool = {
     users: new Map(),           // AccountId → user data
     lastUpdate: 0,              // Время последнего обновления

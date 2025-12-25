@@ -701,30 +701,35 @@ class AccountBot {
         sendHeartbeatToLababot(this.id, this.displayId, 'offline', true);
     }
 
+    // ============= VIP MONITOR (Мониторинг VIP клиентов) =============
+    // ПРОЦЕСС: Проверка онлайн-статуса VIP клиентов (избранных)
+    // ЗА ЧТО ОТВЕЧАЕТ: Уведомления когда VIP клиент появляется онлайн
+    // НАГРУЗКА: Зависит от кол-ва VIP - 1 запрос на каждого VIP каждые 45-75 сек
+    // МАСШТАБИРОВАНИЕ: Умеренная нагрузка (обычно VIP-ов немного)
     async checkVipStatus() {
         if (!this.token || !this.isMonitoring) return;
-        
+
         const vipsToCheck = this.vipList;
-        
+
         for (const vipId of vipsToCheck) {
             try {
                 const res = await makeApiRequest(this, 'GET', `/api/messages/check-send/${vipId}`);
                 const isOnline = !!res.data.CheckId;
-                
-                const oldStatus = this.vipStatus[vipId] || 'offline'; 
+
+                const oldStatus = this.vipStatus[vipId] || 'offline';
                 const status = isOnline ? 'online' : 'offline';
                 let userName = `ID ${vipId}`;
-                
+
                 if (status === 'online' && oldStatus !== 'online') {
                     Logger.add(`👑 VIP Клиент ID ${vipId} теперь ONLINE!`, 'vip-online', this.id, { partnerId: vipId, partnerName: userName });
                 }
                 this.vipStatus[vipId] = status;
-            } catch(e) { 
+            } catch(e) {
                 this.vipStatus[vipId] = 'offline';
             }
             await new Promise(r => setTimeout(r, 1000));
         }
-        
+
         const nextRun = Math.floor(Math.random() * (75000 - 45000 + 1)) + 45000;
         if (this.isMonitoring) setTimeout(() => this.checkVipStatus(), nextRun);
     }
@@ -861,6 +866,11 @@ class AccountBot {
         if (diff > 0 && diff <= 3) Logger.add(`День рождения через ${Math.ceil(diff)}д!`, 'bday', this.id);
     }
 
+    // ============= CHAT SYNC (Проверка чатов) =============
+    // ПРОЦЕСС: Синхронизация чат-сессий и уведомления о новых сообщениях
+    // ЗА ЧТО ОТВЕЧАЕТ: Уведомления о входящих чат-сообщениях, ChatRequests
+    // НАГРУЗКА: 1 запрос каждые 3-7 сек НА КАЖДУЮ анкету через WebView
+    // МАСШТАБИРОВАНИЕ: При 3000 анкет = очень высокая нагрузка (но идёт через WebView)
     async checkChatSync() {
         if (!this.token || !this.isMonitoring) {
             return;
@@ -1094,6 +1104,11 @@ class AccountBot {
         }
     }
 
+    // ============= MAIL CHECK (Проверка входящих писем) =============
+    // ПРОЦЕСС: Проверка новых входящих писем и уведомления
+    // ЗА ЧТО ОТВЕЧАЕТ: Уведомления о входящих письмах от мужчин
+    // НАГРУЗКА: 1 запрос каждые 20-35 сек НА КАЖДУЮ анкету
+    // МАСШТАБИРОВАНИЕ: При 3000 анкет = ~100 запросов/сек к LadaDate API
     async checkNewMails() {
         if (!this.token || !this.isMonitoring) return;
         const isFirstCheck = this.isFirstMailCheck;
@@ -1267,6 +1282,11 @@ class AccountBot {
         }
     }
 
+    // ============= KEEP ALIVE (Поддержание сессии) =============
+    // ПРОЦЕСС: Периодическая активность для поддержания сессии на LadaDate
+    // ЗА ЧТО ОТВЕЧАЕТ: Синхронизация чата, получение онлайн-мужчин, очистка памяти
+    // НАГРУЗКА: ⚠️ ВЫСОКАЯ - 2 запроса к LadaDate каждую минуту НА КАЖДУЮ анкету
+    // МАСШТАБИРОВАНИЕ: При 3000 анкет = 6000 запросов/мин к LadaDate API
     startKeepAlive() {
         this.doActivity();
         if(this.keepAliveTimer) clearInterval(this.keepAliveTimer);
@@ -1276,7 +1296,9 @@ class AccountBot {
     async doActivity() {
         if(!this.token) return;
         try {
+            // POST /chat-sync - поддержание сессии чата
             await makeApiRequest(this, 'POST', '/chat-sync', {});
+            // GET /api/users/online - получение списка онлайн-мужчин
             const res = await makeApiRequest(this, 'GET', '/api/users/online');
             if(res.data.Users) {
                 // Сохраняем для глобального счётчика
