@@ -302,10 +302,12 @@ ipcMain.handle('set-webview-proxy', async (event, { botId, proxyString }) => {
         } else if (parts.length === 4) {
             // Формат: domain:port:user:pass
             const [host, port, user, pass] = parts;
-            proxyUrl = `http://${host}:${port}`;
+            // ВАЖНО: Для HTTPS туннелирования credentials должны быть в URL прокси
+            // onBeforeSendHeaders НЕ работает для CONNECT запросов
+            proxyUrl = `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}`;
             username = user;
             password = pass;
-            console.log(`[WebView Proxy] Формат: domain:port:user:pass → ${proxyUrl} (auth: ${username})`);
+            console.log(`[WebView Proxy] Формат: domain:port:user:pass → http://***:***@${host}:${port} (auth в URL)`);
         } else {
             console.error(`[WebView Proxy] ❌ НЕВЕРНЫЙ ФОРМАТ ПРОКСИ: ${proxyString}`);
             return { success: false, error: 'Неверный формат прокси' };
@@ -349,13 +351,14 @@ ipcMain.handle('set-webview-proxy', async (event, { botId, proxyString }) => {
         }
 
         // Устанавливаем прокси
-        console.log(`[WebView Proxy] Вызов ses.setProxy({ proxyRules: "${proxyUrl}" })...`);
+        const safeProxyUrl = proxyUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@');
+        console.log(`[WebView Proxy] Вызов ses.setProxy({ proxyRules: "${safeProxyUrl}" })...`);
         await ses.setProxy({ proxyRules: proxyUrl });
 
         console.log(`\n[WebView Proxy] ✅✅✅ ПРОКСИ УСПЕШНО УСТАНОВЛЕН ✅✅✅`);
         console.log(`[WebView Proxy] Partition: ${partitionName}`);
-        console.log(`[WebView Proxy] Proxy URL: ${proxyUrl}`);
-        console.log(`[WebView Proxy] Auth: ${username ? 'ДА' : 'НЕТ'}\n`);
+        console.log(`[WebView Proxy] Proxy URL: ${safeProxyUrl}`);
+        console.log(`[WebView Proxy] Auth: ${username ? 'ДА (в URL)' : 'НЕТ'}\n`);
 
         return { success: true, proxy: proxyUrl, partition: partitionName };
     } catch (error) {
