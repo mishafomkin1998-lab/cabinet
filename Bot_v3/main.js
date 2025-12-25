@@ -3,6 +3,131 @@ const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 const axios = require('axios');
+const http = require('http');
+const net = require('net');
+
+// =====================================================
+// === ЛОКАЛЬНЫЙ ПРОКСИ ДЛЯ WEBVIEW ===
+// =====================================================
+// Создаёт локальный прокси без аутентификации который перенаправляет
+// все запросы на upstream прокси (Decodo) с аутентификацией.
+// Это решает проблему Electron не поддерживающего proxy auth в CONNECT.
+
+const localProxyServers = new Map(); // botId -> { server, port }
+let nextLocalProxyPort = 19000;
+
+function createLocalProxyServer(upstreamHost, upstreamPort, upstreamUser, upstreamPass) {
+    return new Promise((resolve, reject) => {
+        const localPort = nextLocalProxyPort++;
+
+        const server = http.createServer((req, res) => {
+            // HTTP запросы (не CONNECT) - форвардим напрямую
+            const options = {
+                hostname: upstreamHost,
+                port: upstreamPort,
+                path: req.url,
+                method: req.method,
+                headers: {
+                    ...req.headers,
+                    'Proxy-Authorization': 'Basic ' + Buffer.from(`${upstreamUser}:${upstreamPass}`).toString('base64')
+                }
+            };
+
+            const proxyReq = http.request(options, (proxyRes) => {
+                res.writeHead(proxyRes.statusCode, proxyRes.headers);
+                proxyRes.pipe(res);
+            });
+
+            proxyReq.on('error', (err) => {
+                console.error('[LocalProxy] HTTP request error:', err.message);
+                res.writeHead(502);
+                res.end('Bad Gateway');
+            });
+
+            req.pipe(proxyReq);
+        });
+
+        // CONNECT для HTTPS туннелирования
+        server.on('connect', (req, clientSocket, head) => {
+            const [targetHost, targetPort] = req.url.split(':');
+
+            // Подключаемся к upstream прокси
+            const upstreamSocket = net.connect(upstreamPort, upstreamHost, () => {
+                // Отправляем CONNECT запрос к upstream прокси с аутентификацией
+                const authHeader = 'Basic ' + Buffer.from(`${upstreamUser}:${upstreamPass}`).toString('base64');
+                const connectRequest = [
+                    `CONNECT ${req.url} HTTP/1.1`,
+                    `Host: ${req.url}`,
+                    `Proxy-Authorization: ${authHeader}`,
+                    `Proxy-Connection: Keep-Alive`,
+                    '',
+                    ''
+                ].join('\r\n');
+
+                upstreamSocket.write(connectRequest);
+            });
+
+            let connected = false;
+            let buffer = Buffer.alloc(0);
+
+            upstreamSocket.on('data', (data) => {
+                if (!connected) {
+                    buffer = Buffer.concat([buffer, data]);
+                    const headerEnd = buffer.indexOf('\r\n\r\n');
+                    if (headerEnd !== -1) {
+                        const header = buffer.slice(0, headerEnd).toString();
+                        if (header.includes('200')) {
+                            connected = true;
+                            clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+
+                            // Если есть данные после заголовка - передаём
+                            const remaining = buffer.slice(headerEnd + 4);
+                            if (remaining.length > 0) {
+                                clientSocket.write(remaining);
+                            }
+
+                            // Устанавливаем двунаправленный pipe
+                            upstreamSocket.pipe(clientSocket);
+                            clientSocket.pipe(upstreamSocket);
+
+                            if (head && head.length > 0) {
+                                upstreamSocket.write(head);
+                            }
+                        } else {
+                            console.error('[LocalProxy] Upstream CONNECT failed:', header.split('\r\n')[0]);
+                            clientSocket.write('HTTP/1.1 502 Bad Gateway\r\n\r\n');
+                            clientSocket.destroy();
+                            upstreamSocket.destroy();
+                        }
+                    }
+                }
+            });
+
+            upstreamSocket.on('error', (err) => {
+                console.error('[LocalProxy] Upstream socket error:', err.message);
+                clientSocket.destroy();
+            });
+
+            clientSocket.on('error', (err) => {
+                console.error('[LocalProxy] Client socket error:', err.message);
+                upstreamSocket.destroy();
+            });
+
+            upstreamSocket.on('close', () => clientSocket.destroy());
+            clientSocket.on('close', () => upstreamSocket.destroy());
+        });
+
+        server.on('error', (err) => {
+            console.error('[LocalProxy] Server error:', err.message);
+            reject(err);
+        });
+
+        server.listen(localPort, '127.0.0.1', () => {
+            console.log(`[LocalProxy] ✅ Локальный прокси запущен на 127.0.0.1:${localPort}`);
+            resolve({ server, port: localPort });
+        });
+    });
+}
 
 // Исправление DPI scaling на Windows - предотвращает обрезание окна
 app.commandLine.appendSwitch('high-dpi-support', '1');
@@ -280,6 +405,16 @@ ipcMain.handle('set-webview-proxy', async (event, { botId, proxyString }) => {
     try {
         const ses = session.fromPartition(partitionName);
 
+        // Закрываем предыдущий локальный прокси если был
+        if (localProxyServers.has(botId)) {
+            const oldProxy = localProxyServers.get(botId);
+            try {
+                oldProxy.server.close();
+                console.log(`[WebView Proxy] 🔄 Закрыт старый локальный прокси на порту ${oldProxy.port}`);
+            } catch (e) {}
+            localProxyServers.delete(botId);
+        }
+
         if (!proxyString || proxyString.trim() === '') {
             await ses.setProxy({ proxyRules: '' });
             console.log(`[WebView Proxy] ⚪ ${botId}: прокси отключен (прямое соединение)`);
@@ -290,77 +425,57 @@ ipcMain.handle('set-webview-proxy', async (event, { botId, proxyString }) => {
         const trimmed = proxyString.trim();
         const parts = trimmed.split(':');
 
-        let proxyUrl;
-        let username = null;
-        let password = null;
+        let upstreamHost, upstreamPort, username, password;
 
         if (parts.length === 2) {
-            // Формат: ip:port
-            const [host, port] = parts;
-            proxyUrl = `http://${host}:${port}`;
-            console.log(`[WebView Proxy] Формат: ip:port → ${proxyUrl}`);
+            // Формат: ip:port (без аутентификации)
+            [upstreamHost, upstreamPort] = parts;
+            upstreamPort = parseInt(upstreamPort);
+
+            // Без аутентификации - используем напрямую
+            const proxyUrl = `http://${upstreamHost}:${upstreamPort}`;
+            console.log(`[WebView Proxy] Формат: ip:port → ${proxyUrl} (без auth)`);
+            await ses.setProxy({ proxyRules: proxyUrl });
+
+            console.log(`\n[WebView Proxy] ✅✅✅ ПРОКСИ УСПЕШНО УСТАНОВЛЕН ✅✅✅`);
+            return { success: true, proxy: proxyUrl, partition: partitionName };
+
         } else if (parts.length === 4) {
-            // Формат: domain:port:user:pass
-            const [host, port, user, pass] = parts;
-            // ВАЖНО: Для HTTPS туннелирования credentials должны быть в URL прокси
-            // onBeforeSendHeaders НЕ работает для CONNECT запросов
-            proxyUrl = `http://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}`;
-            username = user;
-            password = pass;
-            console.log(`[WebView Proxy] Формат: domain:port:user:pass → http://***:***@${host}:${port} (auth в URL)`);
+            // Формат: domain:port:user:pass (С аутентификацией)
+            [upstreamHost, upstreamPort, username, password] = parts;
+            upstreamPort = parseInt(upstreamPort);
+            console.log(`[WebView Proxy] Формат: domain:port:user:pass → ${upstreamHost}:${upstreamPort} (auth: ${username})`);
+
+            // Создаём локальный прокси-туннель
+            console.log(`[WebView Proxy] 🔧 Создаём локальный прокси-туннель...`);
+
+            try {
+                const localProxy = await createLocalProxyServer(upstreamHost, upstreamPort, username, password);
+                localProxyServers.set(botId, localProxy);
+
+                // WebView подключается к локальному прокси (без аутентификации!)
+                const localProxyUrl = `http://127.0.0.1:${localProxy.port}`;
+                console.log(`[WebView Proxy] 📡 Локальный прокси: ${localProxyUrl}`);
+                console.log(`[WebView Proxy] 📡 Upstream прокси: ${upstreamHost}:${upstreamPort}`);
+
+                await ses.setProxy({ proxyRules: localProxyUrl });
+
+                console.log(`\n[WebView Proxy] ✅✅✅ ПРОКСИ УСПЕШНО УСТАНОВЛЕН (через локальный туннель) ✅✅✅`);
+                console.log(`[WebView Proxy] Partition: ${partitionName}`);
+                console.log(`[WebView Proxy] Local: 127.0.0.1:${localProxy.port}`);
+                console.log(`[WebView Proxy] Upstream: ${upstreamHost}:${upstreamPort}\n`);
+
+                return { success: true, proxy: localProxyUrl, partition: partitionName, localPort: localProxy.port };
+
+            } catch (proxyErr) {
+                console.error(`[WebView Proxy] ❌ Ошибка создания локального прокси:`, proxyErr.message);
+                return { success: false, error: `Ошибка локального прокси: ${proxyErr.message}` };
+            }
+
         } else {
             console.error(`[WebView Proxy] ❌ НЕВЕРНЫЙ ФОРМАТ ПРОКСИ: ${proxyString}`);
             return { success: false, error: 'Неверный формат прокси' };
         }
-
-        // Настраиваем аутентификацию ДО установки прокси
-        if (username && password) {
-            // Убираем предыдущие обработчики
-            ses.removeAllListeners('login');
-
-            // Обработчик 407 Proxy Authentication Required
-            ses.on('login', (loginEvent, webContents, request, authInfo, callback) => {
-                console.log(`[WebView Proxy Auth] 🔐 Запрос аутентификации от ${authInfo.host}:${authInfo.port}`);
-                console.log(`[WebView Proxy Auth] 🔐 Отправляю credentials: ${username} / ***`);
-                loginEvent.preventDefault();
-                callback(username, password);
-            });
-
-            console.log(`[WebView Proxy] ✅ Настроен обработчик аутентификации (login event)`);
-
-            // ВАЖНО: Добавляем Proxy-Authorization header ко всем запросам
-            // Некоторые прокси (включая Decodo) ожидают header сразу, без 407
-            const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
-
-            // Счётчик для логирования
-            let requestCount = 0;
-
-            ses.webRequest.onBeforeSendHeaders({ urls: ['*://*/*'] }, (details, callback) => {
-                requestCount++;
-                // Логируем первые 10 запросов чтобы видеть что прокси работает
-                if (requestCount <= 10) {
-                    console.log(`[WebView Proxy Request #${requestCount}] ${details.method} ${details.url.substring(0, 60)}...`);
-                } else if (requestCount === 11) {
-                    console.log(`[WebView Proxy] ... дальнейшие запросы не логируются (их много)`);
-                }
-                details.requestHeaders['Proxy-Authorization'] = authHeader;
-                callback({ requestHeaders: details.requestHeaders });
-            });
-
-            console.log(`[WebView Proxy] ✅ Настроен Proxy-Authorization header`);
-        }
-
-        // Устанавливаем прокси
-        const safeProxyUrl = proxyUrl.replace(/\/\/[^:]+:[^@]+@/, '//***:***@');
-        console.log(`[WebView Proxy] Вызов ses.setProxy({ proxyRules: "${safeProxyUrl}" })...`);
-        await ses.setProxy({ proxyRules: proxyUrl });
-
-        console.log(`\n[WebView Proxy] ✅✅✅ ПРОКСИ УСПЕШНО УСТАНОВЛЕН ✅✅✅`);
-        console.log(`[WebView Proxy] Partition: ${partitionName}`);
-        console.log(`[WebView Proxy] Proxy URL: ${safeProxyUrl}`);
-        console.log(`[WebView Proxy] Auth: ${username ? 'ДА (в URL)' : 'НЕТ'}\n`);
-
-        return { success: true, proxy: proxyUrl, partition: partitionName };
     } catch (error) {
         console.error(`[WebView Proxy] ❌ ОШИБКА:`, error.message);
         console.error(`[WebView Proxy] Stack:`, error.stack);
