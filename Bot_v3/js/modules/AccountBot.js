@@ -10,6 +10,7 @@ class AccountBot {
         this.lastTplChat = null;
         this.isMailRunning = false;
         this.isMailWaiting = false; // true когда рассылка ждёт пользователей
+        this.mailWaitingStartTime = null; // Время начала ожидания (для задержки жёлтой точки)
         this.mailTimeout = null;
         this.mailStats = { sent: 0, errors: 0, waiting: 0 };
         this.mailHistory = { sent: [], errors: [], waiting: [] };
@@ -22,6 +23,7 @@ class AccountBot {
 
         this.isChatRunning = false;
         this.isChatWaiting = false; // true когда рассылка ждёт пользователей
+        this.chatWaitingStartTime = null; // Время начала ожидания (для задержки жёлтой точки)
         this.chatTimeout = null;
         this.chatStats = { sent: 0, errors: 0, waiting: 0 };
         this.chatHistory = { sent: [], errors: [], waiting: [] };
@@ -1350,6 +1352,7 @@ class AccountBot {
     stopMail() {
         this.isMailRunning = false;
         this.isMailWaiting = false;
+        this.mailWaitingStartTime = null;
         clearTimeout(this.mailTimeout);
         this.stopMailTimer();
         this.log("⏹ MAIL Stopped");
@@ -1463,7 +1466,11 @@ class AccountBot {
         let user = null;
         let msgBody = '';
         let fromHotQueue = false; // Флаг: взят из горячей очереди
-        this.isMailWaiting = true; // По умолчанию ждём пока не найдём пользователя
+        // Начинаем ожидание (если ещё не ждали)
+        if (!this.isMailWaiting) {
+            this.isMailWaiting = true;
+            this.mailWaitingStartTime = Date.now();
+        }
         this.updateUI();
         try {
             const target = this.mailSettings.target;
@@ -1652,6 +1659,7 @@ class AccountBot {
 
             user = users[Math.floor(Math.random() * users.length)];
             this.isMailWaiting = false; // Нашли пользователя - активно отправляем
+            this.mailWaitingStartTime = null; // Сбрасываем время ожидания
             this.updateUI();
 
             // Загружаем полный профиль для расширенных макросов
@@ -2256,6 +2264,7 @@ class AccountBot {
     stopChat() {
         this.isChatRunning = false;
         this.isChatWaiting = false;
+        this.chatWaitingStartTime = null;
         clearTimeout(this.chatTimeout);
         this.stopChatTimer();
         // Отменяем все автоответы при остановке
@@ -2307,7 +2316,11 @@ class AccountBot {
         }, delay);
     }
     async processChatUser(fullText) {
-        this.isChatWaiting = true; // По умолчанию ждём пока не найдём пользователя
+        // Начинаем ожидание (если ещё не ждали)
+        if (!this.isChatWaiting) {
+            this.isChatWaiting = true;
+            this.chatWaitingStartTime = Date.now();
+        }
         this.updateUI();
 
         const invites = fullText.split(/\n\s*__\s*\n/);
@@ -2373,6 +2386,7 @@ class AccountBot {
 
             user = users[Math.floor(Math.random() * users.length)];
             this.isChatWaiting = false; // Нашли пользователя - активно отправляем
+            this.chatWaitingStartTime = null; // Сбрасываем время ожидания
             this.updateUI();
 
             // Загружаем полный профиль для расширенных макросов
@@ -3008,20 +3022,31 @@ class AccountBot {
         const btn = document.getElementById(`btn-start-${this.id}`);
 
         // Обновляем точки статуса внутри вкладки
+        // Логика: выкл → без точки, работает → зелёная, ждёт > 1 мин → жёлтая
+        const WAITING_THRESHOLD_MS = 60 * 1000; // 1 минута
+        const now = Date.now();
         const mailDot = document.querySelector(`#tab-${this.id} .mail-dot`);
         const chatDot = document.querySelector(`#tab-${this.id} .chat-dot`);
 
         if (mailDot) {
             mailDot.classList.remove('active', 'waiting');
             if (this.isMailRunning) {
-                mailDot.classList.add(this.isMailWaiting ? 'waiting' : 'active');
+                // Жёлтая только если ждём > 1 минуты
+                const mailWaitingLong = this.isMailWaiting &&
+                    this.mailWaitingStartTime &&
+                    (now - this.mailWaitingStartTime) > WAITING_THRESHOLD_MS;
+                mailDot.classList.add(mailWaitingLong ? 'waiting' : 'active');
             }
         }
 
         if (chatDot) {
             chatDot.classList.remove('active', 'waiting');
             if (this.isChatRunning) {
-                chatDot.classList.add(this.isChatWaiting ? 'waiting' : 'active');
+                // Жёлтая только если ждём > 1 минуты
+                const chatWaitingLong = this.isChatWaiting &&
+                    this.chatWaitingStartTime &&
+                    (now - this.chatWaitingStartTime) > WAITING_THRESHOLD_MS;
+                chatDot.classList.add(chatWaitingLong ? 'waiting' : 'active');
             }
         }
 

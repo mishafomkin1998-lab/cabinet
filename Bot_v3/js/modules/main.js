@@ -1430,7 +1430,7 @@ function renderBlacklist(botId) {
 
         if (bot.vipList.includes(id)) {
             d.classList.add('is-vip');
-            d.innerHTML = `<i class="fa fa-star text-warning me-2"></i> ${id}`;
+            d.innerHTML = `${id} <i class="fa fa-star text-warning ms-2"></i>`;
         }
 
         // Восстанавливаем выбор если элемент был выбран
