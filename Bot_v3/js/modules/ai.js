@@ -446,7 +446,8 @@ async function generateAIForAll(action) {
     if (botIds.length === 0) return;
 
     const actionLabel = action === 'improve' ? 'Improve' : action === 'generate' ? 'Generate' : 'My Prompt';
-    showBulkNotification(`AI ${actionLabel} запущен для всех...`, botIds.length);
+    showBulkNotification(`AI ${actionLabel} запущен для ${botIds.length} анкет...`, botIds.length);
+    console.log(`[AI Bulk] Запуск ${actionLabel} для ${botIds.length} анкет`);
 
     let config = { headers: { 'Authorization': `Bearer ${globalSettings.apiKey}`, 'Content-Type': 'application/json' } };
     if (globalSettings.proxyAI) {
@@ -457,39 +458,63 @@ async function generateAIForAll(action) {
     const systemRole = "You are a helpful dating assistant. Write engaging, short, and natural texts for dating sites.";
     let successCount = 0;
     let errorCount = 0;
+    let skippedCount = 0;
 
     // Генерируем для каждой анкеты последовательно чтобы не перегрузить API
     for (const botId of botIds) {
         const bot = bots[botId];
         const txtArea = document.getElementById(`msg-${botId}`);
-        if (!txtArea) continue;
+
+        if (!txtArea) {
+            console.log(`[AI Bulk] Пропуск ${botId}: textarea не найден`);
+            skippedCount++;
+            continue;
+        }
 
         const currentText = txtArea.value;
         let prompt = "";
+        let skipReason = null;
 
         if(action === 'myprompt') {
             // В режиме Chat используем myPromptChat, в режиме Mail - myPrompt
             const isChat = globalMode === 'chat';
             const myPromptValue = isChat ? globalSettings.myPromptChat : globalSettings.myPrompt;
-            if(!myPromptValue) continue;
-            prompt = `${myPromptValue}. \n\nOriginal text: "${currentText}"`;
+            if(!myPromptValue) {
+                skipReason = 'промпт не задан';
+            } else {
+                prompt = `${myPromptValue}. \n\nOriginal text: "${currentText}"`;
+            }
         } else if (action === 'improve') {
-            if(!currentText) continue;
-            // Используем пользовательский промпт из настроек или стандартный
-            const defaultImprovePrompt = `Исправь грамматику, сделай текст более человечным и женским. Оставь текст на русском, сохрани естественность и не используй "Приветствие" или подпись. Текст: "{text}"`;
-            const improvePromptTemplate = globalSettings.improvePrompt || defaultImprovePrompt;
-            // Заменяем {text} на текущий текст
-            prompt = improvePromptTemplate.includes('{text}')
-                ? improvePromptTemplate.replace('{text}', currentText)
-                : `${improvePromptTemplate}\n\nТекст: "${currentText}"`;
+            if(!currentText) {
+                skipReason = 'текст пустой';
+            } else {
+                // Используем пользовательский промпт из настроек или стандартный
+                const defaultImprovePrompt = `Исправь грамматику, сделай текст более человечным и женским. Оставь текст на русском, сохрани естественность и не используй "Приветствие" или подпись. Текст: "{text}"`;
+                const improvePromptTemplate = globalSettings.improvePrompt || defaultImprovePrompt;
+                // Заменяем {text} на текущий текст
+                prompt = improvePromptTemplate.includes('{text}')
+                    ? improvePromptTemplate.replace('{text}', currentText)
+                    : `${improvePromptTemplate}\n\nТекст: "${currentText}"`;
+            }
         } else if (action === 'generate') {
             // Используем промпт с сервера (синхронизированный из дашборда) или дефолтный
             prompt = serverGenerationPrompt || DEFAULT_GENERATION_PROMPT;
         }
 
-        if (!prompt) continue;
+        if (skipReason) {
+            console.log(`[AI Bulk] Пропуск ${botId}: ${skipReason}`);
+            skippedCount++;
+            continue;
+        }
+
+        if (!prompt) {
+            console.log(`[AI Bulk] Пропуск ${botId}: промпт пустой`);
+            skippedCount++;
+            continue;
+        }
 
         try {
+            console.log(`[AI Bulk] Генерация для ${botId}...`);
             const response = await axios.post(OPENAI_API_ENDPOINT, {
                 model: "gpt-3.5-turbo",
                 messages: [ { role: "system", content: systemRole }, { role: "user", content: prompt } ],
@@ -504,18 +529,29 @@ async function generateAIForAll(action) {
                 }
                 validateInput(txtArea);
                 successCount++;
+                console.log(`[AI Bulk] ✅ ${botId} успешно`);
             }
         } catch (e) {
-            console.error(`AI error for bot ${botId}:`, e);
+            console.error(`[AI Bulk] ❌ Ошибка для ${botId}:`, e.response?.data || e.message);
             errorCount++;
+
+            // Если rate limit - увеличиваем задержку
+            if (e.response?.status === 429) {
+                console.log(`[AI Bulk] Rate limit! Ждём 5 секунд...`);
+                await new Promise(r => setTimeout(r, 5000));
+            }
         }
 
-        // Задержка между запросами для избежания rate limit
-        await new Promise(r => setTimeout(r, 500));
+        // Задержка между запросами для избежания rate limit (увеличена до 1 сек)
+        await new Promise(r => setTimeout(r, 1000));
     }
 
-    const resultMsg = errorCount > 0
-        ? `AI ${actionLabel}: ✅${successCount} ❌${errorCount}`
-        : `AI ${actionLabel} выполнен: ${successCount}`;
+    // Формируем детальное сообщение
+    let resultMsg = `AI ${actionLabel}: ✅${successCount}`;
+    if (errorCount > 0) resultMsg += ` ❌${errorCount}`;
+    if (skippedCount > 0) resultMsg += ` ⏭${skippedCount}`;
+
+    console.log(`[AI Bulk] Завершено: успех=${successCount}, ошибок=${errorCount}, пропущено=${skippedCount}`);
     showBulkNotification(resultMsg, successCount);
 }
+
