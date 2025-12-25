@@ -58,13 +58,15 @@ async function initDefaultProxy() {
 
 function applyTheme(theme) {
     // Убираем все классы тем
-    document.body.classList.remove('theme-dark', 'theme-ladadate');
+    document.body.classList.remove('theme-dark', 'theme-ladadate', 'theme-novabot');
 
     // Применяем выбранную тему
     if (theme === 'dark') {
         document.body.classList.add('theme-dark');
     } else if (theme === 'ladadate') {
         document.body.classList.add('theme-ladadate');
+    } else if (theme === 'novabot') {
+        document.body.classList.add('theme-novabot');
     }
     // light - без класса, используются стандартные стили
 }
