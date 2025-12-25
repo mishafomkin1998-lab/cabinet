@@ -206,8 +206,11 @@ function initFocusProtection() {
 }
 
 function setGlobalTarget(targetType) {
-    // Проверяем, не отключен ли статус
-    if (globalSettings.disabledStatuses && globalSettings.disabledStatuses.includes(targetType)) {
+    // Проверяем, не отключен ли статус (раздельно для Mail и Chat)
+    const disabledList = globalMode === 'chat'
+        ? (globalSettings.disabledStatusesChat || [])
+        : (globalSettings.disabledStatusesMail || []);
+    if (disabledList.includes(targetType)) {
         showToast(`Статус ${targetType.toUpperCase()} отключен`, 'warning');
         return;
     }
@@ -227,23 +230,34 @@ function setGlobalTarget(targetType) {
 }
 
 // ============= ОТКЛЮЧЕНИЕ СТАТУСОВ (ПКМ) =============
+
+// Хелпер: получить массив отключённых статусов для текущего режима
+function getDisabledStatuses() {
+    if (globalMode === 'chat') {
+        if (!globalSettings.disabledStatusesChat) globalSettings.disabledStatusesChat = [];
+        return globalSettings.disabledStatusesChat;
+    } else {
+        if (!globalSettings.disabledStatusesMail) globalSettings.disabledStatusesMail = [];
+        return globalSettings.disabledStatusesMail;
+    }
+}
+
 // Переключение статуса вкл/выкл по правому клику
 function toggleStatusDisabled(status, event) {
     event.preventDefault(); // Отменяем контекстное меню
 
-    if (!globalSettings.disabledStatuses) {
-        globalSettings.disabledStatuses = [];
-    }
+    const disabledList = getDisabledStatuses();
+    const idx = disabledList.indexOf(status);
+    const modeName = globalMode === 'chat' ? 'Chat' : 'Mail';
 
-    const idx = globalSettings.disabledStatuses.indexOf(status);
     if (idx === -1) {
         // Добавляем в отключенные
-        globalSettings.disabledStatuses.push(status);
-        console.log(`🚫 Статус "${status}" отключен (пропускается в авто-режиме)`);
+        disabledList.push(status);
+        console.log(`🚫 [${modeName}] Статус "${status}" отключен`);
     } else {
         // Убираем из отключенных
-        globalSettings.disabledStatuses.splice(idx, 1);
-        console.log(`✅ Статус "${status}" включен`);
+        disabledList.splice(idx, 1);
+        console.log(`✅ [${modeName}] Статус "${status}" включен`);
     }
 
     // Сохраняем и обновляем UI
@@ -253,11 +267,12 @@ function toggleStatusDisabled(status, event) {
 
 // Получить первый включённый статус сверху (по порядку в списке)
 function getFirstEnabledStatus() {
+    const disabledList = getDisabledStatuses();
     // Порядок статусов сверху вниз в выпадающем списке
     const statusOrder = ['online-smart', 'shared-online', 'online', 'favorites', 'my-favorites', 'inbox', 'payers', 'custom-ids'];
 
     for (const status of statusOrder) {
-        if (!globalSettings.disabledStatuses || !globalSettings.disabledStatuses.includes(status)) {
+        if (!disabledList.includes(status)) {
             return status;
         }
     }
@@ -268,11 +283,13 @@ function getFirstEnabledStatus() {
 
 // Обновление визуального отображения отключенных статусов
 function updateDisabledStatusesUI() {
+    const disabledList = getDisabledStatuses();
+
     // 1. Обновляем кнопки в верхней панели
     const buttons = document.querySelectorAll('.btn-status-circle[data-status]');
     buttons.forEach(btn => {
         const status = btn.getAttribute('data-status');
-        if (globalSettings.disabledStatuses && globalSettings.disabledStatuses.includes(status)) {
+        if (disabledList.includes(status)) {
             btn.classList.add('status-disabled');
         } else {
             btn.classList.remove('status-disabled');
@@ -284,7 +301,7 @@ function updateDisabledStatusesUI() {
     selects.forEach(select => {
         Array.from(select.options).forEach(opt => {
             const optValue = opt.value;
-            if (globalSettings.disabledStatuses && globalSettings.disabledStatuses.includes(optValue)) {
+            if (disabledList.includes(optValue)) {
                 opt.style.display = 'none'; // Скрываем из списка
             } else {
                 opt.style.display = ''; // Показываем
@@ -298,7 +315,7 @@ function updateDisabledStatusesUI() {
         const currentTarget = globalMode === 'mail' ? bot.mailSettings.target : bot.chatSettings.target;
 
         // Если текущий статус отключён
-        if (globalSettings.disabledStatuses && globalSettings.disabledStatuses.includes(currentTarget)) {
+        if (disabledList.includes(currentTarget)) {
             console.log(`[Status] Бот ${bot.id}: статус "${currentTarget}" отключён, переключаю на "${firstEnabled}"`);
 
             // Обновляем настройки бота
@@ -328,6 +345,7 @@ function updateDisabledStatusesUI() {
 // Получить следующий активный статус (пропуская отключенные)
 // Порядок снизу вверх по списку: Payers → Inbox → My favorite → I am a favorite of → Online/Shared/Smart
 function getNextActiveStatus(currentStatus) {
+    const disabledList = getDisabledStatuses();
     const statusOrder = ['payers', 'inbox', 'my-favorites', 'favorites'];
     const onlineStatuses = ['online', 'shared-online', 'online-smart'];
     const currentIdx = statusOrder.indexOf(currentStatus);
@@ -340,14 +358,14 @@ function getNextActiveStatus(currentStatus) {
     // Ищем следующий не отключенный статус
     for (let i = currentIdx + 1; i < statusOrder.length; i++) {
         const nextStatus = statusOrder[i];
-        if (!globalSettings.disabledStatuses || !globalSettings.disabledStatuses.includes(nextStatus)) {
+        if (!disabledList.includes(nextStatus)) {
             return nextStatus;
         }
     }
 
     // После favorites переключаемся на первый доступный онлайн
     for (const onlineStatus of onlineStatuses) {
-        if (!globalSettings.disabledStatuses || !globalSettings.disabledStatuses.includes(onlineStatus)) {
+        if (!disabledList.includes(onlineStatus)) {
             return onlineStatus;
         }
     }

@@ -1541,7 +1541,8 @@ class AccountBot {
                     this.log(`✅ Custom IDs: все ID из списка обработаны`);
                     if (this.mailSettings.auto) {
                         // Начинаем с payers (если не отключен), иначе ищем следующий
-                        const newTarget = (!globalSettings.disabledStatuses || !globalSettings.disabledStatuses.includes('payers'))
+                        const disabledMail = globalSettings.disabledStatusesMail || [];
+                        const newTarget = !disabledMail.includes('payers')
                             ? 'payers'
                             : getNextActiveStatus('payers');
 
