@@ -1897,6 +1897,22 @@ class AccountBot {
                                     }
                                 }
 
+                                // Способ 4: ищем 32-символьный hex без дефисов (формат compose UID)
+                                if (!foundUid) {
+                                    const hex32Regex = /[a-f0-9]{32}/gi;
+                                    const hexMatches = html.match(hex32Regex);
+                                    if (hexMatches && hexMatches.length > 0) {
+                                        // Фильтруем - исключаем хеши которые явно не UID (например hash файла)
+                                        for (const h of hexMatches) {
+                                            // Пропускаем если это наш hash фото
+                                            if (h.toLowerCase() === hash.toLowerCase()) continue;
+                                            foundUid = h;
+                                            console.log('[WebView JS] Found 32-char hex UID:', foundUid);
+                                            break;
+                                        }
+                                    }
+                                }
+
                                 if (foundUid) {
                                     uid = foundUid;
                                 } else {
