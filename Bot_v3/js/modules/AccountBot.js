@@ -9,6 +9,7 @@ class AccountBot {
         this.lastTplMail = null; 
         this.lastTplChat = null;
         this.isMailRunning = false;
+        this.isMailStarting = false; // Защита от race condition при быстром Start/Stop/Start
         this.isMailWaiting = false; // true когда рассылка ждёт пользователей
         this.mailWaitingStartTime = null; // Время начала ожидания (для задержки жёлтой точки)
         this.mailTimeout = null;
@@ -22,6 +23,7 @@ class AccountBot {
         this.lastMailSentTime = 0; // Время последней отправки письма (защита от спама)
 
         this.isChatRunning = false;
+        this.isChatStarting = false; // Защита от race condition при быстром Start/Stop/Start
         this.isChatWaiting = false; // true когда рассылка ждёт пользователей
         this.chatWaitingStartTime = null; // Время начала ожидания (для задержки жёлтой точки)
         this.chatTimeout = null;
@@ -1279,78 +1281,90 @@ class AccountBot {
     async startMail(text) {
         if(!this.token) return;
 
-        // КРИТИЧНО: Защита от запуска Mail в режиме Chat
-        if (globalMode === 'chat') {
-            console.error(`[SECURITY] Попытка запустить Mail в режиме Chat! Заблокировано.`);
-            this.log(`⛔ Ошибка: нельзя запустить письма в режиме чата`);
+        // ЗАЩИТА ОТ RACE CONDITION: Блокируем повторный вызов пока идут проверки
+        if (this.isMailStarting || this.isMailRunning) {
+            console.log(`[Mail] Запуск уже в процессе или рассылка уже работает, игнорируем`);
             return;
         }
+        this.isMailStarting = true;
 
-        // Проверяем статус бот-машины (управляется с сервера)
-        if (!controlStatus.botEnabled) {
-            this.log(`🔴 Запуск заблокирован - бот отключен администратором`);
-            return;
-        }
-
-        // Проверяем разрешение рассылки для этой анкеты (управляется с сервера)
-        if (!this.mailingEnabled) {
-            this.log(`⛔ Запуск заблокирован - рассылка отключена администратором`);
-            return;
-        }
-
-        // Проверяем статус профиля на сервере
-        const profileStatus = await checkProfileStatus(this.displayId);
-
-        // Проверяем, есть ли анкета в системе
-        if (!profileStatus.allowed || !profileStatus.exists) {
-            this.log(`⛔ Анкета не найдена в системе личного кабинета`);
-            alert(`Анкета ${this.displayId} не добавлена в личный кабинет. Добавьте её в систему для работы.`);
-            return;
-        }
-
-        // Проверяем, приостановлена ли анкета
-        if (profileStatus.paused) {
-            this.log(`⛔ Рассылка заблокирована - анкета приостановлена в личном кабинете`);
-            alert(`Анкета ${this.displayId} приостановлена в личном кабинете. Рассылка невозможна.`);
-            return;
-        }
-
-        // Проверяем оплату анкеты
-        const paymentStatus = await checkProfilePaymentStatus(this.displayId);
-
-        // Если ошибка сервера - блокируем с понятным сообщением
-        if (paymentStatus.serverError) {
-            this.log(`⛔ Рассылка заблокирована - не удалось проверить оплату`);
-            alert(`Не удалось проверить статус оплаты анкеты.\n\nПроверьте подключение к интернету и попробуйте снова.`);
-            return;
-        }
-
-        if (!paymentStatus.isPaid && !paymentStatus.isFree) {
-            this.log(`⛔ Рассылка заблокирована - анкета не оплачена`);
-
-            // Показываем диалог с возможностью активации trial
-            const dialogResult = await showPaymentDialog(this.displayId, paymentStatus.canTrial);
-
-            if (dialogResult.action === 'trial_activated') {
-                // Trial активирован - запускаем рассылку
-                this.log(`✅ Trial активирован, запускаем рассылку`);
-            } else {
-                // Отмена или ошибка
+        try {
+            // КРИТИЧНО: Защита от запуска Mail в режиме Chat
+            if (globalMode === 'chat') {
+                console.error(`[SECURITY] Попытка запустить Mail в режиме Chat! Заблокировано.`);
+                this.log(`⛔ Ошибка: нельзя запустить письма в режиме чата`);
                 return;
             }
-        }
 
-        this.isMailRunning = true;
-        this.mailStartTime = Date.now();
-        this.initStatusTracking(); // Инициализируем отслеживание статуса
-        this.startMailTimer();
-        this.updateUI();
-        this.log(`🚀 MAIL Started (v${APP_VERSION})`);
-        this.scheduleNextMail(text, 0);
+            // Проверяем статус бот-машины (управляется с сервера)
+            if (!controlStatus.botEnabled) {
+                this.log(`🔴 Запуск заблокирован - бот отключен администратором`);
+                return;
+            }
+
+            // Проверяем разрешение рассылки для этой анкеты (управляется с сервера)
+            if (!this.mailingEnabled) {
+                this.log(`⛔ Запуск заблокирован - рассылка отключена администратором`);
+                return;
+            }
+
+            // Проверяем статус профиля на сервере
+            const profileStatus = await checkProfileStatus(this.displayId);
+
+            // Проверяем, есть ли анкета в системе
+            if (!profileStatus.allowed || !profileStatus.exists) {
+                this.log(`⛔ Анкета не найдена в системе личного кабинета`);
+                alert(`Анкета ${this.displayId} не добавлена в личный кабинет. Добавьте её в систему для работы.`);
+                return;
+            }
+
+            // Проверяем, приостановлена ли анкета
+            if (profileStatus.paused) {
+                this.log(`⛔ Рассылка заблокирована - анкета приостановлена в личном кабинете`);
+                alert(`Анкета ${this.displayId} приостановлена в личном кабинете. Рассылка невозможна.`);
+                return;
+            }
+
+            // Проверяем оплату анкеты
+            const paymentStatus = await checkProfilePaymentStatus(this.displayId);
+
+            // Если ошибка сервера - блокируем с понятным сообщением
+            if (paymentStatus.serverError) {
+                this.log(`⛔ Рассылка заблокирована - не удалось проверить оплату`);
+                alert(`Не удалось проверить статус оплаты анкеты.\n\nПроверьте подключение к интернету и попробуйте снова.`);
+                return;
+            }
+
+            if (!paymentStatus.isPaid && !paymentStatus.isFree) {
+                this.log(`⛔ Рассылка заблокирована - анкета не оплачена`);
+
+                // Показываем диалог с возможностью активации trial
+                const dialogResult = await showPaymentDialog(this.displayId, paymentStatus.canTrial);
+
+                if (dialogResult.action === 'trial_activated') {
+                    // Trial активирован - запускаем рассылку
+                    this.log(`✅ Trial активирован, запускаем рассылку`);
+                } else {
+                    // Отмена или ошибка
+                    return;
+                }
+            }
+
+            this.isMailRunning = true;
+            this.mailStartTime = Date.now();
+            this.initStatusTracking(); // Инициализируем отслеживание статуса
+            this.startMailTimer();
+            this.updateUI();
+            this.log(`🚀 MAIL Started (v${APP_VERSION})`);
+            this.scheduleNextMail(text, 0);
+        } finally {
+            this.isMailStarting = false;
+        }
     }
 
     stopMail() {
         this.isMailRunning = false;
+        this.isMailStarting = false; // Сброс флага на случай если Stop нажали во время проверок
         this.isMailWaiting = false;
         this.mailWaitingStartTime = null;
         clearTimeout(this.mailTimeout);
@@ -2181,88 +2195,100 @@ class AccountBot {
     async startChat(fullText) {
         if(!this.token) return;
 
-        // КРИТИЧНО: Защита от запуска Chat в режиме Mail
-        if (globalMode === 'mail') {
-            console.error(`[SECURITY] Попытка запустить Chat в режиме Mail! Заблокировано.`);
-            this.log(`⛔ Ошибка: нельзя запустить чат в режиме писем`);
+        // ЗАЩИТА ОТ RACE CONDITION: Блокируем повторный вызов пока идут проверки
+        if (this.isChatStarting || this.isChatRunning) {
+            console.log(`[Chat] Запуск уже в процессе или рассылка уже работает, игнорируем`);
             return;
         }
+        this.isChatStarting = true;
 
-        // Проверяем статус бот-машины (управляется с сервера)
-        if (!controlStatus.botEnabled) {
-            this.log(`🔴 Запуск заблокирован - бот отключен администратором`);
-            return;
-        }
-
-        // Проверяем разрешение рассылки для этой анкеты (управляется с сервера)
-        if (!this.mailingEnabled) {
-            this.log(`⛔ Запуск заблокирован - рассылка отключена администратором`);
-            return;
-        }
-
-        // Проверяем статус профиля на сервере
-        const profileStatus = await checkProfileStatus(this.displayId);
-
-        // Проверяем, есть ли анкета в системе
-        if (!profileStatus.allowed || !profileStatus.exists) {
-            this.log(`⛔ Анкета не найдена в системе личного кабинета`);
-            alert(`Анкета ${this.displayId} не добавлена в личный кабинет. Добавьте её в систему для работы.`);
-            return;
-        }
-
-        // Проверяем, приостановлена ли анкета
-        if (profileStatus.paused) {
-            this.log(`⛔ Чат заблокирован - анкета приостановлена в личном кабинете`);
-            alert(`Анкета ${this.displayId} приостановлена в личном кабинете. Чат невозможен.`);
-            return;
-        }
-
-        // Проверяем оплату анкеты
-        const paymentStatus = await checkProfilePaymentStatus(this.displayId);
-
-        // Если ошибка сервера - блокируем с понятным сообщением
-        if (paymentStatus.serverError) {
-            this.log(`⛔ Чат заблокирован - не удалось проверить оплату`);
-            alert(`Не удалось проверить статус оплаты анкеты.\n\nПроверьте подключение к интернету и попробуйте снова.`);
-            return;
-        }
-
-        if (!paymentStatus.isPaid && !paymentStatus.isFree) {
-            this.log(`⛔ Чат заблокирован - анкета не оплачена`);
-
-            // Показываем диалог с возможностью активации trial
-            const dialogResult = await showPaymentDialog(this.displayId, paymentStatus.canTrial);
-
-            if (dialogResult.action === 'trial_activated') {
-                // Trial активирован - запускаем чат
-                this.log(`✅ Trial активирован, запускаем чат`);
-            } else {
-                // Отмена или ошибка
+        try {
+            // КРИТИЧНО: Защита от запуска Chat в режиме Mail
+            if (globalMode === 'mail') {
+                console.error(`[SECURITY] Попытка запустить Chat в режиме Mail! Заблокировано.`);
+                this.log(`⛔ Ошибка: нельзя запустить чат в режиме писем`);
                 return;
             }
-        }
 
-        // === ИСПРАВЛЕНИЕ: Валидация индекса инвайта при старте ===
-        const invites = fullText.split(/\n\s*__\s*\n/);
-        if (this.chatSettings.currentInviteIndex >= invites.length) {
-            // Индекс вышел за пределы - сбрасываем на 0
-            console.log(`[Chat] currentInviteIndex (${this.chatSettings.currentInviteIndex}) >= invites.length (${invites.length}), сброс на 0`);
-            this.chatSettings.currentInviteIndex = 0;
-            this.chatSettings.rotationStartTime = Date.now(); // Сбрасываем таймер ротации
-        }
+            // Проверяем статус бот-машины (управляется с сервера)
+            if (!controlStatus.botEnabled) {
+                this.log(`🔴 Запуск заблокирован - бот отключен администратором`);
+                return;
+            }
 
-        if (this.chatSettings.rotationStartTime === 0) this.chatSettings.rotationStartTime = Date.now();
-        this.isChatRunning = true;
-        this.chatStartTime = Date.now();
-        this.startChatTimer();
-        this.updateUI();
-        this.log(`🚀 CHAT Started (v${APP_VERSION})`);
-        this.scheduleNextChat(fullText, 0);
-        saveSession();
+            // Проверяем разрешение рассылки для этой анкеты (управляется с сервера)
+            if (!this.mailingEnabled) {
+                this.log(`⛔ Запуск заблокирован - рассылка отключена администратором`);
+                return;
+            }
+
+            // Проверяем статус профиля на сервере
+            const profileStatus = await checkProfileStatus(this.displayId);
+
+            // Проверяем, есть ли анкета в системе
+            if (!profileStatus.allowed || !profileStatus.exists) {
+                this.log(`⛔ Анкета не найдена в системе личного кабинета`);
+                alert(`Анкета ${this.displayId} не добавлена в личный кабинет. Добавьте её в систему для работы.`);
+                return;
+            }
+
+            // Проверяем, приостановлена ли анкета
+            if (profileStatus.paused) {
+                this.log(`⛔ Чат заблокирован - анкета приостановлена в личном кабинете`);
+                alert(`Анкета ${this.displayId} приостановлена в личном кабинете. Чат невозможен.`);
+                return;
+            }
+
+            // Проверяем оплату анкеты
+            const paymentStatus = await checkProfilePaymentStatus(this.displayId);
+
+            // Если ошибка сервера - блокируем с понятным сообщением
+            if (paymentStatus.serverError) {
+                this.log(`⛔ Чат заблокирован - не удалось проверить оплату`);
+                alert(`Не удалось проверить статус оплаты анкеты.\n\nПроверьте подключение к интернету и попробуйте снова.`);
+                return;
+            }
+
+            if (!paymentStatus.isPaid && !paymentStatus.isFree) {
+                this.log(`⛔ Чат заблокирован - анкета не оплачена`);
+
+                // Показываем диалог с возможностью активации trial
+                const dialogResult = await showPaymentDialog(this.displayId, paymentStatus.canTrial);
+
+                if (dialogResult.action === 'trial_activated') {
+                    // Trial активирован - запускаем чат
+                    this.log(`✅ Trial активирован, запускаем чат`);
+                } else {
+                    // Отмена или ошибка
+                    return;
+                }
+            }
+
+            // === ИСПРАВЛЕНИЕ: Валидация индекса инвайта при старте ===
+            const invites = fullText.split(/\n\s*__\s*\n/);
+            if (this.chatSettings.currentInviteIndex >= invites.length) {
+                // Индекс вышел за пределы - сбрасываем на 0
+                console.log(`[Chat] currentInviteIndex (${this.chatSettings.currentInviteIndex}) >= invites.length (${invites.length}), сброс на 0`);
+                this.chatSettings.currentInviteIndex = 0;
+                this.chatSettings.rotationStartTime = Date.now(); // Сбрасываем таймер ротации
+            }
+
+            if (this.chatSettings.rotationStartTime === 0) this.chatSettings.rotationStartTime = Date.now();
+            this.isChatRunning = true;
+            this.chatStartTime = Date.now();
+            this.startChatTimer();
+            this.updateUI();
+            this.log(`🚀 CHAT Started (v${APP_VERSION})`);
+            this.scheduleNextChat(fullText, 0);
+            saveSession();
+        } finally {
+            this.isChatStarting = false;
+        }
     }
 
     stopChat() {
         this.isChatRunning = false;
+        this.isChatStarting = false; // Сброс флага на случай если Stop нажали во время проверок
         this.isChatWaiting = false;
         this.chatWaitingStartTime = null;
         clearTimeout(this.chatTimeout);
