@@ -1916,6 +1916,10 @@ class AccountBot {
 
                             console.log('[WebView JS] Using UID:', uid);
 
+                            // Убираем дефисы из UID (API ожидает формат без дефисов)
+                            uid = uid.replace(/-/g, '');
+                            console.log('[WebView JS] UID without dashes:', uid);
+
                             // Конвертируем base64 в Blob
                             const byteCharacters = atob(base64);
                             const byteNumbers = new Array(byteCharacters.length);
