@@ -192,7 +192,10 @@ async function handleAIActionWithTemplate(botId, action, templateId, event) {
     }
 
     btn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Loading...`;
-    let config = { headers: { 'Authorization': `Bearer ${globalSettings.apiKey}`, 'Content-Type': 'application/json' } };
+    let config = {
+        headers: { 'Authorization': `Bearer ${globalSettings.apiKey}`, 'Content-Type': 'application/json' },
+        proxy: false
+    };
     if (globalSettings.proxyAI) {
          const proxyConfig = parseProxyUrl(globalSettings.proxyAI);
          if (proxyConfig) config.proxy = proxyConfig;
@@ -231,7 +234,10 @@ async function generateAIForAllWithTemplate(action, templateId) {
     const actionLabel = action === 'improve' ? 'Improve' : 'My Prompt';
     showBulkNotification(`AI ${actionLabel} запущен для всех...`, botIds.length);
 
-    let config = { headers: { 'Authorization': `Bearer ${globalSettings.apiKey}`, 'Content-Type': 'application/json' } };
+    let config = {
+        headers: { 'Authorization': `Bearer ${globalSettings.apiKey}`, 'Content-Type': 'application/json' },
+        proxy: false
+    };
     if (globalSettings.proxyAI) {
         const proxyConfig = parseProxyUrl(globalSettings.proxyAI);
         if (proxyConfig) config.proxy = proxyConfig;
@@ -406,7 +412,10 @@ async function handleAIAction(botId, action, event) {
     }
 
     btn.innerHTML = `<i class="fa fa-spinner fa-spin"></i> Loading...`;
-    let config = { headers: { 'Authorization': `Bearer ${globalSettings.apiKey}`, 'Content-Type': 'application/json' } };
+    let config = {
+        headers: { 'Authorization': `Bearer ${globalSettings.apiKey}`, 'Content-Type': 'application/json' },
+        proxy: false
+    };
     if (globalSettings.proxyAI) {
          const proxyConfig = parseProxyUrl(globalSettings.proxyAI);
          if (proxyConfig) config.proxy = proxyConfig;
@@ -449,7 +458,11 @@ async function generateAIForAll(action) {
     showBulkNotification(`AI ${actionLabel} запущен для ${botIds.length} анкет...`, botIds.length);
     console.log(`[AI Bulk] Запуск ${actionLabel} для ${botIds.length} анкет`);
 
-    let config = { headers: { 'Authorization': `Bearer ${globalSettings.apiKey}`, 'Content-Type': 'application/json' } };
+    // Конфиг для axios - явно отключаем прокси если не указан AI прокси
+    let config = {
+        headers: { 'Authorization': `Bearer ${globalSettings.apiKey}`, 'Content-Type': 'application/json' },
+        proxy: false  // Явно отключаем системный прокси
+    };
     if (globalSettings.proxyAI) {
         const proxyConfig = parseProxyUrl(globalSettings.proxyAI);
         if (proxyConfig) config.proxy = proxyConfig;
