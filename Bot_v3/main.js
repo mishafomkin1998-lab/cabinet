@@ -263,6 +263,108 @@ ipcMain.handle('set-session-proxy', async (event, { botId, proxyString }) => {
     }
 });
 
+// ============================================================
+// IPC: Установить прокси для WebView сессии (partition wv_)
+// ============================================================
+ipcMain.handle('set-webview-proxy', async (event, { botId, proxyString }) => {
+    const partitionName = `persist:wv_${botId}`;
+
+    console.log(`\n╔══════════════════════════════════════════════════════════════╗`);
+    console.log(`║  [WebView Proxy] Установка прокси для WebView                ║`);
+    console.log(`╠══════════════════════════════════════════════════════════════╣`);
+    console.log(`║  botId: ${botId}`);
+    console.log(`║  partition: ${partitionName}`);
+    console.log(`║  proxyString: ${proxyString ? proxyString.replace(/:[^:]+$/, ':***') : 'НЕТ'}`);
+    console.log(`╚══════════════════════════════════════════════════════════════╝\n`);
+
+    try {
+        const ses = session.fromPartition(partitionName);
+
+        if (!proxyString || proxyString.trim() === '') {
+            await ses.setProxy({ proxyRules: '' });
+            console.log(`[WebView Proxy] ⚪ ${botId}: прокси отключен (прямое соединение)`);
+            return { success: true, proxy: null };
+        }
+
+        // Парсим прокси (формат: domain:port:user:pass)
+        const trimmed = proxyString.trim();
+        const parts = trimmed.split(':');
+
+        let proxyUrl;
+        let username = null;
+        let password = null;
+
+        if (parts.length === 2) {
+            // Формат: ip:port
+            const [host, port] = parts;
+            proxyUrl = `http://${host}:${port}`;
+            console.log(`[WebView Proxy] Формат: ip:port → ${proxyUrl}`);
+        } else if (parts.length === 4) {
+            // Формат: domain:port:user:pass
+            const [host, port, user, pass] = parts;
+            proxyUrl = `http://${host}:${port}`;
+            username = user;
+            password = pass;
+            console.log(`[WebView Proxy] Формат: domain:port:user:pass → ${proxyUrl} (auth: ${username})`);
+        } else {
+            console.error(`[WebView Proxy] ❌ НЕВЕРНЫЙ ФОРМАТ ПРОКСИ: ${proxyString}`);
+            return { success: false, error: 'Неверный формат прокси' };
+        }
+
+        // Настраиваем аутентификацию ДО установки прокси
+        if (username && password) {
+            // Убираем предыдущие обработчики
+            ses.removeAllListeners('login');
+
+            // Обработчик 407 Proxy Authentication Required
+            ses.on('login', (loginEvent, webContents, request, authInfo, callback) => {
+                console.log(`[WebView Proxy Auth] 🔐 Запрос аутентификации от ${authInfo.host}:${authInfo.port}`);
+                console.log(`[WebView Proxy Auth] 🔐 Отправляю credentials: ${username} / ***`);
+                loginEvent.preventDefault();
+                callback(username, password);
+            });
+
+            console.log(`[WebView Proxy] ✅ Настроен обработчик аутентификации (login event)`);
+
+            // ВАЖНО: Добавляем Proxy-Authorization header ко всем запросам
+            // Некоторые прокси (включая Decodo) ожидают header сразу, без 407
+            const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
+
+            // Счётчик для логирования
+            let requestCount = 0;
+
+            ses.webRequest.onBeforeSendHeaders({ urls: ['*://*/*'] }, (details, callback) => {
+                requestCount++;
+                // Логируем первые 10 запросов чтобы видеть что прокси работает
+                if (requestCount <= 10) {
+                    console.log(`[WebView Proxy Request #${requestCount}] ${details.method} ${details.url.substring(0, 60)}...`);
+                } else if (requestCount === 11) {
+                    console.log(`[WebView Proxy] ... дальнейшие запросы не логируются (их много)`);
+                }
+                details.requestHeaders['Proxy-Authorization'] = authHeader;
+                callback({ requestHeaders: details.requestHeaders });
+            });
+
+            console.log(`[WebView Proxy] ✅ Настроен Proxy-Authorization header`);
+        }
+
+        // Устанавливаем прокси
+        console.log(`[WebView Proxy] Вызов ses.setProxy({ proxyRules: "${proxyUrl}" })...`);
+        await ses.setProxy({ proxyRules: proxyUrl });
+
+        console.log(`\n[WebView Proxy] ✅✅✅ ПРОКСИ УСПЕШНО УСТАНОВЛЕН ✅✅✅`);
+        console.log(`[WebView Proxy] Partition: ${partitionName}`);
+        console.log(`[WebView Proxy] Proxy URL: ${proxyUrl}`);
+        console.log(`[WebView Proxy] Auth: ${username ? 'ДА' : 'НЕТ'}\n`);
+
+        return { success: true, proxy: proxyUrl, partition: partitionName };
+    } catch (error) {
+        console.error(`[WebView Proxy] ❌ ОШИБКА:`, error.message);
+        console.error(`[WebView Proxy] Stack:`, error.stack);
+        return { success: false, error: error.message };
+    }
+});
+
 // IPC: Настроить прокси для конкретного webContents (по ID)
 ipcMain.handle('set-webcontents-proxy', async (event, { webContentsId, proxyString, botId }) => {
     const { webContents } = require('electron');

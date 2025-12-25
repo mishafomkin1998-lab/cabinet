@@ -153,17 +153,37 @@ async function setWebviewProxy(botId) {
     const accountNumber = getAccountNumber(botId);
     const proxyString = getProxyForAccountNumber(accountNumber);
 
+    console.log(`\n%c════════════════════════════════════════════════════`, 'color: #00bcd4');
+    console.log(`%c[Proxy Setup] Бот: ${botId} (анкета #${accountNumber})`, 'color: #00bcd4; font-weight: bold');
+    console.log(`%c[Proxy Setup] Прокси: ${proxyString ? proxyString.replace(/:[^:]+$/, ':***') : 'НЕТ'}`, 'color: #00bcd4');
+    console.log(`%c════════════════════════════════════════════════════\n`, 'color: #00bcd4');
+
     try {
-        // 1. Устанавливаем прокси для webview сессии бота
+        // 1. Устанавливаем прокси для API сессии бота (partition: persist:${botId})
         const result = await ipcRenderer.invoke('set-session-proxy', { botId, proxyString });
 
         if (result.success) {
-            console.log(`[Proxy] Бот ${botId} (анкета #${accountNumber}): ${proxyString || 'без прокси'}`);
+            console.log(`%c[Proxy API] ✅ Бот ${botId}: прокси для API установлен`, 'color: green');
         } else {
-            console.error(`[Proxy] Ошибка для ${botId}:`, result.error);
+            console.error(`[Proxy API] ❌ Ошибка для ${botId}:`, result.error);
         }
 
-        // 2. Сохраняем прокси для API запросов через main процесс
+        // 2. ВАЖНО: Устанавливаем прокси для WebView сессии (partition: persist:wv_${botId})
+        // Это критично для быстрой загрузки при заблокированном IP!
+        try {
+            const wvResult = await ipcRenderer.invoke('set-webview-proxy', { botId, proxyString });
+
+            if (wvResult.success) {
+                console.log(`%c[Proxy WebView] ✅ Бот ${botId}: прокси для WebView установлен`, 'color: green; font-weight: bold');
+                console.log(`%c[Proxy WebView] Partition: ${wvResult.partition}`, 'color: green');
+            } else {
+                console.error(`[Proxy WebView] ❌ Ошибка для ${botId}:`, wvResult.error);
+            }
+        } catch (wvErr) {
+            console.error('[Proxy WebView] ❌ IPC ошибка:', wvErr);
+        }
+
+        // 3. Сохраняем прокси для API запросов через main процесс
         try {
             // Устанавливаем прокси для конкретного бота (для IPC api-request)
             await ipcRenderer.invoke('set-bot-proxy', { botId, proxyString });
@@ -172,15 +192,16 @@ async function setWebviewProxy(botId) {
             if (!defaultProxySet && proxyString) {
                 await ipcRenderer.invoke('set-bot-proxy', { botId: 'default', proxyString });
                 defaultProxySet = true;
-                console.log(`%c[Proxy Default] Установлен глобальный прокси: ${proxyString}`, 'color: green; font-weight: bold');
+                console.log(`%c[Proxy Default] ✅ Установлен глобальный прокси: ${proxyString.replace(/:[^:]+$/, ':***')}`, 'color: green; font-weight: bold');
             }
         } catch (e) {
             console.error('[Proxy] IPC ошибка:', e);
         }
 
+        console.log(`%c[Proxy Setup] ✅ Настройка завершена для ${botId}\n`, 'color: #00bcd4; font-weight: bold');
         return result;
     } catch (err) {
-        console.error(`[Proxy] IPC ошибка для ${botId}:`, err);
+        console.error(`[Proxy] ❌ IPC ошибка для ${botId}:`, err);
         return { success: false, error: err.message };
     }
 }
