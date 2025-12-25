@@ -111,7 +111,6 @@ Bot/js/modules/
 | `saveTemplatesToServer(bot)` | Сохранение шаблонов |
 | `saveBlacklistToServer(bot)` | Сохранение blacklist |
 | `resetStatsOnServer(bot, type)` | Сброс статистики |
-| `activityTracker` | Отслеживание активности |
 
 ---
 

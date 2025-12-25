@@ -156,7 +156,6 @@ function initFocusProtection() {
                     // Если это кнопка
                     if (node.tagName === 'BUTTON') {
                         disableButtonFocus(node);
-                        console.log('[Focus Protection] Найдена новая кнопка без ID, заблокирована:', node.className || 'без класса');
                     }
                     // Если это контейнер с кнопками
                     if (node.querySelectorAll) {
@@ -177,7 +176,6 @@ function initFocusProtection() {
     document.addEventListener('focusin', (e) => {
         if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
             lastActiveInput = e.target;
-            console.log('[Focus] Активный input:', e.target.id || e.target.className);
         }
     });
 
@@ -196,25 +194,15 @@ function initFocusProtection() {
 
         // Если фокус ушёл на кнопку, webview или другой не-input элемент
         if ((e.target.tagName === 'BUTTON' && !isAllowedButton) || e.target.tagName === 'WEBVIEW') {
-            console.warn('[Focus Protection] ⚠️ ФОКУС УКРАДЕН элементом:', {
-                tag: e.target.tagName,
-                id: e.target.id || 'БЕЗ ID',
-                className: e.target.className || 'без класса',
-                text: e.target.innerText?.substring(0, 20) || ''
-            });
-
             e.preventDefault();
             e.stopPropagation();
 
             // Небольшая задержка чтобы не конфликтовать с кликом
             setTimeout(() => {
                 lastActiveInput.focus();
-                console.log('[Focus Protection] ✅ Фокус возвращён на:', lastActiveInput.id || lastActiveInput.className);
             }, 10);
         }
     }, true);
-
-    console.log('%c[Focus Protection] Защита от потери фокуса активирована + MutationObserver', 'color: green; font-weight: bold');
 }
 
 function setGlobalTarget(targetType) {
