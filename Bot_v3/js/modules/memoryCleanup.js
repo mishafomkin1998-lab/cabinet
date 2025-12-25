@@ -2,9 +2,10 @@
 // Предотвращает утечки памяти при длительной работе (95+ анкет весь день)
 
 function startMemoryCleanup() {
-    // Очистка каждые 10 минут для hotManQueue (записи старше 5 мин)
+    // Очистка каждые 10 минут для hotManQueue и freshOnline (записи старше 5 мин)
     setInterval(() => {
         cleanupHotQueue();
+        cleanupFreshOnline();
     }, 10 * 60 * 1000);
 
     // Очистка каждый час для остальных объектов

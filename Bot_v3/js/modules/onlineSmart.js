@@ -67,3 +67,77 @@ function cleanupHotQueue() {
         console.log(`[OnlineSmart] 🧹 Очищено ${cleaned} просроченных записей из горячей очереди`);
     }
 }
+
+// ============= FRESH ONLINE - Детектор новых онлайн =============
+
+// Обновить список свежих онлайн (вызывается при получении списка online)
+function updateFreshOnline(currentUsers) {
+    const now = Date.now();
+    const currentIds = new Set();
+    let newCount = 0;
+
+    for (const user of currentUsers) {
+        const id = user.AccountId.toString();
+        currentIds.add(id);
+
+        // Если НЕ был в предыдущем списке — это НОВЫЙ онлайн!
+        if (!previousOnlineIds.has(id)) {
+            if (!freshOnlineUsers.has(id)) {
+                freshOnlineUsers.set(id, {
+                    firstSeen: now,
+                    user: user
+                });
+                newCount++;
+            }
+        }
+    }
+
+    previousOnlineIds = currentIds;
+    cleanupFreshOnline();
+
+    if (newCount > 0) {
+        console.log(`[FreshOnline] 🆕 Обнаружено ${newCount} новых онлайн! Всего свежих: ${freshOnlineUsers.size}`);
+    }
+}
+
+// Получить свежего пользователя для бота
+function getFromFreshOnline(botId, bot) {
+    cleanupFreshOnline();
+
+    for (const [id, entry] of freshOnlineUsers) {
+        // Пропускаем если в blacklist/sent/errors
+        if (!bot.canSendMailTo(parseInt(id))) continue;
+
+        // Пропускаем если уже отправляли через hotQueue
+        if (hotManQueue[id] && hotManQueue[id].sentBy.includes(botId)) continue;
+
+        console.log(`[FreshOnline] 🎯 Найден свежий: ${entry.user.Name} (ID ${id})`);
+        return entry.user;
+    }
+    return null;
+}
+
+// Удалить из свежих после отправки
+function removeFromFreshOnline(userId) {
+    const id = userId.toString();
+    if (freshOnlineUsers.has(id)) {
+        freshOnlineUsers.delete(id);
+    }
+}
+
+// Очистка старых записей (> 5 минут)
+function cleanupFreshOnline() {
+    const now = Date.now();
+    let cleaned = 0;
+
+    for (const [id, entry] of freshOnlineUsers) {
+        if (now - entry.firstSeen > FRESH_ONLINE_EXPIRY_MS) {
+            freshOnlineUsers.delete(id);
+            cleaned++;
+        }
+    }
+
+    if (cleaned > 0) {
+        console.log(`[FreshOnline] 🧹 Очищено ${cleaned} устаревших записей`);
+    }
+}

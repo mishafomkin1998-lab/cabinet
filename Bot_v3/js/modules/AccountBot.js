@@ -1469,26 +1469,40 @@ class AccountBot {
             const target = this.mailSettings.target;
             let users = [];
 
-            // ============ ONLINE SMART: Приоритет горячей очереди ============
+            // ============ ONLINE SMART: Приоритет Fresh → Hot → Online ============
             if (target === 'online-smart') {
-                // Сначала пробуем взять из горячей очереди
-                const hotUser = getFromHotQueue(this.id, this);
-                if (hotUser) {
-                    this.log(`🔥 Из горячей очереди: ${hotUser.name} (${hotUser.manId})`);
-                    users.push({
-                        AccountId: hotUser.manId,
-                        Name: hotUser.name,
-                        City: '',
-                        Age: '',
-                        Country: ''
-                    });
-                    fromHotQueue = true;
-                } else {
-                    // Горячая очередь пуста - берём из обычного online
-                    const usersRes = await makeApiRequest(this, 'GET', '/api/users/online');
-                    users = usersRes.data.Users || [];
-                    this.lastOnlineCount = users.length;
-                    console.log(`[Mail online-smart] API вернул ${users.length} пользователей (горячая очередь пуста)`);
+                // 1️⃣ ПРИОРИТЕТ: Свежие онлайн (только что появились)
+                const freshUser = getFromFreshOnline(this.id, this);
+                if (freshUser) {
+                    this.log(`🆕 Свежий онлайн: ${freshUser.Name} (${freshUser.AccountId})`);
+                    users.push(freshUser);
+                    removeFromFreshOnline(freshUser.AccountId);
+                }
+                // 2️⃣ Горячая очередь
+                else {
+                    const hotUser = getFromHotQueue(this.id, this);
+                    if (hotUser) {
+                        this.log(`🔥 Из горячей очереди: ${hotUser.name} (${hotUser.manId})`);
+                        users.push({
+                            AccountId: hotUser.manId,
+                            Name: hotUser.name,
+                            City: '',
+                            Age: '',
+                            Country: ''
+                        });
+                        fromHotQueue = true;
+                    }
+                    // 3️⃣ Обычный online
+                    else {
+                        const usersRes = await makeApiRequest(this, 'GET', '/api/users/online');
+                        users = usersRes.data.Users || [];
+                        this.lastOnlineCount = users.length;
+
+                        // ВАЖНО: Обновляем список свежих!
+                        updateFreshOnline(users);
+
+                        console.log(`[Mail online-smart] API: ${users.length} онлайн, свежих: ${freshOnlineUsers.size}`);
+                    }
                 }
             } else if (target === 'custom-ids') {
                 // Рассылка по конкретным ID из списка
