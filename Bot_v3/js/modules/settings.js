@@ -1,4 +1,12 @@
+// Запоминаем начальное состояние showProfileCard при старте
+let initialShowProfileCard = null;
+
 function loadGlobalSettingsUI() {
+    // Запоминаем начальное состояние (только один раз при первом вызове)
+    if (initialShowProfileCard === null) {
+        initialShowProfileCard = globalSettings.showProfileCard !== false;
+    }
+
     document.getElementById('set-lang').value = globalSettings.lang;
     document.getElementById('set-theme').value = globalSettings.theme;
     document.getElementById('set-proxy').value = globalSettings.proxy;
@@ -117,6 +125,11 @@ function toggleProfileCards() {
         document.body.classList.add('hide-profile-cards');
     } else {
         document.body.classList.remove('hide-profile-cards');
+
+        // Если при старте было выключено, а сейчас включают - показываем предупреждение
+        if (initialShowProfileCard === false) {
+            showToast('Для отображения фото анкет требуется перезапуск программы', 5000);
+        }
     }
 }
 
