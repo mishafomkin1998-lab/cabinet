@@ -215,6 +215,10 @@ async function handleAIActionWithTemplate(botId, action, templateId, event) {
                 console.log(`🤖 AI генерация для бота ${botId} - флаг usedAi установлен`);
             }
             validateInput(txtArea);
+            // Сохраняем текст в шаблон
+            if (typeof saveTemplateTextNow === 'function') {
+                saveTemplateTextNow(botId);
+            }
         }
     } catch (e) {
         console.error(e);
@@ -307,6 +311,10 @@ async function generateAIForAllWithTemplate(action, templateId) {
                     bot.usedAi = true;
                 }
                 validateInput(txtArea);
+                // Сохраняем текст в шаблон
+                if (typeof saveTemplateTextNow === 'function') {
+                    saveTemplateTextNow(botId);
+                }
                 successCount++;
             }
         } catch (e) {
@@ -438,6 +446,10 @@ async function handleAIAction(botId, action, event) {
                 console.error(`❌ Бот ${botId} не найден в bots!`);
             }
             validateInput(txtArea);
+            // Сохраняем текст в шаблон
+            if (typeof saveTemplateTextNow === 'function') {
+                saveTemplateTextNow(botId);
+            }
         }
     } catch (e) {
         console.error(e);
@@ -541,6 +553,10 @@ async function generateAIForAll(action) {
                     bot.usedAi = true;
                 }
                 validateInput(txtArea);
+                // Сохраняем текст в шаблон чтобы он не потерялся при переключении табов
+                if (typeof saveTemplateTextNow === 'function') {
+                    saveTemplateTextNow(botId);
+                }
                 successCount++;
                 console.log(`[AI Bulk] ✅ ${botId} успешно`);
             }
