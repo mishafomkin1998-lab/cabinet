@@ -306,6 +306,12 @@ function toggleGlobalMode() {
     // КРИТИЧНО: Обновляем ВСЕ вкладки при переключении режима!
     // Иначе при "Старт все" неактивные вкладки будут иметь текст старого режима
     Object.keys(bots).forEach(botId => updateInterfaceForMode(botId));
+
+    // КРИТИЧНО: Обновляем отключённые статусы для нового режима
+    // У Mail и Chat раздельные списки отключённых статусов
+    if (typeof updateDisabledStatusesUI === 'function') {
+        updateDisabledStatusesUI();
+    }
 }
 
 function updateBotCount() { document.getElementById('global-bot-count').innerText = `Анкет: ${Object.keys(bots).length}`; }

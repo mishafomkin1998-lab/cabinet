@@ -268,10 +268,16 @@ function toggleStatusDisabled(status, event) {
 // Получить первый включённый статус сверху (по порядку в списке)
 function getFirstEnabledStatus() {
     const disabledList = getDisabledStatuses();
+    // Статусы только для Mail (в Chat их пропускаем)
+    const mailOnlyStatuses = ['inbox', 'payers'];
     // Порядок статусов сверху вниз в выпадающем списке
     const statusOrder = ['online-smart', 'shared-online', 'online', 'favorites', 'my-favorites', 'inbox', 'payers', 'custom-ids'];
 
     for (const status of statusOrder) {
+        // В режиме Chat пропускаем mail-only статусы
+        if (globalMode === 'chat' && mailOnlyStatuses.includes(status)) {
+            continue;
+        }
         if (!disabledList.includes(status)) {
             return status;
         }
@@ -297,26 +303,38 @@ function updateDisabledStatusesUI() {
     });
 
     // 2. Обновляем опции в select для всех ботов - СКРЫВАЕМ отключённые
+    // Статусы только для Mail (в Chat их не показываем вообще)
+    const mailOnlyStatuses = ['inbox', 'payers'];
+
     const selects = document.querySelectorAll('[id^="target-select-"]');
     selects.forEach(select => {
         Array.from(select.options).forEach(opt => {
             const optValue = opt.value;
-            if (disabledList.includes(optValue)) {
-                opt.style.display = 'none'; // Скрываем из списка
+            // В режиме Chat скрываем статусы которые только для Mail
+            if (globalMode === 'chat' && mailOnlyStatuses.includes(optValue)) {
+                opt.style.display = 'none';
+            } else if (disabledList.includes(optValue)) {
+                opt.style.display = 'none'; // Скрываем отключённые
             } else {
                 opt.style.display = ''; // Показываем
             }
         });
     });
 
-    // 3. Проверяем всех ботов - если их текущий статус отключён, переключаем
+    // 3. Проверяем всех ботов - если их текущий статус отключён или недоступен, переключаем
     const firstEnabled = getFirstEnabledStatus();
     Object.values(bots).forEach(bot => {
         const currentTarget = globalMode === 'mail' ? bot.mailSettings.target : bot.chatSettings.target;
 
-        // Если текущий статус отключён
-        if (disabledList.includes(currentTarget)) {
-            console.log(`[Status] Бот ${bot.id}: статус "${currentTarget}" отключён, переключаю на "${firstEnabled}"`);
+        // Проверяем нужно ли переключить статус:
+        // 1. Статус отключён пользователем
+        // 2. В режиме Chat используется mail-only статус (inbox, payers)
+        const isDisabled = disabledList.includes(currentTarget);
+        const isMailOnlyInChat = globalMode === 'chat' && mailOnlyStatuses.includes(currentTarget);
+
+        if (isDisabled || isMailOnlyInChat) {
+            const reason = isMailOnlyInChat ? 'недоступен в Chat' : 'отключён';
+            console.log(`[Status] Бот ${bot.id}: статус "${currentTarget}" ${reason}, переключаю на "${firstEnabled}"`);
 
             // Обновляем настройки бота
             if (globalMode === 'mail') {
@@ -346,6 +364,8 @@ function updateDisabledStatusesUI() {
 // Порядок снизу вверх по списку: Payers → Inbox → My favorite → I am a favorite of → Online/Shared/Smart
 function getNextActiveStatus(currentStatus) {
     const disabledList = getDisabledStatuses();
+    // Статусы только для Mail (в Chat их пропускаем)
+    const mailOnlyStatuses = ['inbox', 'payers'];
     const statusOrder = ['payers', 'inbox', 'my-favorites', 'favorites'];
     const onlineStatuses = ['online', 'shared-online', 'online-smart'];
     const currentIdx = statusOrder.indexOf(currentStatus);
@@ -358,6 +378,10 @@ function getNextActiveStatus(currentStatus) {
     // Ищем следующий не отключенный статус
     for (let i = currentIdx + 1; i < statusOrder.length; i++) {
         const nextStatus = statusOrder[i];
+        // В режиме Chat пропускаем mail-only статусы
+        if (globalMode === 'chat' && mailOnlyStatuses.includes(nextStatus)) {
+            continue;
+        }
         if (!disabledList.includes(nextStatus)) {
             return nextStatus;
         }
