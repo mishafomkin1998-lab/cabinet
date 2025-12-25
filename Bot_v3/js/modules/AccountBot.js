@@ -653,7 +653,20 @@ class AccountBot {
                 modePrefix = globalMode === 'chat' ? '[CHAT]' : '[MAIL]';
             }
         }
-        if(box) box.innerHTML = `<div class="log-entry"><span style="opacity:0.6">${new Date().toLocaleTimeString()}</span> <b>${modePrefix}</b> ${text}</div>` + box.innerHTML;
+        if(box) {
+            // Добавляем новую запись
+            box.innerHTML = `<div class="log-entry"><span style="opacity:0.6">${new Date().toLocaleTimeString()}</span> <b>${modePrefix}</b> ${text}</div>` + box.innerHTML;
+
+            // Применяем лимит логов (предотвращение утечки памяти)
+            const logLimit = globalSettings.logLimit || DEFAULT_LOG_LIMIT;
+            const entries = box.querySelectorAll('.log-entry');
+            if (entries.length > logLimit) {
+                // Удаляем старые записи (в конце списка)
+                for (let i = logLimit; i < entries.length; i++) {
+                    entries[i].remove();
+                }
+            }
+        }
     }
 
     // Добавление записи в history с лимитом (предотвращение утечки памяти)
@@ -2098,6 +2111,10 @@ class AccountBot {
                 // Добавляем в игнор-лист если это блокировка/игнор
                 if (user && user.AccountId && isIgnored) {
                     if (!this.ignoredUsersMail.includes(user.AccountId)) {
+                        // Проверяем лимит ignoredUsers
+                        if (this.ignoredUsersMail.length >= IGNORED_USERS_MAX_SIZE) {
+                            this.ignoredUsersMail.splice(0, 100); // Удаляем старые 100 записей
+                        }
                         this.ignoredUsersMail.push(user.AccountId);
                         this.log(`⛔ ${user.Name} добавлен в игнор-лист писем (навсегда)`);
                         saveIgnoredUsersToStorage(this.displayId, 'mail', this.ignoredUsersMail);
@@ -2571,6 +2588,10 @@ class AccountBot {
 
                 // Добавляем в игнор-лист если это блокировка/игнор
                 if (isIgnored && !this.ignoredUsersChat.includes(user.AccountId)) {
+                    // Проверяем лимит ignoredUsers
+                    if (this.ignoredUsersChat.length >= IGNORED_USERS_MAX_SIZE) {
+                        this.ignoredUsersChat.splice(0, 100); // Удаляем старые 100 записей
+                    }
                     this.ignoredUsersChat.push(user.AccountId);
                     this.log(`⛔ ${user.Name} добавлен в игнор-лист чатов (навсегда)`);
                     saveIgnoredUsersToStorage(this.displayId, 'chat', this.ignoredUsersChat);
@@ -2628,6 +2649,10 @@ class AccountBot {
                 // Добавляем в игнор-лист если это блокировка/игнор
                 if (user && user.AccountId && isIgnored) {
                     if (!this.ignoredUsersChat.includes(user.AccountId)) {
+                        // Проверяем лимит ignoredUsers
+                        if (this.ignoredUsersChat.length >= IGNORED_USERS_MAX_SIZE) {
+                            this.ignoredUsersChat.splice(0, 100); // Удаляем старые 100 записей
+                        }
                         this.ignoredUsersChat.push(user.AccountId);
                         this.log(`⛔ ${user.Name} добавлен в игнор-лист чатов (навсегда)`);
                         saveIgnoredUsersToStorage(this.displayId, 'chat', this.ignoredUsersChat);

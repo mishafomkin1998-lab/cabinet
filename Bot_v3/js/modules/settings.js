@@ -18,6 +18,7 @@ function loadGlobalSettingsUI() {
     document.getElementById('set-keep-logger-entries').checked = globalSettings.keepLoggerEntries;
     document.getElementById('set-show-profile-card').checked = globalSettings.showProfileCard !== false;
     document.getElementById('set-translator-id').value = globalSettings.translatorId || '';
+    document.getElementById('set-log-limit').value = globalSettings.logLimit || DEFAULT_LOG_LIMIT;
     applyTheme(globalSettings.theme);
     toggleProfileCards(); // Применяем настройку видимости карточек профиля
 
@@ -80,6 +81,10 @@ function saveGlobalSettings() {
     globalSettings.keepLoggerEntries = document.getElementById('set-keep-logger-entries').checked;
     globalSettings.showProfileCard = document.getElementById('set-show-profile-card').checked;
 
+    // Сохраняем лимит логов
+    const logLimitValue = document.getElementById('set-log-limit').value;
+    globalSettings.logLimit = logLimitValue ? parseInt(logLimitValue) : DEFAULT_LOG_LIMIT;
+
     // Сохраняем Translator ID
     const translatorIdValue = document.getElementById('set-translator-id').value.trim();
     globalSettings.translatorId = translatorIdValue ? parseInt(translatorIdValue) : null;
@@ -136,6 +141,7 @@ function openGlobalSettings() {
     document.getElementById('set-keep-logger-entries').checked = globalSettings.keepLoggerEntries;
     document.getElementById('set-show-profile-card').checked = globalSettings.showProfileCard !== false;
     document.getElementById('set-translator-id').value = globalSettings.translatorId || '';
+    document.getElementById('set-log-limit').value = globalSettings.logLimit || DEFAULT_LOG_LIMIT;
 
     // Загружаем прокси для анкет (1-6)
     for (let i = 1; i <= 6; i++) {
