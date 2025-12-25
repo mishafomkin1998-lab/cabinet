@@ -14,6 +14,11 @@ function startMemoryCleanup() {
         cleanupAllConversations();
     }, 60 * 60 * 1000);
 
+    // Очистка кэша WebView каждые 3 часа (освобождение памяти)
+    setInterval(() => {
+        cleanupWebViewCache();
+    }, 3 * 60 * 60 * 1000);
+
     console.log('✅ Периодическая очистка памяти запущена');
 }
 
@@ -42,5 +47,28 @@ function cleanupAllConversations() {
 
     if (totalCleaned > 0) {
         console.log(`🧹 conversations: очищено ${totalCleaned} записей у всех ботов`);
+    }
+}
+
+// Очистка кэша WebView для всех ботов (освобождение памяти)
+async function cleanupWebViewCache() {
+    const botIds = Object.keys(bots);
+
+    if (botIds.length === 0) {
+        console.log('🧹 [WebView Cache] Нет активных ботов для очистки');
+        return;
+    }
+
+    try {
+        const { ipcRenderer } = require('electron');
+        const result = await ipcRenderer.invoke('clear-webview-cache', { botIds });
+
+        if (result.success) {
+            console.log(`🧹 [WebView Cache] Очищено ${result.clearedCount} сессий, освобождено ~${result.totalMB} MB`);
+        } else {
+            console.warn(`🧹 [WebView Cache] Ошибка:`, result.error);
+        }
+    } catch (error) {
+        console.error('🧹 [WebView Cache] IPC ошибка:', error.message);
     }
 }

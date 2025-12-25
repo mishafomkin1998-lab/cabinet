@@ -377,6 +377,38 @@ ipcMain.handle('optimize-webview-session', async (event, { botId }) => {
     }
 });
 
+// IPC: Очистка кэша всех WebView сессий (для предотвращения утечки памяти)
+ipcMain.handle('clear-webview-cache', async (event, { botIds }) => {
+    try {
+        let clearedCount = 0;
+        let totalSize = 0;
+
+        for (const botId of botIds) {
+            try {
+                const ses = session.fromPartition(`persist:wv_${botId}`);
+
+                // Получаем размер кэша до очистки
+                const cacheSize = await ses.getCacheSize();
+                totalSize += cacheSize;
+
+                // Очищаем кэш
+                await ses.clearCache();
+                clearedCount++;
+            } catch (e) {
+                console.warn(`[Cache Clear] Ошибка для wv_${botId}:`, e.message);
+            }
+        }
+
+        const totalMB = (totalSize / 1024 / 1024).toFixed(2);
+        console.log(`🧹 [Cache Clear] Очищено ${clearedCount} сессий, освобождено ~${totalMB} MB`);
+
+        return { success: true, clearedCount, totalMB };
+    } catch (error) {
+        console.error(`[Cache Clear] ❌ Ошибка:`, error.message);
+        return { success: false, error: error.message };
+    }
+});
+
 // IPC: Установить прокси для default session (для axios запросов из renderer)
 ipcMain.handle('set-default-session-proxy', async (event, { proxyString }) => {
     console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
