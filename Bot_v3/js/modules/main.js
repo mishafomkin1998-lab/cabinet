@@ -1877,6 +1877,12 @@ function clearIgnoredAll(type) {
 }
 
 async function saveSession() {
+    // Не сохраняем пока идёт загрузка сессии (чтобы не потерять оригинальный список)
+    if (sessionLoadInProgress) {
+        console.log('[SaveSession] Пропущено - идёт загрузка сессии');
+        return;
+    }
+
     try {
         // Сохраняем порядок вкладок в localStorage
         const currentTabOrder = Array.from(document.querySelectorAll('.tab-item')).map(t => t.id.replace('tab-', ''));
@@ -1941,6 +1947,9 @@ let failedLoginBots = [];
 // Флаг отмены восстановления сессии
 let restoreCancelled = false;
 
+// Флаг что идёт загрузка сессии (чтобы не перезаписывать оригинальный список)
+let sessionLoadInProgress = false;
+
 // Функция отмены восстановления сессии
 function cancelRestore() {
     restoreCancelled = true;
@@ -1960,6 +1969,11 @@ function cancelRestore() {
     } else {
         showToast('Загрузка отменена', 'info');
     }
+
+    // Пользователь явно нажал "Отмена" - сохраняем только загруженные анкеты
+    sessionLoadInProgress = false;
+    saveSession();
+    console.log(`[Restore] Сессия сохранена с ${loadedCount} анкетами (по запросу пользователя)`);
 }
 
 // ============= OVERLAY УПРАВЛЕНИЕ =============
@@ -2022,6 +2036,7 @@ async function restoreSession() {
 
         failedLoginBots = [];
         restoreCancelled = false; // Сбрасываем флаг отмены
+        sessionLoadInProgress = true; // Блокируем saveSession до конца загрузки
 
         // Показываем overlay
         showRestoreOverlay(savedAccounts.length);
@@ -2192,8 +2207,13 @@ async function restoreSession() {
             if (tempBots[id]) bots[id] = tempBots[id];
         });
 
+        // Загрузка завершена - теперь можно сохранять сессию
+        sessionLoadInProgress = false;
+        saveSession();
+
     } catch (error) {
         console.error('Error restoring session:', error);
+        sessionLoadInProgress = false; // Снимаем блокировку при ошибке
         hideRestoreOverlay();
         document.getElementById('restore-status').innerText = "Ошибка загрузки";
         document.getElementById('welcome-screen').style.display = Object.keys(bots).length > 0 ? 'none' : 'flex';
