@@ -239,6 +239,7 @@ async function generateAIForAllWithTemplate(action, templateId) {
 
     const systemRole = "You are a helpful dating assistant. Write engaging, short, and natural texts for dating sites.";
     let successCount = 0;
+    let errorCount = 0;
 
     // Получаем шаблон в зависимости от action
     let templateValue = '';
@@ -304,12 +305,16 @@ async function generateAIForAllWithTemplate(action, templateId) {
             }
         } catch (e) {
             console.error(`AI error for bot ${botId}:`, e);
+            errorCount++;
         }
 
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 500));
     }
 
-    showBulkNotification(`AI ${actionLabel} выполнен`, successCount);
+    const resultMsg = errorCount > 0
+        ? `AI ${actionLabel}: ✅${successCount} ❌${errorCount}`
+        : `AI ${actionLabel} выполнен: ${successCount}`;
+    showBulkNotification(resultMsg, successCount);
 }
 
 // Проверка AI статуса для анкеты (по флагу ai_enabled у переводчика)
@@ -451,6 +456,7 @@ async function generateAIForAll(action) {
 
     const systemRole = "You are a helpful dating assistant. Write engaging, short, and natural texts for dating sites.";
     let successCount = 0;
+    let errorCount = 0;
 
     // Генерируем для каждой анкеты последовательно чтобы не перегрузить API
     for (const botId of botIds) {
@@ -501,11 +507,15 @@ async function generateAIForAll(action) {
             }
         } catch (e) {
             console.error(`AI error for bot ${botId}:`, e);
+            errorCount++;
         }
 
-        // Небольшая задержка между запросами
-        await new Promise(r => setTimeout(r, 300));
+        // Задержка между запросами для избежания rate limit
+        await new Promise(r => setTimeout(r, 500));
     }
 
-    showBulkNotification(`AI ${actionLabel} выполнен`, successCount);
+    const resultMsg = errorCount > 0
+        ? `AI ${actionLabel}: ✅${successCount} ❌${errorCount}`
+        : `AI ${actionLabel} выполнен: ${successCount}`;
+    showBulkNotification(resultMsg, successCount);
 }
