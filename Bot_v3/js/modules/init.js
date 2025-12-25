@@ -263,6 +263,21 @@ function toggleStatusDisabled(status, event) {
     updateDisabledStatusesUI();
 }
 
+// Получить первый включённый статус сверху (по порядку в списке)
+function getFirstEnabledStatus() {
+    // Порядок статусов сверху вниз в выпадающем списке
+    const statusOrder = ['online-smart', 'shared-online', 'online', 'favorites', 'my-favorites', 'inbox', 'payers', 'custom-ids'];
+
+    for (const status of statusOrder) {
+        if (!globalSettings.disabledStatuses || !globalSettings.disabledStatuses.includes(status)) {
+            return status;
+        }
+    }
+
+    // Fallback: online-smart всегда доступен
+    return 'online-smart';
+}
+
 // Обновление визуального отображения отключенных статусов
 function updateDisabledStatusesUI() {
     // 1. Обновляем кнопки в верхней панели
@@ -276,22 +291,50 @@ function updateDisabledStatusesUI() {
         }
     });
 
-    // 2. Обновляем опции в select для всех ботов
+    // 2. Обновляем опции в select для всех ботов - СКРЫВАЕМ отключённые
     const selects = document.querySelectorAll('[id^="target-select-"]');
     selects.forEach(select => {
         Array.from(select.options).forEach(opt => {
             const optValue = opt.value;
             if (globalSettings.disabledStatuses && globalSettings.disabledStatuses.includes(optValue)) {
-                opt.classList.add('status-disabled-option');
-                opt.style.color = '#999';
-                opt.disabled = true; // Запрещаем выбор
+                opt.style.display = 'none'; // Скрываем из списка
             } else {
-                opt.classList.remove('status-disabled-option');
-                opt.style.color = '';
-                opt.disabled = false;
+                opt.style.display = ''; // Показываем
             }
         });
     });
+
+    // 3. Проверяем всех ботов - если их текущий статус отключён, переключаем
+    const firstEnabled = getFirstEnabledStatus();
+    Object.values(bots).forEach(bot => {
+        const currentTarget = globalMode === 'mail' ? bot.mailSettings.target : bot.chatSettings.target;
+
+        // Если текущий статус отключён
+        if (globalSettings.disabledStatuses && globalSettings.disabledStatuses.includes(currentTarget)) {
+            console.log(`[Status] Бот ${bot.id}: статус "${currentTarget}" отключён, переключаю на "${firstEnabled}"`);
+
+            // Обновляем настройки бота
+            if (globalMode === 'mail') {
+                bot.mailSettings.target = firstEnabled;
+            } else {
+                bot.chatSettings.target = firstEnabled;
+            }
+
+            // Обновляем UI
+            const sel = document.getElementById(`target-select-${bot.id}`);
+            if (sel) sel.value = firstEnabled;
+
+            // Обновляем видимость поля Custom IDs
+            if (typeof toggleCustomIdsField === 'function') {
+                toggleCustomIdsField(bot.id);
+            }
+        }
+    });
+
+    // 4. Сохраняем сессию
+    if (typeof saveSession === 'function') {
+        saveSession();
+    }
 }
 
 // Получить следующий активный статус (пропуская отключенные)

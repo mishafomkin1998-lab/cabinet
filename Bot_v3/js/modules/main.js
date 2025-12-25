@@ -727,6 +727,11 @@ async function performLoginFast(login, pass, displayId) {
             // Показываем UI
             createInterface(bot);
 
+            // Обновляем UI статусов (скрываем отключённые в новом select)
+            if (typeof updateDisabledStatusesUI === 'function') {
+                updateDisabledStatusesUI();
+            }
+
             // Создаём WebView
             bot.createWebview();
 
@@ -1648,6 +1653,11 @@ async function performLogin(login, pass, displayId) {
 
             // Показываем UI и создаём WebView
             createInterface(bot); selectTab(bid); saveSession();
+
+            // Обновляем UI статусов (скрываем отключённые в новом select)
+            if (typeof updateDisabledStatusesUI === 'function') {
+                updateDisabledStatusesUI();
+            }
 
             // Создаём WebView (синхронно, прокси уже настроен на partition)
             bot.createWebview();
