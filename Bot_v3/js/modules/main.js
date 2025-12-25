@@ -712,10 +712,15 @@ async function performLoginFast(login, pass, displayId) {
     try {
         const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: login, Password: pass });
 
-        // DEBUG: Показываем что возвращает API логина
-        console.log('%c[LOGIN DEBUG] Полный ответ API:', 'color: yellow; font-weight: bold', res.data);
-
         if(res.data.Token) {
+            // КРИТИЧНО: Проверяем что введённый displayId совпадает с реальным AccountId из токена
+            const realAccountId = getAccountIdFromToken(res.data.Token);
+            if (realAccountId && realAccountId !== displayId) {
+                console.error(`❌ [Security] ID не совпадает! Введено: ${displayId}, Реальный: ${realAccountId}`);
+                showToast(`❌ Неверный ID анкеты! Введите правильный ID: ${realAccountId}`, 'error', 5000);
+                return false;
+            }
+
             const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
             const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
             bots[bid] = bot;
@@ -1639,10 +1644,16 @@ async function performLogin(login, pass, displayId) {
     try {
         const res = await makeApiRequest(null, 'POST', '/api/auth/login', { Login: login, Password: pass });
 
-        // DEBUG: Показываем что возвращает API логина
-        console.log('%c[LOGIN DEBUG] Полный ответ API:', 'color: yellow; font-weight: bold', res.data);
-
         if(res.data.Token) {
+            // КРИТИЧНО: Проверяем что введённый displayId совпадает с реальным AccountId из токена
+            const realAccountId = getAccountIdFromToken(res.data.Token);
+            if (realAccountId && realAccountId !== displayId) {
+                console.error(`❌ [Security] ID не совпадает! Введено: ${displayId}, Реальный: ${realAccountId}`);
+                if(e) e.innerText = `Неверный ID анкеты! Правильный ID: ${realAccountId}`;
+                if(s) s.style.display='none';
+                return false;
+            }
+
             const bid = 'bot_' + Date.now() + Math.floor(Math.random()*1000);
             const bot = new AccountBot(bid, login, pass, displayId, res.data.Token);
             bots[bid] = bot; // СНАЧАЛА добавляем в объект bots

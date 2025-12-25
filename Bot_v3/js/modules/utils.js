@@ -1,3 +1,43 @@
+// ========== JWT Decode ==========
+// Декодирует JWT токен и возвращает payload
+// Используется для получения реального AccountId из токена авторизации
+function decodeJwtPayload(token) {
+    try {
+        // JWT структура: header.payload.signature
+        const parts = token.split('.');
+        if (parts.length !== 3) {
+            console.error('[JWT] Неверный формат токена');
+            return null;
+        }
+
+        // Декодируем payload (вторая часть)
+        const payload = parts[1];
+        // Base64Url -> Base64
+        const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+        // Декодируем
+        const jsonPayload = decodeURIComponent(
+            atob(base64)
+                .split('')
+                .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                .join('')
+        );
+
+        return JSON.parse(jsonPayload);
+    } catch (error) {
+        console.error('[JWT] Ошибка декодирования:', error.message);
+        return null;
+    }
+}
+
+// Получает реальный AccountId из JWT токена
+function getAccountIdFromToken(token) {
+    const payload = decodeJwtPayload(token);
+    if (!payload) return null;
+
+    // LadaDate использует unique_name для AccountId
+    return payload.unique_name || payload.sub || payload.userId || payload.accountId || null;
+}
+
 const forbiddenWords = [
     "Fuck", "Shit", "Ass", "Bitch", "Damn", "Hell", "Dick", "Cunt", "Pussy",
     "Cock", "Tits", "Bastard", "Motherfucker", "Asshole", "Son of a bitch",
