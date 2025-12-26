@@ -1179,7 +1179,39 @@ function createWindow() {
     });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+    // =====================================================
+    // === ОЧИСТКА КЭША WEBVIEW ПРИ ЗАПУСКЕ ===
+    // =====================================================
+    // Очищаем кэш всех WebView партиций для экономии места
+    // Cookies НЕ затрагиваются - авторизация сохраняется
+    try {
+        const partitionsPath = path.join(app.getPath('userData'), 'Partitions');
+        if (fs.existsSync(partitionsPath)) {
+            const partitions = fs.readdirSync(partitionsPath);
+            let cleanedCount = 0;
+
+            for (const name of partitions) {
+                // Очищаем только WebView партиции (wv_)
+                if (name.startsWith('wv_')) {
+                    try {
+                        const ses = session.fromPartition(`persist:${name}`);
+                        await ses.clearCache();
+                        cleanedCount++;
+                    } catch (e) {
+                        console.warn(`[Cache Cleanup] Не удалось очистить ${name}:`, e.message);
+                    }
+                }
+            }
+
+            if (cleanedCount > 0) {
+                console.log(`[Cache Cleanup] ✅ Очищен кэш ${cleanedCount} WebView сессий`);
+            }
+        }
+    } catch (e) {
+        console.warn('[Cache Cleanup] Ошибка очистки кэша:', e.message);
+    }
+
     createWindow();
     initAutoUpdater(); // Проверка обновлений при запуске
 
