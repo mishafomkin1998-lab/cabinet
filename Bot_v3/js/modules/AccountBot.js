@@ -53,7 +53,8 @@ class AccountBot {
         this.unreadChatSessions = []; 
         this.keepAliveTimer = null; 
         this.lababotHeartbeatTimer = null; // Таймер для heartbeat на Lababot сервер
-        this.tabColorState = 0;
+        this.mailTabColorState = 0;
+        this.chatTabColorState = 0;
         this.selectedBlacklistId = null;
 
         this.isMonitoring = false;

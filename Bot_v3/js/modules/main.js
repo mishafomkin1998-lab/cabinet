@@ -273,6 +273,13 @@ function updateInterfaceForMode(botId) {
         initAutoRepliesUI(botId);
     }
 
+    // Применяем цвет вкладки для текущего режима (Mail и Chat имеют раздельные цвета)
+    const tab = document.getElementById(`tab-${botId}`);
+    if (tab) {
+        const colorState = isChat ? bot.chatTabColorState : bot.mailTabColorState;
+        applyTabColor(tab, colorState);
+    }
+
     bot.updateUI();
 }
 
@@ -383,11 +390,24 @@ function onTabRightClick(e, botId) {
     e.preventDefault();
     const tab = document.getElementById(`tab-${botId}`);
     const bot = bots[botId];
-    bot.tabColorState = (bot.tabColorState + 1) % 4;
+    const isChat = globalMode === 'chat';
+
+    // Используем раздельные состояния цвета для Mail и Chat
+    if (isChat) {
+        bot.chatTabColorState = (bot.chatTabColorState + 1) % 4;
+    } else {
+        bot.mailTabColorState = (bot.mailTabColorState + 1) % 4;
+    }
+
+    applyTabColor(tab, isChat ? bot.chatTabColorState : bot.mailTabColorState);
+}
+
+// Применить цвет к вкладке
+function applyTabColor(tab, colorState) {
     tab.classList.remove('tab-green', 'tab-yellow', 'tab-red');
-    if (bot.tabColorState === 1) tab.classList.add('tab-green');
-    else if (bot.tabColorState === 2) tab.classList.add('tab-yellow');
-    else if (bot.tabColorState === 3) tab.classList.add('tab-red');
+    if (colorState === 1) tab.classList.add('tab-green');
+    else if (colorState === 2) tab.classList.add('tab-yellow');
+    else if (colorState === 3) tab.classList.add('tab-red');
 }
 function checkDuplicate(login, displayId) {
     return !!Object.values(bots).find(b => b.login.toLowerCase() === login.toLowerCase() || b.displayId.toLowerCase() === displayId.toLowerCase());
