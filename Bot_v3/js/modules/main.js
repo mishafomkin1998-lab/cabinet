@@ -222,8 +222,8 @@ function updateInterfaceForMode(botId) {
         ws.querySelectorAll('.hide-in-mail').forEach(el => el.style.display = 'block');
 
         Array.from(targetSelect.options).forEach(opt => {
-            // Скрываем опции недоступные в Chat режиме (включая custom-ids и shared-online)
-            if (['favorites', 'my-favorites', 'inbox', 'custom-ids', 'shared-online'].includes(opt.value)) { opt.style.display = 'none'; }
+            // Скрываем опции недоступные в Chat режиме - оставляем только online и payers
+            if (['favorites', 'my-favorites', 'inbox', 'custom-ids', 'shared-online', 'online-smart'].includes(opt.value)) { opt.style.display = 'none'; }
             else { opt.style.display = 'block'; }
         });
         targetSelect.value = bot.chatSettings.target;
