@@ -215,9 +215,24 @@ function setGlobalTarget(targetType) {
         return;
     }
 
+    let stoppedCount = 0;
+
     Object.values(bots).forEach(bot => {
+        const oldTarget = globalMode === 'mail' ? bot.mailSettings.target : bot.chatSettings.target;
+
         if(globalMode === 'mail') bot.mailSettings.target = targetType;
         else bot.chatSettings.target = targetType;
+
+        // Останавливаем рассылку если статус изменился и она была активна
+        if (oldTarget !== targetType) {
+            if (globalMode === 'mail' && bot.isMailRunning) {
+                bot.stopMail();
+                stoppedCount++;
+            } else if (globalMode === 'chat' && bot.isChatRunning) {
+                bot.stopChat();
+                stoppedCount++;
+            }
+        }
 
         const sel = document.getElementById(`target-select-${bot.id}`);
         if(sel) sel.value = targetType;
@@ -226,7 +241,12 @@ function setGlobalTarget(targetType) {
         toggleCustomIdsField(bot.id);
     });
     saveSession();
-    showToast(`Всем установлен: ${targetType.toUpperCase()}`, 'success');
+
+    if (stoppedCount > 0) {
+        showToast(`Всем установлен: ${targetType.toUpperCase()} (остановлено ${stoppedCount} рассылок)`, 'info');
+    } else {
+        showToast(`Всем установлен: ${targetType.toUpperCase()}`, 'success');
+    }
 }
 
 // ============= ОТКЛЮЧЕНИЕ СТАТУСОВ (ПКМ) =============

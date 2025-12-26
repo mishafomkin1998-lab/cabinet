@@ -282,7 +282,21 @@ function updateSettings(botId, type, val) {
     const set = isChat ? bot.chatSettings : bot.mailSettings;
     if (type === 'speed') set.speed = val;
     else {
-        set.target = document.getElementById(`target-select-${botId}`).value;
+        const newTarget = document.getElementById(`target-select-${botId}`).value;
+        const oldTarget = set.target;
+        set.target = newTarget;
+
+        // Если статус изменился во время активной рассылки - останавливаем
+        if (oldTarget !== newTarget) {
+            if (!isChat && bot.isMailRunning) {
+                bot.stopMail();
+                showToast(`Рассылка остановлена (статус изменён на ${newTarget.toUpperCase()})`, 'info');
+            } else if (isChat && bot.isChatRunning) {
+                bot.stopChat();
+                showToast(`Чат остановлен (статус изменён на ${newTarget.toUpperCase()})`, 'info');
+            }
+        }
+
         if(!isChat) {
             set.photoOnly = document.getElementById(`check-photo-${botId}`).checked;
             bot.mailSettings.auto = document.getElementById(`auto-check-${botId}`).checked;
