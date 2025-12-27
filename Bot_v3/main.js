@@ -2280,20 +2280,21 @@ ipcMain.handle('open-response-window', async (event, data) => {
     });
 
     // === ГОРЯЧИЕ КЛАВИШИ ПЕРЕВОДЧИКА В RESPONSE WINDOW ===
+    console.log('[ResponseWindow] Добавляем обработчик горячих клавиш для окна:', windowId);
+
     win.webContents.on('before-input-event', async (event, input) => {
+        // Отладка: показываем ВСЕ нажатия клавиш
+        if (input.type === 'keyDown') {
+            console.log(`[ResponseWindow] Клавиша: ${input.key}, code: ${input.code}, ctrl: ${input.control}, cmd: ${input.meta}, shift: ${input.shift}`);
+        }
+
         if (input.type !== 'keyDown') return;
 
         // Обновляем настройки если нужно
         if (!webviewHotkeySettings._initialized) {
             await updateWebviewHotkeySettings();
             webviewHotkeySettings._initialized = true;
-        }
-
-        // Отладка: показываем какие клавиши нажаты
-        const ctrlOrCmd = input.control || input.meta;
-        if (ctrlOrCmd || input.shift || input.alt) {
-            console.log(`[ResponseWindow Hotkeys] Нажато: ctrl/cmd=${ctrlOrCmd}, shift=${input.shift}, code=${input.code}`);
-            console.log(`[ResponseWindow Hotkeys] Настройки translate:`, webviewHotkeySettings.translate);
+            console.log('[ResponseWindow] Настройки загружены:', webviewHotkeySettings);
         }
 
         // Проверяем горячие клавиши
