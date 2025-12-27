@@ -178,6 +178,7 @@ function showTranslationPopup(translatedText, originalText, x, y) {
     const width = globalSettings.translateWidth || 350;
     const fontSize = globalSettings.translateFontSize || 14;
     const autoClose = globalSettings.translateAutoClose || 0;
+    const isSticky = globalSettings.translatePopupSticky !== false; // default true
 
     // Создаём popup
     const popup = document.createElement('div');
@@ -193,8 +194,11 @@ function showTranslationPopup(translatedText, originalText, x, y) {
             ${escapeHtml(translatedText)}
         </div>
         <div class="translation-popup-footer">
-            <button class="btn btn-sm btn-outline-primary" onclick="copyTranslation()">
+            <button class="btn btn-sm btn-outline-primary" onclick="copyTranslation()" title="Копировать перевод">
                 <i class="fa fa-copy"></i> Копировать
+            </button>
+            <button class="btn btn-sm btn-outline-success translation-replace-btn" onclick="replaceWithTranslation()" title="Заменить выделенный текст переводом">
+                <i class="fa fa-exchange-alt"></i>
             </button>
         </div>
     `;
@@ -204,6 +208,32 @@ function showTranslationPopup(translatedText, originalText, x, y) {
     // Позиционирование - добавляем в специальный контейнер поверх всего
     const container = document.getElementById('translator-popup-container') || document.body;
     container.appendChild(popup);
+
+    // Добавляем tooltip для кнопки замены (появляется через 0.5сек)
+    const replaceBtn = popup.querySelector('.translation-replace-btn');
+    if (replaceBtn) {
+        let tooltipTimeout = null;
+        let tooltip = null;
+
+        replaceBtn.addEventListener('mouseenter', () => {
+            tooltipTimeout = setTimeout(() => {
+                tooltip = document.createElement('div');
+                tooltip.className = 'translation-btn-tooltip';
+                tooltip.textContent = 'Заменить текст';
+                tooltip.style.cssText = 'position:absolute;background:#333;color:white;padding:4px 8px;border-radius:4px;font-size:11px;white-space:nowrap;z-index:1000001;pointer-events:none;';
+
+                const btnRect = replaceBtn.getBoundingClientRect();
+                tooltip.style.left = btnRect.left + 'px';
+                tooltip.style.top = (btnRect.top - 28) + 'px';
+                document.body.appendChild(tooltip);
+            }, 500);
+        });
+
+        replaceBtn.addEventListener('mouseleave', () => {
+            if (tooltipTimeout) clearTimeout(tooltipTimeout);
+            if (tooltip) { tooltip.remove(); tooltip = null; }
+        });
+    }
 
     // Корректируем позицию чтобы не выходил за экран
     const rect = popup.getBoundingClientRect();
@@ -225,8 +255,25 @@ function showTranslationPopup(translatedText, originalText, x, y) {
     popup.style.left = posX + 'px';
     popup.style.top = posY + 'px';
 
-    // Сохраняем текст для копирования
+    // Сохраняем текст для копирования и замены
     popup.dataset.text = translatedText;
+    popup.dataset.original = originalText;
+
+    // Sticky popup логика
+    if (isSticky) {
+        popup.dataset.sticky = 'true';
+        popup.addEventListener('mouseenter', () => {
+            popup.dataset.hovered = 'true';
+            // Отменяем автозакрытие при наведении
+            if (autoCloseTimer) {
+                clearTimeout(autoCloseTimer);
+                autoCloseTimer = null;
+            }
+        });
+        popup.addEventListener('mouseleave', () => {
+            popup.dataset.hovered = 'false';
+        });
+    }
 
     // Автозакрытие
     if (autoClose > 0) {
@@ -235,7 +282,7 @@ function showTranslationPopup(translatedText, originalText, x, y) {
         }, autoClose * 1000);
     }
 
-    // Закрытие по клику вне popup
+    // Закрытие по клику вне popup (с учётом sticky)
     setTimeout(() => {
         document.addEventListener('mousedown', handleOutsideClick);
     }, 100);
@@ -256,7 +303,32 @@ function hideTranslationPopup() {
 function handleOutsideClick(e) {
     const popup = document.getElementById('translation-popup');
     if (popup && !popup.contains(e.target)) {
+        // Если sticky и наведено - не закрываем
+        if (popup.dataset.sticky === 'true' && popup.dataset.hovered === 'true') {
+            return;
+        }
         hideTranslationPopup();
+    }
+}
+
+// Заменить выделенный текст переводом из popup
+function replaceWithTranslation() {
+    const popup = document.getElementById('translation-popup');
+    if (!popup || !popup.dataset.text) {
+        showToast('Нет текста для замены', 'warning');
+        return;
+    }
+
+    const translatedText = popup.dataset.text;
+
+    // Пытаемся заменить выделенный текст
+    try {
+        replaceSelectedText(translatedText);
+        showToast('Текст заменён', 'success');
+        hideTranslationPopup();
+    } catch (err) {
+        console.error('[Translator] Replace error:', err);
+        showToast('Не удалось заменить текст', 'error');
     }
 }
 

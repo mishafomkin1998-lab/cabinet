@@ -38,6 +38,7 @@ function loadGlobalSettingsUI() {
     document.getElementById('set-translate-width').value = globalSettings.translateWidth || 350;
     document.getElementById('set-translate-font-size').value = globalSettings.translateFontSize || 14;
     document.getElementById('set-translate-auto-close').value = globalSettings.translateAutoClose || 0;
+    document.getElementById('set-translate-popup-sticky').checked = globalSettings.translatePopupSticky !== false; // default true
     document.getElementById('set-hotkey-translate').value = globalSettings.hotkeyTranslate || 'Ctrl+Q';
     document.getElementById('set-hotkey-replace').value = globalSettings.hotkeyReplace || 'Ctrl+S';
     document.getElementById('set-hotkey-replace-lang').value = globalSettings.hotkeyReplaceLang || 'Ctrl+Shift+S';
@@ -124,6 +125,7 @@ function saveGlobalSettings() {
     globalSettings.translateWidth = parseInt(document.getElementById('set-translate-width').value) || 350;
     globalSettings.translateFontSize = parseInt(document.getElementById('set-translate-font-size').value) || 14;
     globalSettings.translateAutoClose = parseInt(document.getElementById('set-translate-auto-close').value) || 0;
+    globalSettings.translatePopupSticky = document.getElementById('set-translate-popup-sticky').checked;
     globalSettings.hotkeyTranslate = document.getElementById('set-hotkey-translate').value || 'Ctrl+Q';
     globalSettings.hotkeyReplace = document.getElementById('set-hotkey-replace').value || 'Ctrl+S';
     globalSettings.hotkeyReplaceLang = document.getElementById('set-hotkey-replace-lang').value || 'Ctrl+Shift+S';
@@ -197,6 +199,7 @@ function openGlobalSettings() {
     document.getElementById('set-translate-width').value = globalSettings.translateWidth || 350;
     document.getElementById('set-translate-font-size').value = globalSettings.translateFontSize || 14;
     document.getElementById('set-translate-auto-close').value = globalSettings.translateAutoClose || 0;
+    document.getElementById('set-translate-popup-sticky').checked = globalSettings.translatePopupSticky !== false; // default true
     document.getElementById('set-hotkey-translate').value = globalSettings.hotkeyTranslate || 'Ctrl+Q';
     document.getElementById('set-hotkey-replace').value = globalSettings.hotkeyReplace || 'Ctrl+S';
     document.getElementById('set-hotkey-replace-lang').value = globalSettings.hotkeyReplaceLang || 'Ctrl+Shift+S';

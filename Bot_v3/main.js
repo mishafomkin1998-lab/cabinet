@@ -2422,6 +2422,14 @@ ipcMain.handle('response-window-translate', async (event, { text, x, y }) => {
 
         // Если перевод успешен - показываем popup в Response Window
         if (result.success && !result.sameLanguage) {
+            // Получаем настройку sticky из mainWindow
+            let isSticky = true; // default
+            try {
+                isSticky = await mainWindow.webContents.executeJavaScript(`
+                    globalSettings.translatePopupSticky !== false
+                `);
+            } catch (e) { /* use default */ }
+
             // Находим окно, которое отправило запрос
             const senderWindow = BrowserWindow.fromWebContents(event.sender);
             if (senderWindow && !senderWindow.isDestroyed()) {
@@ -2430,7 +2438,8 @@ ipcMain.handle('response-window-translate', async (event, { text, x, y }) => {
                     text: result.text,
                     originalText: text,
                     x: x,
-                    y: y
+                    y: y,
+                    sticky: isSticky
                 });
             }
         }
