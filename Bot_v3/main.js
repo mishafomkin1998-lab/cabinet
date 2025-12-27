@@ -1613,11 +1613,21 @@ app.whenReady().then(async () => {
         setTimeout(forceRestoreWindowSize, 500);
     });
 
-    // Изменение метрик дисплея (DPI, разрешение)
+    // Изменение метрик дисплея (DPI, разрешение) с debounce
+    let displayMetricsTimeout = null;
     screen.on('display-metrics-changed', (event, display, changedMetrics) => {
-        console.log('[Screen] Метрики дисплея изменились:', changedMetrics);
-        setTimeout(forceRestoreWindowSize, 300);
-        setTimeout(forceRestoreWindowSize, 1000); // Повторная проверка
+        // Debounce: игнорируем частые повторные события
+        if (displayMetricsTimeout) return;
+
+        if (changedMetrics && changedMetrics.length > 0) {
+            console.log('[Screen] Метрики дисплея изменились:', changedMetrics);
+            setTimeout(forceRestoreWindowSize, 300);
+            setTimeout(forceRestoreWindowSize, 1000);
+        }
+
+        displayMetricsTimeout = setTimeout(() => {
+            displayMetricsTimeout = null;
+        }, 2000); // Игнорируем повторные события 2 секунды
     });
 });
 
