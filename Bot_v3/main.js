@@ -1918,225 +1918,66 @@ ipcMain.handle('close-response-window', async (event, windowId) => {
     return { success: true };
 });
 
-// === Плавающая кнопка перевода для Response Windows ===
+// === Горячие клавиши перевода для Response Windows ===
 
-// Функция инъекции плавающей кнопки перевода
+// Функция инъекции горячих клавиш перевода (как в основном боте)
 function injectTranslateButton(win) {
     if (win.isDestroyed()) return;
 
-    // Проверяем включён ли переводчик в настройках
+    // Получаем настройки переводчика из главного окна
     if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.executeJavaScript(`
             (function() {
-                return !!(typeof globalSettings !== 'undefined' && globalSettings.translatorEnabled);
+                if (typeof globalSettings === 'undefined' || !globalSettings.translatorEnabled) {
+                    return null;
+                }
+                return {
+                    hotkeyTranslate: globalSettings.hotkeyTranslate || 'Shift+Q',
+                    hotkeyReplace: globalSettings.hotkeyReplace || 'Shift+S',
+                    hotkeyReplaceLang: globalSettings.hotkeyReplaceLang || 'Ctrl+Shift+S'
+                };
             })()
-        `).then(isEnabled => {
-            if (!isEnabled) {
+        `).then(settings => {
+            if (!settings) {
                 console.log('[InjectTranslate] Переводчик выключен в настройках');
                 return;
             }
 
-            // Инжектируем скрипт плавающей кнопки
+            const { hotkeyTranslate, hotkeyReplace, hotkeyReplaceLang } = settings;
+            console.log('[InjectTranslate] Hotkeys:', hotkeyTranslate, hotkeyReplace, hotkeyReplaceLang);
+
+            // Инжектируем скрипт с горячими клавишами
             win.webContents.executeJavaScript(`
                 (function() {
-                    // Проверяем что скрипт не был уже инициализирован
-                    if (window.__translateButtonInit) return;
-                    window.__translateButtonInit = true;
+                    if (window.__translateHotkeysInit) return;
+                    window.__translateHotkeysInit = true;
 
-                    console.log('[TranslateBtn] Инициализация плавающей кнопки перевода');
+                    const HOTKEY_TRANSLATE = '${hotkeyTranslate}';
+                    const HOTKEY_REPLACE = '${hotkeyReplace}';
+                    const HOTKEY_REPLACE_LANG = '${hotkeyReplaceLang}';
 
-                    // Создаём стили для кнопки
-                    const style = document.createElement('style');
-                    style.textContent = \`
-                        #laba-translate-btn {
-                            position: fixed;
-                            z-index: 999999;
-                            width: 32px;
-                            height: 32px;
-                            border-radius: 50%;
-                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                            border: 2px solid #fff;
-                            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                            cursor: pointer;
-                            display: none;
-                            align-items: center;
-                            justify-content: center;
-                            font-size: 16px;
-                            color: white;
-                            transition: transform 0.15s ease, box-shadow 0.15s ease;
-                            user-select: none;
+                    console.log('[TranslateHotkeys] Инициализация горячих клавиш:', HOTKEY_TRANSLATE, HOTKEY_REPLACE, HOTKEY_REPLACE_LANG);
+
+                    // Сохранённый контекст выделения для замены
+                    let savedSelectionContext = null;
+
+                    // Получить комбинацию клавиш из события
+                    function getKeyCombo(e) {
+                        const parts = [];
+                        if (e.ctrlKey) parts.push('Ctrl');
+                        if (e.shiftKey) parts.push('Shift');
+                        if (e.altKey) parts.push('Alt');
+                        let key = e.key.toUpperCase();
+                        if (key === ' ') key = 'Space';
+                        if (!['CONTROL', 'SHIFT', 'ALT', 'META'].includes(key)) {
+                            parts.push(key);
                         }
-                        #laba-translate-btn:hover {
-                            transform: scale(1.15);
-                            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.5);
-                        }
-                        #laba-translate-btn:active {
-                            transform: scale(0.95);
-                        }
-                        #laba-translate-btn.loading {
-                            pointer-events: none;
-                            opacity: 0.7;
-                        }
-                        #laba-translate-btn.loading::after {
-                            content: '';
-                            position: absolute;
-                            width: 20px;
-                            height: 20px;
-                            border: 2px solid transparent;
-                            border-top-color: white;
-                            border-radius: 50%;
-                            animation: laba-spin 0.8s linear infinite;
-                        }
-                        @keyframes laba-spin {
-                            to { transform: rotate(360deg); }
-                        }
-                    \`;
-                    document.head.appendChild(style);
-
-                    // Создаём кнопку
-                    const btn = document.createElement('div');
-                    btn.id = 'laba-translate-btn';
-                    btn.innerHTML = '🌐';
-                    btn.title = 'ЛКМ: показать перевод\\nПКМ: заменить текст';
-                    document.body.appendChild(btn);
-
-                    let hideTimeout = null;
-                    let lastSelection = '';
-                    let lastSelectionContext = null; // Сохраняем контекст для замены
-
-                    // Сохранить контекст выделения
-                    function saveSelectionContext() {
-                        const activeEl = document.activeElement;
-
-                        // Для input/textarea
-                        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
-                            const start = activeEl.selectionStart;
-                            const end = activeEl.selectionEnd;
-                            if (start !== end) {
-                                return {
-                                    type: 'input',
-                                    element: activeEl,
-                                    start: start,
-                                    end: end
-                                };
-                            }
-                        }
-
-                        // Для contenteditable
-                        if (activeEl && activeEl.isContentEditable) {
-                            const selection = window.getSelection();
-                            if (selection.rangeCount > 0) {
-                                return {
-                                    type: 'contenteditable',
-                                    element: activeEl,
-                                    range: selection.getRangeAt(0).cloneRange()
-                                };
-                            }
-                        }
-
-                        // Для обычного выделения на странице
-                        const selection = window.getSelection();
-                        if (selection.rangeCount > 0 && selection.toString().trim()) {
-                            return {
-                                type: 'selection',
-                                range: selection.getRangeAt(0).cloneRange()
-                            };
-                        }
-
-                        return null;
-                    }
-
-                    // Заменить текст используя сохранённый контекст
-                    function replaceWithContext(newText) {
-                        if (!lastSelectionContext) {
-                            console.log('[TranslateBtn] Нет сохранённого контекста');
-                            return false;
-                        }
-
-                        try {
-                            const ctx = lastSelectionContext;
-
-                            if (ctx.type === 'input') {
-                                const el = ctx.element;
-                                const value = el.value;
-                                el.value = value.substring(0, ctx.start) + newText + value.substring(ctx.end);
-                                el.selectionStart = el.selectionEnd = ctx.start + newText.length;
-                                el.dispatchEvent(new Event('input', { bubbles: true }));
-                                el.focus();
-                                console.log('[TranslateBtn] Текст заменён в input/textarea');
-                                return true;
-                            }
-
-                            if (ctx.type === 'contenteditable') {
-                                ctx.element.focus();
-                                const selection = window.getSelection();
-                                selection.removeAllRanges();
-                                selection.addRange(ctx.range);
-                                document.execCommand('insertText', false, newText);
-                                console.log('[TranslateBtn] Текст заменён в contenteditable');
-                                return true;
-                            }
-
-                            if (ctx.type === 'selection') {
-                                // Для обычного текста на странице замена невозможна
-                                // Вместо этого показываем popup с переводом
-                                console.log('[TranslateBtn] Обычный текст - замена невозможна, показываем popup');
-                                return false;
-                            }
-                        } catch (err) {
-                            console.error('[TranslateBtn] Ошибка замены:', err);
-                        }
-
-                        return false;
-                    }
-
-                    // Показать кнопку рядом с выделением
-                    function showButton(x, y, text) {
-                        if (!text || text.length < 2) {
-                            hideButton();
-                            return;
-                        }
-
-                        lastSelection = text;
-                        lastSelectionContext = saveSelectionContext();
-
-                        // Позиционируем кнопку
-                        const btnSize = 32;
-                        let posX = x + 5;
-                        let posY = y - btnSize - 5;
-
-                        // Не выходим за границы экрана
-                        if (posX + btnSize > window.innerWidth) {
-                            posX = window.innerWidth - btnSize - 10;
-                        }
-                        if (posY < 10) {
-                            posY = y + 20;
-                        }
-                        if (posX < 10) posX = 10;
-
-                        btn.style.left = posX + 'px';
-                        btn.style.top = posY + 'px';
-                        btn.style.display = 'flex';
-                        btn.classList.remove('loading');
-
-                        // Автоскрытие через 5 секунд
-                        clearTimeout(hideTimeout);
-                        hideTimeout = setTimeout(hideButton, 5000);
-                    }
-
-                    // Скрыть кнопку
-                    function hideButton() {
-                        btn.style.display = 'none';
-                        btn.classList.remove('loading');
-                        btn.innerHTML = '🌐';
-                        clearTimeout(hideTimeout);
+                        return parts.join('+');
                     }
 
                     // Получить выделенный текст
                     function getSelectedText() {
                         const activeEl = document.activeElement;
-
-                        // Для input/textarea
                         if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
                             const start = activeEl.selectionStart;
                             const end = activeEl.selectionEnd;
@@ -2144,165 +1985,176 @@ function injectTranslateButton(win) {
                                 return activeEl.value.substring(start, end).trim();
                             }
                         }
-
-                        // Для обычного выделения
                         const selection = window.getSelection();
                         return selection ? selection.toString().trim() : '';
                     }
 
-                    // Обработчик выделения текста
-                    document.addEventListener('mouseup', (e) => {
-                        // Игнорируем клик по самой кнопке
-                        if (e.target === btn || btn.contains(e.target)) return;
-
-                        // Небольшая задержка чтобы выделение успело обновиться
-                        setTimeout(() => {
-                            const text = getSelectedText();
-                            if (text && text.length >= 2) {
-                                showButton(e.clientX, e.clientY, text);
-                            } else {
-                                hideButton();
+                    // Сохранить контекст выделения
+                    function saveSelectionContext() {
+                        const activeEl = document.activeElement;
+                        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+                            const start = activeEl.selectionStart;
+                            const end = activeEl.selectionEnd;
+                            if (start !== end) {
+                                return { type: 'input', element: activeEl, start, end };
                             }
-                        }, 10);
-                    });
-
-                    // Скрываем при скролле
-                    document.addEventListener('scroll', hideButton, true);
-
-                    // Обработчик клика на кнопку перевода
-                    btn.addEventListener('click', async (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-
-                        const text = lastSelection || getSelectedText();
-                        if (!text) {
-                            console.log('[TranslateBtn] Нет текста для перевода');
-                            return;
                         }
-
-                        console.log('[TranslateBtn] Запрос перевода:', text.substring(0, 50));
-
-                        // Показываем загрузку
-                        btn.classList.add('loading');
-                        btn.innerHTML = '';
-
-                        // Получаем позицию для popup
-                        const rect = btn.getBoundingClientRect();
-
-                        // Вызываем перевод через preload API
-                        if (window.lababotAI && window.lababotAI.translate) {
-                            try {
-                                await window.lababotAI.translate(text, rect.left, rect.bottom + 5);
-                            } catch (err) {
-                                console.error('[TranslateBtn] Ошибка:', err);
+                        if (activeEl && activeEl.isContentEditable) {
+                            const selection = window.getSelection();
+                            if (selection.rangeCount > 0) {
+                                return { type: 'contenteditable', element: activeEl, range: selection.getRangeAt(0).cloneRange() };
                             }
-                        } else {
-                            console.error('[TranslateBtn] API перевода недоступен');
+                        }
+                        return null;
+                    }
+
+                    // Заменить текст используя сохранённый контекст
+                    function replaceWithContext(ctx, newText) {
+                        if (!ctx) return false;
+                        try {
+                            if (ctx.type === 'input') {
+                                const el = ctx.element;
+                                const value = el.value;
+                                el.value = value.substring(0, ctx.start) + newText + value.substring(ctx.end);
+                                el.selectionStart = el.selectionEnd = ctx.start + newText.length;
+                                el.dispatchEvent(new Event('input', { bubbles: true }));
+                                el.focus();
+                                return true;
+                            }
+                            if (ctx.type === 'contenteditable') {
+                                ctx.element.focus();
+                                const selection = window.getSelection();
+                                selection.removeAllRanges();
+                                selection.addRange(ctx.range);
+                                document.execCommand('insertText', false, newText);
+                                return true;
+                            }
+                        } catch (err) {
+                            console.error('[TranslateHotkeys] Replace error:', err);
+                        }
+                        return false;
+                    }
+
+                    // Обработчик горячих клавиш
+                    document.addEventListener('keydown', async (e) => {
+                        const combo = getKeyCombo(e);
+                        const text = getSelectedText();
+
+                        // Shift+Q - показать перевод
+                        if (combo === HOTKEY_TRANSLATE && text) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            console.log('[TranslateHotkeys] Translate:', text.substring(0, 30));
+
+                            if (window.lababotAI && window.lababotAI.translate) {
+                                const selection = window.getSelection();
+                                let x = window.innerWidth / 2, y = window.innerHeight / 3;
+                                if (selection.rangeCount > 0) {
+                                    const rect = selection.getRangeAt(0).getBoundingClientRect();
+                                    if (rect.width > 0) { x = rect.left; y = rect.bottom + 10; }
+                                }
+                                await window.lababotAI.translate(text, x, y);
+                            }
                         }
 
-                        // Скрываем кнопку
-                        setTimeout(hideButton, 300);
-                    });
+                        // Shift+S - заменить переводом
+                        else if (combo === HOTKEY_REPLACE && text) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const ctx = saveSelectionContext();
+                            if (!ctx) {
+                                console.log('[TranslateHotkeys] Нет редактируемого контекста');
+                                return;
+                            }
+                            console.log('[TranslateHotkeys] Replace:', text.substring(0, 30));
 
-                    // Обработчик ПКМ на кнопку перевода - замена текста
-                    btn.addEventListener('contextmenu', async (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-
-                        const text = lastSelection || getSelectedText();
-                        if (!text) {
-                            console.log('[TranslateBtn] Нет текста для замены');
-                            return;
-                        }
-
-                        if (!lastSelectionContext) {
-                            console.log('[TranslateBtn] Нет сохранённого контекста выделения');
-                            return;
-                        }
-
-                        console.log('[TranslateBtn] ПКМ - замена текста:', text.substring(0, 50));
-
-                        // Показываем загрузку
-                        btn.classList.add('loading');
-                        btn.innerHTML = '';
-
-                        // Получаем перевод через API и заменяем локально
-                        if (window.lababotAI && window.lababotAI.translateAndReplace) {
-                            try {
+                            if (window.lababotAI && window.lababotAI.translateAndReplace) {
                                 const result = await window.lababotAI.translateAndReplace(text);
                                 if (result && result.success && result.text) {
-                                    // Пытаемся заменить текст локально
-                                    const replaced = replaceWithContext(result.text);
-
-                                    if (!replaced) {
-                                        // Если замена невозможна (обычный текст на странице),
-                                        // показываем popup с переводом вместо замены
-                                        console.log('[TranslateBtn] Замена невозможна, показываем popup');
-                                        const rect = btn.getBoundingClientRect();
-                                        if (window.lababotAI && window.lababotAI.translate) {
-                                            await window.lababotAI.translate(text, rect.left, rect.bottom + 5);
-                                        }
-                                    }
-                                } else if (result && result.sameLanguage) {
-                                    console.log('[TranslateBtn] Текст уже на целевом языке');
-                                } else {
-                                    console.error('[TranslateBtn] Ошибка перевода:', result?.error);
+                                    replaceWithContext(ctx, result.text);
                                 }
-                            } catch (err) {
-                                console.error('[TranslateBtn] Ошибка замены:', err);
                             }
-                        } else {
-                            console.error('[TranslateBtn] API замены недоступен');
                         }
 
-                        // Скрываем кнопку
-                        setTimeout(hideButton, 300);
-                    });
-
-                    // Обработчик Ctrl+A для показа кнопки (keydown более надёжен)
-                    document.addEventListener('keydown', (e) => {
-                        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
-                            // Задержка чтобы выделение успело примениться
-                            setTimeout(() => {
-                                const text = getSelectedText();
-                                if (text && text.length >= 2) {
-                                    // Показываем кнопку в центре экрана
-                                    showButton(window.innerWidth / 2, window.innerHeight / 2, text);
-                                }
-                            }, 100);
+                        // Ctrl+Shift+S - заменить с выбором языка (показываем popup)
+                        else if (combo === HOTKEY_REPLACE_LANG && text) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            savedSelectionContext = saveSelectionContext();
+                            if (!savedSelectionContext) {
+                                console.log('[TranslateHotkeys] Нет редактируемого контекста');
+                                return;
+                            }
+                            console.log('[TranslateHotkeys] Replace with lang choice:', text.substring(0, 30));
+                            showLanguagePicker(text);
                         }
                     });
 
-                    // Обработчик selectionchange - срабатывает при любом изменении выделения
-                    let selectionChangeTimeout = null;
-                    document.addEventListener('selectionchange', () => {
-                        // Debounce чтобы не спамить
-                        clearTimeout(selectionChangeTimeout);
-                        selectionChangeTimeout = setTimeout(() => {
-                            const text = getSelectedText();
-                            if (text && text.length >= 2 && btn.style.display !== 'flex') {
-                                // Если кнопка ещё не показана и есть выделение
-                                // Показываем в центре (т.к. не знаем координаты)
-                                const selection = window.getSelection();
-                                if (selection.rangeCount > 0) {
-                                    const range = selection.getRangeAt(0);
-                                    const rect = range.getBoundingClientRect();
-                                    if (rect.width > 0) {
-                                        showButton(rect.right, rect.top, text);
-                                    } else {
-                                        showButton(window.innerWidth / 2, window.innerHeight / 2, text);
+                    // Popup выбора языка
+                    function showLanguagePicker(textToTranslate) {
+                        const existing = document.getElementById('laba-lang-picker');
+                        if (existing) existing.remove();
+
+                        const languages = [
+                            { code: 'EN', name: '🇬🇧 English' },
+                            { code: 'RU', name: '🇷🇺 Русский' },
+                            { code: 'DE', name: '🇩🇪 Deutsch' },
+                            { code: 'FR', name: '🇫🇷 Français' },
+                            { code: 'ES', name: '🇪🇸 Español' },
+                            { code: 'IT', name: '🇮🇹 Italiano' },
+                            { code: 'PT', name: '🇵🇹 Português' },
+                            { code: 'PL', name: '🇵🇱 Polski' },
+                            { code: 'UK', name: '🇺🇦 Українська' },
+                            { code: 'ZH', name: '🇨🇳 中文' },
+                            { code: 'JA', name: '🇯🇵 日本語' },
+                            { code: 'KO', name: '🇰🇷 한국어' },
+                            { code: 'TR', name: '🇹🇷 Türkçe' },
+                            { code: 'AR', name: '🇸🇦 العربية' },
+                            { code: 'NL', name: '🇳🇱 Nederlands' },
+                            { code: 'SV', name: '🇸🇪 Svenska' }
+                        ];
+
+                        const popup = document.createElement('div');
+                        popup.id = 'laba-lang-picker';
+                        popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:999999;background:white;padding:15px;border-radius:12px;box-shadow:0 4px 25px rgba(0,0,0,0.3);font-family:Arial,sans-serif;';
+                        popup.innerHTML = '<div style="font-weight:600;margin-bottom:12px;color:#667eea;">🌐 Выберите язык</div>' +
+                            '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">' +
+                            languages.map(l => '<button data-lang="' + l.code + '" style="padding:10px;border:1px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:13px;transition:all 0.15s;">' + l.name + '</button>').join('') +
+                            '</div>';
+
+                        document.body.appendChild(popup);
+
+                        popup.querySelectorAll('button').forEach(btn => {
+                            btn.onmouseenter = () => { btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'; btn.style.color = 'white'; };
+                            btn.onmouseleave = () => { btn.style.background = 'white'; btn.style.color = 'black'; };
+                            btn.onclick = async () => {
+                                const lang = btn.dataset.lang;
+                                popup.remove();
+
+                                if (window.lababotAI) {
+                                    // Переводим на выбранный язык
+                                    const result = await window.lababotAI.translateToLang(textToTranslate, lang);
+                                    if (result && result.success && result.text && savedSelectionContext) {
+                                        replaceWithContext(savedSelectionContext, result.text);
                                     }
                                 }
-                            } else if (!text || text.length < 2) {
-                                hideButton();
-                            }
-                        }, 150);
-                    });
+                            };
+                        });
 
-                    // Обработчик для скрытия кнопки при потере фокуса
-                    window.addEventListener('blur', hideButton);
+                        // Закрытие по клику вне
+                        setTimeout(() => {
+                            document.addEventListener('mousedown', function close(e) {
+                                if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('mousedown', close); }
+                            });
+                        }, 100);
 
-                    console.log('[TranslateBtn] Плавающая кнопка перевода готова');
+                        // Закрытие по Escape
+                        document.addEventListener('keydown', function esc(e) {
+                            if (e.key === 'Escape') { popup.remove(); document.removeEventListener('keydown', esc); }
+                        });
+                    }
+
+                    console.log('[TranslateHotkeys] Горячие клавиши перевода готовы');
                 })();
             `).catch(err => {
                 console.log('[InjectTranslate] Error:', err.message);
@@ -2630,6 +2482,42 @@ ipcMain.handle('response-window-translate-replace', async (event, { text }) => {
         return result;
     } catch (err) {
         console.error('[ResponseWindow TranslateReplace] Error:', err);
+        return { success: false, error: err.message };
+    }
+});
+
+// IPC: Перевод на конкретный язык (для Ctrl+Shift+S)
+ipcMain.handle('response-window-translate-to-lang', async (event, { text, targetLang }) => {
+    console.log('[ResponseWindow TranslateToLang] Запрос:', text?.substring(0, 30), '→', targetLang);
+
+    if (!mainWindow || mainWindow.isDestroyed()) {
+        return { success: false, error: 'Main window not available' };
+    }
+
+    try {
+        // Выполняем перевод через renderer
+        const result = await mainWindow.webContents.executeJavaScript(`
+            (async function() {
+                if (typeof translateText !== 'function') {
+                    return { success: false, error: 'Переводчик не загружен' };
+                }
+
+                if (!globalSettings || !globalSettings.translatorEnabled) {
+                    return { success: false, error: 'Переводчик выключен в настройках' };
+                }
+
+                const text = ${JSON.stringify(text)};
+                const targetLang = ${JSON.stringify(targetLang)};
+                const sourceLang = globalSettings.translateFrom || 'auto';
+
+                const result = await translateText(text, targetLang, sourceLang);
+                return result;
+            })()
+        `);
+
+        return result;
+    } catch (err) {
+        console.error('[ResponseWindow TranslateToLang] Error:', err);
         return { success: false, error: err.message };
     }
 });

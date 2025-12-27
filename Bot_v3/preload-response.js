@@ -47,7 +47,7 @@ contextBridge.exposeInMainWorld('lababotAI', {
         }
     },
 
-    // Перевод и замена текста (для плавающей кнопки - ПКМ)
+    // Перевод и замена текста (для горячей клавиши Shift+S)
     translateAndReplace: async (text) => {
         try {
             const result = await ipcRenderer.invoke('response-window-translate-replace', {
@@ -56,6 +56,20 @@ contextBridge.exposeInMainWorld('lababotAI', {
             return result;
         } catch (err) {
             console.error('[LababotAI] TranslateReplace error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    // Перевод на конкретный язык (для горячей клавиши Ctrl+Shift+S)
+    translateToLang: async (text, targetLang) => {
+        try {
+            const result = await ipcRenderer.invoke('response-window-translate-to-lang', {
+                text,
+                targetLang
+            });
+            return result;
+        } catch (err) {
+            console.error('[LababotAI] TranslateToLang error:', err);
             return { success: false, error: err.message };
         }
     }
