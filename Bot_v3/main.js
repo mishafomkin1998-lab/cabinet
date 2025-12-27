@@ -2251,17 +2251,44 @@ function injectTranslateButton(win) {
                         setTimeout(hideButton, 300);
                     });
 
-                    // Обработчик Ctrl+A для показа кнопки
-                    document.addEventListener('keyup', (e) => {
+                    // Обработчик Ctrl+A для показа кнопки (keydown более надёжен)
+                    document.addEventListener('keydown', (e) => {
                         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+                            // Задержка чтобы выделение успело примениться
                             setTimeout(() => {
                                 const text = getSelectedText();
                                 if (text && text.length >= 2) {
                                     // Показываем кнопку в центре экрана
                                     showButton(window.innerWidth / 2, window.innerHeight / 2, text);
                                 }
-                            }, 50);
+                            }, 100);
                         }
+                    });
+
+                    // Обработчик selectionchange - срабатывает при любом изменении выделения
+                    let selectionChangeTimeout = null;
+                    document.addEventListener('selectionchange', () => {
+                        // Debounce чтобы не спамить
+                        clearTimeout(selectionChangeTimeout);
+                        selectionChangeTimeout = setTimeout(() => {
+                            const text = getSelectedText();
+                            if (text && text.length >= 2 && btn.style.display !== 'flex') {
+                                // Если кнопка ещё не показана и есть выделение
+                                // Показываем в центре (т.к. не знаем координаты)
+                                const selection = window.getSelection();
+                                if (selection.rangeCount > 0) {
+                                    const range = selection.getRangeAt(0);
+                                    const rect = range.getBoundingClientRect();
+                                    if (rect.width > 0) {
+                                        showButton(rect.right, rect.top, text);
+                                    } else {
+                                        showButton(window.innerWidth / 2, window.innerHeight / 2, text);
+                                    }
+                                }
+                            } else if (!text || text.length < 2) {
+                                hideButton();
+                            }
+                        }, 150);
                     });
 
                     // Обработчик для скрытия кнопки при потере фокуса

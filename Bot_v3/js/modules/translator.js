@@ -535,47 +535,122 @@ async function handleReplaceWithLanguageChoice(e) {
     showLanguagePickerPopup(e, selectedText);
 }
 
-// Popup с выбором языка для замены
+// Popup с выбором языка для замены (все языки мира с поиском)
 function showLanguagePickerPopup(e, textToTranslate) {
     // Удаляем существующий popup если есть
     const existingPopup = document.getElementById('laba-language-picker');
     if (existingPopup) existingPopup.remove();
 
+    // Полный список языков (поддерживаемые Google/DeepL/MyMemory)
     const languages = [
-        { code: 'EN', name: 'English', flag: '🇬🇧' },
-        { code: 'RU', name: 'Русский', flag: '🇷🇺' },
-        { code: 'DE', name: 'Deutsch', flag: '🇩🇪' },
-        { code: 'FR', name: 'Français', flag: '🇫🇷' },
-        { code: 'ES', name: 'Español', flag: '🇪🇸' },
-        { code: 'IT', name: 'Italiano', flag: '🇮🇹' },
-        { code: 'PT', name: 'Português', flag: '🇵🇹' },
-        { code: 'PL', name: 'Polski', flag: '🇵🇱' },
-        { code: 'UK', name: 'Українська', flag: '🇺🇦' },
-        { code: 'ZH', name: '中文', flag: '🇨🇳' },
-        { code: 'JA', name: '日本語', flag: '🇯🇵' },
-        { code: 'KO', name: '한국어', flag: '🇰🇷' }
+        // Популярные (сверху)
+        { code: 'EN', name: 'English', flag: '🇬🇧', popular: true },
+        { code: 'RU', name: 'Русский', flag: '🇷🇺', popular: true },
+        { code: 'DE', name: 'Deutsch', flag: '🇩🇪', popular: true },
+        { code: 'FR', name: 'Français', flag: '🇫🇷', popular: true },
+        { code: 'ES', name: 'Español', flag: '🇪🇸', popular: true },
+        { code: 'IT', name: 'Italiano', flag: '🇮🇹', popular: true },
+        { code: 'PT', name: 'Português', flag: '🇵🇹', popular: true },
+        { code: 'ZH', name: '中文 (Chinese)', flag: '🇨🇳', popular: true },
+        { code: 'JA', name: '日本語 (Japanese)', flag: '🇯🇵', popular: true },
+        { code: 'KO', name: '한국어 (Korean)', flag: '🇰🇷', popular: true },
+        { code: 'UK', name: 'Українська', flag: '🇺🇦', popular: true },
+        { code: 'PL', name: 'Polski', flag: '🇵🇱', popular: true },
+        // Остальные по алфавиту
+        { code: 'AF', name: 'Afrikaans', flag: '🇿🇦' },
+        { code: 'SQ', name: 'Albanian (Shqip)', flag: '🇦🇱' },
+        { code: 'AM', name: 'Amharic (አማርኛ)', flag: '🇪🇹' },
+        { code: 'AR', name: 'Arabic (العربية)', flag: '🇸🇦' },
+        { code: 'HY', name: 'Armenian (Հայերdelays)', flag: '🇦🇲' },
+        { code: 'AZ', name: 'Azerbaijani (Azərbaycan)', flag: '🇦🇿' },
+        { code: 'EU', name: 'Basque (Euskara)', flag: '🏴' },
+        { code: 'BE', name: 'Belarusian (Беларуская)', flag: '🇧🇾' },
+        { code: 'BN', name: 'Bengali (বাংলা)', flag: '🇧🇩' },
+        { code: 'BS', name: 'Bosnian (Bosanski)', flag: '🇧🇦' },
+        { code: 'BG', name: 'Bulgarian (Български)', flag: '🇧🇬' },
+        { code: 'CA', name: 'Catalan (Català)', flag: '🏴' },
+        { code: 'HR', name: 'Croatian (Hrvatski)', flag: '🇭🇷' },
+        { code: 'CS', name: 'Czech (Čeština)', flag: '🇨🇿' },
+        { code: 'DA', name: 'Danish (Dansk)', flag: '🇩🇰' },
+        { code: 'NL', name: 'Dutch (Nederlands)', flag: '🇳🇱' },
+        { code: 'ET', name: 'Estonian (Eesti)', flag: '🇪🇪' },
+        { code: 'FI', name: 'Finnish (Suomi)', flag: '🇫🇮' },
+        { code: 'KA', name: 'Georgian (ქართული)', flag: '🇬🇪' },
+        { code: 'EL', name: 'Greek (Ελληνικά)', flag: '🇬🇷' },
+        { code: 'GU', name: 'Gujarati (ગુજરાતી)', flag: '🇮🇳' },
+        { code: 'HT', name: 'Haitian Creole', flag: '🇭🇹' },
+        { code: 'HA', name: 'Hausa', flag: '🇳🇬' },
+        { code: 'HE', name: 'Hebrew (עברית)', flag: '🇮🇱' },
+        { code: 'HI', name: 'Hindi (हिन्दी)', flag: '🇮🇳' },
+        { code: 'HU', name: 'Hungarian (Magyar)', flag: '🇭🇺' },
+        { code: 'IS', name: 'Icelandic (Íslenska)', flag: '🇮🇸' },
+        { code: 'ID', name: 'Indonesian (Bahasa)', flag: '🇮🇩' },
+        { code: 'GA', name: 'Irish (Gaeilge)', flag: '🇮🇪' },
+        { code: 'KN', name: 'Kannada (ಕನ್ನಡ)', flag: '🇮🇳' },
+        { code: 'KK', name: 'Kazakh (Қазақ)', flag: '🇰🇿' },
+        { code: 'KM', name: 'Khmer (ខ្មែរ)', flag: '🇰🇭' },
+        { code: 'KY', name: 'Kyrgyz (Кыргызча)', flag: '🇰🇬' },
+        { code: 'LO', name: 'Lao (ລາວ)', flag: '🇱🇦' },
+        { code: 'LA', name: 'Latin', flag: '🏛️' },
+        { code: 'LV', name: 'Latvian (Latviešu)', flag: '🇱🇻' },
+        { code: 'LT', name: 'Lithuanian (Lietuvių)', flag: '🇱🇹' },
+        { code: 'MK', name: 'Macedonian (Македонски)', flag: '🇲🇰' },
+        { code: 'MS', name: 'Malay (Bahasa Melayu)', flag: '🇲🇾' },
+        { code: 'ML', name: 'Malayalam (മലയാളം)', flag: '🇮🇳' },
+        { code: 'MT', name: 'Maltese (Malti)', flag: '🇲🇹' },
+        { code: 'MR', name: 'Marathi (मराठी)', flag: '🇮🇳' },
+        { code: 'MN', name: 'Mongolian (Монгол)', flag: '🇲🇳' },
+        { code: 'MY', name: 'Myanmar (မြန်မာ)', flag: '🇲🇲' },
+        { code: 'NE', name: 'Nepali (नेपाली)', flag: '🇳🇵' },
+        { code: 'NO', name: 'Norwegian (Norsk)', flag: '🇳🇴' },
+        { code: 'PS', name: 'Pashto (پښتو)', flag: '🇦🇫' },
+        { code: 'FA', name: 'Persian (فارسی)', flag: '🇮🇷' },
+        { code: 'PA', name: 'Punjabi (ਪੰਜਾਬੀ)', flag: '🇮🇳' },
+        { code: 'RO', name: 'Romanian (Română)', flag: '🇷🇴' },
+        { code: 'SR', name: 'Serbian (Српски)', flag: '🇷🇸' },
+        { code: 'SI', name: 'Sinhala (සිංහල)', flag: '🇱🇰' },
+        { code: 'SK', name: 'Slovak (Slovenčina)', flag: '🇸🇰' },
+        { code: 'SL', name: 'Slovenian (Slovenščina)', flag: '🇸🇮' },
+        { code: 'SO', name: 'Somali (Soomaali)', flag: '🇸🇴' },
+        { code: 'SW', name: 'Swahili (Kiswahili)', flag: '🇰🇪' },
+        { code: 'SV', name: 'Swedish (Svenska)', flag: '🇸🇪' },
+        { code: 'TL', name: 'Tagalog (Filipino)', flag: '🇵🇭' },
+        { code: 'TG', name: 'Tajik (Тоҷикӣ)', flag: '🇹🇯' },
+        { code: 'TA', name: 'Tamil (தமிழ்)', flag: '🇮🇳' },
+        { code: 'TE', name: 'Telugu (తెలుగు)', flag: '🇮🇳' },
+        { code: 'TH', name: 'Thai (ไทย)', flag: '🇹🇭' },
+        { code: 'TR', name: 'Turkish (Türkçe)', flag: '🇹🇷' },
+        { code: 'TK', name: 'Turkmen (Türkmen)', flag: '🇹🇲' },
+        { code: 'UR', name: 'Urdu (اردو)', flag: '🇵🇰' },
+        { code: 'UZ', name: 'Uzbek (Oʻzbek)', flag: '🇺🇿' },
+        { code: 'VI', name: 'Vietnamese (Tiếng Việt)', flag: '🇻🇳' },
+        { code: 'CY', name: 'Welsh (Cymraeg)', flag: '🏴󠁧󠁢󠁷󠁬󠁳󠁿' },
+        { code: 'YI', name: 'Yiddish (ייִדיש)', flag: '🕎' },
+        { code: 'ZU', name: 'Zulu (isiZulu)', flag: '🇿🇦' }
     ];
 
     const popup = document.createElement('div');
     popup.id = 'laba-language-picker';
+
+    // Создаём HTML с поиском
     popup.innerHTML = `
         <div style="font-weight: 600; margin-bottom: 10px; color: #667eea;">🌐 Выберите язык перевода</div>
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
-            ${languages.map(lang => `
-                <button class="lang-btn" data-lang="${lang.code}" style="
-                    padding: 8px 10px;
-                    border: 1px solid #ddd;
-                    border-radius: 6px;
-                    background: white;
-                    cursor: pointer;
-                    font-size: 13px;
-                    transition: all 0.15s;
-                    display: flex;
-                    align-items: center;
-                    gap: 6px;
-                ">${lang.flag} ${lang.name}</button>
-            `).join('')}
-        </div>
+        <input type="text" id="lang-search" placeholder="🔍 Поиск языка..." style="
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 14px;
+            box-sizing: border-box;
+        ">
+        <div id="lang-list" style="
+            max-height: 350px;
+            overflow-y: auto;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+        "></div>
     `;
 
     Object.assign(popup.style, {
@@ -585,17 +660,101 @@ function showLanguagePickerPopup(e, textToTranslate) {
         padding: '15px',
         borderRadius: '10px',
         boxShadow: '0 4px 25px rgba(0,0,0,0.25)',
-        maxWidth: '320px',
+        width: '380px',
+        maxWidth: '90vw',
         fontFamily: 'Arial, sans-serif',
         fontSize: '14px'
     });
 
     document.body.appendChild(popup);
 
+    const langList = popup.querySelector('#lang-list');
+    const searchInput = popup.querySelector('#lang-search');
+
+    // Функция отрисовки языков
+    function renderLanguages(filter = '') {
+        const filterLower = filter.toLowerCase();
+        const filtered = languages.filter(lang =>
+            lang.name.toLowerCase().includes(filterLower) ||
+            lang.code.toLowerCase().includes(filterLower)
+        );
+
+        // Сортируем: сначала популярные, потом остальные
+        filtered.sort((a, b) => {
+            if (a.popular && !b.popular) return -1;
+            if (!a.popular && b.popular) return 1;
+            return 0;
+        });
+
+        langList.innerHTML = filtered.map(lang => `
+            <button class="lang-btn" data-lang="${lang.code}" style="
+                padding: 8px 10px;
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                background: ${lang.popular ? '#f8f9ff' : 'white'};
+                cursor: pointer;
+                font-size: 12px;
+                transition: all 0.15s;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                text-align: left;
+            ">${lang.flag} ${lang.name}</button>
+        `).join('');
+
+        // Обработчики для кнопок
+        langList.querySelectorAll('.lang-btn').forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                btn.style.color = 'white';
+                btn.style.borderColor = '#667eea';
+            });
+            btn.addEventListener('mouseleave', () => {
+                const isPopular = languages.find(l => l.code === btn.dataset.lang)?.popular;
+                btn.style.background = isPopular ? '#f8f9ff' : 'white';
+                btn.style.color = 'black';
+                btn.style.borderColor = '#ddd';
+            });
+            btn.addEventListener('click', async () => {
+                const targetLang = btn.dataset.lang;
+                popup.remove();
+
+                showToast(`Перевод на ${targetLang}...`, 'info');
+
+                try {
+                    const sourceLang = globalSettings.translateFrom || 'auto';
+                    const result = await translateText(textToTranslate, targetLang, sourceLang);
+
+                    if (result.success && !result.sameLanguage) {
+                        replaceSelectedText(result.text);
+                        showToast('Текст заменён', 'success');
+                    } else if (result.sameLanguage) {
+                        showToast('Текст уже на этом языке', 'info');
+                    } else {
+                        showToast(`Ошибка: ${result.error}`, 'error');
+                    }
+                } catch (err) {
+                    showToast(`Ошибка: ${err.message}`, 'error');
+                }
+            });
+        });
+    }
+
+    // Первоначальная отрисовка
+    renderLanguages();
+
+    // Поиск
+    searchInput.addEventListener('input', (e) => {
+        renderLanguages(e.target.value);
+    });
+
+    // Фокус на поиске
+    setTimeout(() => searchInput.focus(), 100);
+
     // Позиционируем popup
     const rect = popup.getBoundingClientRect();
-    let x = e.clientX || window.innerWidth / 2;
-    let y = e.clientY || window.innerHeight / 2;
+    let x = (e.clientX || window.innerWidth / 2) - rect.width / 2;
+    let y = (e.clientY || window.innerHeight / 2) - rect.height / 2;
 
     if (x + rect.width > window.innerWidth - 10) {
         x = window.innerWidth - rect.width - 10;
@@ -608,42 +767,6 @@ function showLanguagePickerPopup(e, textToTranslate) {
 
     popup.style.left = x + 'px';
     popup.style.top = y + 'px';
-
-    // Обработчики для кнопок
-    popup.querySelectorAll('.lang-btn').forEach(btn => {
-        btn.addEventListener('mouseenter', () => {
-            btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-            btn.style.color = 'white';
-            btn.style.borderColor = '#667eea';
-        });
-        btn.addEventListener('mouseleave', () => {
-            btn.style.background = 'white';
-            btn.style.color = 'black';
-            btn.style.borderColor = '#ddd';
-        });
-        btn.addEventListener('click', async () => {
-            const targetLang = btn.dataset.lang;
-            popup.remove();
-
-            showToast(`Перевод на ${targetLang}...`, 'info');
-
-            try {
-                const sourceLang = globalSettings.translateFrom || 'auto';
-                const result = await translateText(textToTranslate, targetLang, sourceLang);
-
-                if (result.success && !result.sameLanguage) {
-                    replaceSelectedText(result.text);
-                    showToast('Текст заменён', 'success');
-                } else if (result.sameLanguage) {
-                    showToast('Текст уже на этом языке', 'info');
-                } else {
-                    showToast(`Ошибка: ${result.error}`, 'error');
-                }
-            } catch (err) {
-                showToast(`Ошибка: ${err.message}`, 'error');
-            }
-        });
-    });
 
     // Закрытие по клику вне popup
     setTimeout(() => {

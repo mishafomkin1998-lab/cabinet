@@ -183,16 +183,39 @@ const TRANSLATE_BUTTON_SCRIPT = `
         setTimeout(hideButton, 500);
     });
 
-    // Обработчик Ctrl+A для показа кнопки
-    document.addEventListener('keyup', (e) => {
+    // Обработчик Ctrl+A для показа кнопки (keydown более надёжен)
+    document.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
             setTimeout(() => {
                 const text = getSelectedText();
                 if (text && text.length >= 2) {
                     showButton(window.innerWidth / 2, window.innerHeight / 2, text);
                 }
-            }, 50);
+            }, 100);
         }
+    });
+
+    // Обработчик selectionchange - срабатывает при любом изменении выделения
+    let selectionChangeTimeout = null;
+    document.addEventListener('selectionchange', () => {
+        clearTimeout(selectionChangeTimeout);
+        selectionChangeTimeout = setTimeout(() => {
+            const text = getSelectedText();
+            if (text && text.length >= 2 && btn.style.display !== 'flex') {
+                const selection = window.getSelection();
+                if (selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    const rect = range.getBoundingClientRect();
+                    if (rect.width > 0) {
+                        showButton(rect.right, rect.top, text);
+                    } else {
+                        showButton(window.innerWidth / 2, window.innerHeight / 2, text);
+                    }
+                }
+            } else if (!text || text.length < 2) {
+                hideButton();
+            }
+        }, 150);
     });
 
     // Обработчик для скрытия кнопки при потере фокуса
