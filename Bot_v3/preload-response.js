@@ -32,7 +32,7 @@ contextBridge.exposeInMainWorld('lababotAI', {
         }
     },
 
-    // Перевод текста (для плавающей кнопки)
+    // Перевод текста (для плавающей кнопки - ЛКМ)
     translate: async (text, x, y) => {
         try {
             const result = await ipcRenderer.invoke('response-window-translate', {
@@ -43,6 +43,19 @@ contextBridge.exposeInMainWorld('lababotAI', {
             return result;
         } catch (err) {
             console.error('[LababotAI] Translate error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    // Перевод и замена текста (для плавающей кнопки - ПКМ)
+    translateAndReplace: async (text) => {
+        try {
+            const result = await ipcRenderer.invoke('response-window-translate-replace', {
+                text
+            });
+            return result;
+        } catch (err) {
+            console.error('[LababotAI] TranslateReplace error:', err);
             return { success: false, error: err.message };
         }
     }
@@ -128,6 +141,47 @@ ipcRenderer.on('show-translation-popup', (event, { text, originalText, x, y }) =
     setTimeout(() => {
         if (document.body.contains(popup)) popup.remove();
     }, 15000);
+});
+
+// Слушаем событие замены выделенного текста
+ipcRenderer.on('replace-selected-text', (event, { text }) => {
+    console.log('[LababotAI] Замена текста:', text?.substring(0, 30));
+
+    try {
+        const activeEl = document.activeElement;
+
+        // Для input/textarea
+        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+            const start = activeEl.selectionStart;
+            const end = activeEl.selectionEnd;
+            const value = activeEl.value;
+
+            activeEl.value = value.substring(0, start) + text + value.substring(end);
+            activeEl.selectionStart = activeEl.selectionEnd = start + text.length;
+            activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+            activeEl.focus();
+            console.log('[LababotAI] Текст заменён в input/textarea');
+            return;
+        }
+
+        // Для contenteditable
+        if (activeEl && activeEl.isContentEditable) {
+            document.execCommand('insertText', false, text);
+            console.log('[LababotAI] Текст заменён в contenteditable');
+            return;
+        }
+
+        // Fallback - просто заменяем выделение
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(document.createTextNode(text));
+            console.log('[LababotAI] Текст заменён через selection');
+        }
+    } catch (err) {
+        console.error('[LababotAI] Ошибка замены текста:', err);
+    }
 });
 
 // Функция экранирования HTML

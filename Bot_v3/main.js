@@ -1709,36 +1709,7 @@ ipcMain.handle('open-response-window', async (event, data) => {
             });
         }
 
-        // Пункты перевода для response window
-        const translateItems = params.selectionText ? [
-            { type: 'separator' },
-            {
-                label: '🌐 Перевести',
-                click: () => {
-                    // Отправляем в главное окно для показа popup
-                    if (mainWindow && !mainWindow.isDestroyed()) {
-                        mainWindow.webContents.send('translate-selection', {
-                            text: params.selectionText,
-                            x: params.x + win.getBounds().x,
-                            y: params.y + win.getBounds().y,
-                            mode: 'show'
-                        });
-                    }
-                }
-            },
-            {
-                label: '🔄 Заменить переводом',
-                click: async () => {
-                    // Переводим и заменяем текст прямо в response window
-                    if (mainWindow && !mainWindow.isDestroyed()) {
-                        mainWindow.webContents.send('translate-for-replace', {
-                            text: params.selectionText,
-                            windowId: windowId
-                        });
-                    }
-                }
-            }
-        ] : [];
+        // Перевод убран из контекстного меню - используется плавающая кнопка
 
         const contextMenu = Menu.buildFromTemplate([
             {
@@ -1749,7 +1720,6 @@ ipcMain.handle('open-response-window', async (event, data) => {
             { label: 'Вырезать', role: 'cut' },
             { label: 'Копировать', role: 'copy' },
             { label: 'Вставить', role: 'paste' },
-            ...translateItems,
             { type: 'separator' },
             { label: 'Выделить всё', role: 'selectAll' }
         ]);
@@ -1961,7 +1931,7 @@ function injectTranslateButton(win) {
                     const btn = document.createElement('div');
                     btn.id = 'laba-translate-btn';
                     btn.innerHTML = '🌐';
-                    btn.title = 'Перевести выделенный текст';
+                    btn.title = 'ЛКМ: показать перевод\\nПКМ: заменить текст';
                     document.body.appendChild(btn);
 
                     let hideTimeout = null;
@@ -2074,6 +2044,38 @@ function injectTranslateButton(win) {
                             }
                         } else {
                             console.error('[TranslateBtn] API перевода недоступен');
+                        }
+
+                        // Скрываем кнопку
+                        setTimeout(hideButton, 300);
+                    });
+
+                    // Обработчик ПКМ на кнопку перевода - замена текста
+                    btn.addEventListener('contextmenu', async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        const text = lastSelection || getSelectedText();
+                        if (!text) {
+                            console.log('[TranslateBtn] Нет текста для замены');
+                            return;
+                        }
+
+                        console.log('[TranslateBtn] ПКМ - замена текста:', text.substring(0, 50));
+
+                        // Показываем загрузку
+                        btn.classList.add('loading');
+                        btn.innerHTML = '';
+
+                        // Вызываем перевод и замену через preload API
+                        if (window.lababotAI && window.lababotAI.translateAndReplace) {
+                            try {
+                                await window.lababotAI.translateAndReplace(text);
+                            } catch (err) {
+                                console.error('[TranslateBtn] Ошибка замены:', err);
+                            }
+                        } else {
+                            console.error('[TranslateBtn] API замены недоступен');
                         }
 
                         // Скрываем кнопку
@@ -2367,6 +2369,60 @@ ipcMain.handle('response-window-translate', async (event, { text, x, y }) => {
         return result;
     } catch (err) {
         console.error('[ResponseWindow Translate] Error:', err);
+        return { success: false, error: err.message };
+    }
+});
+
+// IPC: Перевод и замена текста из Response Window (ПКМ на плавающей кнопке)
+ipcMain.handle('response-window-translate-replace', async (event, { text }) => {
+    console.log('[ResponseWindow TranslateReplace] Запрос:', text?.substring(0, 30));
+
+    if (!mainWindow || mainWindow.isDestroyed()) {
+        return { success: false, error: 'Main window not available' };
+    }
+
+    try {
+        // Выполняем перевод через renderer
+        const result = await mainWindow.webContents.executeJavaScript(`
+            (async function() {
+                if (typeof translateText !== 'function') {
+                    return { success: false, error: 'Переводчик не загружен' };
+                }
+
+                if (!globalSettings || !globalSettings.translatorEnabled) {
+                    return { success: false, error: 'Переводчик выключен в настройках' };
+                }
+
+                const text = ${JSON.stringify(text)};
+                const sourceLang = globalSettings.translateFrom || 'auto';
+                let targetLang;
+
+                if (sourceLang === 'auto') {
+                    // Для замены используем translateReplace (по умолчанию EN)
+                    targetLang = getAutoTargetLang(text, globalSettings.translateReplace || 'EN');
+                } else {
+                    targetLang = globalSettings.translateReplace || 'EN';
+                }
+
+                const result = await translateText(text, targetLang, sourceLang);
+                return result;
+            })()
+        `);
+
+        // Если перевод успешен - заменяем текст в Response Window
+        if (result.success && !result.sameLanguage) {
+            const senderWindow = BrowserWindow.fromWebContents(event.sender);
+            if (senderWindow && !senderWindow.isDestroyed()) {
+                // Отправляем команду замены текста
+                senderWindow.webContents.send('replace-selected-text', {
+                    text: result.text
+                });
+            }
+        }
+
+        return result;
+    } catch (err) {
+        console.error('[ResponseWindow TranslateReplace] Error:', err);
         return { success: false, error: err.message };
     }
 });

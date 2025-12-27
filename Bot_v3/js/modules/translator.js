@@ -313,6 +313,13 @@ function initTranslatorHotkeys() {
                 console.log('[Translator] Hotkey: замена');
                 await handleReplaceHotkey();
             }
+            // Ctrl+Shift+S - заменить с выбором языка
+            else if (pressedCombo === 'Ctrl+Shift+S') {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[Translator] Hotkey: замена с выбором языка');
+                await handleReplaceWithLanguageChoice(e);
+            }
         } catch (error) {
             console.error('[Translator] Ошибка в обработчике горячих клавиш:', error);
             if (typeof showToast === 'function') {
@@ -500,6 +507,149 @@ async function handleReplaceHotkey() {
         console.error('[Translator] handleReplaceHotkey error:', error);
         showToast(`Ошибка: ${error.message}`, 'error');
     }
+}
+
+// Ctrl+Shift+S - замена с выбором языка
+async function handleReplaceWithLanguageChoice(e) {
+    const selectedText = getSelectedText();
+    if (!selectedText) {
+        showToast('Выделите текст для перевода', 'warning');
+        return;
+    }
+
+    console.log('[Translator] Выбор языка для:', selectedText.substring(0, 30));
+
+    // Показываем popup с выбором языка
+    showLanguagePickerPopup(e, selectedText);
+}
+
+// Popup с выбором языка для замены
+function showLanguagePickerPopup(e, textToTranslate) {
+    // Удаляем существующий popup если есть
+    const existingPopup = document.getElementById('laba-language-picker');
+    if (existingPopup) existingPopup.remove();
+
+    const languages = [
+        { code: 'EN', name: 'English', flag: '🇬🇧' },
+        { code: 'RU', name: 'Русский', flag: '🇷🇺' },
+        { code: 'DE', name: 'Deutsch', flag: '🇩🇪' },
+        { code: 'FR', name: 'Français', flag: '🇫🇷' },
+        { code: 'ES', name: 'Español', flag: '🇪🇸' },
+        { code: 'IT', name: 'Italiano', flag: '🇮🇹' },
+        { code: 'PT', name: 'Português', flag: '🇵🇹' },
+        { code: 'PL', name: 'Polski', flag: '🇵🇱' },
+        { code: 'UK', name: 'Українська', flag: '🇺🇦' },
+        { code: 'ZH', name: '中文', flag: '🇨🇳' },
+        { code: 'JA', name: '日本語', flag: '🇯🇵' },
+        { code: 'KO', name: '한국어', flag: '🇰🇷' }
+    ];
+
+    const popup = document.createElement('div');
+    popup.id = 'laba-language-picker';
+    popup.innerHTML = `
+        <div style="font-weight: 600; margin-bottom: 10px; color: #667eea;">🌐 Выберите язык перевода</div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;">
+            ${languages.map(lang => `
+                <button class="lang-btn" data-lang="${lang.code}" style="
+                    padding: 8px 10px;
+                    border: 1px solid #ddd;
+                    border-radius: 6px;
+                    background: white;
+                    cursor: pointer;
+                    font-size: 13px;
+                    transition: all 0.15s;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                ">${lang.flag} ${lang.name}</button>
+            `).join('')}
+        </div>
+    `;
+
+    Object.assign(popup.style, {
+        position: 'fixed',
+        zIndex: '999999',
+        background: 'white',
+        padding: '15px',
+        borderRadius: '10px',
+        boxShadow: '0 4px 25px rgba(0,0,0,0.25)',
+        maxWidth: '320px',
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '14px'
+    });
+
+    document.body.appendChild(popup);
+
+    // Позиционируем popup
+    const rect = popup.getBoundingClientRect();
+    let x = e.clientX || window.innerWidth / 2;
+    let y = e.clientY || window.innerHeight / 2;
+
+    if (x + rect.width > window.innerWidth - 10) {
+        x = window.innerWidth - rect.width - 10;
+    }
+    if (y + rect.height > window.innerHeight - 10) {
+        y = window.innerHeight - rect.height - 10;
+    }
+    if (x < 10) x = 10;
+    if (y < 10) y = 10;
+
+    popup.style.left = x + 'px';
+    popup.style.top = y + 'px';
+
+    // Обработчики для кнопок
+    popup.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.addEventListener('mouseenter', () => {
+            btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+            btn.style.color = 'white';
+            btn.style.borderColor = '#667eea';
+        });
+        btn.addEventListener('mouseleave', () => {
+            btn.style.background = 'white';
+            btn.style.color = 'black';
+            btn.style.borderColor = '#ddd';
+        });
+        btn.addEventListener('click', async () => {
+            const targetLang = btn.dataset.lang;
+            popup.remove();
+
+            showToast(`Перевод на ${targetLang}...`, 'info');
+
+            try {
+                const sourceLang = globalSettings.translateFrom || 'auto';
+                const result = await translateText(textToTranslate, targetLang, sourceLang);
+
+                if (result.success && !result.sameLanguage) {
+                    replaceSelectedText(result.text);
+                    showToast('Текст заменён', 'success');
+                } else if (result.sameLanguage) {
+                    showToast('Текст уже на этом языке', 'info');
+                } else {
+                    showToast(`Ошибка: ${result.error}`, 'error');
+                }
+            } catch (err) {
+                showToast(`Ошибка: ${err.message}`, 'error');
+            }
+        });
+    });
+
+    // Закрытие по клику вне popup
+    setTimeout(() => {
+        document.addEventListener('mousedown', function closePopup(ev) {
+            if (!popup.contains(ev.target)) {
+                popup.remove();
+                document.removeEventListener('mousedown', closePopup);
+            }
+        });
+    }, 100);
+
+    // Закрытие по Escape
+    document.addEventListener('keydown', function escHandler(ev) {
+        if (ev.key === 'Escape') {
+            popup.remove();
+            document.removeEventListener('keydown', escHandler);
+        }
+    });
 }
 
 function getSelectedText() {
