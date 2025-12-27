@@ -452,11 +452,93 @@ function replaceSelectedText(newText) {
 }
 
 // =====================================================
+// === IPC ОБРАБОТЧИКИ (из контекстного меню) ===
+// =====================================================
+
+function initTranslatorIPC() {
+    const { ipcRenderer } = require('electron');
+
+    // Обработка перевода из контекстного меню
+    ipcRenderer.on('translate-selection', async (event, data) => {
+        if (!globalSettings.translatorEnabled) {
+            showToast('Переводчик выключен в настройках', 'warning');
+            return;
+        }
+
+        const { text, x, y, mode } = data;
+
+        if (!text || !text.trim()) {
+            showToast('Нет текста для перевода', 'warning');
+            return;
+        }
+
+        if (mode === 'show') {
+            // Показать popup с переводом
+            showToast('Переводим...', 'info');
+
+            const targetLang = globalSettings.translateTo || 'RU';
+            const sourceLang = globalSettings.translateFrom || 'auto';
+
+            const result = await translateText(text, targetLang, sourceLang);
+
+            if (result.success) {
+                showTranslationPopup(result.text, text, x, y);
+            } else {
+                showToast(`Ошибка перевода: ${result.error}`, 'error');
+            }
+        } else if (mode === 'replace') {
+            // Заменить выделенный текст переводом
+            showToast('Переводим...', 'info');
+
+            const targetLang = globalSettings.translateReplace || 'EN';
+            const sourceLang = globalSettings.translateFrom || 'auto';
+
+            const result = await translateText(text, targetLang, sourceLang);
+
+            if (result.success) {
+                replaceSelectedText(result.text);
+                showToast('Текст заменён', 'success');
+            } else {
+                showToast(`Ошибка перевода: ${result.error}`, 'error');
+            }
+        }
+    });
+
+    // Обработка перевода для замены в response window
+    ipcRenderer.on('translate-for-replace', async (event, data) => {
+        if (!globalSettings.translatorEnabled) {
+            return;
+        }
+
+        const { text, windowId } = data;
+
+        const targetLang = globalSettings.translateReplace || 'EN';
+        const sourceLang = globalSettings.translateFrom || 'auto';
+
+        const result = await translateText(text, targetLang, sourceLang);
+
+        if (result.success) {
+            // Отправляем перевод обратно в main для вставки в response window
+            ipcRenderer.send('insert-translation-to-window', {
+                windowId: windowId,
+                text: result.text
+            });
+            showToast('Текст заменён', 'success');
+        } else {
+            showToast(`Ошибка перевода: ${result.error}`, 'error');
+        }
+    });
+
+    console.log('[Translator] IPC обработчики инициализированы');
+}
+
+// =====================================================
 // === ИНИЦИАЛИЗАЦИЯ ===
 // =====================================================
 
-// Инициализируем горячие клавиши при загрузке
+// Инициализируем при загрузке
 document.addEventListener('DOMContentLoaded', function() {
     initTranslatorHotkeys();
+    initTranslatorIPC();
     console.log('[Translator] Модуль переводчика инициализирован');
 });

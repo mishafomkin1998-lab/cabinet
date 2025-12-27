@@ -748,6 +748,86 @@ ipcMain.handle('test-proxy', async (event, { proxyString }) => {
     }
 });
 
+// IPC: Вставка перевода в response window
+ipcMain.on('insert-translation-to-window', (event, { windowId, text }) => {
+    const win = responseWindows.get(windowId);
+    if (win && !win.isDestroyed()) {
+        // Вставляем переведённый текст вместо выделенного
+        win.webContents.executeJavaScript(`
+            (function() {
+                const selection = window.getSelection();
+                if (selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    range.deleteContents();
+                    range.insertNode(document.createTextNode(${JSON.stringify(text)}));
+                    selection.removeAllRanges();
+                }
+            })()
+        `).catch(err => console.error('[Translator] Insert error:', err));
+    }
+});
+
+// IPC: Контекстное меню для WebView
+ipcMain.on('show-webview-context-menu', (event, { botId, x, y, selectionText, isEditable }) => {
+    const menuItems = [];
+
+    // Стандартные пункты
+    if (isEditable) {
+        menuItems.push(
+            { label: 'Вырезать', role: 'cut' },
+            { label: 'Копировать', role: 'copy' },
+            { label: 'Вставить', role: 'paste' }
+        );
+    } else {
+        menuItems.push({ label: 'Копировать', role: 'copy' });
+    }
+
+    // Пункты перевода (если есть выделение)
+    if (selectionText) {
+        menuItems.push(
+            { type: 'separator' },
+            {
+                label: '🌐 Перевести',
+                click: () => {
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send('translate-selection', {
+                            text: selectionText,
+                            x: x,
+                            y: y,
+                            mode: 'show'
+                        });
+                    }
+                }
+            }
+        );
+
+        if (isEditable) {
+            menuItems.push({
+                label: '🔄 Заменить переводом',
+                click: () => {
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send('translate-selection', {
+                            text: selectionText,
+                            x: x,
+                            y: y,
+                            mode: 'replace',
+                            botId: botId // для замены в webview
+                        });
+                    }
+                }
+            });
+        }
+    }
+
+    menuItems.push(
+        { type: 'separator' },
+        { label: 'Выделить всё', role: 'selectAll' }
+    );
+
+    const contextMenu = Menu.buildFromTemplate(menuItems);
+    contextMenu.popup();
+});
+
 // =====================================================
 
 // Хранилище прокси настроек для ботов
@@ -1127,20 +1207,63 @@ function createWindow() {
                 }
             }));
 
+            const translateItems = params.selectionText ? [
+                { type: 'separator' },
+                {
+                    label: '🌐 Перевести',
+                    click: () => {
+                        mainWindow.webContents.send('translate-selection', {
+                            text: params.selectionText,
+                            x: params.x,
+                            y: params.y,
+                            mode: 'show' // показать popup
+                        });
+                    }
+                },
+                {
+                    label: '🔄 Заменить переводом',
+                    click: () => {
+                        mainWindow.webContents.send('translate-selection', {
+                            text: params.selectionText,
+                            x: params.x,
+                            y: params.y,
+                            mode: 'replace' // заменить текст
+                        });
+                    }
+                }
+            ] : [];
+
             const contextMenu = Menu.buildFromTemplate([
                 ...transcriptionItems,
                 { type: 'separator' },
                 { label: 'Вырезать', role: 'cut' },
                 { label: 'Копировать', role: 'copy' },
                 { label: 'Вставить', role: 'paste' },
+                ...translateItems,
                 { type: 'separator' },
                 { label: 'Выделить всё', role: 'selectAll' }
             ]);
             contextMenu.popup();
         } else {
             // Обычное контекстное меню для не-editable элементов
+            const translateItems = params.selectionText ? [
+                { type: 'separator' },
+                {
+                    label: '🌐 Перевести',
+                    click: () => {
+                        mainWindow.webContents.send('translate-selection', {
+                            text: params.selectionText,
+                            x: params.x,
+                            y: params.y,
+                            mode: 'show'
+                        });
+                    }
+                }
+            ] : [];
+
             const contextMenu = Menu.buildFromTemplate([
                 { label: 'Копировать', role: 'copy' },
+                ...translateItems,
                 { label: 'Выделить всё', role: 'selectAll' }
             ]);
             contextMenu.popup();
@@ -1406,6 +1529,37 @@ ipcMain.handle('open-response-window', async (event, data) => {
             });
         }
 
+        // Пункты перевода для response window
+        const translateItems = params.selectionText ? [
+            { type: 'separator' },
+            {
+                label: '🌐 Перевести',
+                click: () => {
+                    // Отправляем в главное окно для показа popup
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send('translate-selection', {
+                            text: params.selectionText,
+                            x: params.x + win.getBounds().x,
+                            y: params.y + win.getBounds().y,
+                            mode: 'show'
+                        });
+                    }
+                }
+            },
+            {
+                label: '🔄 Заменить переводом',
+                click: async () => {
+                    // Переводим и заменяем текст прямо в response window
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send('translate-for-replace', {
+                            text: params.selectionText,
+                            windowId: windowId
+                        });
+                    }
+                }
+            }
+        ] : [];
+
         const contextMenu = Menu.buildFromTemplate([
             {
                 label: '✨ AI Ответ',
@@ -1415,6 +1569,7 @@ ipcMain.handle('open-response-window', async (event, data) => {
             { label: 'Вырезать', role: 'cut' },
             { label: 'Копировать', role: 'copy' },
             { label: 'Вставить', role: 'paste' },
+            ...translateItems,
             { type: 'separator' },
             { label: 'Выделить всё', role: 'selectAll' }
         ]);

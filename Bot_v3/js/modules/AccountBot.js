@@ -581,6 +581,28 @@ class AccountBot {
             webview.executeJavaScript(script);
         });
 
+        // КОНТЕКСТНОЕ МЕНЮ для webview (перевод)
+        webview.addEventListener('context-menu', async (e) => {
+            e.preventDefault();
+
+            // Получаем выделенный текст из webview
+            let selectedText = '';
+            try {
+                selectedText = await webview.executeJavaScript('window.getSelection().toString()');
+            } catch (err) {
+                console.log('[WebView Context] Не удалось получить выделение:', err.message);
+            }
+
+            // Отправляем в main process для показа контекстного меню
+            ipcRenderer.send('show-webview-context-menu', {
+                botId: this.id,
+                x: e.params?.x || e.x,
+                y: e.params?.y || e.y,
+                selectionText: selectedText?.trim() || '',
+                isEditable: e.params?.isEditable || false
+            });
+        });
+
         // ВАЖНО: Добавляем webview в скрытый контейнер
         document.getElementById('browsers-container').appendChild(webview);
         this.webview = webview;
