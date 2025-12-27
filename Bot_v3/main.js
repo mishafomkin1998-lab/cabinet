@@ -1685,7 +1685,11 @@ function matchesHotkey(input, hotkey) {
     // Это работает независимо от раскладки
     const inputCode = input.code || '';
 
-    return input.control === hotkey.ctrl &&
+    // На Mac Command (meta) = Ctrl на Windows
+    // Проверяем оба варианта для кроссплатформенности
+    const ctrlOrCmd = input.control || input.meta;
+
+    return ctrlOrCmd === hotkey.ctrl &&
            input.shift === hotkey.shift &&
            (input.alt || false) === (hotkey.alt || false) &&
            inputCode.toUpperCase() === hotkey.code.toUpperCase();
@@ -2273,6 +2277,13 @@ ipcMain.handle('open-response-window', async (event, data) => {
         if (!webviewHotkeySettings._initialized) {
             await updateWebviewHotkeySettings();
             webviewHotkeySettings._initialized = true;
+        }
+
+        // Отладка: показываем какие клавиши нажаты
+        const ctrlOrCmd = input.control || input.meta;
+        if (ctrlOrCmd || input.shift || input.alt) {
+            console.log(`[ResponseWindow Hotkeys] Нажато: ctrl/cmd=${ctrlOrCmd}, shift=${input.shift}, code=${input.code}`);
+            console.log(`[ResponseWindow Hotkeys] Настройки translate:`, webviewHotkeySettings.translate);
         }
 
         // Проверяем горячие клавиши
