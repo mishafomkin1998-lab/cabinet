@@ -2070,10 +2070,10 @@ function injectTranslateButton(win) {
                             }
 
                             if (ctx.type === 'selection') {
-                                ctx.range.deleteContents();
-                                ctx.range.insertNode(document.createTextNode(newText));
-                                console.log('[TranslateBtn] Текст заменён через selection');
-                                return true;
+                                // Для обычного текста на странице замена невозможна
+                                // Вместо этого показываем popup с переводом
+                                console.log('[TranslateBtn] Обычный текст - замена невозможна, показываем popup');
+                                return false;
                             }
                         } catch (err) {
                             console.error('[TranslateBtn] Ошибка замены:', err);
@@ -2223,8 +2223,18 @@ function injectTranslateButton(win) {
                             try {
                                 const result = await window.lababotAI.translateAndReplace(text);
                                 if (result && result.success && result.text) {
-                                    // Заменяем текст локально используя сохранённый контекст
-                                    replaceWithContext(result.text);
+                                    // Пытаемся заменить текст локально
+                                    const replaced = replaceWithContext(result.text);
+
+                                    if (!replaced) {
+                                        // Если замена невозможна (обычный текст на странице),
+                                        // показываем popup с переводом вместо замены
+                                        console.log('[TranslateBtn] Замена невозможна, показываем popup');
+                                        const rect = btn.getBoundingClientRect();
+                                        if (window.lababotAI && window.lababotAI.translate) {
+                                            await window.lababotAI.translate(text, rect.left, rect.bottom + 5);
+                                        }
+                                    }
                                 } else if (result && result.sameLanguage) {
                                     console.log('[TranslateBtn] Текст уже на целевом языке');
                                 } else {
