@@ -27,6 +27,20 @@ function loadGlobalSettingsUI() {
     document.getElementById('set-show-profile-card').checked = globalSettings.showProfileCard !== false;
     document.getElementById('set-translator-id').value = globalSettings.translatorId || '';
     document.getElementById('set-log-limit').value = globalSettings.logLimit || DEFAULT_LOG_LIMIT;
+
+    // Настройки переводчика
+    document.getElementById('set-translator-enabled').checked = globalSettings.translatorEnabled !== false;
+    document.getElementById('set-deepl-key').value = globalSettings.deeplKey || '';
+    document.getElementById('set-google-translate-key').value = globalSettings.googleTranslateKey || '';
+    document.getElementById('set-translate-from').value = globalSettings.translateFrom || 'auto';
+    document.getElementById('set-translate-to').value = globalSettings.translateTo || 'RU';
+    document.getElementById('set-translate-replace').value = globalSettings.translateReplace || 'EN';
+    document.getElementById('set-translate-width').value = globalSettings.translateWidth || 350;
+    document.getElementById('set-translate-font-size').value = globalSettings.translateFontSize || 14;
+    document.getElementById('set-translate-auto-close').value = globalSettings.translateAutoClose || 0;
+    document.getElementById('set-hotkey-translate').value = globalSettings.hotkeyTranslate || 'Ctrl+Q';
+    document.getElementById('set-hotkey-replace').value = globalSettings.hotkeyReplace || 'Ctrl+S';
+
     applyTheme(globalSettings.theme);
     toggleProfileCards(); // Применяем настройку видимости карточек профиля
 
@@ -99,6 +113,19 @@ function saveGlobalSettings() {
     const translatorIdValue = document.getElementById('set-translator-id').value.trim();
     globalSettings.translatorId = translatorIdValue ? parseInt(translatorIdValue) : null;
 
+    // Сохраняем настройки переводчика
+    globalSettings.translatorEnabled = document.getElementById('set-translator-enabled').checked;
+    globalSettings.deeplKey = document.getElementById('set-deepl-key').value.trim();
+    globalSettings.googleTranslateKey = document.getElementById('set-google-translate-key').value.trim();
+    globalSettings.translateFrom = document.getElementById('set-translate-from').value;
+    globalSettings.translateTo = document.getElementById('set-translate-to').value;
+    globalSettings.translateReplace = document.getElementById('set-translate-replace').value;
+    globalSettings.translateWidth = parseInt(document.getElementById('set-translate-width').value) || 350;
+    globalSettings.translateFontSize = parseInt(document.getElementById('set-translate-font-size').value) || 14;
+    globalSettings.translateAutoClose = parseInt(document.getElementById('set-translate-auto-close').value) || 0;
+    globalSettings.hotkeyTranslate = document.getElementById('set-hotkey-translate').value || 'Ctrl+Q';
+    globalSettings.hotkeyReplace = document.getElementById('set-hotkey-replace').value || 'Ctrl+S';
+
     // Сохраняем прокси для анкет (1-6)
     for (let i = 1; i <= 6; i++) {
         const proxyInput = document.getElementById(`set-proxy-${i}`);
@@ -157,6 +184,19 @@ function openGlobalSettings() {
     document.getElementById('set-show-profile-card').checked = globalSettings.showProfileCard !== false;
     document.getElementById('set-translator-id').value = globalSettings.translatorId || '';
     document.getElementById('set-log-limit').value = globalSettings.logLimit || DEFAULT_LOG_LIMIT;
+
+    // Загружаем настройки переводчика
+    document.getElementById('set-translator-enabled').checked = globalSettings.translatorEnabled !== false;
+    document.getElementById('set-deepl-key').value = globalSettings.deeplKey || '';
+    document.getElementById('set-google-translate-key').value = globalSettings.googleTranslateKey || '';
+    document.getElementById('set-translate-from').value = globalSettings.translateFrom || 'auto';
+    document.getElementById('set-translate-to').value = globalSettings.translateTo || 'RU';
+    document.getElementById('set-translate-replace').value = globalSettings.translateReplace || 'EN';
+    document.getElementById('set-translate-width').value = globalSettings.translateWidth || 350;
+    document.getElementById('set-translate-font-size').value = globalSettings.translateFontSize || 14;
+    document.getElementById('set-translate-auto-close').value = globalSettings.translateAutoClose || 0;
+    document.getElementById('set-hotkey-translate').value = globalSettings.hotkeyTranslate || 'Ctrl+Q';
+    document.getElementById('set-hotkey-replace').value = globalSettings.hotkeyReplace || 'Ctrl+S';
 
     // Загружаем прокси для анкет (1-6)
     for (let i = 1; i <= 6; i++) {
@@ -680,4 +720,62 @@ async function savePromptText(promptType) {
             }
         }
     }
+}
+
+// =====================================================
+// === ЗАХВАТ ГОРЯЧИХ КЛАВИШ ДЛЯ ПЕРЕВОДЧИКА ===
+// =====================================================
+
+let capturingHotkey = null;
+
+function captureHotkey(input, type) {
+    capturingHotkey = { input, type };
+    input.value = 'Нажмите комбинацию...';
+    input.classList.add('capturing');
+
+    const handler = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Игнорируем одиночные модификаторы
+        if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) {
+            return;
+        }
+
+        const parts = [];
+        if (e.ctrlKey) parts.push('Ctrl');
+        if (e.shiftKey) parts.push('Shift');
+        if (e.altKey) parts.push('Alt');
+
+        // Форматируем клавишу
+        let key = e.key.toUpperCase();
+        if (key === ' ') key = 'Space';
+        if (key === 'ESCAPE') {
+            // Отмена
+            input.value = globalSettings[type === 'translate' ? 'hotkeyTranslate' : 'hotkeyReplace'] || (type === 'translate' ? 'Ctrl+Q' : 'Ctrl+S');
+            input.classList.remove('capturing');
+            capturingHotkey = null;
+            document.removeEventListener('keydown', handler, true);
+            return;
+        }
+
+        parts.push(key);
+        const combo = parts.join('+');
+
+        input.value = combo;
+        input.classList.remove('capturing');
+        capturingHotkey = null;
+
+        // Сохраняем настройку
+        if (type === 'translate') {
+            globalSettings.hotkeyTranslate = combo;
+        } else {
+            globalSettings.hotkeyReplace = combo;
+        }
+        localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
+
+        document.removeEventListener('keydown', handler, true);
+    };
+
+    document.addEventListener('keydown', handler, true);
 }

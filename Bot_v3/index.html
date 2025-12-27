@@ -211,6 +211,7 @@
                 <button class="settings-tab active" onclick="switchSettingsTab('interface')"><i class="fa fa-palette"></i> Интерфейс</button>
                 <button class="settings-tab" onclick="switchSettingsTab('proxy')"><i class="fa fa-globe"></i> Прокси</button>
                 <button class="settings-tab" onclick="switchSettingsTab('ai')"><i class="fa fa-robot"></i> AI функции</button>
+                <button class="settings-tab" onclick="switchSettingsTab('translator')"><i class="fa fa-language"></i> Переводчик</button>
                 <button class="settings-tab" onclick="switchSettingsTab('other')"><i class="fa fa-ellipsis-h"></i> Другое</button>
             </div>
 
@@ -413,6 +414,103 @@
                     </div>
                     <textarea id="set-chat-prompt" class="form-control mt-2" rows="2" placeholder="Напр: пиши коротко, игриво, задавай вопросы" onchange="savePromptText('chatPrompt')"></textarea>
                     <small class="text-muted" style="font-size:10px">Используется для AI ответов в чатах</small>
+                </div>
+            </div>
+
+            <!-- Панель: Переводчик -->
+            <div id="settings-panel-translator" class="settings-panel">
+                <div class="settings-grid">
+                    <div class="settings-section">
+                        <div class="settings-section-title"><i class="fa fa-power-off"></i> Основные</div>
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="set-translator-enabled" onchange="saveGlobalSettings()">
+                            <label class="form-check-label small" for="set-translator-enabled">Включить переводчик</label>
+                        </div>
+                        <div class="settings-section-title"><i class="fa fa-key"></i> API ключи</div>
+                        <div class="mb-2">
+                            <label class="form-label small">DeepL API Key</label>
+                            <input id="set-deepl-key" class="form-control form-control-sm" type="password" placeholder="Вставьте ключ DeepL" onchange="saveGlobalSettings()">
+                            <small class="text-muted" style="font-size:10px">Бесплатно: <a href="https://www.deepl.com/pro-api" target="_blank">deepl.com/pro-api</a> (500K симв/мес)</small>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Google Translate API Key</label>
+                            <input id="set-google-translate-key" class="form-control form-control-sm" type="password" placeholder="Опционально" onchange="saveGlobalSettings()">
+                            <small class="text-muted" style="font-size:10px">Опционально. Без ключа используется MyMemory</small>
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title"><i class="fa fa-globe"></i> Языки перевода</div>
+                        <div class="mb-2">
+                            <label class="form-label small">Исходный язык</label>
+                            <select id="set-translate-from" class="form-select form-select-sm" onchange="saveGlobalSettings()">
+                                <option value="auto">Определить автоматически</option>
+                                <option value="EN">English</option>
+                                <option value="RU">Русский</option>
+                                <option value="DE">Deutsch</option>
+                                <option value="FR">Français</option>
+                                <option value="ES">Español</option>
+                                <option value="IT">Italiano</option>
+                                <option value="PL">Polski</option>
+                                <option value="UK">Українська</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Перевод на (Ctrl+Q)</label>
+                            <select id="set-translate-to" class="form-select form-select-sm" onchange="saveGlobalSettings()">
+                                <option value="RU">Русский</option>
+                                <option value="EN">English</option>
+                                <option value="DE">Deutsch</option>
+                                <option value="FR">Français</option>
+                                <option value="ES">Español</option>
+                                <option value="IT">Italiano</option>
+                                <option value="PL">Polski</option>
+                                <option value="UK">Українська</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Замена текста на (Ctrl+S)</label>
+                            <select id="set-translate-replace" class="form-select form-select-sm" onchange="saveGlobalSettings()">
+                                <option value="EN">English</option>
+                                <option value="RU">Русский</option>
+                                <option value="DE">Deutsch</option>
+                                <option value="FR">Français</option>
+                                <option value="ES">Español</option>
+                                <option value="IT">Italiano</option>
+                                <option value="PL">Polski</option>
+                                <option value="UK">Українська</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-grid mt-3">
+                    <div class="settings-section">
+                        <div class="settings-section-title"><i class="fa fa-window-restore"></i> Окно перевода</div>
+                        <div class="mb-2">
+                            <label class="form-label small">Ширина окна (px)</label>
+                            <input type="number" id="set-translate-width" class="form-control form-control-sm" style="width: 100px" min="200" max="800" placeholder="350" onchange="saveGlobalSettings()">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Размер текста (px)</label>
+                            <input type="number" id="set-translate-font-size" class="form-control form-control-sm" style="width: 100px" min="10" max="24" placeholder="14" onchange="saveGlobalSettings()">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Автозакрытие (сек, 0 = выкл)</label>
+                            <input type="number" id="set-translate-auto-close" class="form-control form-control-sm" style="width: 100px" min="0" max="60" placeholder="0" onchange="saveGlobalSettings()">
+                        </div>
+                    </div>
+                    <div class="settings-section">
+                        <div class="settings-section-title"><i class="fa fa-keyboard"></i> Горячие клавиши</div>
+                        <div class="mb-2">
+                            <label class="form-label small">Показать перевод</label>
+                            <input id="set-hotkey-translate" class="form-control form-control-sm hotkey-input" placeholder="Ctrl+Q" readonly onclick="captureHotkey(this, 'translate')" onchange="saveGlobalSettings()">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small">Заменить текст переводом</label>
+                            <input id="set-hotkey-replace" class="form-control form-control-sm hotkey-input" placeholder="Ctrl+S" readonly onclick="captureHotkey(this, 'replace')" onchange="saveGlobalSettings()">
+                        </div>
+                        <small class="text-muted" style="font-size:10px">Нажмите на поле и введите комбинацию клавиш</small>
+                    </div>
                 </div>
             </div>
 
@@ -690,6 +788,7 @@
     <script src="js/modules/logger.js"></script>      <!-- 4. Logger, KEEP_ALIVE_SCRIPT -->
     <script src="js/modules/ai.js"></script>          <!-- 5. AI функции -->
     <script src="js/modules/settings.js"></script>    <!-- 6. Настройки -->
+    <script src="js/modules/translator.js"></script>  <!-- 6.1 Переводчик -->
     <script src="js/modules/AccountBot.js"></script>  <!-- 7. Класс AccountBot -->
     <script src="js/modules/main.js"></script>        <!-- 8. UI функции и основная логика -->
     <script src="js/modules/hotkeys.js"></script>     <!-- 9. Горячие клавиши -->
