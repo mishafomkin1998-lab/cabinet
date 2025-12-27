@@ -1950,17 +1950,41 @@ async function handleGlobalTranslate() {
     }
 }
 
+// Конвертация формата горячей клавиши из настроек в формат Electron
+function convertHotkeyToElectron(hotkey) {
+    if (!hotkey) return null;
+    // "Ctrl+Q" -> "CommandOrControl+Q"
+    // "Ctrl+Shift+S" -> "CommandOrControl+Shift+S"
+    return hotkey
+        .replace(/Ctrl/gi, 'CommandOrControl')
+        .replace(/Alt/gi, 'Alt')
+        .replace(/Shift/gi, 'Shift');
+}
+
 // Инициализация глобального переводчика
-function initGlobalTranslator() {
-    // Регистрируем глобальную горячую клавишу Ctrl+Alt+Q
-    const hotkey = 'CommandOrControl+Alt+Q';
+async function initGlobalTranslator() {
+    // Ждём пока mainWindow загрузит настройки
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Получаем горячую клавишу из настроек
+    let hotkey = 'CommandOrControl+Q'; // default
+    try {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            const settingsHotkey = await mainWindow.webContents.executeJavaScript(`
+                globalSettings.hotkeyTranslate || 'Ctrl+Q'
+            `);
+            hotkey = convertHotkeyToElectron(settingsHotkey);
+        }
+    } catch (e) {
+        console.log('[GlobalTranslator] Используем горячую клавишу по умолчанию');
+    }
 
     try {
         const registered = globalShortcut.register(hotkey, handleGlobalTranslate);
         if (registered) {
             console.log(`[GlobalTranslator] ✅ Глобальная горячая клавиша ${hotkey} зарегистрирована`);
         } else {
-            console.error(`[GlobalTranslator] ❌ Не удалось зарегистрировать ${hotkey}`);
+            console.error(`[GlobalTranslator] ❌ Не удалось зарегистрировать ${hotkey} - возможно занята другой программой`);
         }
     } catch (err) {
         console.error('[GlobalTranslator] Ошибка регистрации горячей клавиши:', err);
