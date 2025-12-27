@@ -94,14 +94,24 @@ async function translateText(text, targetLang, sourceLang = 'auto', botId = null
     // Определяем botId для прокси
     const effectiveBotId = botId || getCurrentBotId();
 
-    // Выбираем сервис перевода
+    // Выбираем сервис перевода с приоритетом: DeepL → Google → MyMemory
     const deeplKey = globalSettings.deeplKey;
+    const googleKey = globalSettings.googleTranslateKey;
+    const mymemoryEmail = globalSettings.mymemoryEmail;
 
     let result;
     if (deeplKey) {
-        result = await translateWithIPC(text, targetLang, sourceLang, 'deepl', deeplKey, effectiveBotId);
+        // Приоритет 1: DeepL
+        console.log('[Translator] Используем DeepL');
+        result = await translateWithIPC(text, targetLang, sourceLang, 'deepl', deeplKey, null, effectiveBotId);
+    } else if (googleKey) {
+        // Приоритет 2: Google Translate
+        console.log('[Translator] Используем Google Translate');
+        result = await translateWithIPC(text, targetLang, sourceLang, 'google', googleKey, null, effectiveBotId);
     } else {
-        result = await translateWithIPC(text, targetLang, sourceLang, 'mymemory', null, effectiveBotId);
+        // Приоритет 3: MyMemory (бесплатный)
+        console.log('[Translator] Используем MyMemory' + (mymemoryEmail ? ' (с email)' : ''));
+        result = await translateWithIPC(text, targetLang, sourceLang, 'mymemory', null, mymemoryEmail, effectiveBotId);
     }
 
     // Сохраняем в кеш при успехе (кроме случая sameLanguage)
@@ -121,7 +131,7 @@ async function translateText(text, targetLang, sourceLang = 'auto', botId = null
 // === ПЕРЕВОД ЧЕРЕЗ IPC (с поддержкой прокси) ===
 // =====================================================
 
-async function translateWithIPC(text, targetLang, sourceLang, service, apiKey, botId) {
+async function translateWithIPC(text, targetLang, sourceLang, service, apiKey, email, botId) {
     try {
         const { ipcRenderer } = require('electron');
 
@@ -133,6 +143,7 @@ async function translateWithIPC(text, targetLang, sourceLang, service, apiKey, b
             targetLang: targetLang,
             sourceLang: sourceLang,
             apiKey: apiKey,
+            email: email,
             botId: botId
         });
 

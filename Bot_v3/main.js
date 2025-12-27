@@ -950,7 +950,7 @@ ipcMain.handle('set-bot-proxy', async (event, { botId, proxyString }) => {
 });
 
 // IPC: Запрос перевода через main процесс с поддержкой прокси
-ipcMain.handle('translate-request', async (event, { service, text, targetLang, sourceLang, apiKey, botId }) => {
+ipcMain.handle('translate-request', async (event, { service, text, targetLang, sourceLang, apiKey, email, botId }) => {
     console.log(`[Translator] Запрос перевода: ${service}, ${sourceLang} → ${targetLang}, botId: ${botId || 'none'}`);
 
     try {
@@ -1031,13 +1031,71 @@ ipcMain.handle('translate-request', async (event, { service, text, targetLang, s
                 result = { success: false, error: 'Нет результата от DeepL' };
             }
 
+        } else if (service === 'google') {
+            // Google Cloud Translation API
+            const googleUrl = `https://translation.googleapis.com/language/translate/v2`;
+
+            const axiosConfig = {
+                method: 'POST',
+                url: googleUrl,
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                params: {
+                    key: apiKey
+                },
+                data: {
+                    q: text,
+                    target: targetLang.toLowerCase(),
+                    source: sourceLang === 'auto' ? undefined : sourceLang.toLowerCase(),
+                    format: 'text'
+                },
+                timeout: 15000,
+                proxy: false
+            };
+
+            if (httpsAgent) {
+                axiosConfig.httpsAgent = httpsAgent;
+            }
+
+            const response = await axios(axiosConfig);
+            const translatedText = response.data?.data?.translations?.[0]?.translatedText;
+            const detectedLang = response.data?.data?.translations?.[0]?.detectedSourceLanguage;
+
+            if (translatedText) {
+                // Проверяем не тот же ли это язык
+                if (detectedLang && detectedLang.toUpperCase() === targetLang.toUpperCase()) {
+                    result = {
+                        success: true,
+                        text: text,
+                        service: 'Google',
+                        sameLanguage: true
+                    };
+                } else {
+                    result = {
+                        success: true,
+                        text: translatedText,
+                        detectedLang: detectedLang,
+                        service: 'Google'
+                    };
+                }
+            } else {
+                result = { success: false, error: 'Нет результата от Google Translate' };
+            }
+
         } else {
-            // MyMemory API (бесплатный)
+            // MyMemory API (бесплатный, с email лимит увеличивается до 10000 слов/день)
             const langPair = sourceLang === 'auto'
                 ? `autodetect|${targetLang.toLowerCase()}`
                 : `${sourceLang.toLowerCase()}|${targetLang.toLowerCase()}`;
 
-            const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
+            let url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
+
+            // Добавляем email для увеличения лимита (5000 → 10000 слов/день)
+            if (email) {
+                url += `&de=${encodeURIComponent(email)}`;
+                console.log('[Translator] MyMemory с email (лимит 10000 слов/день)');
+            }
 
             const axiosConfig = {
                 method: 'GET',
