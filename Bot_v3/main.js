@@ -769,6 +769,7 @@ ipcMain.on('insert-translation-to-window', (event, { windowId, text }) => {
 
 // IPC: Контекстное меню для WebView
 ipcMain.on('show-webview-context-menu', (event, { botId, x, y, selectionText, isEditable }) => {
+    console.log('[Main] show-webview-context-menu:', { botId, selectionText: selectionText?.substring(0, 30), isEditable });
     const menuItems = [];
 
     // Стандартные пункты

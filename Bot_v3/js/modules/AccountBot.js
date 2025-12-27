@@ -584,23 +584,27 @@ class AccountBot {
         // КОНТЕКСТНОЕ МЕНЮ для webview (перевод)
         webview.addEventListener('context-menu', async (e) => {
             e.preventDefault();
+            console.log('[WebView Context] Контекстное меню вызвано, params:', e.params);
 
             // Получаем выделенный текст из webview
             let selectedText = '';
             try {
                 selectedText = await webview.executeJavaScript('window.getSelection().toString()');
+                console.log('[WebView Context] Выделенный текст:', selectedText?.substring(0, 50));
             } catch (err) {
                 console.log('[WebView Context] Не удалось получить выделение:', err.message);
             }
 
             // Отправляем в main process для показа контекстного меню
-            ipcRenderer.send('show-webview-context-menu', {
+            const menuData = {
                 botId: this.id,
-                x: e.params?.x || e.x,
-                y: e.params?.y || e.y,
+                x: e.params?.x || e.x || 100,
+                y: e.params?.y || e.y || 100,
                 selectionText: selectedText?.trim() || '',
                 isEditable: e.params?.isEditable || false
-            });
+            };
+            console.log('[WebView Context] Отправляем в main:', menuData);
+            ipcRenderer.send('show-webview-context-menu', menuData);
         });
 
         // ВАЖНО: Добавляем webview в скрытый контейнер
