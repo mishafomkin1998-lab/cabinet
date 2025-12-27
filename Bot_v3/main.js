@@ -1,10 +1,11 @@
-const { app, BrowserWindow, ipcMain, session, Menu, dialog, powerMonitor, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, session, Menu, dialog, powerMonitor, screen, globalShortcut, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 const axios = require('axios');
 const http = require('http');
 const net = require('net');
+const { exec } = require('child_process');
 
 // =====================================================
 // === ЛОКАЛЬНЫЙ ПРОКСИ ДЛЯ WEBVIEW ===
@@ -1618,6 +1619,358 @@ app.whenReady().then(async () => {
         setTimeout(forceRestoreWindowSize, 300);
         setTimeout(forceRestoreWindowSize, 1000); // Повторная проверка
     });
+
+    // =====================================================
+    // === ГЛОБАЛЬНЫЙ ПЕРЕВОДЧИК (работает везде в системе) ===
+    // =====================================================
+    initGlobalTranslator();
+});
+
+// Глобальное окно переводчика
+let globalTranslatorWindow = null;
+
+// Симуляция Ctrl+C для копирования выделенного текста
+function simulateCtrlC() {
+    return new Promise((resolve) => {
+        if (process.platform === 'win32') {
+            // Windows: используем PowerShell для симуляции Ctrl+C
+            exec('powershell -command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait(\'^c\')"', (err) => {
+                if (err) console.error('[GlobalTranslator] Ctrl+C simulation error:', err);
+                setTimeout(resolve, 150); // Даём время для копирования
+            });
+        } else if (process.platform === 'linux') {
+            // Linux: используем xdotool
+            exec('xdotool key ctrl+c', (err) => {
+                if (err) console.error('[GlobalTranslator] Ctrl+C simulation error:', err);
+                setTimeout(resolve, 150);
+            });
+        } else if (process.platform === 'darwin') {
+            // macOS: используем osascript
+            exec('osascript -e \'tell application "System Events" to keystroke "c" using command down\'', (err) => {
+                if (err) console.error('[GlobalTranslator] Ctrl+C simulation error:', err);
+                setTimeout(resolve, 150);
+            });
+        } else {
+            resolve();
+        }
+    });
+}
+
+// Создание окна глобального переводчика
+function createGlobalTranslatorWindow(translatedText, originalText, theme) {
+    // Закрываем существующее окно
+    if (globalTranslatorWindow && !globalTranslatorWindow.isDestroyed()) {
+        globalTranslatorWindow.close();
+    }
+
+    // Получаем позицию курсора
+    const cursorPos = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(cursorPos);
+
+    // Создаём окно
+    globalTranslatorWindow = new BrowserWindow({
+        width: 400,
+        height: 250,
+        x: Math.min(cursorPos.x, display.workArea.x + display.workArea.width - 420),
+        y: Math.min(cursorPos.y + 10, display.workArea.y + display.workArea.height - 270),
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        resizable: false,
+        show: false,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true
+        }
+    });
+
+    // Генерируем HTML с учётом темы
+    const styles = getGlobalTranslatorStyles(theme);
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: 'Segoe UI', Arial, sans-serif;
+                background: transparent;
+                overflow: hidden;
+            }
+            .popup {
+                background: ${styles.bg};
+                border-radius: 10px;
+                box-shadow: ${styles.shadow};
+                border: ${styles.border};
+                overflow: hidden;
+                animation: fadeIn 0.2s ease;
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(-10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+            .header {
+                background: ${styles.headerBg};
+                padding: 10px 15px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                border-bottom: 1px solid ${styles.headerBorder};
+                cursor: move;
+                -webkit-app-region: drag;
+            }
+            .header span {
+                color: white;
+                font-weight: 600;
+                font-size: 13px;
+            }
+            .close-btn {
+                background: none;
+                border: none;
+                color: ${styles.closeColor};
+                font-size: 20px;
+                cursor: pointer;
+                padding: 0 5px;
+                -webkit-app-region: no-drag;
+            }
+            .close-btn:hover { opacity: 0.8; }
+            .content {
+                padding: 15px;
+                color: ${styles.contentColor};
+                font-size: 14px;
+                line-height: 1.5;
+                max-height: 150px;
+                overflow-y: auto;
+            }
+            .footer {
+                padding: 10px 15px;
+                background: ${styles.footerBg};
+                border-top: 1px solid ${styles.footerBorder};
+                display: flex;
+                gap: 8px;
+                justify-content: flex-end;
+            }
+            .btn {
+                padding: 6px 12px;
+                border: none;
+                border-radius: 5px;
+                cursor: pointer;
+                font-size: 12px;
+                color: white;
+                transition: opacity 0.2s;
+            }
+            .btn:hover { opacity: 0.9; }
+            .btn-copy { background: ${styles.copyBtnBg}; }
+            .btn-replace { background: ${styles.replaceBtnBg}; }
+        </style>
+    </head>
+    <body>
+        <div class="popup">
+            <div class="header">
+                <span>🌐 Перевод</span>
+                <button class="close-btn" onclick="window.close()">×</button>
+            </div>
+            <div class="content">${escapeHtmlForGlobal(translatedText)}</div>
+            <div class="footer">
+                <button class="btn btn-copy" onclick="copyText()">📋 Копировать</button>
+            </div>
+        </div>
+        <script>
+            const translatedText = ${JSON.stringify(translatedText)};
+            function copyText() {
+                navigator.clipboard.writeText(translatedText).then(() => {
+                    document.querySelector('.btn-copy').textContent = '✓ Скопировано';
+                    setTimeout(() => window.close(), 500);
+                });
+            }
+            // Закрытие по Escape
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') window.close();
+            });
+            // Закрытие по клику вне окна
+            window.addEventListener('blur', () => {
+                setTimeout(() => window.close(), 100);
+            });
+        </script>
+    </body>
+    </html>
+    `;
+
+    globalTranslatorWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+
+    globalTranslatorWindow.once('ready-to-show', () => {
+        globalTranslatorWindow.show();
+    });
+
+    globalTranslatorWindow.on('closed', () => {
+        globalTranslatorWindow = null;
+    });
+}
+
+// Стили для глобального переводчика по теме
+function getGlobalTranslatorStyles(theme) {
+    const themes = {
+        light: {
+            bg: '#ffffff',
+            headerBg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            headerBorder: '#667eea',
+            contentColor: '#333',
+            footerBg: '#f8f9fa',
+            footerBorder: '#eee',
+            shadow: '0 8px 32px rgba(0,0,0,0.3)',
+            border: 'none',
+            copyBtnBg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            replaceBtnBg: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+            closeColor: 'rgba(255,255,255,0.8)'
+        },
+        dark: {
+            bg: '#161616',
+            headerBg: 'linear-gradient(90deg, #0d0d0d 0%, #1a1a1a 100%)',
+            headerBorder: '#00ff88',
+            contentColor: '#f0f0f0',
+            footerBg: '#0d0d0d',
+            footerBorder: '#333',
+            shadow: '0 8px 32px rgba(0,255,136,0.3)',
+            border: '1px solid #00ff88',
+            copyBtnBg: 'linear-gradient(135deg, #00ff88 0%, #00cc6a 100%)',
+            replaceBtnBg: 'linear-gradient(135deg, #00d4ff 0%, #0099cc 100%)',
+            closeColor: '#00ff88'
+        },
+        ladadate: {
+            bg: '#1a1025',
+            headerBg: 'linear-gradient(90deg, #2d1f3d 0%, #3d2850 100%)',
+            headerBorder: '#ec4899',
+            contentColor: '#f0d0f0',
+            footerBg: '#2d1f3d',
+            footerBorder: '#4a3660',
+            shadow: '0 8px 32px rgba(236,72,153,0.4)',
+            border: '1px solid #ec4899',
+            copyBtnBg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+            replaceBtnBg: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+            closeColor: '#ec4899'
+        },
+        novabot: {
+            bg: '#0a1929',
+            headerBg: 'linear-gradient(90deg, #0d2137 0%, #1a3a5f 100%)',
+            headerBorder: '#2196f3',
+            contentColor: '#b0d4f1',
+            footerBg: '#0d2137',
+            footerBorder: '#1e3a5f',
+            shadow: '0 8px 32px rgba(33,150,243,0.4)',
+            border: '1px solid #2196f3',
+            copyBtnBg: 'linear-gradient(135deg, #2196f3 0%, #1565c0 100%)',
+            replaceBtnBg: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
+            closeColor: '#2196f3'
+        }
+    };
+    return themes[theme] || themes.light;
+}
+
+function escapeHtmlForGlobal(text) {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Обработка глобального перевода
+async function handleGlobalTranslate() {
+    console.log('[GlobalTranslator] Горячая клавиша нажата');
+
+    // Симулируем Ctrl+C для копирования выделенного текста
+    const originalClipboard = clipboard.readText();
+    await simulateCtrlC();
+
+    // Читаем скопированный текст
+    const selectedText = clipboard.readText();
+
+    // Восстанавливаем оригинальный буфер обмена
+    if (originalClipboard !== selectedText) {
+        setTimeout(() => clipboard.writeText(originalClipboard), 500);
+    }
+
+    if (!selectedText || !selectedText.trim() || selectedText === originalClipboard) {
+        console.log('[GlobalTranslator] Нет выделенного текста');
+        return;
+    }
+
+    console.log('[GlobalTranslator] Текст для перевода:', selectedText.substring(0, 50));
+
+    // Получаем настройки из mainWindow
+    let settings = { theme: 'light', translatorEnabled: true };
+    try {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            settings = await mainWindow.webContents.executeJavaScript(`
+                ({
+                    theme: globalSettings.theme || 'light',
+                    translatorEnabled: globalSettings.translatorEnabled !== false,
+                    translateFrom: globalSettings.translateFrom || 'auto',
+                    translateTo: globalSettings.translateTo || 'RU'
+                })
+            `);
+        }
+    } catch (e) { /* use defaults */ }
+
+    if (!settings.translatorEnabled) {
+        console.log('[GlobalTranslator] Переводчик выключен в настройках');
+        return;
+    }
+
+    // Выполняем перевод через renderer
+    try {
+        const result = await mainWindow.webContents.executeJavaScript(`
+            (async function() {
+                if (typeof translateText !== 'function') {
+                    return { success: false, error: 'Переводчик не загружен' };
+                }
+
+                const text = ${JSON.stringify(selectedText.trim())};
+                const sourceLang = globalSettings.translateFrom || 'auto';
+                let targetLang;
+
+                if (sourceLang === 'auto') {
+                    targetLang = getAutoTargetLang(text, globalSettings.translateTo || 'RU');
+                } else {
+                    targetLang = globalSettings.translateTo || 'RU';
+                }
+
+                const result = await translateText(text, targetLang, sourceLang);
+                return result;
+            })()
+        `);
+
+        if (result.success && !result.sameLanguage) {
+            createGlobalTranslatorWindow(result.text, selectedText, settings.theme);
+        } else if (result.sameLanguage) {
+            console.log('[GlobalTranslator] Текст уже на целевом языке');
+        } else {
+            console.error('[GlobalTranslator] Ошибка перевода:', result.error);
+        }
+    } catch (err) {
+        console.error('[GlobalTranslator] Error:', err);
+    }
+}
+
+// Инициализация глобального переводчика
+function initGlobalTranslator() {
+    // Регистрируем глобальную горячую клавишу Ctrl+Alt+Q
+    const hotkey = 'CommandOrControl+Alt+Q';
+
+    try {
+        const registered = globalShortcut.register(hotkey, handleGlobalTranslate);
+        if (registered) {
+            console.log(`[GlobalTranslator] ✅ Глобальная горячая клавиша ${hotkey} зарегистрирована`);
+        } else {
+            console.error(`[GlobalTranslator] ❌ Не удалось зарегистрировать ${hotkey}`);
+        }
+    } catch (err) {
+        console.error('[GlobalTranslator] Ошибка регистрации горячей клавиши:', err);
+    }
+}
+
+// Освобождаем горячие клавиши при закрытии
+app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
+    console.log('[GlobalTranslator] Глобальные горячие клавиши освобождены');
 });
 
 app.on('window-all-closed', () => {
