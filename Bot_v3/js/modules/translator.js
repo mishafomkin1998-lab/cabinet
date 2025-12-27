@@ -11,6 +11,55 @@ const CACHE_MAX_SIZE = 500;
 let autoCloseTimer = null;
 
 // =====================================================
+// === АВТО-ОПРЕДЕЛЕНИЕ ЯЗЫКА ===
+// =====================================================
+
+// Определяет язык текста по символам
+function detectTextLanguage(text) {
+    if (!text) return null;
+
+    // Считаем кириллические и латинские символы
+    let cyrillicCount = 0;
+    let latinCount = 0;
+
+    for (const char of text) {
+        // Кириллица: U+0400–U+04FF
+        if (/[\u0400-\u04FF]/.test(char)) {
+            cyrillicCount++;
+        }
+        // Латиница: A-Z, a-z
+        else if (/[A-Za-z]/.test(char)) {
+            latinCount++;
+        }
+    }
+
+    // Если больше кириллицы - русский
+    if (cyrillicCount > latinCount) {
+        return 'RU';
+    }
+    // Если больше латиницы - английский
+    if (latinCount > cyrillicCount) {
+        return 'EN';
+    }
+
+    return null; // Не удалось определить
+}
+
+// Получает целевой язык автоматически (противоположный исходному)
+function getAutoTargetLang(text, defaultTarget) {
+    const detectedLang = detectTextLanguage(text);
+
+    if (detectedLang === 'RU') {
+        return 'EN'; // Русский → Английский
+    }
+    if (detectedLang === 'EN') {
+        return 'RU'; // Английский → Русский
+    }
+
+    return defaultTarget; // Fallback на настройки
+}
+
+// =====================================================
 // === ОСНОВНАЯ ФУНКЦИЯ ПЕРЕВОДА ===
 // =====================================================
 
@@ -350,7 +399,26 @@ function getKeyCombo(e) {
 }
 
 async function handleTranslateHotkey(e) {
+    // ВАЖНО: Сохраняем выделение и позицию ДО любых async операций
     const selectedText = getSelectedText();
+
+    // Сохраняем позицию popup сразу
+    let popupX = window.innerWidth / 2 - 175;
+    let popupY = window.innerHeight / 2 - 100;
+
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+        try {
+            const range = selection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            if (rect.width > 0 || rect.height > 0) {
+                popupX = rect.left + rect.width / 2;
+                popupY = rect.bottom + 5;
+            }
+        } catch (err) {
+            console.log('[Translator] Не удалось получить позицию выделения');
+        }
+    }
 
     if (!selectedText) {
         showToast('Выделите текст для перевода', 'warning');
@@ -360,8 +428,16 @@ async function handleTranslateHotkey(e) {
     // Показываем индикатор загрузки
     showToast('Переводим...', 'info');
 
-    const targetLang = globalSettings.translateTo || 'RU';
+    // Авто-определение языка: русский↔английский
     const sourceLang = globalSettings.translateFrom || 'auto';
+    let targetLang;
+
+    if (sourceLang === 'auto') {
+        // Автоматически определяем направление
+        targetLang = getAutoTargetLang(selectedText, globalSettings.translateTo || 'RU');
+    } else {
+        targetLang = globalSettings.translateTo || 'RU';
+    }
 
     const result = await translateText(selectedText, targetLang, sourceLang);
 
@@ -372,28 +448,24 @@ async function handleTranslateHotkey(e) {
             return;
         }
 
-        // Получаем позицию для popup из выделенного текста
-        const selection = window.getSelection();
-        let x = window.innerWidth / 2 - 175; // По центру по умолчанию
-        let y = window.innerHeight / 2 - 100;
-
-        if (selection && selection.rangeCount > 0) {
-            const range = selection.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
-            if (rect.width > 0 || rect.height > 0) {
-                x = rect.left + rect.width / 2;
-                y = rect.bottom + 5;
-            }
-        }
-
-        showTranslationPopup(result.text, selectedText, x, y);
+        showTranslationPopup(result.text, selectedText, popupX, popupY);
     } else {
         showToast(`Ошибка перевода: ${result.error}`, 'error');
     }
 }
 
 async function handleReplaceHotkey() {
+    // ВАЖНО: Сохраняем activeElement и выделение ДО любых async операций
     const activeElement = document.activeElement;
+    const selectedText = getSelectedText();
+
+    // Сохраняем позиции выделения для input/textarea
+    let selectionStart = null;
+    let selectionEnd = null;
+    if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+        selectionStart = activeElement.selectionStart;
+        selectionEnd = activeElement.selectionEnd;
+    }
 
     // Проверяем что фокус в текстовом поле
     if (!activeElement ||
@@ -404,8 +476,6 @@ async function handleReplaceHotkey() {
         return;
     }
 
-    const selectedText = getSelectedText();
-
     if (!selectedText) {
         showToast('Выделите текст для замены', 'warning');
         return;
@@ -413,8 +483,16 @@ async function handleReplaceHotkey() {
 
     showToast('Переводим...', 'info');
 
-    const targetLang = globalSettings.translateReplace || 'EN';
+    // Авто-определение языка: русский↔английский
     const sourceLang = globalSettings.translateFrom || 'auto';
+    let targetLang;
+
+    if (sourceLang === 'auto') {
+        // Автоматически определяем направление
+        targetLang = getAutoTargetLang(selectedText, globalSettings.translateReplace || 'EN');
+    } else {
+        targetLang = globalSettings.translateReplace || 'EN';
+    }
 
     const result = await translateText(selectedText, targetLang, sourceLang);
 
@@ -424,6 +502,16 @@ async function handleReplaceHotkey() {
             showToast('Текст уже на целевом языке', 'info');
             return;
         }
+
+        // Восстанавливаем фокус и выделение перед заменой
+        if (activeElement && document.body.contains(activeElement)) {
+            activeElement.focus();
+            if (selectionStart !== null && selectionEnd !== null) {
+                activeElement.selectionStart = selectionStart;
+                activeElement.selectionEnd = selectionEnd;
+            }
+        }
+
         replaceSelectedText(result.text);
         showToast('Текст заменён', 'success');
     } else {
@@ -509,8 +597,14 @@ function initTranslatorIPC() {
             // Показать popup с переводом
             showToast('Переводим...', 'info');
 
-            const targetLang = globalSettings.translateTo || 'RU';
+            // Авто-определение языка: русский↔английский
             const sourceLang = globalSettings.translateFrom || 'auto';
+            let targetLang;
+            if (sourceLang === 'auto') {
+                targetLang = getAutoTargetLang(text, globalSettings.translateTo || 'RU');
+            } else {
+                targetLang = globalSettings.translateTo || 'RU';
+            }
 
             const result = await translateText(text, targetLang, sourceLang);
 
@@ -527,8 +621,14 @@ function initTranslatorIPC() {
             // Заменить выделенный текст переводом
             showToast('Переводим...', 'info');
 
-            const targetLang = globalSettings.translateReplace || 'EN';
+            // Авто-определение языка: русский↔английский
             const sourceLang = globalSettings.translateFrom || 'auto';
+            let targetLang;
+            if (sourceLang === 'auto') {
+                targetLang = getAutoTargetLang(text, globalSettings.translateReplace || 'EN');
+            } else {
+                targetLang = globalSettings.translateReplace || 'EN';
+            }
 
             const result = await translateText(text, targetLang, sourceLang);
 
@@ -553,8 +653,14 @@ function initTranslatorIPC() {
 
         const { text, windowId } = data;
 
-        const targetLang = globalSettings.translateReplace || 'EN';
+        // Авто-определение языка: русский↔английский
         const sourceLang = globalSettings.translateFrom || 'auto';
+        let targetLang;
+        if (sourceLang === 'auto') {
+            targetLang = getAutoTargetLang(text, globalSettings.translateReplace || 'EN');
+        } else {
+            targetLang = globalSettings.translateReplace || 'EN';
+        }
 
         const result = await translateText(text, targetLang, sourceLang);
 
