@@ -75,28 +75,88 @@ contextBridge.exposeInMainWorld('lababotAI', {
     }
 });
 
+// Получить стили для темы
+function getThemeStyles(theme) {
+    const themes = {
+        light: {
+            bg: '#ffffff',
+            headerBg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            headerBorder: '#667eea',
+            contentColor: '#333',
+            footerBg: '#f8f9fa',
+            footerBorder: '#eee',
+            shadow: '0 4px 20px rgba(0,0,0,0.25)',
+            border: 'none',
+            copyBtnBg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            replaceBtnBg: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
+            closeColor: 'rgba(255,255,255,0.8)'
+        },
+        dark: {
+            bg: '#161616',
+            headerBg: 'linear-gradient(90deg, #0d0d0d 0%, #1a1a1a 100%)',
+            headerBorder: '#00ff88',
+            contentColor: '#f0f0f0',
+            footerBg: '#0d0d0d',
+            footerBorder: '#333',
+            shadow: '0 8px 32px rgba(0,255,136,0.2)',
+            border: '1px solid #00ff88',
+            copyBtnBg: 'linear-gradient(135deg, #00ff88 0%, #00cc6a 100%)',
+            replaceBtnBg: 'linear-gradient(135deg, #00d4ff 0%, #0099cc 100%)',
+            closeColor: '#00ff88'
+        },
+        ladadate: {
+            bg: '#1a1025',
+            headerBg: 'linear-gradient(90deg, #2d1f3d 0%, #3d2850 100%)',
+            headerBorder: '#ec4899',
+            contentColor: '#f0d0f0',
+            footerBg: '#2d1f3d',
+            footerBorder: '#4a3660',
+            shadow: '0 8px 32px rgba(236,72,153,0.3)',
+            border: '1px solid #ec4899',
+            copyBtnBg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+            replaceBtnBg: 'linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)',
+            closeColor: '#ec4899'
+        },
+        novabot: {
+            bg: '#0a1929',
+            headerBg: 'linear-gradient(90deg, #0d2137 0%, #1a3a5f 100%)',
+            headerBorder: '#2196f3',
+            contentColor: '#b0d4f1',
+            footerBg: '#0d2137',
+            footerBorder: '#1e3a5f',
+            shadow: '0 8px 32px rgba(33,150,243,0.3)',
+            border: '1px solid #2196f3',
+            copyBtnBg: 'linear-gradient(135deg, #2196f3 0%, #1565c0 100%)',
+            replaceBtnBg: 'linear-gradient(135deg, #4caf50 0%, #2e7d32 100%)',
+            closeColor: '#2196f3'
+        }
+    };
+    return themes[theme] || themes.light;
+}
+
 // Слушаем событие показа popup с переводом
-ipcRenderer.on('show-translation-popup', (event, { text, originalText, x, y, sticky }) => {
-    console.log('[LababotAI] Показываем popup с переводом, sticky:', sticky);
+ipcRenderer.on('show-translation-popup', (event, { text, originalText, x, y, sticky, theme }) => {
+    console.log('[LababotAI] Показываем popup с переводом, sticky:', sticky, 'theme:', theme);
 
     // Удаляем существующий popup
     const existingPopup = document.getElementById('laba-translation-popup');
     if (existingPopup) existingPopup.remove();
 
     const isSticky = sticky !== false; // default true
+    const styles = getThemeStyles(theme || 'light');
 
     // Создаём popup
     const popup = document.createElement('div');
     popup.id = 'laba-translation-popup';
     popup.innerHTML = `
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #e0e0e0;">
-            <span style="font-weight: 600; color: #667eea;">🌐 Перевод</span>
-            <button id="laba-popup-close" style="background: none; border: none; cursor: pointer; font-size: 18px; color: #999; padding: 0 4px;">&times;</button>
+        <div id="laba-popup-header" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: ${styles.headerBg}; border-radius: 8px 8px 0 0; border-bottom: 1px solid ${styles.headerBorder};">
+            <span style="font-weight: 600; color: white; font-size: 13px;">🌐 Перевод</span>
+            <button id="laba-popup-close" style="background: none; border: none; cursor: pointer; font-size: 18px; color: ${styles.closeColor}; padding: 0 4px;">&times;</button>
         </div>
-        <div class="laba-popup-content" style="line-height: 1.5; color: #333;">${escapeHtml(text)}</div>
-        <div style="margin-top: 10px; display: flex; gap: 8px; justify-content: flex-end;">
-            <button id="laba-popup-replace" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 14px;" title="Заменить выделенный текст переводом">🔄</button>
-            <button id="laba-popup-copy" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">📋 Копировать</button>
+        <div class="laba-popup-content" style="line-height: 1.5; color: ${styles.contentColor}; padding: 12px 15px; max-height: 50vh; overflow-y: auto;">${escapeHtml(text)}</div>
+        <div style="padding: 10px 15px; background: ${styles.footerBg}; border-top: 1px solid ${styles.footerBorder}; border-radius: 0 0 8px 8px; display: flex; gap: 8px; justify-content: flex-end;">
+            <button id="laba-popup-replace" style="background: ${styles.replaceBtnBg}; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 14px;" title="Заменить выделенный текст переводом">🔄</button>
+            <button id="laba-popup-copy" style="background: ${styles.copyBtnBg}; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">📋 Копировать</button>
         </div>
     `;
 
@@ -104,10 +164,11 @@ ipcRenderer.on('show-translation-popup', (event, { text, originalText, x, y, sti
     Object.assign(popup.style, {
         position: 'fixed',
         zIndex: '999999',
-        background: 'white',
-        padding: '12px 15px',
+        background: styles.bg,
+        padding: '0',
         borderRadius: '8px',
-        boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
+        boxShadow: styles.shadow,
+        border: styles.border,
         maxWidth: '500px',
         minWidth: '250px',
         maxHeight: '70vh',
@@ -117,12 +178,6 @@ ipcRenderer.on('show-translation-popup', (event, { text, originalText, x, y, sti
         fontSize: '14px',
         fontFamily: 'Arial, sans-serif'
     });
-
-    // Делаем контент скроллируемым
-    const contentDiv = popup.querySelector('.laba-popup-content');
-    if (contentDiv) {
-        contentDiv.style.cssText = 'line-height: 1.5; color: #333; max-height: 50vh; overflow-y: auto; padding-right: 5px;';
-    }
 
     document.body.appendChild(popup);
 

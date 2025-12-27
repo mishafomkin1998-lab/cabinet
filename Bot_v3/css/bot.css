@@ -4278,25 +4278,57 @@ body.hide-profile-cards .profile-card {
     justify-content: flex-end;
 }
 
-/* Dark theme */
+/* Dark theme (Cyberpunk/Neon) */
 body.theme-dark .translation-popup {
-    background: #2d2d2d;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    background: #161616;
+    box-shadow: 0 8px 32px rgba(0,255,136,0.2);
+    border: 1px solid #00ff88;
+}
+
+body.theme-dark .translation-popup-header {
+    background: linear-gradient(90deg, #0d0d0d 0%, #1a1a1a 100%);
+    border-bottom: 1px solid #00ff88;
 }
 
 body.theme-dark .translation-popup-content {
-    color: #e0e0e0;
+    color: #f0f0f0;
 }
 
 body.theme-dark .translation-popup-footer {
-    background: #333;
-    border-top-color: #444;
+    background: #0d0d0d;
+    border-top-color: #333;
 }
 
-/* LadaDate theme */
+body.theme-dark .translation-popup-footer .btn-outline-primary {
+    color: #00ff88;
+    border-color: #00ff88;
+}
+
+body.theme-dark .translation-popup-footer .btn-outline-primary:hover {
+    background: #00ff88;
+    color: #0d0d0d;
+}
+
+body.theme-dark .translation-popup-footer .btn-outline-success {
+    color: #00d4ff;
+    border-color: #00d4ff;
+}
+
+body.theme-dark .translation-popup-footer .btn-outline-success:hover {
+    background: #00d4ff;
+    color: #0d0d0d;
+}
+
+/* LadaDate theme (Pink/Purple) */
 body.theme-ladadate .translation-popup {
     background: #1a1025;
     box-shadow: 0 8px 32px rgba(236,72,153,0.3);
+    border: 1px solid #ec4899;
+}
+
+body.theme-ladadate .translation-popup-header {
+    background: linear-gradient(90deg, #2d1f3d 0%, #3d2850 100%);
+    border-bottom: 1px solid #ec4899;
 }
 
 body.theme-ladadate .translation-popup-content {
@@ -4308,10 +4340,36 @@ body.theme-ladadate .translation-popup-footer {
     border-top-color: #4a3660;
 }
 
-/* NovaBot theme */
+body.theme-ladadate .translation-popup-footer .btn-outline-primary {
+    color: #ec4899;
+    border-color: #ec4899;
+}
+
+body.theme-ladadate .translation-popup-footer .btn-outline-primary:hover {
+    background: #ec4899;
+    color: #fff;
+}
+
+body.theme-ladadate .translation-popup-footer .btn-outline-success {
+    color: #a855f7;
+    border-color: #a855f7;
+}
+
+body.theme-ladadate .translation-popup-footer .btn-outline-success:hover {
+    background: #a855f7;
+    color: #fff;
+}
+
+/* NovaBot theme (Blue) */
 body.theme-novabot .translation-popup {
     background: #0a1929;
     box-shadow: 0 8px 32px rgba(33,150,243,0.3);
+    border: 1px solid #2196f3;
+}
+
+body.theme-novabot .translation-popup-header {
+    background: linear-gradient(90deg, #0d2137 0%, #1a3a5f 100%);
+    border-bottom: 1px solid #2196f3;
 }
 
 body.theme-novabot .translation-popup-content {
@@ -4321,6 +4379,26 @@ body.theme-novabot .translation-popup-content {
 body.theme-novabot .translation-popup-footer {
     background: #0d2137;
     border-top-color: #1e3a5f;
+}
+
+body.theme-novabot .translation-popup-footer .btn-outline-primary {
+    color: #2196f3;
+    border-color: #2196f3;
+}
+
+body.theme-novabot .translation-popup-footer .btn-outline-primary:hover {
+    background: #2196f3;
+    color: #fff;
+}
+
+body.theme-novabot .translation-popup-footer .btn-outline-success {
+    color: #4caf50;
+    border-color: #4caf50;
+}
+
+body.theme-novabot .translation-popup-footer .btn-outline-success:hover {
+    background: #4caf50;
+    color: #fff;
 }
 
 /* Hotkey input - обычный шрифт */
