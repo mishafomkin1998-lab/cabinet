@@ -4192,7 +4192,7 @@ body.hide-profile-cards .profile-card {
 /* ============= TRANSLATOR POPUP ============= */
 .translation-popup {
     position: fixed;
-    z-index: 100000;
+    z-index: 2147483647 !important; /* Максимальное значение z-index */
     background: #ffffff;
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.2);
@@ -4200,6 +4200,7 @@ body.hide-profile-cards .profile-card {
     animation: popupFadeIn 0.2s ease-out;
     max-width: 90vw;
     max-height: 80vh;
+    isolation: isolate; /* Создаём новый stacking context */
 }
 
 @keyframes popupFadeIn {
