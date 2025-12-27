@@ -41,6 +41,7 @@ function loadGlobalSettingsUI() {
     document.getElementById('set-translate-auto-close').value = globalSettings.translateAutoClose || 0;
     document.getElementById('set-hotkey-translate').value = globalSettings.hotkeyTranslate || 'Ctrl+Q';
     document.getElementById('set-hotkey-replace').value = globalSettings.hotkeyReplace || 'Ctrl+S';
+    document.getElementById('set-hotkey-replace-lang').value = globalSettings.hotkeyReplaceLang || 'Ctrl+Shift+S';
 
     applyTheme(globalSettings.theme);
     toggleProfileCards(); // Применяем настройку видимости карточек профиля
@@ -127,6 +128,7 @@ function saveGlobalSettings() {
     globalSettings.translateAutoClose = parseInt(document.getElementById('set-translate-auto-close').value) || 0;
     globalSettings.hotkeyTranslate = document.getElementById('set-hotkey-translate').value || 'Ctrl+Q';
     globalSettings.hotkeyReplace = document.getElementById('set-hotkey-replace').value || 'Ctrl+S';
+    globalSettings.hotkeyReplaceLang = document.getElementById('set-hotkey-replace-lang').value || 'Ctrl+Shift+S';
 
     // Сохраняем прокси для анкет (1-6)
     for (let i = 1; i <= 6; i++) {
@@ -200,6 +202,7 @@ function openGlobalSettings() {
     document.getElementById('set-translate-auto-close').value = globalSettings.translateAutoClose || 0;
     document.getElementById('set-hotkey-translate').value = globalSettings.hotkeyTranslate || 'Ctrl+Q';
     document.getElementById('set-hotkey-replace').value = globalSettings.hotkeyReplace || 'Ctrl+S';
+    document.getElementById('set-hotkey-replace-lang').value = globalSettings.hotkeyReplaceLang || 'Ctrl+Shift+S';
 
     // Загружаем прокси для анкет (1-6)
     for (let i = 1; i <= 6; i++) {
@@ -754,8 +757,10 @@ function captureHotkey(input, type) {
         let key = e.key.toUpperCase();
         if (key === ' ') key = 'Space';
         if (key === 'ESCAPE') {
-            // Отмена
-            input.value = globalSettings[type === 'translate' ? 'hotkeyTranslate' : 'hotkeyReplace'] || (type === 'translate' ? 'Ctrl+Q' : 'Ctrl+S');
+            // Отмена - восстанавливаем предыдущее значение
+            const defaults = { translate: 'Ctrl+Q', replace: 'Ctrl+S', replaceLang: 'Ctrl+Shift+S' };
+            const settingKeys = { translate: 'hotkeyTranslate', replace: 'hotkeyReplace', replaceLang: 'hotkeyReplaceLang' };
+            input.value = globalSettings[settingKeys[type]] || defaults[type];
             input.classList.remove('capturing');
             capturingHotkey = null;
             document.removeEventListener('keydown', handler, true);
@@ -772,8 +777,10 @@ function captureHotkey(input, type) {
         // Сохраняем настройку
         if (type === 'translate') {
             globalSettings.hotkeyTranslate = combo;
-        } else {
+        } else if (type === 'replace') {
             globalSettings.hotkeyReplace = combo;
+        } else if (type === 'replaceLang') {
+            globalSettings.hotkeyReplaceLang = combo;
         }
         localStorage.setItem('globalSettings', JSON.stringify(globalSettings));
 

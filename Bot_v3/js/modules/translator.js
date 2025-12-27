@@ -307,6 +307,7 @@ function initTranslatorHotkeys() {
 
             const hotkeyTranslate = globalSettings.hotkeyTranslate || 'Ctrl+Q';
             const hotkeyReplace = globalSettings.hotkeyReplace || 'Ctrl+S';
+            const hotkeyReplaceLang = globalSettings.hotkeyReplaceLang || 'Ctrl+Shift+S';
 
             const pressedCombo = getKeyCombo(e);
 
@@ -325,7 +326,7 @@ function initTranslatorHotkeys() {
                 await handleReplaceHotkey();
             }
             // Ctrl+Shift+S - заменить с выбором языка
-            else if (pressedCombo === 'Ctrl+Shift+S') {
+            else if (pressedCombo === hotkeyReplaceLang) {
                 e.preventDefault();
                 e.stopPropagation();
                 console.log('[Translator] Hotkey: замена с выбором языка');
