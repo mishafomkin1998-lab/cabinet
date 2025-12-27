@@ -1872,31 +1872,56 @@ function escapeHtmlForGlobal(text) {
     return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// Обработка глобального перевода
-async function handleGlobalTranslate() {
-    console.log('[GlobalTranslator] Горячая клавиша нажата');
+// Симуляция Ctrl+V для вставки текста
+function simulateCtrlV() {
+    return new Promise((resolve) => {
+        if (process.platform === 'win32') {
+            exec('powershell -command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait(\'^v\')"', (err) => {
+                if (err) console.error('[GlobalTranslator] Ctrl+V simulation error:', err);
+                setTimeout(resolve, 100);
+            });
+        } else if (process.platform === 'linux') {
+            exec('xdotool key ctrl+v', (err) => {
+                if (err) console.error('[GlobalTranslator] Ctrl+V simulation error:', err);
+                setTimeout(resolve, 100);
+            });
+        } else if (process.platform === 'darwin') {
+            exec('osascript -e \'tell application "System Events" to keystroke "v" using command down\'', (err) => {
+                if (err) console.error('[GlobalTranslator] Ctrl+V simulation error:', err);
+                setTimeout(resolve, 100);
+            });
+        } else {
+            resolve();
+        }
+    });
+}
 
-    // Симулируем Ctrl+C для копирования выделенного текста
+// Получить выделенный текст (копирует в буфер и возвращает)
+async function getSelectedText() {
     const originalClipboard = clipboard.readText();
     await simulateCtrlC();
-
-    // Читаем скопированный текст
     const selectedText = clipboard.readText();
 
-    // Восстанавливаем оригинальный буфер обмена
-    if (originalClipboard !== selectedText) {
-        setTimeout(() => clipboard.writeText(originalClipboard), 500);
+    // Если текст изменился - значит что-то скопировали
+    if (selectedText && selectedText.trim() && selectedText !== originalClipboard) {
+        // Восстанавливаем буфер позже
+        setTimeout(() => clipboard.writeText(originalClipboard), 1000);
+        return selectedText.trim();
     }
 
-    if (!selectedText || !selectedText.trim() || selectedText === originalClipboard) {
-        console.log('[GlobalTranslator] Нет выделенного текста');
-        return;
-    }
+    return null;
+}
 
-    console.log('[GlobalTranslator] Текст для перевода:', selectedText.substring(0, 50));
+// Получить настройки переводчика
+async function getTranslatorSettings() {
+    let settings = {
+        theme: 'light',
+        translatorEnabled: true,
+        translateFrom: 'auto',
+        translateTo: 'RU',
+        translateReplace: 'EN'
+    };
 
-    // Получаем настройки из mainWindow
-    let settings = { theme: 'light', translatorEnabled: true };
     try {
         if (mainWindow && !mainWindow.isDestroyed()) {
             settings = await mainWindow.webContents.executeJavaScript(`
@@ -1904,18 +1929,22 @@ async function handleGlobalTranslate() {
                     theme: globalSettings.theme || 'light',
                     translatorEnabled: globalSettings.translatorEnabled !== false,
                     translateFrom: globalSettings.translateFrom || 'auto',
-                    translateTo: globalSettings.translateTo || 'RU'
+                    translateTo: globalSettings.translateTo || 'RU',
+                    translateReplace: globalSettings.translateReplace || 'EN'
                 })
             `);
         }
     } catch (e) { /* use defaults */ }
 
-    if (!settings.translatorEnabled) {
-        console.log('[GlobalTranslator] Переводчик выключен в настройках');
-        return;
+    return settings;
+}
+
+// Выполнить перевод
+async function doTranslate(text, targetLang = null) {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+        return { success: false, error: 'Main window not available' };
     }
 
-    // Выполняем перевод через renderer
     try {
         const result = await mainWindow.webContents.executeJavaScript(`
             (async function() {
@@ -1923,14 +1952,16 @@ async function handleGlobalTranslate() {
                     return { success: false, error: 'Переводчик не загружен' };
                 }
 
-                const text = ${JSON.stringify(selectedText.trim())};
+                const text = ${JSON.stringify(text)};
                 const sourceLang = globalSettings.translateFrom || 'auto';
-                let targetLang;
+                let targetLang = ${targetLang ? JSON.stringify(targetLang) : 'null'};
 
-                if (sourceLang === 'auto') {
-                    targetLang = getAutoTargetLang(text, globalSettings.translateTo || 'RU');
-                } else {
-                    targetLang = globalSettings.translateTo || 'RU';
+                if (!targetLang) {
+                    if (sourceLang === 'auto') {
+                        targetLang = getAutoTargetLang(text, globalSettings.translateTo || 'RU');
+                    } else {
+                        targetLang = globalSettings.translateTo || 'RU';
+                    }
                 }
 
                 const result = await translateText(text, targetLang, sourceLang);
@@ -1938,57 +1969,277 @@ async function handleGlobalTranslate() {
             })()
         `);
 
-        if (result.success && !result.sameLanguage) {
-            createGlobalTranslatorWindow(result.text, selectedText, settings.theme);
-        } else if (result.sameLanguage) {
-            console.log('[GlobalTranslator] Текст уже на целевом языке');
-        } else {
-            console.error('[GlobalTranslator] Ошибка перевода:', result.error);
-        }
+        return result;
     } catch (err) {
-        console.error('[GlobalTranslator] Error:', err);
+        console.error('[GlobalTranslator] Translation error:', err);
+        return { success: false, error: err.message };
     }
 }
+
+// Обработчик: Показать перевод (Ctrl+Q)
+async function handleGlobalTranslate() {
+    console.log('[GlobalTranslator] Показать перевод');
+
+    const selectedText = await getSelectedText();
+    if (!selectedText) {
+        console.log('[GlobalTranslator] Нет выделенного текста');
+        return;
+    }
+
+    const settings = await getTranslatorSettings();
+    if (!settings.translatorEnabled) {
+        console.log('[GlobalTranslator] Переводчик выключен');
+        return;
+    }
+
+    const result = await doTranslate(selectedText);
+
+    if (result.success && !result.sameLanguage) {
+        createGlobalTranslatorWindow(result.text, selectedText, settings.theme);
+    } else if (result.sameLanguage) {
+        console.log('[GlobalTranslator] Текст уже на целевом языке');
+    } else {
+        console.error('[GlobalTranslator] Ошибка:', result.error);
+    }
+}
+
+// Обработчик: Заменить текст переводом (Ctrl+S или Shift+S)
+async function handleGlobalReplace() {
+    console.log('[GlobalTranslator] Заменить переводом');
+
+    const selectedText = await getSelectedText();
+    if (!selectedText) {
+        console.log('[GlobalTranslator] Нет выделенного текста');
+        return;
+    }
+
+    const settings = await getTranslatorSettings();
+    if (!settings.translatorEnabled) {
+        console.log('[GlobalTranslator] Переводчик выключен');
+        return;
+    }
+
+    // Для замены используем translateReplace как целевой язык
+    const result = await doTranslate(selectedText, settings.translateReplace);
+
+    if (result.success && !result.sameLanguage) {
+        // Записываем перевод в буфер и вставляем
+        clipboard.writeText(result.text);
+        await simulateCtrlV();
+        console.log('[GlobalTranslator] Текст заменён');
+    } else if (result.sameLanguage) {
+        console.log('[GlobalTranslator] Текст уже на целевом языке');
+    } else {
+        console.error('[GlobalTranslator] Ошибка:', result.error);
+    }
+}
+
+// Обработчик: Заменить с выбором языка (Ctrl+Shift+S)
+async function handleGlobalReplaceWithLang() {
+    console.log('[GlobalTranslator] Заменить с выбором языка');
+
+    const selectedText = await getSelectedText();
+    if (!selectedText) {
+        console.log('[GlobalTranslator] Нет выделенного текста');
+        return;
+    }
+
+    const settings = await getTranslatorSettings();
+    if (!settings.translatorEnabled) {
+        console.log('[GlobalTranslator] Переводчик выключен');
+        return;
+    }
+
+    // Показываем окно выбора языка
+    createLanguagePickerWindow(selectedText, settings.theme);
+}
+
+// Окно выбора языка для перевода
+function createLanguagePickerWindow(textToTranslate, theme) {
+    const cursorPos = screen.getCursorScreenPoint();
+    const display = screen.getDisplayNearestPoint(cursorPos);
+    const styles = getGlobalTranslatorStyles(theme);
+
+    const pickerWindow = new BrowserWindow({
+        width: 200,
+        height: 280,
+        x: Math.min(cursorPos.x, display.workArea.x + display.workArea.width - 220),
+        y: Math.min(cursorPos.y + 10, display.workArea.y + display.workArea.height - 300),
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        resizable: false,
+        show: false,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+        }
+    });
+
+    const languages = [
+        { code: 'EN', name: 'English' },
+        { code: 'RU', name: 'Русский' },
+        { code: 'DE', name: 'Deutsch' },
+        { code: 'FR', name: 'Français' },
+        { code: 'ES', name: 'Español' },
+        { code: 'IT', name: 'Italiano' },
+        { code: 'UK', name: 'Українська' },
+        { code: 'PL', name: 'Polski' }
+    ];
+
+    const langButtons = languages.map(l =>
+        `<button class="lang-btn" data-lang="${l.code}">${l.name}</button>`
+    ).join('');
+
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Segoe UI', Arial, sans-serif; background: transparent; }
+            .popup {
+                background: ${styles.bg};
+                border-radius: 10px;
+                box-shadow: ${styles.shadow};
+                border: ${styles.border};
+                overflow: hidden;
+            }
+            .header {
+                background: ${styles.headerBg};
+                padding: 8px 12px;
+                color: white;
+                font-weight: 600;
+                font-size: 12px;
+                border-bottom: 1px solid ${styles.headerBorder};
+            }
+            .langs { padding: 8px; }
+            .lang-btn {
+                display: block;
+                width: 100%;
+                padding: 8px 12px;
+                margin: 4px 0;
+                background: ${styles.footerBg};
+                border: 1px solid ${styles.footerBorder};
+                border-radius: 5px;
+                color: ${styles.contentColor};
+                cursor: pointer;
+                text-align: left;
+                font-size: 13px;
+                transition: all 0.2s;
+            }
+            .lang-btn:hover {
+                background: ${styles.headerBg};
+                color: white;
+                border-color: ${styles.headerBorder};
+            }
+        </style>
+    </head>
+    <body>
+        <div class="popup">
+            <div class="header">🌐 Выберите язык</div>
+            <div class="langs">${langButtons}</div>
+        </div>
+        <script>
+            const { ipcRenderer } = require('electron');
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    ipcRenderer.send('global-translate-to-lang', {
+                        text: ${JSON.stringify(textToTranslate)},
+                        lang: btn.dataset.lang
+                    });
+                    window.close();
+                });
+            });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') window.close(); });
+            window.addEventListener('blur', () => setTimeout(() => window.close(), 100));
+        </script>
+    </body>
+    </html>
+    `;
+
+    pickerWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+    pickerWindow.once('ready-to-show', () => pickerWindow.show());
+}
+
+// IPC обработчик для перевода на выбранный язык
+ipcMain.on('global-translate-to-lang', async (event, { text, lang }) => {
+    console.log('[GlobalTranslator] Перевод на', lang);
+
+    const result = await doTranslate(text, lang);
+
+    if (result.success && !result.sameLanguage) {
+        clipboard.writeText(result.text);
+        await simulateCtrlV();
+        console.log('[GlobalTranslator] Текст заменён на', lang);
+    }
+});
 
 // Конвертация формата горячей клавиши из настроек в формат Electron
 function convertHotkeyToElectron(hotkey) {
     if (!hotkey) return null;
-    // "Ctrl+Q" -> "CommandOrControl+Q"
-    // "Ctrl+Shift+S" -> "CommandOrControl+Shift+S"
     return hotkey
         .replace(/Ctrl/gi, 'CommandOrControl')
         .replace(/Alt/gi, 'Alt')
         .replace(/Shift/gi, 'Shift');
 }
 
+// Текущие зарегистрированные горячие клавиши
+let registeredHotkeys = [];
+
 // Инициализация глобального переводчика
 async function initGlobalTranslator() {
     // Ждём пока mainWindow загрузит настройки
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Получаем горячую клавишу из настроек
-    let hotkey = 'CommandOrControl+Q'; // default
-    try {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-            const settingsHotkey = await mainWindow.webContents.executeJavaScript(`
-                globalSettings.hotkeyTranslate || 'Ctrl+Q'
-            `);
-            hotkey = convertHotkeyToElectron(settingsHotkey);
-        }
-    } catch (e) {
-        console.log('[GlobalTranslator] Используем горячую клавишу по умолчанию');
-    }
+    // Получаем горячие клавиши из настроек
+    let hotkeys = {
+        translate: 'CommandOrControl+Q',
+        replace: 'CommandOrControl+S',
+        replaceLang: 'CommandOrControl+Shift+S'
+    };
 
     try {
-        const registered = globalShortcut.register(hotkey, handleGlobalTranslate);
-        if (registered) {
-            console.log(`[GlobalTranslator] ✅ Глобальная горячая клавиша ${hotkey} зарегистрирована`);
-        } else {
-            console.error(`[GlobalTranslator] ❌ Не удалось зарегистрировать ${hotkey} - возможно занята другой программой`);
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            const settings = await mainWindow.webContents.executeJavaScript(`
+                ({
+                    translate: globalSettings.hotkeyTranslate || 'Ctrl+Q',
+                    replace: globalSettings.hotkeyReplace || 'Ctrl+S',
+                    replaceLang: globalSettings.hotkeyReplaceLang || 'Ctrl+Shift+S'
+                })
+            `);
+            hotkeys.translate = convertHotkeyToElectron(settings.translate);
+            hotkeys.replace = convertHotkeyToElectron(settings.replace);
+            hotkeys.replaceLang = convertHotkeyToElectron(settings.replaceLang);
         }
-    } catch (err) {
-        console.error('[GlobalTranslator] Ошибка регистрации горячей клавиши:', err);
+    } catch (e) {
+        console.log('[GlobalTranslator] Используем горячие клавиши по умолчанию');
     }
+
+    // Регистрируем все горячие клавиши
+    const shortcuts = [
+        { key: hotkeys.translate, handler: handleGlobalTranslate, name: 'Показать перевод' },
+        { key: hotkeys.replace, handler: handleGlobalReplace, name: 'Заменить переводом' },
+        { key: hotkeys.replaceLang, handler: handleGlobalReplaceWithLang, name: 'Заменить с выбором языка' }
+    ];
+
+    for (const shortcut of shortcuts) {
+        try {
+            const registered = globalShortcut.register(shortcut.key, shortcut.handler);
+            if (registered) {
+                registeredHotkeys.push(shortcut.key);
+                console.log(`[GlobalTranslator] ✅ ${shortcut.key} - ${shortcut.name}`);
+            } else {
+                console.error(`[GlobalTranslator] ❌ ${shortcut.key} - не удалось зарегистрировать`);
+            }
+        } catch (err) {
+            console.error(`[GlobalTranslator] Ошибка ${shortcut.key}:`, err.message);
+        }
+    }
+
+    console.log('[GlobalTranslator] Глобальные горячие клавиши работают везде в системе');
 }
 
 // Освобождаем горячие клавиши при закрытии
@@ -2092,14 +2343,6 @@ ipcMain.handle('open-response-window', async (event, data) => {
                 }
             `).catch(() => {});
         }
-
-        // Инжектируем плавающую кнопку перевода
-        injectTranslateButton(win);
-    });
-
-    // Повторное инжектирование при навигации внутри страницы
-    win.webContents.on('did-navigate-in-page', () => {
-        setTimeout(() => injectTranslateButton(win), 300);
     });
 
     // Сохраняем тип окна для AI
@@ -2294,251 +2537,6 @@ ipcMain.handle('close-response-window', async (event, windowId) => {
     }
     return { success: true };
 });
-
-// === Горячие клавиши перевода для Response Windows ===
-
-// Функция инъекции горячих клавиш перевода (как в основном боте)
-function injectTranslateButton(win) {
-    if (win.isDestroyed()) return;
-
-    // Получаем настройки переводчика из главного окна
-    if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.executeJavaScript(`
-            (function() {
-                if (typeof globalSettings === 'undefined' || !globalSettings.translatorEnabled) {
-                    return null;
-                }
-                return {
-                    hotkeyTranslate: globalSettings.hotkeyTranslate || 'Shift+Q',
-                    hotkeyReplace: globalSettings.hotkeyReplace || 'Shift+S',
-                    hotkeyReplaceLang: globalSettings.hotkeyReplaceLang || 'Ctrl+Shift+S'
-                };
-            })()
-        `).then(settings => {
-            if (!settings) {
-                console.log('[InjectTranslate] Переводчик выключен в настройках');
-                return;
-            }
-
-            const { hotkeyTranslate, hotkeyReplace, hotkeyReplaceLang } = settings;
-            console.log('[InjectTranslate] Hotkeys:', hotkeyTranslate, hotkeyReplace, hotkeyReplaceLang);
-
-            // Инжектируем скрипт с горячими клавишами
-            win.webContents.executeJavaScript(`
-                (function() {
-                    if (window.__translateHotkeysInit) return;
-                    window.__translateHotkeysInit = true;
-
-                    const HOTKEY_TRANSLATE = '${hotkeyTranslate}';
-                    const HOTKEY_REPLACE = '${hotkeyReplace}';
-                    const HOTKEY_REPLACE_LANG = '${hotkeyReplaceLang}';
-
-                    console.log('[TranslateHotkeys] Инициализация горячих клавиш:', HOTKEY_TRANSLATE, HOTKEY_REPLACE, HOTKEY_REPLACE_LANG);
-
-                    // Сохранённый контекст выделения для замены
-                    let savedSelectionContext = null;
-
-                    // Получить комбинацию клавиш из события
-                    function getKeyCombo(e) {
-                        const parts = [];
-                        if (e.ctrlKey) parts.push('Ctrl');
-                        if (e.shiftKey) parts.push('Shift');
-                        if (e.altKey) parts.push('Alt');
-                        let key = e.key.toUpperCase();
-                        if (key === ' ') key = 'Space';
-                        if (!['CONTROL', 'SHIFT', 'ALT', 'META'].includes(key)) {
-                            parts.push(key);
-                        }
-                        return parts.join('+');
-                    }
-
-                    // Получить выделенный текст
-                    function getSelectedText() {
-                        const activeEl = document.activeElement;
-                        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
-                            const start = activeEl.selectionStart;
-                            const end = activeEl.selectionEnd;
-                            if (start !== end) {
-                                return activeEl.value.substring(start, end).trim();
-                            }
-                        }
-                        const selection = window.getSelection();
-                        return selection ? selection.toString().trim() : '';
-                    }
-
-                    // Сохранить контекст выделения
-                    function saveSelectionContext() {
-                        const activeEl = document.activeElement;
-                        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
-                            const start = activeEl.selectionStart;
-                            const end = activeEl.selectionEnd;
-                            if (start !== end) {
-                                return { type: 'input', element: activeEl, start, end };
-                            }
-                        }
-                        if (activeEl && activeEl.isContentEditable) {
-                            const selection = window.getSelection();
-                            if (selection.rangeCount > 0) {
-                                return { type: 'contenteditable', element: activeEl, range: selection.getRangeAt(0).cloneRange() };
-                            }
-                        }
-                        return null;
-                    }
-
-                    // Заменить текст используя сохранённый контекст
-                    function replaceWithContext(ctx, newText) {
-                        if (!ctx) return false;
-                        try {
-                            if (ctx.type === 'input') {
-                                const el = ctx.element;
-                                const value = el.value;
-                                el.value = value.substring(0, ctx.start) + newText + value.substring(ctx.end);
-                                el.selectionStart = el.selectionEnd = ctx.start + newText.length;
-                                el.dispatchEvent(new Event('input', { bubbles: true }));
-                                el.focus();
-                                return true;
-                            }
-                            if (ctx.type === 'contenteditable') {
-                                ctx.element.focus();
-                                const selection = window.getSelection();
-                                selection.removeAllRanges();
-                                selection.addRange(ctx.range);
-                                document.execCommand('insertText', false, newText);
-                                return true;
-                            }
-                        } catch (err) {
-                            console.error('[TranslateHotkeys] Replace error:', err);
-                        }
-                        return false;
-                    }
-
-                    // Обработчик горячих клавиш
-                    document.addEventListener('keydown', async (e) => {
-                        const combo = getKeyCombo(e);
-                        const text = getSelectedText();
-
-                        // Shift+Q - показать перевод
-                        if (combo === HOTKEY_TRANSLATE && text) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            console.log('[TranslateHotkeys] Translate:', text.substring(0, 30));
-
-                            if (window.lababotAI && window.lababotAI.translate) {
-                                const selection = window.getSelection();
-                                let x = window.innerWidth / 2, y = window.innerHeight / 3;
-                                if (selection.rangeCount > 0) {
-                                    const rect = selection.getRangeAt(0).getBoundingClientRect();
-                                    if (rect.width > 0) { x = rect.left; y = rect.bottom + 10; }
-                                }
-                                await window.lababotAI.translate(text, x, y);
-                            }
-                        }
-
-                        // Shift+S - заменить переводом
-                        else if (combo === HOTKEY_REPLACE && text) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            const ctx = saveSelectionContext();
-                            if (!ctx) {
-                                console.log('[TranslateHotkeys] Нет редактируемого контекста');
-                                return;
-                            }
-                            console.log('[TranslateHotkeys] Replace:', text.substring(0, 30));
-
-                            if (window.lababotAI && window.lababotAI.translateAndReplace) {
-                                const result = await window.lababotAI.translateAndReplace(text);
-                                if (result && result.success && result.text) {
-                                    replaceWithContext(ctx, result.text);
-                                }
-                            }
-                        }
-
-                        // Ctrl+Shift+S - заменить с выбором языка (показываем popup)
-                        else if (combo === HOTKEY_REPLACE_LANG && text) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            savedSelectionContext = saveSelectionContext();
-                            if (!savedSelectionContext) {
-                                console.log('[TranslateHotkeys] Нет редактируемого контекста');
-                                return;
-                            }
-                            console.log('[TranslateHotkeys] Replace with lang choice:', text.substring(0, 30));
-                            showLanguagePicker(text);
-                        }
-                    });
-
-                    // Popup выбора языка
-                    function showLanguagePicker(textToTranslate) {
-                        const existing = document.getElementById('laba-lang-picker');
-                        if (existing) existing.remove();
-
-                        const languages = [
-                            { code: 'EN', name: '🇬🇧 English' },
-                            { code: 'RU', name: '🇷🇺 Русский' },
-                            { code: 'DE', name: '🇩🇪 Deutsch' },
-                            { code: 'FR', name: '🇫🇷 Français' },
-                            { code: 'ES', name: '🇪🇸 Español' },
-                            { code: 'IT', name: '🇮🇹 Italiano' },
-                            { code: 'PT', name: '🇵🇹 Português' },
-                            { code: 'PL', name: '🇵🇱 Polski' },
-                            { code: 'UK', name: '🇺🇦 Українська' },
-                            { code: 'ZH', name: '🇨🇳 中文' },
-                            { code: 'JA', name: '🇯🇵 日本語' },
-                            { code: 'KO', name: '🇰🇷 한국어' },
-                            { code: 'TR', name: '🇹🇷 Türkçe' },
-                            { code: 'AR', name: '🇸🇦 العربية' },
-                            { code: 'NL', name: '🇳🇱 Nederlands' },
-                            { code: 'SV', name: '🇸🇪 Svenska' }
-                        ];
-
-                        const popup = document.createElement('div');
-                        popup.id = 'laba-lang-picker';
-                        popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:999999;background:white;padding:15px;border-radius:12px;box-shadow:0 4px 25px rgba(0,0,0,0.3);font-family:Arial,sans-serif;';
-                        popup.innerHTML = '<div style="font-weight:600;margin-bottom:12px;color:#667eea;">🌐 Выберите язык</div>' +
-                            '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">' +
-                            languages.map(l => '<button data-lang="' + l.code + '" style="padding:10px;border:1px solid #ddd;border-radius:8px;background:white;cursor:pointer;font-size:13px;transition:all 0.15s;">' + l.name + '</button>').join('') +
-                            '</div>';
-
-                        document.body.appendChild(popup);
-
-                        popup.querySelectorAll('button').forEach(btn => {
-                            btn.onmouseenter = () => { btn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'; btn.style.color = 'white'; };
-                            btn.onmouseleave = () => { btn.style.background = 'white'; btn.style.color = 'black'; };
-                            btn.onclick = async () => {
-                                const lang = btn.dataset.lang;
-                                popup.remove();
-
-                                if (window.lababotAI) {
-                                    // Переводим на выбранный язык
-                                    const result = await window.lababotAI.translateToLang(textToTranslate, lang);
-                                    if (result && result.success && result.text && savedSelectionContext) {
-                                        replaceWithContext(savedSelectionContext, result.text);
-                                    }
-                                }
-                            };
-                        });
-
-                        // Закрытие по клику вне
-                        setTimeout(() => {
-                            document.addEventListener('mousedown', function close(e) {
-                                if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('mousedown', close); }
-                            });
-                        }, 100);
-
-                        // Закрытие по Escape
-                        document.addEventListener('keydown', function esc(e) {
-                            if (e.key === 'Escape') { popup.remove(); document.removeEventListener('keydown', esc); }
-                        });
-                    }
-
-                    console.log('[TranslateHotkeys] Горячие клавиши перевода готовы');
-                })();
-            `).catch(err => {
-                console.log('[InjectTranslate] Error:', err.message);
-            });
-        }).catch(() => {});
-    }
-}
 
 // === AI для Response Windows ===
 
