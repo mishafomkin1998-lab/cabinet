@@ -1994,6 +1994,93 @@ function injectTranslateButton(win) {
 
                     let hideTimeout = null;
                     let lastSelection = '';
+                    let lastSelectionContext = null; // Сохраняем контекст для замены
+
+                    // Сохранить контекст выделения
+                    function saveSelectionContext() {
+                        const activeEl = document.activeElement;
+
+                        // Для input/textarea
+                        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+                            const start = activeEl.selectionStart;
+                            const end = activeEl.selectionEnd;
+                            if (start !== end) {
+                                return {
+                                    type: 'input',
+                                    element: activeEl,
+                                    start: start,
+                                    end: end
+                                };
+                            }
+                        }
+
+                        // Для contenteditable
+                        if (activeEl && activeEl.isContentEditable) {
+                            const selection = window.getSelection();
+                            if (selection.rangeCount > 0) {
+                                return {
+                                    type: 'contenteditable',
+                                    element: activeEl,
+                                    range: selection.getRangeAt(0).cloneRange()
+                                };
+                            }
+                        }
+
+                        // Для обычного выделения на странице
+                        const selection = window.getSelection();
+                        if (selection.rangeCount > 0 && selection.toString().trim()) {
+                            return {
+                                type: 'selection',
+                                range: selection.getRangeAt(0).cloneRange()
+                            };
+                        }
+
+                        return null;
+                    }
+
+                    // Заменить текст используя сохранённый контекст
+                    function replaceWithContext(newText) {
+                        if (!lastSelectionContext) {
+                            console.log('[TranslateBtn] Нет сохранённого контекста');
+                            return false;
+                        }
+
+                        try {
+                            const ctx = lastSelectionContext;
+
+                            if (ctx.type === 'input') {
+                                const el = ctx.element;
+                                const value = el.value;
+                                el.value = value.substring(0, ctx.start) + newText + value.substring(ctx.end);
+                                el.selectionStart = el.selectionEnd = ctx.start + newText.length;
+                                el.dispatchEvent(new Event('input', { bubbles: true }));
+                                el.focus();
+                                console.log('[TranslateBtn] Текст заменён в input/textarea');
+                                return true;
+                            }
+
+                            if (ctx.type === 'contenteditable') {
+                                ctx.element.focus();
+                                const selection = window.getSelection();
+                                selection.removeAllRanges();
+                                selection.addRange(ctx.range);
+                                document.execCommand('insertText', false, newText);
+                                console.log('[TranslateBtn] Текст заменён в contenteditable');
+                                return true;
+                            }
+
+                            if (ctx.type === 'selection') {
+                                ctx.range.deleteContents();
+                                ctx.range.insertNode(document.createTextNode(newText));
+                                console.log('[TranslateBtn] Текст заменён через selection');
+                                return true;
+                            }
+                        } catch (err) {
+                            console.error('[TranslateBtn] Ошибка замены:', err);
+                        }
+
+                        return false;
+                    }
 
                     // Показать кнопку рядом с выделением
                     function showButton(x, y, text) {
@@ -2003,6 +2090,7 @@ function injectTranslateButton(win) {
                         }
 
                         lastSelection = text;
+                        lastSelectionContext = saveSelectionContext();
 
                         // Позиционируем кнопку
                         const btnSize = 32;
@@ -2119,16 +2207,29 @@ function injectTranslateButton(win) {
                             return;
                         }
 
+                        if (!lastSelectionContext) {
+                            console.log('[TranslateBtn] Нет сохранённого контекста выделения');
+                            return;
+                        }
+
                         console.log('[TranslateBtn] ПКМ - замена текста:', text.substring(0, 50));
 
                         // Показываем загрузку
                         btn.classList.add('loading');
                         btn.innerHTML = '';
 
-                        // Вызываем перевод и замену через preload API
+                        // Получаем перевод через API и заменяем локально
                         if (window.lababotAI && window.lababotAI.translateAndReplace) {
                             try {
-                                await window.lababotAI.translateAndReplace(text);
+                                const result = await window.lababotAI.translateAndReplace(text);
+                                if (result && result.success && result.text) {
+                                    // Заменяем текст локально используя сохранённый контекст
+                                    replaceWithContext(result.text);
+                                } else if (result && result.sameLanguage) {
+                                    console.log('[TranslateBtn] Текст уже на целевом языке');
+                                } else {
+                                    console.error('[TranslateBtn] Ошибка перевода:', result?.error);
+                                }
                             } catch (err) {
                                 console.error('[TranslateBtn] Ошибка замены:', err);
                             }
@@ -2138,6 +2239,19 @@ function injectTranslateButton(win) {
 
                         // Скрываем кнопку
                         setTimeout(hideButton, 300);
+                    });
+
+                    // Обработчик Ctrl+A для показа кнопки
+                    document.addEventListener('keyup', (e) => {
+                        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+                            setTimeout(() => {
+                                const text = getSelectedText();
+                                if (text && text.length >= 2) {
+                                    // Показываем кнопку в центре экрана
+                                    showButton(window.innerWidth / 2, window.innerHeight / 2, text);
+                                }
+                            }, 50);
+                        }
                     });
 
                     // Обработчик для скрытия кнопки при потере фокуса
@@ -2467,17 +2581,7 @@ ipcMain.handle('response-window-translate-replace', async (event, { text }) => {
             })()
         `);
 
-        // Если перевод успешен - заменяем текст в Response Window
-        if (result.success && !result.sameLanguage) {
-            const senderWindow = BrowserWindow.fromWebContents(event.sender);
-            if (senderWindow && !senderWindow.isDestroyed()) {
-                // Отправляем команду замены текста
-                senderWindow.webContents.send('replace-selected-text', {
-                    text: result.text
-                });
-            }
-        }
-
+        // Возвращаем результат - замена делается локально в инжектированном скрипте
         return result;
     } catch (err) {
         console.error('[ResponseWindow TranslateReplace] Error:', err);
