@@ -583,21 +583,28 @@ async function handleReplaceHotkey() {
 function getSelectedText() {
     const activeElement = document.activeElement;
 
+    console.log('[Translator] getSelectedText - activeElement:', activeElement?.tagName, activeElement?.id || activeElement?.className);
+
     // Для input/textarea
     if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
         const start = activeElement.selectionStart;
         const end = activeElement.selectionEnd;
+        console.log('[Translator] Input selection:', start, '-', end, 'value length:', activeElement.value?.length);
         if (start !== end) {
-            return activeElement.value.substring(start, end);
+            const selected = activeElement.value.substring(start, end);
+            console.log('[Translator] Selected from input:', selected.substring(0, 30));
+            return selected;
         }
     }
 
     // Для contenteditable и обычного выделения
     const selection = window.getSelection();
+    console.log('[Translator] window.getSelection:', selection?.toString()?.substring(0, 30));
     if (selection && selection.toString().trim()) {
         return selection.toString().trim();
     }
 
+    console.log('[Translator] Нет выделенного текста');
     return '';
 }
 
