@@ -10,6 +10,34 @@ const CACHE_MAX_SIZE = 500;
 // Таймер автозакрытия popup
 let autoCloseTimer = null;
 
+// Таймаут для запросов (10 секунд)
+const FETCH_TIMEOUT = 10000;
+
+// =====================================================
+// === УТИЛИТЫ ===
+// =====================================================
+
+// Fetch с таймаутом
+async function fetchWithTimeout(url, options = {}, timeout = FETCH_TIMEOUT) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+            throw new Error('Таймаут запроса (сервер не отвечает)');
+        }
+        throw error;
+    }
+}
+
 // =====================================================
 // === АВТО-ОПРЕДЕЛЕНИЕ ЯЗЫКА ===
 // =====================================================
@@ -119,7 +147,7 @@ async function translateWithDeepL(text, targetLang, sourceLang, apiKey) {
             params.append('source_lang', sourceLang);
         }
 
-        const response = await fetch(baseUrl, {
+        const response = await fetchWithTimeout(baseUrl, {
             method: 'POST',
             headers: {
                 'Authorization': `DeepL-Auth-Key ${apiKey}`,
@@ -178,7 +206,7 @@ async function translateWithMyMemory(text, targetLang, sourceLang) {
 
         const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
 
-        const response = await fetch(url);
+        const response = await fetchWithTimeout(url);
 
         if (!response.ok) {
             return { success: false, error: `MyMemory HTTP ${response.status}` };
@@ -357,28 +385,39 @@ function initTranslatorHotkeys() {
     translatorHotkeysInitialized = true;
 
     document.addEventListener('keydown', async function translatorKeyHandler(e) {
-        // Проверяем включён ли переводчик
-        if (!globalSettings.translatorEnabled) return;
+        try {
+            // Проверяем включён ли переводчик
+            if (!globalSettings || !globalSettings.translatorEnabled) {
+                return;
+            }
 
-        // Проверяем что не в процессе захвата горячей клавиши (переменная из settings.js)
-        if (typeof capturingHotkey !== 'undefined' && capturingHotkey) return;
+            // Проверяем что не в процессе захвата горячей клавиши (переменная из settings.js)
+            if (typeof capturingHotkey !== 'undefined' && capturingHotkey) return;
 
-        const hotkeyTranslate = globalSettings.hotkeyTranslate || 'Ctrl+Q';
-        const hotkeyReplace = globalSettings.hotkeyReplace || 'Ctrl+S';
+            const hotkeyTranslate = globalSettings.hotkeyTranslate || 'Ctrl+Q';
+            const hotkeyReplace = globalSettings.hotkeyReplace || 'Ctrl+S';
 
-        const pressedCombo = getKeyCombo(e);
+            const pressedCombo = getKeyCombo(e);
 
-        // Ctrl+Q - показать перевод
-        if (pressedCombo === hotkeyTranslate) {
-            e.preventDefault();
-            e.stopPropagation();
-            await handleTranslateHotkey(e);
-        }
-        // Ctrl+S - заменить текст переводом
-        else if (pressedCombo === hotkeyReplace) {
-            e.preventDefault();
-            e.stopPropagation();
-            await handleReplaceHotkey();
+            // Ctrl+Q - показать перевод
+            if (pressedCombo === hotkeyTranslate) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[Translator] Hotkey: перевод');
+                await handleTranslateHotkey(e);
+            }
+            // Ctrl+S - заменить текст переводом
+            else if (pressedCombo === hotkeyReplace) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('[Translator] Hotkey: замена');
+                await handleReplaceHotkey();
+            }
+        } catch (error) {
+            console.error('[Translator] Ошибка в обработчике горячих клавиш:', error);
+            if (typeof showToast === 'function') {
+                showToast(`Ошибка переводчика: ${error.message}`, 'error');
+            }
         }
     }, true);
 }
@@ -399,123 +438,145 @@ function getKeyCombo(e) {
 }
 
 async function handleTranslateHotkey(e) {
-    // ВАЖНО: Сохраняем выделение и позицию ДО любых async операций
-    const selectedText = getSelectedText();
+    try {
+        // ВАЖНО: Сохраняем выделение и позицию ДО любых async операций
+        const selectedText = getSelectedText();
 
-    // Сохраняем позицию popup сразу
-    let popupX = window.innerWidth / 2 - 175;
-    let popupY = window.innerHeight / 2 - 100;
+        // Сохраняем позицию popup сразу
+        let popupX = window.innerWidth / 2 - 175;
+        let popupY = window.innerHeight / 2 - 100;
 
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-        try {
-            const range = selection.getRangeAt(0);
-            const rect = range.getBoundingClientRect();
-            if (rect.width > 0 || rect.height > 0) {
-                popupX = rect.left + rect.width / 2;
-                popupY = rect.bottom + 5;
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0) {
+            try {
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+                if (rect.width > 0 || rect.height > 0) {
+                    popupX = rect.left + rect.width / 2;
+                    popupY = rect.bottom + 5;
+                }
+            } catch (err) {
+                console.log('[Translator] Не удалось получить позицию выделения');
             }
-        } catch (err) {
-            console.log('[Translator] Не удалось получить позицию выделения');
         }
-    }
 
-    if (!selectedText) {
-        showToast('Выделите текст для перевода', 'warning');
-        return;
-    }
-
-    // Показываем индикатор загрузки
-    showToast('Переводим...', 'info');
-
-    // Авто-определение языка: русский↔английский
-    const sourceLang = globalSettings.translateFrom || 'auto';
-    let targetLang;
-
-    if (sourceLang === 'auto') {
-        // Автоматически определяем направление
-        targetLang = getAutoTargetLang(selectedText, globalSettings.translateTo || 'RU');
-    } else {
-        targetLang = globalSettings.translateTo || 'RU';
-    }
-
-    const result = await translateText(selectedText, targetLang, sourceLang);
-
-    if (result.success) {
-        // Если текст уже на целевом языке
-        if (result.sameLanguage) {
-            showToast('Текст уже на целевом языке', 'info');
+        if (!selectedText) {
+            showToast('Выделите текст для перевода', 'warning');
             return;
         }
 
-        showTranslationPopup(result.text, selectedText, popupX, popupY);
-    } else {
-        showToast(`Ошибка перевода: ${result.error}`, 'error');
+        console.log('[Translator] Текст для перевода:', selectedText.substring(0, 50) + '...');
+
+        // Показываем индикатор загрузки
+        showToast('Переводим...', 'info');
+
+        // Авто-определение языка: русский↔английский
+        const sourceLang = globalSettings.translateFrom || 'auto';
+        let targetLang;
+
+        if (sourceLang === 'auto') {
+            // Автоматически определяем направление
+            targetLang = getAutoTargetLang(selectedText, globalSettings.translateTo || 'RU');
+        } else {
+            targetLang = globalSettings.translateTo || 'RU';
+        }
+
+        console.log('[Translator] Направление:', sourceLang, '→', targetLang);
+
+        const result = await translateText(selectedText, targetLang, sourceLang);
+
+        console.log('[Translator] Результат:', result.success ? 'OK' : result.error);
+
+        if (result.success) {
+            // Если текст уже на целевом языке
+            if (result.sameLanguage) {
+                showToast('Текст уже на целевом языке', 'info');
+                return;
+            }
+
+            showTranslationPopup(result.text, selectedText, popupX, popupY);
+        } else {
+            showToast(`Ошибка перевода: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('[Translator] handleTranslateHotkey error:', error);
+        showToast(`Ошибка: ${error.message}`, 'error');
     }
 }
 
 async function handleReplaceHotkey() {
-    // ВАЖНО: Сохраняем activeElement и выделение ДО любых async операций
-    const activeElement = document.activeElement;
-    const selectedText = getSelectedText();
+    try {
+        // ВАЖНО: Сохраняем activeElement и выделение ДО любых async операций
+        const activeElement = document.activeElement;
+        const selectedText = getSelectedText();
 
-    // Сохраняем позиции выделения для input/textarea
-    let selectionStart = null;
-    let selectionEnd = null;
-    if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
-        selectionStart = activeElement.selectionStart;
-        selectionEnd = activeElement.selectionEnd;
-    }
+        // Сохраняем позиции выделения для input/textarea
+        let selectionStart = null;
+        let selectionEnd = null;
+        if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+            selectionStart = activeElement.selectionStart;
+            selectionEnd = activeElement.selectionEnd;
+        }
 
-    // Проверяем что фокус в текстовом поле
-    if (!activeElement ||
-        (activeElement.tagName !== 'INPUT' &&
-         activeElement.tagName !== 'TEXTAREA' &&
-         !activeElement.isContentEditable)) {
-        showToast('Поставьте курсор в текстовое поле', 'warning');
-        return;
-    }
-
-    if (!selectedText) {
-        showToast('Выделите текст для замены', 'warning');
-        return;
-    }
-
-    showToast('Переводим...', 'info');
-
-    // Авто-определение языка: русский↔английский
-    const sourceLang = globalSettings.translateFrom || 'auto';
-    let targetLang;
-
-    if (sourceLang === 'auto') {
-        // Автоматически определяем направление
-        targetLang = getAutoTargetLang(selectedText, globalSettings.translateReplace || 'EN');
-    } else {
-        targetLang = globalSettings.translateReplace || 'EN';
-    }
-
-    const result = await translateText(selectedText, targetLang, sourceLang);
-
-    if (result.success) {
-        // Если текст уже на целевом языке - не заменяем
-        if (result.sameLanguage) {
-            showToast('Текст уже на целевом языке', 'info');
+        // Проверяем что фокус в текстовом поле
+        if (!activeElement ||
+            (activeElement.tagName !== 'INPUT' &&
+             activeElement.tagName !== 'TEXTAREA' &&
+             !activeElement.isContentEditable)) {
+            showToast('Поставьте курсор в текстовое поле', 'warning');
             return;
         }
 
-        // Восстанавливаем фокус и выделение перед заменой
-        if (activeElement && document.body.contains(activeElement)) {
-            activeElement.focus();
-            if (selectionStart !== null && selectionEnd !== null) {
-                activeElement.selectionStart = selectionStart;
-                activeElement.selectionEnd = selectionEnd;
-            }
+        if (!selectedText) {
+            showToast('Выделите текст для замены', 'warning');
+            return;
         }
 
-        replaceSelectedText(result.text);
-        showToast('Текст заменён', 'success');
-    } else {
-        showToast(`Ошибка перевода: ${result.error}`, 'error');
+        console.log('[Translator] Замена текста:', selectedText.substring(0, 50) + '...');
+
+        showToast('Переводим...', 'info');
+
+        // Авто-определение языка: русский↔английский
+        const sourceLang = globalSettings.translateFrom || 'auto';
+        let targetLang;
+
+        if (sourceLang === 'auto') {
+            // Автоматически определяем направление
+            targetLang = getAutoTargetLang(selectedText, globalSettings.translateReplace || 'EN');
+        } else {
+            targetLang = globalSettings.translateReplace || 'EN';
+        }
+
+        console.log('[Translator] Направление замены:', sourceLang, '→', targetLang);
+
+        const result = await translateText(selectedText, targetLang, sourceLang);
+
+        console.log('[Translator] Результат замены:', result.success ? 'OK' : result.error);
+
+        if (result.success) {
+            // Если текст уже на целевом языке - не заменяем
+            if (result.sameLanguage) {
+                showToast('Текст уже на целевом языке', 'info');
+                return;
+            }
+
+            // Восстанавливаем фокус и выделение перед заменой
+            if (activeElement && document.body.contains(activeElement)) {
+                activeElement.focus();
+                if (selectionStart !== null && selectionEnd !== null) {
+                    activeElement.selectionStart = selectionStart;
+                    activeElement.selectionEnd = selectionEnd;
+                }
+            }
+
+            replaceSelectedText(result.text);
+            showToast('Текст заменён', 'success');
+        } else {
+            showToast(`Ошибка перевода: ${result.error}`, 'error');
+        }
+    } catch (error) {
+        console.error('[Translator] handleReplaceHotkey error:', error);
+        showToast(`Ошибка: ${error.message}`, 'error');
     }
 }
 
