@@ -520,6 +520,75 @@ async function handleReplaceHotkey() {
     }
 }
 
+// Сохранить контекст выделения для последующей замены
+function saveSelectionContext() {
+    const activeEl = document.activeElement;
+
+    // Для input/textarea
+    if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+        const start = activeEl.selectionStart;
+        const end = activeEl.selectionEnd;
+        if (start !== end) {
+            return {
+                type: 'input',
+                element: activeEl,
+                start: start,
+                end: end
+            };
+        }
+    }
+
+    // Для contenteditable
+    if (activeEl && activeEl.isContentEditable) {
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            return {
+                type: 'contenteditable',
+                element: activeEl,
+                range: selection.getRangeAt(0).cloneRange()
+            };
+        }
+    }
+
+    // Для обычного выделения на странице (не заменяем, только показываем)
+    return null;
+}
+
+// Заменить текст используя сохранённый контекст
+function replaceWithSavedContext(ctx, newText) {
+    if (!ctx) {
+        console.log('[Translator] Нет сохранённого контекста - замена невозможна');
+        return false;
+    }
+
+    try {
+        if (ctx.type === 'input') {
+            const el = ctx.element;
+            const value = el.value;
+            el.value = value.substring(0, ctx.start) + newText + value.substring(ctx.end);
+            el.selectionStart = el.selectionEnd = ctx.start + newText.length;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.focus();
+            console.log('[Translator] Текст заменён в input/textarea');
+            return true;
+        }
+
+        if (ctx.type === 'contenteditable') {
+            ctx.element.focus();
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(ctx.range);
+            document.execCommand('insertText', false, newText);
+            console.log('[Translator] Текст заменён в contenteditable');
+            return true;
+        }
+    } catch (err) {
+        console.error('[Translator] Ошибка замены:', err);
+    }
+
+    return false;
+}
+
 // Ctrl+Shift+S - замена с выбором языка
 async function handleReplaceWithLanguageChoice(e) {
     const selectedText = getSelectedText();
@@ -528,14 +597,21 @@ async function handleReplaceWithLanguageChoice(e) {
         return;
     }
 
+    // ВАЖНО: Сохраняем контекст ДО показа popup (потом фокус потеряется)
+    const selectionContext = saveSelectionContext();
+    if (!selectionContext) {
+        showToast('Выделите текст в редактируемом поле', 'warning');
+        return;
+    }
+
     console.log('[Translator] Выбор языка для:', selectedText.substring(0, 30));
 
-    // Показываем popup с выбором языка
-    showLanguagePickerPopup(e, selectedText);
+    // Показываем popup с выбором языка, передаём контекст
+    showLanguagePickerPopup(e, selectedText, selectionContext);
 }
 
 // Popup с выбором языка для замены (все языки мира с поиском)
-function showLanguagePickerPopup(e, textToTranslate) {
+function showLanguagePickerPopup(e, textToTranslate, selectionContext) {
     // Удаляем существующий popup если есть
     const existingPopup = document.getElementById('laba-language-picker');
     if (existingPopup) existingPopup.remove();
@@ -725,8 +801,13 @@ function showLanguagePickerPopup(e, textToTranslate) {
                     const result = await translateText(textToTranslate, targetLang, sourceLang);
 
                     if (result.success && !result.sameLanguage) {
-                        replaceSelectedText(result.text);
-                        showToast('Текст заменён', 'success');
+                        // Используем сохранённый контекст для замены
+                        const replaced = replaceWithSavedContext(selectionContext, result.text);
+                        if (replaced) {
+                            showToast('Текст заменён', 'success');
+                        } else {
+                            showToast('Не удалось заменить текст', 'warning');
+                        }
                     } else if (result.sameLanguage) {
                         showToast('Текст уже на этом языке', 'info');
                     } else {
