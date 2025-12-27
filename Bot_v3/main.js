@@ -1080,6 +1080,189 @@ ipcMain.handle('translate-request', async (event, { service, text, targetLang, s
     }
 });
 
+// =====================================================
+// === POPUP ОКНО ПЕРЕВОДА (отдельное BrowserWindow) ===
+// =====================================================
+
+let translationPopupWindow = null;
+
+// IPC: Показать popup перевода как отдельное окно (поверх webview)
+ipcMain.on('show-translation-popup', (event, { translatedText, x, y, width, fontSize }) => {
+    // Закрываем существующее окно если есть
+    if (translationPopupWindow && !translationPopupWindow.isDestroyed()) {
+        translationPopupWindow.close();
+    }
+
+    // Получаем позицию главного окна для правильного позиционирования
+    const mainBounds = mainWindow.getBounds();
+    const absoluteX = mainBounds.x + x;
+    const absoluteY = mainBounds.y + y;
+
+    // Создаём окно без рамки
+    translationPopupWindow = new BrowserWindow({
+        width: width || 350,
+        height: 200,
+        x: absoluteX,
+        y: absoluteY,
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
+        skipTaskbar: true,
+        resizable: false,
+        focusable: true,
+        parent: mainWindow,
+        webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+        }
+    });
+
+    // HTML контент для popup
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                background: transparent;
+                padding: 5px;
+            }
+            .popup {
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                overflow: hidden;
+            }
+            .header {
+                background: linear-gradient(135deg, #28a745, #20c997);
+                color: white;
+                padding: 8px 12px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                cursor: move;
+                -webkit-app-region: drag;
+            }
+            .title {
+                font-size: 13px;
+                font-weight: 500;
+            }
+            .close-btn {
+                background: none;
+                border: none;
+                color: white;
+                font-size: 16px;
+                cursor: pointer;
+                padding: 2px 6px;
+                border-radius: 4px;
+                -webkit-app-region: no-drag;
+            }
+            .close-btn:hover { background: rgba(255,255,255,0.2); }
+            .content {
+                padding: 12px 15px;
+                font-size: ${fontSize || 14}px;
+                line-height: 1.5;
+                color: #333;
+                max-height: 150px;
+                overflow-y: auto;
+                word-wrap: break-word;
+            }
+            .footer {
+                padding: 8px 12px;
+                border-top: 1px solid #eee;
+                display: flex;
+                gap: 8px;
+            }
+            .btn {
+                padding: 5px 12px;
+                border: 1px solid #28a745;
+                background: white;
+                color: #28a745;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+            }
+            .btn:hover { background: #28a745; color: white; }
+        </style>
+    </head>
+    <body>
+        <div class="popup">
+            <div class="header">
+                <span class="title">🌐 Перевод</span>
+                <button class="close-btn" onclick="closePopup()">✕</button>
+            </div>
+            <div class="content" id="content"></div>
+            <div class="footer">
+                <button class="btn" onclick="copyText()">📋 Копировать</button>
+            </div>
+        </div>
+        <script>
+            const { ipcRenderer } = require('electron');
+            const text = ${JSON.stringify(translatedText)};
+            document.getElementById('content').textContent = text;
+
+            function closePopup() {
+                ipcRenderer.send('hide-translation-popup');
+            }
+            function copyText() {
+                navigator.clipboard.writeText(text).then(() => {
+                    ipcRenderer.send('translation-copied');
+                    closePopup();
+                });
+            }
+            // Закрытие по Escape
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') closePopup();
+            });
+            // Закрытие при потере фокуса
+            window.addEventListener('blur', () => {
+                setTimeout(() => closePopup(), 100);
+            });
+        </script>
+    </body>
+    </html>
+    `;
+
+    translationPopupWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+
+    // Подгоняем размер под контент после загрузки
+    translationPopupWindow.webContents.on('did-finish-load', () => {
+        translationPopupWindow.webContents.executeJavaScript(`
+            const popup = document.querySelector('.popup');
+            const height = Math.min(popup.offsetHeight + 10, 300);
+            require('electron').ipcRenderer.send('resize-translation-popup', { height });
+        `);
+    });
+
+    console.log('[Translator] Popup окно создано');
+});
+
+// IPC: Скрыть popup перевода
+ipcMain.on('hide-translation-popup', () => {
+    if (translationPopupWindow && !translationPopupWindow.isDestroyed()) {
+        translationPopupWindow.close();
+        translationPopupWindow = null;
+    }
+});
+
+// IPC: Изменить размер popup
+ipcMain.on('resize-translation-popup', (event, { height }) => {
+    if (translationPopupWindow && !translationPopupWindow.isDestroyed()) {
+        const bounds = translationPopupWindow.getBounds();
+        translationPopupWindow.setBounds({ ...bounds, height: height });
+    }
+});
+
+// IPC: Перевод скопирован - показать уведомление в главном окне
+ipcMain.on('translation-copied', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('show-toast', { message: 'Перевод скопирован', type: 'success' });
+    }
+});
+
 // Чтение фото для отправки в письмах
 ipcMain.handle('read-photo-file', async (event, { filePath }) => {
     try {

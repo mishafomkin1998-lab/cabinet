@@ -158,109 +158,41 @@ function decodeHTMLEntities(text) {
 }
 
 // =====================================================
-// === POPUP ОКНО ПЕРЕВОДА ===
+// === POPUP ОКНО ПЕРЕВОДА (отдельное BrowserWindow) ===
 // =====================================================
 
 function showTranslationPopup(translatedText, originalText, x, y) {
-    // Удаляем существующий popup
-    hideTranslationPopup();
+    const { ipcRenderer } = require('electron');
 
     const width = globalSettings.translateWidth || 350;
     const fontSize = globalSettings.translateFontSize || 14;
-    const autoClose = globalSettings.translateAutoClose || 0;
 
-    // Создаём popup
-    const popup = document.createElement('div');
-    popup.id = 'translation-popup';
-    popup.className = 'translation-popup';
+    // Отправляем в main процесс для создания отдельного окна
+    // Это единственный способ показать popup поверх webview
+    ipcRenderer.send('show-translation-popup', {
+        translatedText: translatedText,
+        x: x,
+        y: y,
+        width: width,
+        fontSize: fontSize
+    });
 
-    popup.innerHTML = `
-        <div class="translation-popup-header">
-            <span class="translation-popup-title"><i class="fa fa-language"></i> Перевод</span>
-            <button class="translation-popup-close" onclick="hideTranslationPopup()"><i class="fa fa-times"></i></button>
-        </div>
-        <div class="translation-popup-content" style="font-size: ${fontSize}px">
-            ${escapeHtml(translatedText)}
-        </div>
-        <div class="translation-popup-footer">
-            <button class="btn btn-sm btn-outline-primary" onclick="copyTranslation()">
-                <i class="fa fa-copy"></i> Копировать
-            </button>
-        </div>
-    `;
-
-    popup.style.width = width + 'px';
-
-    // Позиционирование - добавляем в специальный контейнер поверх всего
-    const container = document.getElementById('translator-popup-container') || document.body;
-    container.appendChild(popup);
-
-    // Корректируем позицию чтобы не выходил за экран
-    const rect = popup.getBoundingClientRect();
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-
-    let posX = x;
-    let posY = y + 10; // Немного ниже курсора
-
-    if (posX + rect.width > viewportWidth - 10) {
-        posX = viewportWidth - rect.width - 10;
-    }
-    if (posY + rect.height > viewportHeight - 10) {
-        posY = y - rect.height - 10; // Показываем выше курсора
-    }
-    if (posX < 10) posX = 10;
-    if (posY < 10) posY = 10;
-
-    popup.style.left = posX + 'px';
-    popup.style.top = posY + 'px';
-
-    // Сохраняем текст для копирования
-    popup.dataset.text = translatedText;
-
-    // Автозакрытие
-    if (autoClose > 0) {
-        autoCloseTimer = setTimeout(() => {
-            hideTranslationPopup();
-        }, autoClose * 1000);
-    }
-
-    // Закрытие по клику вне popup
-    setTimeout(() => {
-        document.addEventListener('mousedown', handleOutsideClick);
-    }, 100);
+    console.log('[Translator] Запрос на показ popup окна');
 }
 
 function hideTranslationPopup() {
-    const popup = document.getElementById('translation-popup');
-    if (popup) {
-        popup.remove();
-    }
-    if (autoCloseTimer) {
-        clearTimeout(autoCloseTimer);
-        autoCloseTimer = null;
-    }
-    document.removeEventListener('mousedown', handleOutsideClick);
+    const { ipcRenderer } = require('electron');
+    ipcRenderer.send('hide-translation-popup');
 }
 
-function handleOutsideClick(e) {
-    const popup = document.getElementById('translation-popup');
-    if (popup && !popup.contains(e.target)) {
-        hideTranslationPopup();
-    }
-}
-
-function copyTranslation() {
-    const popup = document.getElementById('translation-popup');
-    if (popup && popup.dataset.text) {
-        navigator.clipboard.writeText(popup.dataset.text).then(() => {
-            showToast('Перевод скопирован', 'success');
-            hideTranslationPopup();
-        }).catch(err => {
-            console.error('[Translator] Copy error:', err);
-            showToast('Ошибка копирования', 'error');
-        });
-    }
+// Обработчик toast уведомлений от popup окна
+function initPopupToastHandler() {
+    const { ipcRenderer } = require('electron');
+    ipcRenderer.on('show-toast', (event, { message, type }) => {
+        if (typeof showToast === 'function') {
+            showToast(message, type);
+        }
+    });
 }
 
 // Экранирование HTML
@@ -739,12 +671,14 @@ function initTranslatorIPC() {
         document.addEventListener('DOMContentLoaded', function() {
             initTranslatorHotkeys();
             initTranslatorIPC();
+            initPopupToastHandler();
             console.log('[Translator] Модуль переводчика инициализирован (DOMContentLoaded)');
         });
     } else {
         // DOM уже готов
         initTranslatorHotkeys();
         initTranslatorIPC();
+        initPopupToastHandler();
         console.log('[Translator] Модуль переводчика инициализирован (DOM ready)');
     }
 })();
