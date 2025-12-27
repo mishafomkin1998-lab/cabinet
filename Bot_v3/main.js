@@ -1085,51 +1085,128 @@ ipcMain.handle('translate-request', async (event, { service, text, targetLang, s
 
         } else {
             // MyMemory API (бесплатный, с email лимит увеличивается до 10000 слов/день)
+            // MyMemory имеет лимит ~500 символов на запрос, поэтому разбиваем длинные тексты
+            const MYMEMORY_CHUNK_SIZE = 450;
+
             const langPair = sourceLang === 'auto'
                 ? `autodetect|${targetLang.toLowerCase()}`
                 : `${sourceLang.toLowerCase()}|${targetLang.toLowerCase()}`;
 
-            let url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
+            // Функция для перевода одного чанка
+            async function translateChunk(chunkText) {
+                let url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(chunkText)}&langpair=${langPair}`;
 
-            // Добавляем email для увеличения лимита (5000 → 10000 слов/день)
-            if (email) {
-                url += `&de=${encodeURIComponent(email)}`;
-                console.log('[Translator] MyMemory с email (лимит 10000 слов/день)');
+                if (email) {
+                    url += `&de=${encodeURIComponent(email)}`;
+                }
+
+                const axiosConfig = {
+                    method: 'GET',
+                    url: url,
+                    timeout: 15000,
+                    proxy: false
+                };
+
+                if (httpsAgent) {
+                    axiosConfig.httpsAgent = httpsAgent;
+                }
+
+                const response = await axios(axiosConfig);
+                return response.data;
             }
 
-            const axiosConfig = {
-                method: 'GET',
-                url: url,
-                timeout: 15000,
-                proxy: false
-            };
+            // Разбиваем текст на чанки по предложениям/абзацам
+            function splitTextIntoChunks(inputText, maxSize) {
+                if (inputText.length <= maxSize) {
+                    return [inputText];
+                }
 
-            if (httpsAgent) {
-                axiosConfig.httpsAgent = httpsAgent;
+                const chunks = [];
+                let remaining = inputText;
+
+                while (remaining.length > 0) {
+                    if (remaining.length <= maxSize) {
+                        chunks.push(remaining);
+                        break;
+                    }
+
+                    // Ищем хорошее место для разбиения (конец предложения, абзац)
+                    let splitIndex = maxSize;
+
+                    // Сначала ищем конец абзаца
+                    const newlineIndex = remaining.lastIndexOf('\n', maxSize);
+                    if (newlineIndex > maxSize * 0.5) {
+                        splitIndex = newlineIndex + 1;
+                    } else {
+                        // Ищем конец предложения
+                        const periodIndex = remaining.lastIndexOf('. ', maxSize);
+                        const questionIndex = remaining.lastIndexOf('? ', maxSize);
+                        const exclamIndex = remaining.lastIndexOf('! ', maxSize);
+                        const sentenceEnd = Math.max(periodIndex, questionIndex, exclamIndex);
+
+                        if (sentenceEnd > maxSize * 0.5) {
+                            splitIndex = sentenceEnd + 2;
+                        } else {
+                            // Ищем пробел
+                            const spaceIndex = remaining.lastIndexOf(' ', maxSize);
+                            if (spaceIndex > maxSize * 0.5) {
+                                splitIndex = spaceIndex + 1;
+                            }
+                        }
+                    }
+
+                    chunks.push(remaining.substring(0, splitIndex).trim());
+                    remaining = remaining.substring(splitIndex).trim();
+                }
+
+                return chunks;
             }
 
-            const response = await axios(axiosConfig);
-            const data = response.data;
+            try {
+                const chunks = splitTextIntoChunks(text, MYMEMORY_CHUNK_SIZE);
+                console.log(`[Translator] MyMemory: ${text.length} символов → ${chunks.length} чанков`);
 
-            if (data.responseStatus === 200 && data.responseData?.translatedText) {
-                result = {
-                    success: true,
-                    text: data.responseData.translatedText,
-                    service: 'MyMemory'
-                };
-            } else if (data.responseStatus === 429 || data.responseDetails?.includes('LIMIT')) {
-                result = { success: false, error: 'Превышен лимит MyMemory (5000 слов/день)' };
-            } else if (data.responseDetails?.includes('PLEASE SELECT TWO DISTINCT LANGUAGES') ||
-                       data.responseDetails?.includes('SAME LANGUAGE')) {
-                // Текст уже на целевом языке
-                result = {
-                    success: true,
-                    text: text,
-                    service: 'MyMemory',
-                    sameLanguage: true
-                };
-            } else {
-                result = { success: false, error: data.responseDetails || 'Ошибка MyMemory' };
+                if (email) {
+                    console.log('[Translator] MyMemory с email (лимит 10000 слов/день)');
+                }
+
+                const translatedChunks = [];
+                let sameLanguageCount = 0;
+
+                for (let i = 0; i < chunks.length; i++) {
+                    const data = await translateChunk(chunks[i]);
+
+                    if (data.responseStatus === 200 && data.responseData?.translatedText) {
+                        translatedChunks.push(data.responseData.translatedText);
+                    } else if (data.responseStatus === 429 || data.responseDetails?.includes('LIMIT')) {
+                        result = { success: false, error: 'Превышен лимит MyMemory (5000 слов/день)' };
+                        break;
+                    } else if (data.responseDetails?.includes('PLEASE SELECT TWO DISTINCT LANGUAGES') ||
+                               data.responseDetails?.includes('SAME LANGUAGE')) {
+                        sameLanguageCount++;
+                        translatedChunks.push(chunks[i]); // Оставляем оригинал
+                    } else {
+                        result = { success: false, error: data.responseDetails || 'Ошибка MyMemory' };
+                        break;
+                    }
+
+                    // Небольшая пауза между запросами чтобы не перегружать API
+                    if (i < chunks.length - 1) {
+                        await new Promise(r => setTimeout(r, 100));
+                    }
+                }
+
+                // Если все чанки переведены успешно
+                if (translatedChunks.length === chunks.length) {
+                    result = {
+                        success: true,
+                        text: translatedChunks.join(' '),
+                        service: 'MyMemory',
+                        sameLanguage: sameLanguageCount === chunks.length
+                    };
+                }
+            } catch (chunkError) {
+                result = { success: false, error: chunkError.message };
             }
         }
 

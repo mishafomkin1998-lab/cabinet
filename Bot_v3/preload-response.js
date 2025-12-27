@@ -83,7 +83,7 @@ ipcRenderer.on('show-translation-popup', (event, { text, originalText, x, y }) =
         </div>
     `;
 
-    // Стили popup
+    // Стили popup (адаптивный для длинных текстов)
     Object.assign(popup.style, {
         position: 'fixed',
         zIndex: '999999',
@@ -91,11 +91,21 @@ ipcRenderer.on('show-translation-popup', (event, { text, originalText, x, y }) =
         padding: '12px 15px',
         borderRadius: '8px',
         boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
-        maxWidth: '350px',
-        minWidth: '200px',
+        maxWidth: '500px',
+        minWidth: '250px',
+        maxHeight: '70vh',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
         fontSize: '14px',
         fontFamily: 'Arial, sans-serif'
     });
+
+    // Делаем контент скроллируемым
+    const contentDiv = popup.querySelector('div:nth-child(2)');
+    if (contentDiv) {
+        contentDiv.style.cssText = 'line-height: 1.5; color: #333; max-height: 50vh; overflow-y: auto; padding-right: 5px;';
+    }
 
     document.body.appendChild(popup);
 
