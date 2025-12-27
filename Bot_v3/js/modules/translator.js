@@ -155,6 +155,17 @@ async function translateWithMyMemory(text, targetLang, sourceLang) {
             return { success: false, error: 'Превышен лимит MyMemory (5000 слов/день)' };
         }
 
+        // Ошибка одинаковых языков - текст уже на целевом языке
+        if (data.responseDetails?.includes('PLEASE SELECT TWO DISTINCT LANGUAGES') ||
+            data.responseDetails?.includes('SAME LANGUAGE')) {
+            return {
+                success: true,
+                text: text, // Возвращаем оригинальный текст
+                service: 'MyMemory',
+                sameLanguage: true
+            };
+        }
+
         return { success: false, error: data.responseDetails || 'Ошибка MyMemory' };
 
     } catch (error) {
@@ -355,6 +366,12 @@ async function handleTranslateHotkey(e) {
     const result = await translateText(selectedText, targetLang, sourceLang);
 
     if (result.success) {
+        // Если текст уже на целевом языке
+        if (result.sameLanguage) {
+            showToast('Текст уже на целевом языке', 'info');
+            return;
+        }
+
         // Получаем позицию для popup из выделенного текста
         const selection = window.getSelection();
         let x = window.innerWidth / 2 - 175; // По центру по умолчанию
@@ -402,6 +419,11 @@ async function handleReplaceHotkey() {
     const result = await translateText(selectedText, targetLang, sourceLang);
 
     if (result.success) {
+        // Если текст уже на целевом языке - не заменяем
+        if (result.sameLanguage) {
+            showToast('Текст уже на целевом языке', 'info');
+            return;
+        }
         replaceSelectedText(result.text);
         showToast('Текст заменён', 'success');
     } else {
@@ -493,7 +515,11 @@ function initTranslatorIPC() {
             const result = await translateText(text, targetLang, sourceLang);
 
             if (result.success) {
-                showTranslationPopup(result.text, text, x, y);
+                if (result.sameLanguage) {
+                    showToast('Текст уже на целевом языке', 'info');
+                } else {
+                    showTranslationPopup(result.text, text, x, y);
+                }
             } else {
                 showToast(`Ошибка перевода: ${result.error}`, 'error');
             }
@@ -507,8 +533,12 @@ function initTranslatorIPC() {
             const result = await translateText(text, targetLang, sourceLang);
 
             if (result.success) {
-                replaceSelectedText(result.text);
-                showToast('Текст заменён', 'success');
+                if (result.sameLanguage) {
+                    showToast('Текст уже на целевом языке', 'info');
+                } else {
+                    replaceSelectedText(result.text);
+                    showToast('Текст заменён', 'success');
+                }
             } else {
                 showToast(`Ошибка перевода: ${result.error}`, 'error');
             }
@@ -529,12 +559,16 @@ function initTranslatorIPC() {
         const result = await translateText(text, targetLang, sourceLang);
 
         if (result.success) {
-            // Отправляем перевод обратно в main для вставки в response window
-            ipcRenderer.send('insert-translation-to-window', {
-                windowId: windowId,
-                text: result.text
-            });
-            showToast('Текст заменён', 'success');
+            if (result.sameLanguage) {
+                showToast('Текст уже на целевом языке', 'info');
+            } else {
+                // Отправляем перевод обратно в main для вставки в response window
+                ipcRenderer.send('insert-translation-to-window', {
+                    windowId: windowId,
+                    text: result.text
+                });
+                showToast('Текст заменён', 'success');
+            }
         } else {
             showToast(`Ошибка перевода: ${result.error}`, 'error');
         }
