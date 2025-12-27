@@ -286,8 +286,17 @@ function escapeHtml(text) {
 // === ГОРЯЧИЕ КЛАВИШИ ПЕРЕВОДЧИКА ===
 // =====================================================
 
+// Флаг инициализации чтобы не добавлять обработчик повторно
+let translatorHotkeysInitialized = false;
+
 function initTranslatorHotkeys() {
-    document.addEventListener('keydown', async function(e) {
+    if (translatorHotkeysInitialized) {
+        console.log('[Translator] Hotkeys уже инициализированы, пропускаем');
+        return;
+    }
+    translatorHotkeysInitialized = true;
+
+    document.addEventListener('keydown', async function translatorKeyHandler(e) {
         // Проверяем включён ли переводчик
         if (!globalSettings.translatorEnabled) return;
 
@@ -296,8 +305,6 @@ function initTranslatorHotkeys() {
 
         const hotkeyTranslate = globalSettings.hotkeyTranslate || 'Ctrl+Q';
         const hotkeyReplace = globalSettings.hotkeyReplace || 'Ctrl+S';
-
-        console.log('[Translator] Keydown:', e.key, 'Combo:', getKeyCombo(e), 'Expected:', hotkeyTranslate);
 
         const pressedCombo = getKeyCombo(e);
 
@@ -348,16 +355,18 @@ async function handleTranslateHotkey(e) {
     const result = await translateText(selectedText, targetLang, sourceLang);
 
     if (result.success) {
-        // Получаем позицию для popup
+        // Получаем позицию для popup из выделенного текста
         const selection = window.getSelection();
-        let x = e.clientX || 100;
-        let y = e.clientY || 100;
+        let x = window.innerWidth / 2 - 175; // По центру по умолчанию
+        let y = window.innerHeight / 2 - 100;
 
-        if (selection.rangeCount > 0) {
+        if (selection && selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);
             const rect = range.getBoundingClientRect();
-            x = rect.left;
-            y = rect.bottom;
+            if (rect.width > 0 || rect.height > 0) {
+                x = rect.left + rect.width / 2;
+                y = rect.bottom + 5;
+            }
         }
 
         showTranslationPopup(result.text, selectedText, x, y);

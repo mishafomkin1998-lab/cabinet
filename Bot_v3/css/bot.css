@@ -4217,18 +4217,19 @@ body.hide-profile-cards .profile-card {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 15px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 4px 10px;
+    background: #28a745;
     color: white;
 }
 
 .translation-popup-title {
-    font-weight: 600;
-    font-size: 14px;
+    font-weight: 500;
+    font-size: 11px;
 }
 
 .translation-popup-title i {
-    margin-right: 6px;
+    margin-right: 4px;
+    font-size: 10px;
 }
 
 .translation-popup-close {
@@ -4236,8 +4237,9 @@ body.hide-profile-cards .profile-card {
     border: none;
     color: white;
     cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 4px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-size: 10px;
     transition: background 0.2s;
 }
 
@@ -4283,10 +4285,6 @@ body.theme-ladadate .translation-popup {
     box-shadow: 0 8px 32px rgba(236,72,153,0.3);
 }
 
-body.theme-ladadate .translation-popup-header {
-    background: linear-gradient(135deg, #ec4899 0%, #d946ef 100%);
-}
-
 body.theme-ladadate .translation-popup-content {
     color: #f0d0f0;
 }
@@ -4302,10 +4300,6 @@ body.theme-novabot .translation-popup {
     box-shadow: 0 8px 32px rgba(33,150,243,0.3);
 }
 
-body.theme-novabot .translation-popup-header {
-    background: linear-gradient(135deg, #2196f3 0%, #00bcd4 100%);
-}
-
 body.theme-novabot .translation-popup-content {
     color: #b0d4f1;
 }
@@ -4315,12 +4309,13 @@ body.theme-novabot .translation-popup-footer {
     border-top-color: #1e3a5f;
 }
 
-/* Hotkey input capturing state */
+/* Hotkey input - обычный шрифт */
 .hotkey-input {
     cursor: pointer;
     text-align: center;
-    font-family: monospace;
-    font-weight: 600;
+    font-family: inherit;
+    font-weight: 400;
+    font-size: 13px;
 }
 
 .hotkey-input.capturing {
