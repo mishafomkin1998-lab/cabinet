@@ -1,3 +1,4 @@
+// NovaBot Main Process
 const { app, BrowserWindow, ipcMain, session, Menu, dialog, powerMonitor, screen } = require('electron');
 const path = require('path');
 const fs = require('fs');
