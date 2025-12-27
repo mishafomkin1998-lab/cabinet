@@ -837,6 +837,22 @@ ipcMain.on('replace-text-in-webview', (event, { botId, text }) => {
     }
 });
 
+// IPC: Запрос перевода от плавающей кнопки в webview
+ipcMain.on('webview-translate-request', (event, { botId, text, x, y }) => {
+    console.log('[Main] webview-translate-request:', { botId, text: text?.substring(0, 30), x, y });
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        // Отправляем в renderer для перевода (используем тот же механизм что и контекстное меню)
+        mainWindow.webContents.send('translate-selection', {
+            text: text,
+            x: x,
+            y: y,
+            mode: 'show',
+            botId: botId
+        });
+    }
+});
+
 // =====================================================
 
 // Хранилище прокси настроек для ботов
@@ -1611,7 +1627,7 @@ ipcMain.handle('open-response-window', async (event, data) => {
         }
     });
 
-    // Устанавливаем масштаб после загрузки + блокировка уведомлений
+    // Устанавливаем масштаб после загрузки + блокировка уведомлений + кнопка перевода
     win.webContents.on('did-finish-load', () => {
         win.webContents.setZoomFactor(0.8);
 
@@ -1633,6 +1649,14 @@ ipcMain.handle('open-response-window', async (event, data) => {
                 }
             `).catch(() => {});
         }
+
+        // Инжектируем плавающую кнопку перевода
+        injectTranslateButton(win);
+    });
+
+    // Повторное инжектирование при навигации внутри страницы
+    win.webContents.on('did-navigate-in-page', () => {
+        setTimeout(() => injectTranslateButton(win), 300);
     });
 
     // Сохраняем тип окна для AI
@@ -1858,6 +1882,216 @@ ipcMain.handle('close-response-window', async (event, windowId) => {
     return { success: true };
 });
 
+// === Плавающая кнопка перевода для Response Windows ===
+
+// Функция инъекции плавающей кнопки перевода
+function injectTranslateButton(win) {
+    if (win.isDestroyed()) return;
+
+    // Проверяем включён ли переводчик в настройках
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.executeJavaScript(`
+            (function() {
+                return !!(typeof globalSettings !== 'undefined' && globalSettings.translatorEnabled);
+            })()
+        `).then(isEnabled => {
+            if (!isEnabled) {
+                console.log('[InjectTranslate] Переводчик выключен в настройках');
+                return;
+            }
+
+            // Инжектируем скрипт плавающей кнопки
+            win.webContents.executeJavaScript(`
+                (function() {
+                    // Проверяем что скрипт не был уже инициализирован
+                    if (window.__translateButtonInit) return;
+                    window.__translateButtonInit = true;
+
+                    console.log('[TranslateBtn] Инициализация плавающей кнопки перевода');
+
+                    // Создаём стили для кнопки
+                    const style = document.createElement('style');
+                    style.textContent = \`
+                        #laba-translate-btn {
+                            position: fixed;
+                            z-index: 999999;
+                            width: 32px;
+                            height: 32px;
+                            border-radius: 50%;
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            border: 2px solid #fff;
+                            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                            cursor: pointer;
+                            display: none;
+                            align-items: center;
+                            justify-content: center;
+                            font-size: 16px;
+                            color: white;
+                            transition: transform 0.15s ease, box-shadow 0.15s ease;
+                            user-select: none;
+                        }
+                        #laba-translate-btn:hover {
+                            transform: scale(1.15);
+                            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.5);
+                        }
+                        #laba-translate-btn:active {
+                            transform: scale(0.95);
+                        }
+                        #laba-translate-btn.loading {
+                            pointer-events: none;
+                            opacity: 0.7;
+                        }
+                        #laba-translate-btn.loading::after {
+                            content: '';
+                            position: absolute;
+                            width: 20px;
+                            height: 20px;
+                            border: 2px solid transparent;
+                            border-top-color: white;
+                            border-radius: 50%;
+                            animation: laba-spin 0.8s linear infinite;
+                        }
+                        @keyframes laba-spin {
+                            to { transform: rotate(360deg); }
+                        }
+                    \`;
+                    document.head.appendChild(style);
+
+                    // Создаём кнопку
+                    const btn = document.createElement('div');
+                    btn.id = 'laba-translate-btn';
+                    btn.innerHTML = '🌐';
+                    btn.title = 'Перевести выделенный текст';
+                    document.body.appendChild(btn);
+
+                    let hideTimeout = null;
+                    let lastSelection = '';
+
+                    // Показать кнопку рядом с выделением
+                    function showButton(x, y, text) {
+                        if (!text || text.length < 2) {
+                            hideButton();
+                            return;
+                        }
+
+                        lastSelection = text;
+
+                        // Позиционируем кнопку
+                        const btnSize = 32;
+                        let posX = x + 5;
+                        let posY = y - btnSize - 5;
+
+                        // Не выходим за границы экрана
+                        if (posX + btnSize > window.innerWidth) {
+                            posX = window.innerWidth - btnSize - 10;
+                        }
+                        if (posY < 10) {
+                            posY = y + 20;
+                        }
+                        if (posX < 10) posX = 10;
+
+                        btn.style.left = posX + 'px';
+                        btn.style.top = posY + 'px';
+                        btn.style.display = 'flex';
+                        btn.classList.remove('loading');
+
+                        // Автоскрытие через 5 секунд
+                        clearTimeout(hideTimeout);
+                        hideTimeout = setTimeout(hideButton, 5000);
+                    }
+
+                    // Скрыть кнопку
+                    function hideButton() {
+                        btn.style.display = 'none';
+                        btn.classList.remove('loading');
+                        btn.innerHTML = '🌐';
+                        clearTimeout(hideTimeout);
+                    }
+
+                    // Получить выделенный текст
+                    function getSelectedText() {
+                        const activeEl = document.activeElement;
+
+                        // Для input/textarea
+                        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+                            const start = activeEl.selectionStart;
+                            const end = activeEl.selectionEnd;
+                            if (start !== end) {
+                                return activeEl.value.substring(start, end).trim();
+                            }
+                        }
+
+                        // Для обычного выделения
+                        const selection = window.getSelection();
+                        return selection ? selection.toString().trim() : '';
+                    }
+
+                    // Обработчик выделения текста
+                    document.addEventListener('mouseup', (e) => {
+                        // Игнорируем клик по самой кнопке
+                        if (e.target === btn || btn.contains(e.target)) return;
+
+                        // Небольшая задержка чтобы выделение успело обновиться
+                        setTimeout(() => {
+                            const text = getSelectedText();
+                            if (text && text.length >= 2) {
+                                showButton(e.clientX, e.clientY, text);
+                            } else {
+                                hideButton();
+                            }
+                        }, 10);
+                    });
+
+                    // Скрываем при скролле
+                    document.addEventListener('scroll', hideButton, true);
+
+                    // Обработчик клика на кнопку перевода
+                    btn.addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+
+                        const text = lastSelection || getSelectedText();
+                        if (!text) {
+                            console.log('[TranslateBtn] Нет текста для перевода');
+                            return;
+                        }
+
+                        console.log('[TranslateBtn] Запрос перевода:', text.substring(0, 50));
+
+                        // Показываем загрузку
+                        btn.classList.add('loading');
+                        btn.innerHTML = '';
+
+                        // Получаем позицию для popup
+                        const rect = btn.getBoundingClientRect();
+
+                        // Вызываем перевод через preload API
+                        if (window.lababotAI && window.lababotAI.translate) {
+                            try {
+                                await window.lababotAI.translate(text, rect.left, rect.bottom + 5);
+                            } catch (err) {
+                                console.error('[TranslateBtn] Ошибка:', err);
+                            }
+                        } else {
+                            console.error('[TranslateBtn] API перевода недоступен');
+                        }
+
+                        // Скрываем кнопку
+                        setTimeout(hideButton, 300);
+                    });
+
+                    // Обработчик для скрытия кнопки при потере фокуса
+                    window.addEventListener('blur', hideButton);
+
+                    console.log('[TranslateBtn] Плавающая кнопка перевода готова');
+                })();
+            `).catch(err => {
+                console.log('[InjectTranslate] Error:', err.message);
+            });
+        }).catch(() => {});
+    }
+}
+
 // === AI для Response Windows ===
 
 // Функция инъекции кнопки AI на сайт (с retry)
@@ -2076,6 +2310,64 @@ ipcMain.handle('response-window-ai-check', async (event) => {
         return result;
     } catch (err) {
         return { available: false };
+    }
+});
+
+// IPC: Перевод текста из Response Window (плавающая кнопка)
+ipcMain.handle('response-window-translate', async (event, { text, x, y }) => {
+    console.log('[ResponseWindow Translate] Запрос:', text?.substring(0, 30));
+
+    if (!mainWindow || mainWindow.isDestroyed()) {
+        return { success: false, error: 'Main window not available' };
+    }
+
+    try {
+        // Выполняем перевод через renderer (там есть translateText функция)
+        const result = await mainWindow.webContents.executeJavaScript(`
+            (async function() {
+                if (typeof translateText !== 'function') {
+                    return { success: false, error: 'Переводчик не загружен' };
+                }
+
+                // Проверяем включён ли переводчик
+                if (!globalSettings || !globalSettings.translatorEnabled) {
+                    return { success: false, error: 'Переводчик выключен в настройках' };
+                }
+
+                const text = ${JSON.stringify(text)};
+                const sourceLang = globalSettings.translateFrom || 'auto';
+                let targetLang;
+
+                if (sourceLang === 'auto') {
+                    targetLang = getAutoTargetLang(text, globalSettings.translateTo || 'RU');
+                } else {
+                    targetLang = globalSettings.translateTo || 'RU';
+                }
+
+                const result = await translateText(text, targetLang, sourceLang);
+                return result;
+            })()
+        `);
+
+        // Если перевод успешен - показываем popup в Response Window
+        if (result.success && !result.sameLanguage) {
+            // Находим окно, которое отправило запрос
+            const senderWindow = BrowserWindow.fromWebContents(event.sender);
+            if (senderWindow && !senderWindow.isDestroyed()) {
+                // Отправляем результат обратно для показа popup
+                senderWindow.webContents.send('show-translation-popup', {
+                    text: result.text,
+                    originalText: text,
+                    x: x,
+                    y: y
+                });
+            }
+        }
+
+        return result;
+    } catch (err) {
+        console.error('[ResponseWindow Translate] Error:', err);
+        return { success: false, error: err.message };
     }
 });
 

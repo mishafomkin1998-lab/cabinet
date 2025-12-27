@@ -550,6 +550,12 @@ class AccountBot {
 
             // 1. Внедрение скрипта "Анти-сон" (Keep-Alive)
             webview.executeJavaScript(KEEP_ALIVE_SCRIPT);
+
+            // 1.5. Внедрение плавающей кнопки перевода (если переводчик включён)
+            if (globalSettings && globalSettings.translatorEnabled) {
+                webview.executeJavaScript(TRANSLATE_BUTTON_SCRIPT);
+                console.log(`[WebView ${this.id}] 🌐 Плавающая кнопка перевода внедрена`);
+            }
             
             // 2. Скрипт авто-входа (если токен есть, все равно создаем сессию)
             // БЕЗОПАСНОСТЬ: Экранируем логин и пароль для предотвращения XSS
@@ -605,6 +611,32 @@ class AccountBot {
             };
             console.log('[WebView Context] Отправляем в main:', menuData);
             ipcRenderer.send('show-webview-context-menu', menuData);
+        });
+
+        // ОБРАБОТЧИК ПЛАВАЮЩЕЙ КНОПКИ ПЕРЕВОДА
+        // Перехватываем console.log из webview с маркером LABA_TRANSLATE
+        webview.addEventListener('console-message', (e) => {
+            const msg = e.message;
+            if (msg && msg.startsWith('LABA_TRANSLATE:')) {
+                try {
+                    const jsonStr = msg.substring('LABA_TRANSLATE:'.length);
+                    const data = JSON.parse(jsonStr);
+                    console.log('[WebView Translate] Получен запрос:', data.text?.substring(0, 30));
+
+                    // Отправляем запрос на перевод через IPC
+                    // Используем тот же механизм что и контекстное меню
+                    if (typeof mainWindow !== 'undefined' || true) {
+                        ipcRenderer.send('webview-translate-request', {
+                            botId: this.id,
+                            text: data.text,
+                            x: data.x,
+                            y: data.y
+                        });
+                    }
+                } catch (err) {
+                    console.error('[WebView Translate] Ошибка парсинга:', err);
+                }
+            }
         });
 
         // ВАЖНО: Добавляем webview в скрытый контейнер
