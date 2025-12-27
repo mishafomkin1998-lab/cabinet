@@ -1872,20 +1872,56 @@ async function injectTranslationPopup(contents, translatedText, originalText, x,
                         gap: 8px;
                         justify-content: flex-end;
                     ">
-                        <button onclick="navigator.clipboard.writeText('${escapedText}'); this.textContent='✓ Скопировано'; setTimeout(() => document.getElementById('lababot-translate-popup').remove(), 500);" style="
-                            padding: 6px 12px;
+                        <button id="lababot-replace-btn" title="Заменить выделенный текст" style="
+                            padding: 6px 10px;
+                            background: #28a745;
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 14px;
+                        ">✏️</button>
+                        <button onclick="navigator.clipboard.writeText('${escapedText}'); this.textContent='✓'; setTimeout(() => document.getElementById('lababot-translate-popup').remove(), 500);" title="Копировать" style="
+                            padding: 6px 10px;
                             background: ${styles.btnBg};
                             color: white;
                             border: none;
                             border-radius: 4px;
                             cursor: pointer;
-                            font-size: 12px;
-                        ">📋 Копировать</button>
+                            font-size: 14px;
+                        ">📋</button>
                     </div>
                 </div>
             \`;
 
             document.body.appendChild(popup);
+
+            // Сохраняем выделение для замены
+            const selection = window.getSelection();
+            const savedRange = selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null;
+            const activeEl = document.activeElement;
+            const selStart = activeEl?.selectionStart;
+            const selEnd = activeEl?.selectionEnd;
+
+            // Обработчик кнопки замены
+            document.getElementById('lababot-replace-btn').addEventListener('click', () => {
+                const translatedText = '${escapedText}';
+
+                // Для input/textarea
+                if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+                    activeEl.focus();
+                    activeEl.selectionStart = selStart;
+                    activeEl.selectionEnd = selEnd;
+                    document.execCommand('insertText', false, translatedText);
+                } else if (savedRange) {
+                    // Для contenteditable
+                    selection.removeAllRanges();
+                    selection.addRange(savedRange);
+                    document.execCommand('insertText', false, translatedText);
+                }
+
+                document.getElementById('lababot-translate-popup')?.remove();
+            });
 
             // Закрытие по Escape
             const escHandler = (e) => {
