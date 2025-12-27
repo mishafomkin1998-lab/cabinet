@@ -10,34 +10,6 @@ const CACHE_MAX_SIZE = 500;
 // Таймер автозакрытия popup
 let autoCloseTimer = null;
 
-// Таймаут для запросов (10 секунд)
-const FETCH_TIMEOUT = 10000;
-
-// =====================================================
-// === УТИЛИТЫ ===
-// =====================================================
-
-// Fetch с таймаутом
-async function fetchWithTimeout(url, options = {}, timeout = FETCH_TIMEOUT) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-    try {
-        const response = await fetch(url, {
-            ...options,
-            signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        return response;
-    } catch (error) {
-        clearTimeout(timeoutId);
-        if (error.name === 'AbortError') {
-            throw new Error('Таймаут запроса (сервер не отвечает)');
-        }
-        throw error;
-    }
-}
-
 // =====================================================
 // === АВТО-ОПРЕДЕЛЕНИЕ ЯЗЫКА ===
 // =====================================================
@@ -91,7 +63,21 @@ function getAutoTargetLang(text, defaultTarget) {
 // === ОСНОВНАЯ ФУНКЦИЯ ПЕРЕВОДА ===
 // =====================================================
 
-async function translateText(text, targetLang, sourceLang = 'auto') {
+// Получить текущий активный botId для использования прокси
+function getCurrentBotId() {
+    // Пытаемся получить ID активного бота из интерфейса
+    if (typeof currentBotId !== 'undefined' && currentBotId) {
+        return currentBotId;
+    }
+    // Альтернатива: проверить активную вкладку
+    const activeTab = document.querySelector('.bot-tab.active');
+    if (activeTab && activeTab.dataset.botId) {
+        return activeTab.dataset.botId;
+    }
+    return null;
+}
+
+async function translateText(text, targetLang, sourceLang = 'auto', botId = null) {
     if (!text || !text.trim()) {
         return { success: false, error: 'Пустой текст' };
     }
@@ -105,18 +91,21 @@ async function translateText(text, targetLang, sourceLang = 'auto') {
         return { success: true, text: translationCache.get(cacheKey), fromCache: true };
     }
 
+    // Определяем botId для прокси
+    const effectiveBotId = botId || getCurrentBotId();
+
     // Выбираем сервис перевода
     const deeplKey = globalSettings.deeplKey;
 
     let result;
     if (deeplKey) {
-        result = await translateWithDeepL(text, targetLang, sourceLang, deeplKey);
+        result = await translateWithIPC(text, targetLang, sourceLang, 'deepl', deeplKey, effectiveBotId);
     } else {
-        result = await translateWithMyMemory(text, targetLang, sourceLang);
+        result = await translateWithIPC(text, targetLang, sourceLang, 'mymemory', null, effectiveBotId);
     }
 
-    // Сохраняем в кеш при успехе
-    if (result.success) {
+    // Сохраняем в кеш при успехе (кроме случая sameLanguage)
+    if (result.success && !result.sameLanguage) {
         // Ограничиваем размер кеша
         if (translationCache.size >= CACHE_MAX_SIZE) {
             const firstKey = translationCache.keys().next().value;
@@ -129,127 +118,37 @@ async function translateText(text, targetLang, sourceLang = 'auto') {
 }
 
 // =====================================================
-// === DeepL API ===
+// === ПЕРЕВОД ЧЕРЕЗ IPC (с поддержкой прокси) ===
 // =====================================================
 
-async function translateWithDeepL(text, targetLang, sourceLang, apiKey) {
+async function translateWithIPC(text, targetLang, sourceLang, service, apiKey, botId) {
     try {
-        // DeepL Free API использует api-free.deepl.com
-        const isFreeKey = apiKey.endsWith(':fx');
-        const baseUrl = isFreeKey
-            ? 'https://api-free.deepl.com/v2/translate'
-            : 'https://api.deepl.com/v2/translate';
+        const { ipcRenderer } = require('electron');
 
-        const params = new URLSearchParams();
-        params.append('text', text);
-        params.append('target_lang', targetLang);
-        if (sourceLang && sourceLang !== 'auto') {
-            params.append('source_lang', sourceLang);
-        }
+        console.log(`[Translator] IPC запрос: ${service}, ${sourceLang} → ${targetLang}, botId: ${botId || 'none'}`);
 
-        const response = await fetchWithTimeout(baseUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': `DeepL-Auth-Key ${apiKey}`,
-                'Content-Type': 'application/x-www-form-urlencoded'
-            },
-            body: params.toString()
+        const result = await ipcRenderer.invoke('translate-request', {
+            service: service,
+            text: text,
+            targetLang: targetLang,
+            sourceLang: sourceLang,
+            apiKey: apiKey,
+            botId: botId
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('[Translator] DeepL error:', response.status, errorText);
-
-            if (response.status === 403) {
-                return { success: false, error: 'Неверный API ключ DeepL' };
-            }
-            if (response.status === 456) {
-                return { success: false, error: 'Превышен лимит DeepL' };
-            }
-
-            // Fallback на MyMemory при ошибке DeepL
-            console.log('[Translator] Fallback на MyMemory...');
-            return await translateWithMyMemory(text, targetLang, sourceLang);
+        // Декодируем HTML entities для MyMemory
+        if (result.success && result.service === 'MyMemory' && !result.sameLanguage) {
+            result.text = decodeHTMLEntities(result.text);
         }
 
-        const data = await response.json();
-        const translatedText = data.translations?.[0]?.text;
-
-        if (translatedText) {
-            return {
-                success: true,
-                text: translatedText,
-                detectedLang: data.translations?.[0]?.detected_source_language,
-                service: 'DeepL'
-            };
-        }
-
-        return { success: false, error: 'Нет результата от DeepL' };
+        return result;
 
     } catch (error) {
-        console.error('[Translator] DeepL exception:', error);
-        // Fallback на MyMemory
-        return await translateWithMyMemory(text, targetLang, sourceLang);
-    }
-}
-
-// =====================================================
-// === MyMemory API (бесплатный) ===
-// =====================================================
-
-async function translateWithMyMemory(text, targetLang, sourceLang) {
-    try {
-        // MyMemory использует формат "en|ru"
-        const langPair = sourceLang === 'auto'
-            ? `autodetect|${targetLang.toLowerCase()}`
-            : `${sourceLang.toLowerCase()}|${targetLang.toLowerCase()}`;
-
-        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
-
-        const response = await fetchWithTimeout(url);
-
-        if (!response.ok) {
-            return { success: false, error: `MyMemory HTTP ${response.status}` };
-        }
-
-        const data = await response.json();
-
-        if (data.responseStatus === 200 && data.responseData?.translatedText) {
-            let translatedText = data.responseData.translatedText;
-
-            // MyMemory иногда возвращает HTML entities
-            translatedText = decodeHTMLEntities(translatedText);
-
-            return {
-                success: true,
-                text: translatedText,
-                service: 'MyMemory'
-            };
-        }
-
-        // Проверяем лимит
-        if (data.responseStatus === 429 || data.responseDetails?.includes('LIMIT')) {
-            return { success: false, error: 'Превышен лимит MyMemory (5000 слов/день)' };
-        }
-
-        // Ошибка одинаковых языков - текст уже на целевом языке
-        if (data.responseDetails?.includes('PLEASE SELECT TWO DISTINCT LANGUAGES') ||
-            data.responseDetails?.includes('SAME LANGUAGE')) {
-            return {
-                success: true,
-                text: text, // Возвращаем оригинальный текст
-                service: 'MyMemory',
-                sameLanguage: true
-            };
-        }
-
-        return { success: false, error: data.responseDetails || 'Ошибка MyMemory' };
-
-    } catch (error) {
-        console.error('[Translator] MyMemory exception:', error);
+        console.error('[Translator] IPC ошибка:', error);
         return { success: false, error: error.message };
     }
 }
+
 
 // Декодирование HTML entities
 function decodeHTMLEntities(text) {
@@ -292,8 +191,9 @@ function showTranslationPopup(translatedText, originalText, x, y) {
 
     popup.style.width = width + 'px';
 
-    // Позиционирование
-    document.body.appendChild(popup);
+    // Позиционирование - добавляем в специальный контейнер поверх всего
+    const container = document.getElementById('translator-popup-container') || document.body;
+    container.appendChild(popup);
 
     // Корректируем позицию чтобы не выходил за экран
     const rect = popup.getBoundingClientRect();

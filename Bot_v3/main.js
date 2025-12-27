@@ -933,6 +933,153 @@ ipcMain.handle('set-bot-proxy', async (event, { botId, proxyString }) => {
     return { success: true };
 });
 
+// IPC: Запрос перевода через main процесс с поддержкой прокси
+ipcMain.handle('translate-request', async (event, { service, text, targetLang, sourceLang, apiKey, botId }) => {
+    console.log(`[Translator] Запрос перевода: ${service}, ${sourceLang} → ${targetLang}, botId: ${botId || 'none'}`);
+
+    try {
+        const axios = require('axios');
+        const { HttpsProxyAgent } = require('https-proxy-agent');
+
+        // Получаем прокси для этого бота или дефолтный
+        const proxyString = proxySettings[botId] || proxySettings['default'] || null;
+        console.log(`[Translator] proxyString: ${proxyString || 'НЕТ ПРОКСИ'}`);
+
+        let httpsAgent = null;
+
+        // Настраиваем прокси если есть
+        if (proxyString) {
+            const proxyParts = proxyString.split(':');
+
+            let proxyUrl;
+            if (proxyParts.length === 2) {
+                // Формат: host:port
+                proxyUrl = `http://${proxyParts[0]}:${proxyParts[1]}`;
+            } else if (proxyParts.length === 4) {
+                // Формат: host:port:user:pass
+                const [host, port, user, pass] = proxyParts;
+                proxyUrl = `http://${user}:${pass}@${host}:${port}`;
+            } else {
+                console.error('[Translator] Неверный формат прокси:', proxyString);
+            }
+
+            if (proxyUrl) {
+                console.log(`[Translator] Прокси URL: ${proxyUrl.replace(/:[^:@]+@/, ':***@')}`);
+                httpsAgent = new HttpsProxyAgent(proxyUrl);
+            }
+        }
+
+        let result;
+
+        if (service === 'deepl') {
+            // DeepL API
+            const isFreeKey = apiKey.endsWith(':fx');
+            const baseUrl = isFreeKey
+                ? 'https://api-free.deepl.com/v2/translate'
+                : 'https://api.deepl.com/v2/translate';
+
+            const params = new URLSearchParams();
+            params.append('text', text);
+            params.append('target_lang', targetLang);
+            if (sourceLang && sourceLang !== 'auto') {
+                params.append('source_lang', sourceLang);
+            }
+
+            const axiosConfig = {
+                method: 'POST',
+                url: baseUrl,
+                headers: {
+                    'Authorization': `DeepL-Auth-Key ${apiKey}`,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                data: params.toString(),
+                timeout: 15000,
+                proxy: false
+            };
+
+            if (httpsAgent) {
+                axiosConfig.httpsAgent = httpsAgent;
+            }
+
+            const response = await axios(axiosConfig);
+            const translatedText = response.data.translations?.[0]?.text;
+
+            if (translatedText) {
+                result = {
+                    success: true,
+                    text: translatedText,
+                    detectedLang: response.data.translations?.[0]?.detected_source_language,
+                    service: 'DeepL'
+                };
+            } else {
+                result = { success: false, error: 'Нет результата от DeepL' };
+            }
+
+        } else {
+            // MyMemory API (бесплатный)
+            const langPair = sourceLang === 'auto'
+                ? `autodetect|${targetLang.toLowerCase()}`
+                : `${sourceLang.toLowerCase()}|${targetLang.toLowerCase()}`;
+
+            const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`;
+
+            const axiosConfig = {
+                method: 'GET',
+                url: url,
+                timeout: 15000,
+                proxy: false
+            };
+
+            if (httpsAgent) {
+                axiosConfig.httpsAgent = httpsAgent;
+            }
+
+            const response = await axios(axiosConfig);
+            const data = response.data;
+
+            if (data.responseStatus === 200 && data.responseData?.translatedText) {
+                result = {
+                    success: true,
+                    text: data.responseData.translatedText,
+                    service: 'MyMemory'
+                };
+            } else if (data.responseStatus === 429 || data.responseDetails?.includes('LIMIT')) {
+                result = { success: false, error: 'Превышен лимит MyMemory (5000 слов/день)' };
+            } else if (data.responseDetails?.includes('PLEASE SELECT TWO DISTINCT LANGUAGES') ||
+                       data.responseDetails?.includes('SAME LANGUAGE')) {
+                // Текст уже на целевом языке
+                result = {
+                    success: true,
+                    text: text,
+                    service: 'MyMemory',
+                    sameLanguage: true
+                };
+            } else {
+                result = { success: false, error: data.responseDetails || 'Ошибка MyMemory' };
+            }
+        }
+
+        console.log(`[Translator] Результат: ${result.success ? '✅ ' + result.service : '❌ ' + result.error}`);
+        return result;
+
+    } catch (error) {
+        console.error('[Translator] Ошибка:', error.message);
+
+        // Обработка специфичных ошибок DeepL
+        if (error.response) {
+            const status = error.response.status;
+            if (status === 403) {
+                return { success: false, error: 'Неверный API ключ DeepL' };
+            }
+            if (status === 456) {
+                return { success: false, error: 'Превышен лимит DeepL' };
+            }
+        }
+
+        return { success: false, error: error.message };
+    }
+});
+
 // Чтение фото для отправки в письмах
 ipcMain.handle('read-photo-file', async (event, { filePath }) => {
     try {

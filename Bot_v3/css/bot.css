@@ -4190,6 +4190,20 @@ body.hide-profile-cards .profile-card {
 }
 
 /* ============= TRANSLATOR POPUP ============= */
+#translator-popup-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2147483647 !important; /* Максимальный z-index */
+}
+
+#translator-popup-container .translation-popup {
+    pointer-events: auto;
+}
+
 .translation-popup {
     position: fixed;
     z-index: 2147483647 !important; /* Максимальное значение z-index */
@@ -4200,7 +4214,6 @@ body.hide-profile-cards .profile-card {
     animation: popupFadeIn 0.2s ease-out;
     max-width: 90vw;
     max-height: 80vh;
-    isolation: isolate; /* Создаём новый stacking context */
 }
 
 @keyframes popupFadeIn {
