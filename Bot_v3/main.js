@@ -2265,6 +2265,82 @@ ipcMain.handle('open-response-window', async (event, data) => {
         }
     });
 
+    // === ГОРЯЧИЕ КЛАВИШИ ПЕРЕВОДЧИКА В RESPONSE WINDOW ===
+    win.webContents.on('before-input-event', async (event, input) => {
+        if (input.type !== 'keyDown') return;
+
+        // Обновляем настройки если нужно
+        if (!webviewHotkeySettings._initialized) {
+            await updateWebviewHotkeySettings();
+            webviewHotkeySettings._initialized = true;
+        }
+
+        // Проверяем горячие клавиши
+        let action = null;
+
+        if (matchesHotkey(input, webviewHotkeySettings.replaceLang)) {
+            action = 'replaceLang';
+        } else if (matchesHotkey(input, webviewHotkeySettings.replace)) {
+            action = 'replace';
+        } else if (matchesHotkey(input, webviewHotkeySettings.translate)) {
+            action = 'translate';
+        }
+
+        if (!action) return;
+
+        event.preventDefault();
+        console.log(`[ResponseWindow Hotkeys] Перехвачено: ${action}`);
+
+        try {
+            // Получаем выделенный текст и позицию
+            const selectionData = await win.webContents.executeJavaScript(`
+                (function() {
+                    const selection = window.getSelection();
+                    const text = selection.toString().trim();
+
+                    let x = window.innerWidth / 2;
+                    let y = window.innerHeight / 2;
+
+                    if (selection.rangeCount > 0) {
+                        const range = selection.getRangeAt(0);
+                        const rect = range.getBoundingClientRect();
+                        if (rect.width > 0 || rect.height > 0) {
+                            x = rect.left + rect.width / 2;
+                            y = rect.bottom;
+                        }
+                    }
+
+                    return { text, x, y };
+                })();
+            `);
+
+            if (!selectionData.text) {
+                console.log('[ResponseWindow Hotkeys] Нет выделенного текста');
+                return;
+            }
+
+            const { text, x, y } = selectionData;
+            console.log('[ResponseWindow Hotkeys] Текст:', text.substring(0, 30) + '...');
+
+            if (action === 'translate') {
+                const result = await doWebviewTranslate(text, false);
+                if (result.success && !result.sameLanguage) {
+                    await injectTranslationPopup(win.webContents, result.text, text, x, y);
+                }
+            } else if (action === 'replace') {
+                const result = await doWebviewTranslate(text, true);
+                if (result.success && !result.sameLanguage) {
+                    await replaceSelectedTextInWebview(win.webContents, result.text);
+                }
+            } else if (action === 'replaceLang') {
+                await injectLanguagePickerPopup(win.webContents, text, x, y);
+            }
+
+        } catch (err) {
+            console.error('[ResponseWindow Hotkeys] Ошибка:', err);
+        }
+    });
+
     // Устанавливаем масштаб после загрузки + блокировка уведомлений + кнопка перевода
     win.webContents.on('did-finish-load', () => {
         win.webContents.setZoomFactor(0.8);
