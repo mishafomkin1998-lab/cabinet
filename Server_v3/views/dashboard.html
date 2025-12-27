@@ -1,0 +1,2092 @@
+<!DOCTYPE html>
+<html lang="ru" x-data="{ htmlLang: 'ru' }" :lang="htmlLang">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova Dashboard</title>
+    <link rel="icon" type="image/png" href="images/logo.png">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Flatpickr -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/ru.js"></script>
+    <!-- Localization -->
+    <script src="js/locales.js"></script>
+    <!-- Alpine.js -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
+    <!-- Configuration -->
+    <script>
+        // API Server URL - автоматически определяет адрес сервера
+        const API_BASE = window.location.origin;
+
+        // Auth check
+        const novaUserData = JSON.parse(localStorage.getItem('novaUser') || sessionStorage.getItem('novaUser') || 'null');
+        if (!novaUserData || !novaUserData.loggedIn) {
+            window.location.href = 'login.html';
+        }
+
+        // Load saved language or default to Russian
+        const savedLanguage = localStorage.getItem('novaLanguage') || 'ru';
+    </script>
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="css/common.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body x-data="dashboard()" x-init="init()" :class="{ 'dark': darkMode }" class="text-gray-800">
+    <div class="flex h-screen">
+        <!-- Сайдбар -->
+        <aside class="glass-sidebar w-64 flex-shrink-0 flex flex-col p-4">
+            <!-- Логотип NOVA -->
+            <div class="mb-4">
+                <a href="index.html" class="flex items-center">
+                    <img src="images/nova.png" alt="Nova" class="h-12 w-auto">
+                </a>
+            </div>
+
+            <!-- Menu -->
+            <nav class="flex-1">
+                <div class="space-y-1">
+                    <div>
+                        <div @click="setActiveMenu('accounts')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'accounts' ? 'active' : ''">
+                            <i class="fas fa-folder w-5 text-gray-600"></i>
+                            <span class="ml-3 font-medium" x-text="t('menu.profiles')"></span>
+                        </div>
+                    </div>
+                    <!-- Команда - для директора и админа -->
+                    <div x-show="currentUser.role === 'director' || currentUser.role === 'admin'">
+                        <div @click="setActiveMenu('team')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'team' ? 'active' : ''">
+                            <i class="fas fa-users w-5 text-gray-600"></i>
+                            <span class="ml-3 font-medium">Команда</span>
+                        </div>
+                    </div>
+                    <!-- Управление - только для директора -->
+                    <div x-show="currentUser.role === 'director'">
+                        <div @click="setActiveMenu('control')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'control' ? 'active' : ''">
+                            <i class="fas fa-sliders-h w-5 text-gray-600"></i>
+                            <span class="ml-3 font-medium" x-text="t('menu.control')"></span>
+                        </div>
+                    </div>
+                    <!-- Финансы (только для директора) -->
+                    <div x-show="currentUser.role === 'director'">
+                        <div @click="setActiveMenu('finances')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'finances' ? 'active' : ''">
+                            <i class="fas fa-wallet w-5 text-gray-600"></i>
+                            <span class="ml-3 font-medium">Финансы</span>
+                        </div>
+                    </div>
+                    <!-- Клиенты (только для директора) -->
+                    <div x-show="currentUser.role === 'director'">
+                        <div @click="setActiveMenu('clients')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'clients' ? 'active' : ''">
+                            <i class="fas fa-address-book w-5 text-gray-600"></i>
+                            <span class="ml-3 font-medium">Клиенты</span>
+                        </div>
+                    </div>
+                    <div>
+                        <div @click="setActiveMenu('history')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'history' ? 'active' : ''">
+                            <i class="fas fa-history w-5 text-gray-600"></i>
+                            <span class="ml-3 font-medium" x-text="t('menu.history')"></span>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+
+            <!-- Нижний блок: Обучение + Поддержка -->
+            <div class="mt-auto pt-4 border-t border-gray-200 space-y-2">
+                <div @click="setActiveMenu('training')" class="menu-item flex items-center p-3 rounded-xl cursor-pointer" :class="activeMenu === 'training' ? 'active' : ''">
+                    <i class="fas fa-graduation-cap w-5 text-gray-600"></i>
+                    <span class="ml-3 font-medium" x-text="t('menu.training')"></span>
+                </div>
+                <a href="https://t.me/S_Shevil" target="_blank"
+                   class="flex items-center p-3 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600 transition-all">
+                    <i class="fab fa-telegram w-5"></i>
+                    <span class="ml-3 font-medium">Поддержка</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <main class="flex-1 overflow-y-auto px-5 pt-2 pb-4">
+            <!-- Loading indicator -->
+            <div x-show="loading" class="fixed inset-0 bg-white/80 backdrop-blur-sm z-50 flex items-center justify-center">
+                <div class="text-center">
+                    <i class="fas fa-spinner fa-spin text-4xl text-indigo-500 mb-4"></i>
+                    <div class="text-gray-600" x-text="t('common.loading')"></div>
+                </div>
+            </div>
+
+            <!-- Connection error -->
+            <div x-show="error" x-cloak class="glass rounded-2xl p-6 mb-6 border-l-4 border-red-500">
+                <div class="flex items-center">
+                    <i class="fas fa-exclamation-triangle text-red-500 mr-3"></i>
+                    <div>
+                        <div class="font-bold text-red-700" x-text="t('messages.connectionError')"></div>
+                        <div class="text-sm text-gray-600" x-text="error"></div>
+                    </div>
+                    <button @click="loadAllData()" class="ml-auto px-5 py-2.5 bg-red-100 text-red-600 rounded-xl hover:bg-red-200 font-medium transition-all">
+                        <i class="fas fa-redo mr-1"></i> <span x-text="t('messages.retry')"></span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-3">
+                <div>
+                    <h2 class="text-xl font-bold" x-text="getPageTitle()"></h2>
+                    <p class="text-sm text-gray-500" x-text="getPageSubtitle()"></p>
+                </div>
+
+                <div class="flex items-center space-x-3">
+                    <!-- Balance (only for admins without "мой админ") -->
+                    <template x-if="currentUser.role === 'admin' && !isRestricted">
+                        <div class="glass px-4 py-2 rounded-xl flex items-center">
+                            <i class="fas fa-wallet mr-2 text-gray-400"></i>
+                            <span class="font-semibold" :class="userBalance > 0 ? 'text-green-600' : 'text-red-500'">
+                                $<span x-text="userBalance.toFixed(2)"></span>
+                            </span>
+                        </div>
+                    </template>
+
+                    <!-- Profile -->
+                    <div class="relative" x-data="{open: false}">
+                        <button @click="open = !open" class="flex items-center glass px-4 py-2 rounded-xl hover:bg-gray-50">
+                            <div class="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center overflow-hidden">
+                                <template x-if="currentUser.avatar_url">
+                                    <img :src="currentUser.avatar_url" class="w-full h-full object-cover">
+                                </template>
+                                <template x-if="!currentUser.avatar_url">
+                                    <span class="text-white text-sm font-medium" x-text="currentUser.username ? currentUser.username.substring(0,1).toUpperCase() : 'U'">U</span>
+                                </template>
+                            </div>
+                            <span class="ml-2 text-sm font-medium hidden md:block" x-text="currentUser.username"></span>
+                            <i class="fas fa-chevron-down ml-2 text-gray-400 text-xs"></i>
+                        </button>
+
+                        <div x-show="open" @click.outside="open = false" class="absolute right-0 mt-2 w-56 glass rounded-xl p-2 shadow-xl z-50">
+                            <div class="px-3 py-2 border-b border-gray-100 mb-2">
+                                <div class="font-medium" x-text="currentUser.username"></div>
+                                <div class="text-xs text-gray-500" x-text="t('roles.' + currentUser.role)"></div>
+                            </div>
+                            <a href="#" @click.prevent="showSettingsModal = true; open = false" class="flex items-center p-3 rounded-lg hover:bg-gray-100 text-gray-700 mb-1">
+                                <i class="fas fa-cog mr-3"></i>
+                                <span>Настройки</span>
+                            </a>
+                            <a href="#" @click="logout()" class="flex items-center p-3 rounded-lg hover:bg-red-50 text-red-500">
+                                <i class="fas fa-sign-out-alt mr-3"></i>
+                                <span x-text="t('userMenu.logout')"></span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Content -->
+            <!-- Команда -->
+            <div x-show="activeMenu === 'team'" x-cloak class="fade-in">
+                <!-- Для директора -->
+                <template x-if="currentUser.role === 'director'">
+                    <div>
+                        <!-- Секция Админы -->
+                        <div class="glass rounded-2xl p-5 mb-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-bold">
+                                    <i class="fas fa-user-tie text-indigo-500 mr-2"></i>Админы
+                                </h3>
+                                <button @click="showAddAdminModal = true" class="px-4 py-2 rounded-xl text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white transition-all">
+                                    <i class="fas fa-plus mr-2"></i>Добавить админа
+                                </button>
+                            </div>
+
+                            <div class="space-y-3">
+                                <template x-for="admin in admins" :key="admin.id">
+                                    <div class="border border-gray-200 rounded-xl overflow-hidden">
+                                        <!-- Карточка админа -->
+                                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 flex items-center justify-between cursor-pointer hover:from-blue-100 hover:to-indigo-100 transition-colors"
+                                             @click="toggleAdminExpanded(admin.id)">
+                                            <div class="flex items-center">
+                                                <div class="w-12 h-12 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-center flex-shrink-0">
+                                                    <span class="text-white font-bold" x-text="admin.initials"></span>
+                                                </div>
+                                                <div class="ml-4">
+                                                    <div class="font-semibold text-gray-800" x-text="admin.name"></div>
+                                                    <div class="text-sm text-gray-500">
+                                                        <span x-text="admin.translators.length"></span> переводчиков •
+                                                        <span x-text="admin.accounts"></span> анкет
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="flex items-center gap-2">
+                                                <!-- Баланс (если не мой админ) - клик для пополнения -->
+                                                <button x-show="!admin.isMyAdmin" @click.stop="openTopupModal(admin.id)"
+                                                        class="px-3 py-1.5 rounded-lg bg-green-100 hover:bg-green-200 flex items-center gap-1"
+                                                        title="Пополнить баланс">
+                                                    <i class="fas fa-wallet text-green-600 text-sm"></i>
+                                                    <span class="text-green-700 font-medium text-sm">$<span x-text="(admin.balance || 0).toFixed(2)"></span></span>
+                                                </button>
+
+                                                <!-- Мой админ -->
+                                                <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/50 cursor-pointer" @click.stop>
+                                                    <input type="checkbox" :checked="admin.isMyAdmin" @change="toggleIsRestricted(admin)" class="w-4 h-4 text-indigo-600 rounded">
+                                                    <span class="text-sm text-gray-600">Мой админ</span>
+                                                </label>
+
+                                                <!-- AI toggle -->
+                                                <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/50 cursor-pointer" @click.stop>
+                                                    <input type="checkbox" :checked="admin.aiEnabled" @change="toggleAiEnabled(admin)" class="w-4 h-4 text-purple-600 rounded">
+                                                    <span class="text-sm text-gray-600">AI</span>
+                                                </label>
+
+                                                <!-- Редактировать -->
+                                                <button @click.stop="editAdmin(admin)"
+                                                        class="w-9 h-9 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center"
+                                                        title="Редактировать">
+                                                    <i class="fas fa-edit text-blue-600"></i>
+                                                </button>
+
+                                                <!-- Удалить -->
+                                                <button @click.stop="deleteAdmin(admin)"
+                                                        class="w-9 h-9 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center"
+                                                        title="Удалить">
+                                                    <i class="fas fa-trash text-red-600"></i>
+                                                </button>
+
+                                                <!-- Стрелка раскрытия -->
+                                                <div class="w-9 h-9 flex items-center justify-center">
+                                                    <i class="fas fa-chevron-down text-gray-400 transition-transform" :class="expandedAdminId === admin.id ? 'rotate-180' : ''"></i>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Переводчики админа (раскрывающийся список) -->
+                                        <div x-show="expandedAdminId === admin.id" x-transition class="bg-gray-50 p-4 border-t border-gray-200">
+                                            <div x-show="admin.translators.length === 0" class="text-center text-gray-500 py-4">
+                                                <i class="fas fa-users text-gray-300 text-2xl mb-2"></i>
+                                                <div>Нет переводчиков</div>
+                                            </div>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                <template x-for="translator in admin.translators" :key="translator.id">
+                                                    <div class="bg-white rounded-lg p-3 border border-gray-200 flex items-center justify-between">
+                                                        <div class="flex items-center">
+                                                            <div class="w-10 h-10 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center">
+                                                                <span class="text-white font-medium" x-text="translator.name.charAt(0).toUpperCase()"></span>
+                                                            </div>
+                                                            <div class="ml-3">
+                                                                <div class="font-medium text-gray-800" x-text="translator.name"></div>
+                                                                <div class="text-xs text-gray-500"><span x-text="translator.accountsCount || 0"></span> анкет</div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="flex items-center gap-1">
+                                                            <!-- AI toggle (только если у админа включен AI) -->
+                                                            <label x-show="admin.aiEnabled" class="flex items-center gap-1 px-2 py-1 rounded bg-gray-50 cursor-pointer" @click.stop>
+                                                                <input type="checkbox" :checked="translator.aiEnabled" @change="toggleAiEnabled(translator)" class="w-3.5 h-3.5 text-purple-600 rounded">
+                                                                <span class="text-xs text-gray-500">AI</span>
+                                                            </label>
+                                                            <button @click="openTranslatorProfilesModal(translator)"
+                                                                    class="w-8 h-8 rounded-lg bg-purple-100 hover:bg-purple-200 flex items-center justify-center"
+                                                                    title="Анкеты">
+                                                                <i class="fas fa-folder text-purple-600 text-xs"></i>
+                                                            </button>
+                                                            <button @click="editTranslator(translator)"
+                                                                    class="w-8 h-8 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center"
+                                                                    title="Редактировать">
+                                                                <i class="fas fa-edit text-blue-600 text-xs"></i>
+                                                            </button>
+                                                            <button @click="deleteTranslator(translator)"
+                                                                    class="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center"
+                                                                    title="Удалить">
+                                                                <i class="fas fa-trash text-red-600 text-xs"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <div x-show="admins.length === 0" class="text-center text-gray-500 py-8">
+                                    <i class="fas fa-user-tie text-gray-300 text-4xl mb-3"></i>
+                                    <div>Нет админов</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Секция Мои переводчики (напрямую под директором) -->
+                        <div class="glass rounded-2xl p-5">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-bold">
+                                    <i class="fas fa-language text-purple-500 mr-2"></i>Мои переводчики
+                                </h3>
+                                <button @click="openAddTranslatorModal()" class="px-4 py-2 rounded-xl text-sm font-medium bg-purple-500 hover:bg-purple-600 text-white transition-all">
+                                    <i class="fas fa-plus mr-2"></i>Добавить переводчика
+                                </button>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                <template x-for="translator in directTranslators" :key="translator.id">
+                                    <div class="bg-gradient-to-r rounded-xl p-4 border"
+                                         :class="translator.isOwnTranslator ? 'from-purple-50 to-pink-50 border-purple-100' : 'from-yellow-50 to-orange-50 border-yellow-200'">
+                                        <div class="flex items-center justify-between">
+                                            <div class="flex items-center min-w-0 flex-1">
+                                                <div class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+                                                     :class="translator.isOwnTranslator ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-gradient-to-r from-yellow-500 to-orange-500'">
+                                                    <span class="text-white font-bold" x-text="translator.name.charAt(0).toUpperCase()"></span>
+                                                </div>
+                                                <div class="ml-3 min-w-0">
+                                                    <div class="font-semibold text-gray-800 truncate max-w-[120px]" x-text="translator.name" :title="translator.name"></div>
+                                                    <div class="text-sm text-gray-500"><span x-text="translator.accountsCount || 0"></span> анкет</div>
+                                                    <!-- Баланс для НЕ своего переводчика -->
+                                                    <div x-show="!translator.isOwnTranslator" class="text-xs mt-1">
+                                                        <span class="px-2 py-0.5 rounded-full"
+                                                              :class="(translator.balance || 0) > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+                                                            Баланс: $<span x-text="(translator.balance || 0).toFixed(2)"></span>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center gap-1 flex-shrink-0">
+                                                <!-- Индикатор "Мой" / toggle -->
+                                                <label class="flex items-center gap-1 px-2 py-1 rounded cursor-pointer"
+                                                       :class="translator.isOwnTranslator ? 'bg-purple-100' : 'bg-yellow-100'">
+                                                    <input type="checkbox" :checked="translator.isOwnTranslator" @change="toggleIsOwnTranslator(translator)"
+                                                           class="w-3.5 h-3.5 rounded"
+                                                           :class="translator.isOwnTranslator ? 'text-purple-600' : 'text-yellow-600'">
+                                                    <span class="text-xs" :class="translator.isOwnTranslator ? 'text-purple-600' : 'text-yellow-600'"
+                                                          x-text="translator.isOwnTranslator ? 'Мой' : 'Платный'"></span>
+                                                </label>
+                                                <!-- Пополнить баланс (только для НЕ своего) -->
+                                                <button x-show="!translator.isOwnTranslator" @click="openTopupModal(translator.id)"
+                                                        class="w-8 h-8 rounded-lg bg-green-100 hover:bg-green-200 flex items-center justify-center"
+                                                        title="Пополнить баланс">
+                                                    <i class="fas fa-dollar-sign text-green-600 text-xs"></i>
+                                                </button>
+                                                <!-- AI toggle -->
+                                                <label class="flex items-center gap-1 px-2 py-1 rounded bg-white/50 cursor-pointer">
+                                                    <input type="checkbox" :checked="translator.aiEnabled" @change="toggleAiEnabled(translator)" class="w-4 h-4 text-purple-600 rounded">
+                                                    <span class="text-xs text-gray-600">AI</span>
+                                                </label>
+                                                <button @click="openTranslatorProfilesModal(translator)"
+                                                        class="w-8 h-8 rounded-lg bg-purple-100 hover:bg-purple-200 flex items-center justify-center"
+                                                        title="Анкеты">
+                                                    <i class="fas fa-folder text-purple-600 text-xs"></i>
+                                                </button>
+                                                <button @click="editTranslator(translator)"
+                                                        class="w-8 h-8 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center"
+                                                        title="Редактировать">
+                                                    <i class="fas fa-edit text-blue-600 text-xs"></i>
+                                                </button>
+                                                <button @click="deleteTranslator(translator)"
+                                                        class="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center"
+                                                        title="Удалить">
+                                                    <i class="fas fa-trash text-red-600 text-xs"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            <div x-show="directTranslators.length === 0" class="text-center text-gray-500 py-8">
+                                <i class="fas fa-language text-gray-300 text-4xl mb-3"></i>
+                                <div>Нет переводчиков напрямую под вами</div>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- Для админа -->
+                <template x-if="currentUser.role === 'admin'">
+                    <div class="glass rounded-2xl p-5">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold">
+                                <i class="fas fa-users text-indigo-500 mr-2"></i>Мои переводчики
+                            </h3>
+                            <button @click="openAddTranslatorModal()" class="px-4 py-2 rounded-xl text-sm font-medium bg-purple-500 hover:bg-purple-600 text-white transition-all">
+                                <i class="fas fa-plus mr-2"></i>Добавить переводчика
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <template x-for="translator in myTranslators" :key="translator.id">
+                                <div class="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-4 border border-indigo-100">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center">
+                                            <div class="w-12 h-12 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center">
+                                                <span class="text-white font-bold" x-text="translator.name.charAt(0).toUpperCase()"></span>
+                                            </div>
+                                            <div class="ml-3">
+                                                <div class="font-semibold text-gray-800" x-text="translator.name"></div>
+                                                <div class="text-sm text-gray-500"><span x-text="translator.accountsCount || 0"></span> анкет</div>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-1">
+                                            <!-- AI toggle (только если у текущего админа включен AI) -->
+                                            <label x-show="currentUser.aiEnabled" class="flex items-center gap-1 px-2 py-1 rounded bg-white/50 cursor-pointer">
+                                                <input type="checkbox" :checked="translator.aiEnabled" @change="toggleAiEnabled(translator)" class="w-4 h-4 text-purple-600 rounded">
+                                                <span class="text-xs text-gray-600">AI</span>
+                                            </label>
+                                            <button @click="openTranslatorProfilesModal(translator)"
+                                                    class="w-8 h-8 rounded-lg bg-indigo-100 hover:bg-indigo-200 flex items-center justify-center"
+                                                    title="Анкеты">
+                                                <i class="fas fa-folder text-indigo-600 text-xs"></i>
+                                            </button>
+                                            <button @click="editTranslator(translator)"
+                                                    class="w-8 h-8 rounded-lg bg-blue-100 hover:bg-blue-200 flex items-center justify-center"
+                                                    title="Редактировать">
+                                                <i class="fas fa-edit text-blue-600 text-xs"></i>
+                                            </button>
+                                            <button @click="deleteTranslator(translator)"
+                                                    class="w-8 h-8 rounded-lg bg-red-100 hover:bg-red-200 flex items-center justify-center"
+                                                    title="Удалить">
+                                                <i class="fas fa-trash text-red-600 text-xs"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div x-show="myTranslators.length === 0" class="text-center text-gray-500 py-8">
+                            <i class="fas fa-users text-gray-300 text-4xl mb-3"></i>
+                            <div>У вас пока нет переводчиков</div>
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Анкеты -->
+            <div x-show="activeMenu === 'accounts'" x-cloak class="fade-in">
+                <!-- Список анкет -->
+                <!-- Панель фильтров и действий -->
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <div class="flex flex-wrap items-center gap-3">
+                        <!-- Фильтр по админу (только для директора) -->
+                        <template x-if="currentUser.role === 'director'">
+                            <select class="glass px-4 py-2.5 rounded-xl text-sm font-medium" x-model="adminFilter">
+                                <option value="all">Все админы</option>
+                                <option value="unassigned">Без админа</option>
+                                <template x-for="admin in admins" :key="admin.id">
+                                    <option :value="admin.id" x-text="admin.name"></option>
+                                </template>
+                            </select>
+                        </template>
+
+                        <!-- Фильтр по переводчику (для админа) -->
+                        <template x-if="currentUser.role === 'admin'">
+                            <select class="glass px-4 py-2.5 rounded-xl text-sm font-medium" x-model="translatorFilter">
+                                <option value="all">Все переводчики</option>
+                                <option value="unassigned">Без переводчика</option>
+                                <template x-for="translator in myTranslators" :key="translator.id">
+                                    <option :value="translator.id" x-text="translator.name"></option>
+                                </template>
+                            </select>
+                        </template>
+
+                        <!-- Поиск -->
+                        <div class="relative">
+                            <input type="search" :placeholder="t('profiles.searchPlaceholder')"
+                                   class="glass pl-10 pr-4 py-2.5 rounded-xl w-64"
+                                   autocomplete="new-password"
+                                   name="profile_search_field_unique"
+                                   data-lpignore="true"
+                                   data-form-type="other"
+                                   x-model="searchQuery">
+                            <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                        </div>
+                    </div>
+
+                    <!-- Кнопка добавления -->
+                    <button x-show="currentUser.role !== 'translator'" @click="showAddAccountModal = true" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                        <i class="fas fa-plus mr-2"></i><span x-text="t('common.add')"></span>
+                    </button>
+                </div>
+
+                <!-- Панель массовых действий (появляется при выборе анкет) -->
+                <div x-show="selectedProfileIds.length > 0"
+                     x-transition:enter="transition ease-out duration-200"
+                     x-transition:enter-start="opacity-0 transform -translate-y-2"
+                     x-transition:enter-end="opacity-100 transform translate-y-0"
+                     class="glass rounded-xl p-3 mb-4 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 relative z-50">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium text-indigo-700">
+                            <i class="fas fa-check-square mr-2"></i>
+                            Выбрано: <span x-text="selectedProfileIds.length" class="font-bold"></span> анкет
+                        </span>
+                        <button @click="selectedProfileIds = []" class="text-gray-500 hover:text-gray-700 text-sm ml-2">
+                            <i class="fas fa-times"></i> Сбросить
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <!-- Назначить админу (для директора) -->
+                        <template x-if="currentUser.role === 'director'">
+                            <div class="relative" x-data="{ showDropdown: false }">
+                                <button @click="showDropdown = !showDropdown"
+                                        class="px-4 py-2 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium transition-colors">
+                                    <i class="fas fa-user-tie mr-2"></i>Назначить админу
+                                    <i class="fas fa-chevron-down ml-2 text-xs"></i>
+                                </button>
+                                <div x-show="showDropdown" @click.outside="showDropdown = false"
+                                     class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-[100] max-h-64 overflow-y-auto">
+                                    <button @click="assignSelectedToAdmin(null); showDropdown = false"
+                                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 text-gray-600">
+                                        <i class="fas fa-ban mr-2"></i>Снять назначение
+                                    </button>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    <template x-for="admin in admins" :key="admin.id">
+                                        <button @click="assignSelectedToAdmin(admin.id); showDropdown = false"
+                                                class="w-full px-4 py-2 text-left text-sm hover:bg-indigo-50 hover:text-indigo-700">
+                                            <i class="fas fa-user mr-2"></i><span x-text="admin.name"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Назначить переводчику (для админа) -->
+                        <template x-if="currentUser.role === 'admin'">
+                            <div class="relative" x-data="{ showDropdown: false }">
+                                <button @click="showDropdown = !showDropdown"
+                                        class="px-4 py-2 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium transition-colors">
+                                    <i class="fas fa-language mr-2"></i>Назначить переводчику
+                                    <i class="fas fa-chevron-down ml-2 text-xs"></i>
+                                </button>
+                                <div x-show="showDropdown" @click.outside="showDropdown = false"
+                                     class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-[100] max-h-64 overflow-y-auto">
+                                    <button @click="assignSelectedToTranslator(null); showDropdown = false"
+                                            class="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 text-gray-600">
+                                        <i class="fas fa-ban mr-2"></i>Снять назначение
+                                    </button>
+                                    <div class="border-t border-gray-100 my-1"></div>
+                                    <template x-for="translator in myTranslators" :key="translator.id">
+                                        <button @click="assignSelectedToTranslator(translator.id); showDropdown = false"
+                                                class="w-full px-4 py-2 text-left text-sm hover:bg-purple-50 hover:text-purple-700">
+                                            <i class="fas fa-user mr-2"></i><span x-text="translator.name"></span>
+                                        </button>
+                                    </template>
+                                    <template x-if="myTranslators.length === 0">
+                                        <div class="px-4 py-2 text-sm text-gray-400">Нет переводчиков</div>
+                                    </template>
+                                </div>
+                            </div>
+                        </template>
+
+                        <!-- Оплатить (если не мой админ) -->
+                        <template x-if="!isRestricted">
+                            <button @click="paySelectedProfiles()" class="px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition-colors">
+                                <i class="fas fa-credit-card mr-2"></i>Оплатить
+                            </button>
+                        </template>
+
+                        <!-- Удалить выбранные -->
+                        <button @click="deleteSelectedProfiles()" class="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors">
+                            <i class="fas fa-trash mr-2"></i>Удалить
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Сортировка -->
+                <div class="glass rounded-2xl overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full resizable-table" id="profiles-table">
+                            <thead>
+                                <tr class="border-b border-gray-200 text-xs text-gray-600 uppercase tracking-wide">
+                                    <!-- Чекбокс для выбора всех -->
+                                    <th class="text-left py-1.5 px-2 w-10">
+                                        <input type="checkbox"
+                                               class="profile-checkbox"
+                                               @change="toggleSelectAllProfiles($event.target.checked)"
+                                               :checked="selectedProfileIds.length > 0 && selectedProfileIds.length === filteredAccounts.length"
+                                               :indeterminate="selectedProfileIds.length > 0 && selectedProfileIds.length < filteredAccounts.length">
+                                    </th>
+                                    <th class="text-left py-1.5 px-2 cursor-pointer hover:bg-gray-50 font-medium" style="width: 100px;" @click="sortAccounts('id')">
+                                        <div class="flex items-center gap-1 overflow-hidden">
+                                            <span class="truncate" x-text="t('profiles.id')"></span>
+                                            <i class="fas text-[10px] flex-shrink-0" :class="sortBy === 'id' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        </div>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
+                                    </th>
+                                    <th class="text-left py-1.5 px-2 cursor-pointer hover:bg-gray-50 font-medium" style="width: 100px;" @click="sortAccounts('status')">
+                                        <div class="flex items-center gap-1 overflow-hidden">
+                                            <span class="truncate" x-text="t('profiles.statusCol')"></span>
+                                            <i class="fas text-[10px] flex-shrink-0" :class="sortBy === 'status' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        </div>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
+                                    </th>
+                                    <th class="text-left py-1.5 px-2 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('lastOnline')">
+                                        <div class="flex items-center gap-1 overflow-hidden">
+                                            <span class="truncate" x-text="t('profiles.lastOnline')"></span>
+                                            <i class="fas text-[10px] flex-shrink-0" :class="sortBy === 'lastOnline' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        </div>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
+                                    </th>
+                                    <th class="text-left py-1.5 px-2 cursor-pointer hover:bg-gray-50 font-medium" style="width: 100px;" @click="sortAccounts('incoming')">
+                                        <div class="flex items-center gap-1 overflow-hidden">
+                                            <span class="truncate" x-text="t('profiles.incoming')"></span>
+                                            <i class="fas text-[10px] flex-shrink-0" :class="sortBy === 'incoming' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        </div>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
+                                    </th>
+                                    <th x-show="currentUser.role === 'director'" class="text-left py-1.5 px-2 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('admin')">
+                                        <div class="flex items-center gap-1 overflow-hidden">
+                                            <span class="truncate" x-text="t('profiles.admin')"></span>
+                                            <i class="fas text-[10px] flex-shrink-0" :class="sortBy === 'admin' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        </div>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
+                                    </th>
+                                    <!-- Колонка Переводчик для админа -->
+                                    <th x-show="currentUser.role === 'admin'" class="text-left py-1.5 px-2 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('translator')">
+                                        <div class="flex items-center gap-1 overflow-hidden">
+                                            <span class="truncate">Переводчик</span>
+                                            <i class="fas text-[10px] flex-shrink-0" :class="sortBy === 'translator' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        </div>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
+                                    </th>
+                                    <th class="text-left py-1.5 px-2 cursor-pointer hover:bg-gray-50 font-medium" style="width: 120px;" @click="sortAccounts('date')">
+                                        <div class="flex items-center gap-1 overflow-hidden">
+                                            <span class="truncate" x-text="t('profiles.addedDate')"></span>
+                                            <i class="fas text-[10px] flex-shrink-0" :class="sortBy === 'date' ? (sortDirection === 'asc' ? 'fa-sort-up' : 'fa-sort-down') : 'fa-sort text-gray-300'"></i>
+                                        </div>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
+                                    </th>
+                                    <th class="text-left py-1.5 px-2 font-medium" style="width: 150px;">
+                                        <div class="flex items-center overflow-hidden">
+                                            <span class="truncate" x-text="t('profiles.commentCol')"></span>
+                                        </div>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
+                                    </th>
+                                    <th class="text-left py-1.5 px-2 font-medium" style="width: 100px;">
+                                        <div class="flex items-center overflow-hidden">
+                                            <span class="truncate">Оплата</span>
+                                        </div>
+                                        <div class="resize-handle" @mousedown.stop="initResize($event)"></div>
+                                    </th>
+                                    <th class="text-left py-1.5 px-2 font-medium">
+                                        <div class="flex items-center overflow-hidden">
+                                            <span class="truncate" x-text="t('common.actions')"></span>
+                                        </div>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="account in filteredAccounts" :key="account.id">
+                                    <tr class="border-b border-gray-100 hover:bg-gray-50 transition-colors text-sm"
+                                        :class="{'bg-red-50': account.paused,
+                                                'account-online': account.status === 'online' && !account.paused,
+                                                'account-offline': account.status === 'offline' && !account.paused}">
+                                        <!-- Чекбокс для выбора -->
+                                        <td class="py-1.5 px-2">
+                                            <input type="checkbox"
+                                                   class="profile-checkbox"
+                                                   :value="account.id"
+                                                   :checked="selectedProfileIds.includes(String(account.id))"
+                                                   @change="toggleProfileSelection(account.id, $event.target.checked)">
+                                        </td>
+                                        <td class="py-1.5 px-2 font-mono" x-text="account.id"></td>
+                                        <td class="py-1.5 px-2">
+                                            <span class="px-2 py-0.5 rounded-full text-xs"
+                                                  :class="getStatusClass(account.status)"
+                                                  x-text="getStatusText(account.status)">
+                                            </span>
+                                        </td>
+                                        <td class="py-1.5 px-2 text-gray-500">
+                                            <span x-show="account.status === 'online' || account.status === 'working'">-</span>
+                                            <span x-show="!(account.status === 'online' || account.status === 'working')" x-text="account.lastOnline || '-'"></span>
+                                        </td>
+                                        <td class="py-1.5 px-2">
+                                            <span class="px-2 py-0.5 rounded text-xs"
+                                                  :class="account.incoming > 0 ? 'bg-white text-green-600 font-medium shadow-sm' : 'bg-gray-100 text-gray-400'"
+                                                  x-text="account.incoming || 0"></span>
+                                        </td>
+                                        <td x-show="currentUser.role === 'director'" class="py-1.5 px-2">
+                                            <span class="text-xs font-medium"
+                                                  :class="account.admin ? getAdminColor(account.adminId, account.admin) : 'text-gray-400'"
+                                                  x-text="account.admin || 'Нет админа'"></span>
+                                        </td>
+                                        <!-- Колонка Переводчик для админа -->
+                                        <td x-show="currentUser.role === 'admin'" class="py-1.5 px-2">
+                                            <span class="px-2 py-0.5 rounded text-xs"
+                                                  :class="account.translatorName ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-400'"
+                                                  x-text="account.translatorName || 'Не назначен'"></span>
+                                        </td>
+                                        <td class="py-1.5 px-2 text-gray-500" x-text="account.addedDate"></td>
+                                        <td class="py-1.5 px-2 max-w-xs">
+                                            <div class="truncate text-gray-600" :title="account.comment" x-text="account.comment"></div>
+                                        </td>
+                                        <!-- Оплата -->
+                                        <td class="py-1.5 px-2">
+                                            <div class="flex items-center space-x-2">
+                                                <span class="text-xs font-medium" :class="getPaymentStatusClass(account)" x-text="getPaymentStatusText(account)"></span>
+                                                <!-- Кнопки оплаты (только для admin не "мой админ") -->
+                                                <template x-if="currentUser.role === 'admin' && !isRestricted && !account.isFree">
+                                                    <div class="flex items-center space-x-1">
+                                                        <!-- Кнопка trial если не использован -->
+                                                        <button x-show="!account.trialUsed && !account.isPaid"
+                                                                @click="startTrial(account)"
+                                                                class="px-2 py-0.5 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
+                                                                title="Активировать тестовый период (2 дня)">
+                                                            Trial
+                                                        </button>
+                                                        <!-- Кнопка продлить -->
+                                                        <button @click="openExtendModal(account)"
+                                                                class="px-2 py-0.5 text-xs bg-green-100 text-green-600 rounded hover:bg-green-200"
+                                                                title="Продлить анкету">
+                                                            <i class="fas fa-plus"></i>
+                                                        </button>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </td>
+                                        <td class="py-1.5 px-2">
+                                            <div class="flex items-center space-x-2">
+                                                <button @click="deleteAccount(account)"
+                                                        class="p-1 rounded text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                        title="Удалить">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Управление -->
+            <div x-show="activeMenu === 'control' && currentUser.role === 'director'" x-cloak class="fade-in">
+                <div class="grid grid-cols-1 gap-6">
+                    <!-- Сессии -->
+                    <div class="glass rounded-2xl p-6">
+                        <h3 class="text-lg font-bold mb-6" x-text="t('control.activeSessions')"></h3>
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- Сообщение если ботов нет -->
+                            <div x-show="bots.length === 0" class="col-span-2 text-center py-8 text-gray-500">
+                                <i class="fas fa-robot text-4xl mb-3 opacity-30"></i>
+                                <p>Нет активных ботов</p>
+                                <p class="text-sm">Боты появятся здесь после подключения</p>
+                            </div>
+                            <template x-for="bot in bots" :key="bot.id">
+                                <div class="p-4 rounded-xl border border-gray-100">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <div class="flex items-center">
+                                            <i :class="bot.icon + ' mr-3'" :class="bot.status === 'active' ? 'text-green-500' : 'text-red-500'"></i>
+                                            <div>
+                                                <div class="font-medium flex items-center">
+                                                    <!-- Имя бота с inline редактированием -->
+                                                    <span x-show="!bot.editing"
+                                                          @dblclick="bot.editing = true; bot.editName = bot.name; $nextTick(() => $refs['botInput' + bot.id]?.focus())"
+                                                          class="cursor-pointer hover:bg-gray-100 px-1 rounded"
+                                                          title="Двойной клик для редактирования"
+                                                          x-text="bot.name"></span>
+                                                    <input x-show="bot.editing"
+                                                           x-ref="botInput"
+                                                           :x-ref="'botInput' + bot.id"
+                                                           type="text"
+                                                           x-model="bot.name"
+                                                           @keyup.enter="saveBotName(bot); bot.editing = false"
+                                                           @keyup.escape="bot.name = bot.editName; bot.editing = false"
+                                                           @blur="saveBotName(bot); bot.editing = false"
+                                                           class="px-1 py-0 text-sm border border-blue-300 rounded focus:outline-none focus:border-blue-500 w-32">
+                                                    <span class="ml-2 text-xs px-2 py-0.5 rounded-full" 
+                                                          :class="bot.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'"
+                                                          x-text="bot.status === 'active' ? 'Активен' : 'Неактивен'">
+                                                    </span>
+                                                </div>
+                                                <div class="text-sm text-gray-500" x-text="bot.os"></div>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <button @click="toggleBotStatus(bot)" 
+                                                    class="px-3 py-1 rounded-lg text-sm"
+                                                    :class="bot.status === 'active' ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'bg-green-100 text-green-600 hover:bg-green-200'">
+                                                <span x-text="bot.status === 'active' ? 'Выключить' : 'Активировать'"></span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Статистика сессии -->
+                                    <div class="grid grid-cols-3 gap-3 mb-3">
+                                        <div class="bg-blue-50 rounded-lg p-2 text-center">
+                                            <div class="text-lg font-bold text-blue-600" x-text="bot.sessionStats?.mailSent || 0"></div>
+                                            <div class="text-xs text-blue-500">Письма</div>
+                                        </div>
+                                        <div class="bg-purple-50 rounded-lg p-2 text-center">
+                                            <div class="text-lg font-bold text-purple-600" x-text="bot.sessionStats?.chatSent || 0"></div>
+                                            <div class="text-xs text-purple-500">Чаты</div>
+                                        </div>
+                                        <div class="bg-red-50 rounded-lg p-2 text-center">
+                                            <div class="text-lg font-bold text-red-600" x-text="bot.sessionStats?.errors || 0"></div>
+                                            <div class="text-xs text-red-500">Ошибки</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Детальная информация -->
+                                    <div class="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                                        <div>
+                                            <span class="font-medium">Анкет:</span>
+                                            <span x-text="bot.profilesCount"></span>
+                                            <span class="text-green-600" x-show="bot.profilesRunning > 0" x-text="'(' + bot.profilesRunning + ' работают)'"></span>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium">Режим:</span>
+                                            <span x-text="formatMode(bot.globalMode)"></span>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium">Время работы:</span>
+                                            <span x-text="formatUptime(bot.uptime)"></span>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium">RAM:</span>
+                                            <span x-text="bot.memoryUsage ? bot.memoryUsage + ' MB' : '-'"></span>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium">IP:</span>
+                                            <span x-text="cleanIP(bot.ip)"></span>
+                                        </div>
+                                        <div>
+                                            <span class="font-medium">Версия:</span>
+                                            <span x-text="bot.version"></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Последний отклик -->
+                                    <div class="mt-2 text-xs text-gray-400">
+                                        Последний отклик: <span x-text="bot.lastHeartbeat ? new Date(bot.lastHeartbeat).toLocaleString('ru-RU') : '-'"></span>
+                                    </div>
+
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                    
+                </div>
+
+                <!-- Промт для генерации -->
+                <div class="glass rounded-2xl p-6 mt-6">
+                    <h3 class="text-lg font-bold mb-4" x-text="t('control.generationPrompt')"></h3>
+                    <textarea
+                        class="glass w-full px-4 py-3 rounded-xl"
+                        rows="4"
+                        :placeholder="t('control.promptPlaceholder')"
+                        x-model="generationPrompt"></textarea>
+                    <p class="text-sm text-gray-500 mt-2" x-text="t('control.promptSync')"></p>
+                    <button @click="syncPromptWithBots" class="mt-3 glow-button px-5 py-2.5 rounded-xl text-white text-sm font-medium" x-text="t('control.syncWithBots')">
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- Обучение -->
+            <div x-show="activeMenu === 'training'" x-cloak class="fade-in">
+                <div class="glass rounded-2xl p-6">
+                    <h3 class="text-xl font-bold mb-6" x-text="t('training.title')"></h3>
+                    <div class="grid grid-cols-2 gap-6">
+                        <div class="p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50">
+                            <i class="fas fa-book text-blue-500 text-2xl mb-3"></i>
+                            <h4 class="font-bold mb-2" x-text="t('training.userGuide')"></h4>
+                            <p class="text-sm text-gray-600 mb-3" x-text="t('training.userGuideDesc')"></p>
+                            <button class="text-blue-600 hover:text-blue-800 text-sm font-medium" x-text="t('training.openBtn') + ' →'">
+                            </button>
+                        </div>
+                        <div class="p-4 rounded-xl bg-gradient-to-r from-purple-50 to-pink-50">
+                            <i class="fas fa-video text-purple-500 text-2xl mb-3"></i>
+                            <h4 class="font-bold mb-2" x-text="t('training.videoTutorials')"></h4>
+                            <p class="text-sm text-gray-600 mb-3" x-text="t('training.videoDesc')"></p>
+                            <button class="text-purple-600 hover:text-purple-800 text-sm font-medium" x-text="t('training.watchBtn') + ' →'">
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- История -->
+            <div x-show="activeMenu === 'history'" x-cloak class="fade-in">
+                <!-- Фильтры истории -->
+                <div class="glass rounded-2xl p-5 mb-6">
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <!-- Поиск по анкете -->
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                            <input type="text"
+                                   class="glass pl-10 pr-4 py-2.5 rounded-xl w-48"
+                                   placeholder="Поиск по ID анкеты..."
+                                   x-model="historyFilter.profileId"
+                                   @keyup.enter="loadProfileHistory()">
+                        </div>
+
+                        <!-- Выбор админа (только для директора) -->
+                        <div x-show="currentUser.role === 'director'">
+                            <select class="glass px-4 py-2.5 rounded-xl" x-model="historyFilter.admin">
+                                <option value="" x-text="t('filters.allAdmins')"></option>
+                                <template x-for="admin in admins" :key="admin.id">
+                                    <option :value="admin.id" x-text="admin.name"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <!-- Календарь (Flatpickr) -->
+                        <div class="glass px-4 py-2.5 rounded-xl flex items-center">
+                            <i class="fas fa-calendar mr-2 text-gray-400"></i>
+                            <input type="text" id="historyDatePicker" class="bg-transparent border-none outline-none w-48 text-sm" readonly :placeholder="t('common.selectPeriod')">
+                        </div>
+
+                        <button @click="loadProfileHistory()" class="px-5 py-2.5 rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 font-medium transition-all">
+                            <i class="fas fa-sync-alt mr-2"></i><span x-text="t('common.refresh')"></span>
+                        </button>
+
+                        <!-- Кнопка очистки истории (только для директора) -->
+                        <button x-show="currentUser.role === 'director'"
+                                @click="clearProfileHistory()"
+                                class="px-5 py-2.5 rounded-xl bg-red-500 text-white hover:bg-red-600 font-medium transition-all">
+                            <i class="fas fa-trash-alt mr-2"></i>Очистить историю
+                        </button>
+                    </div>
+                </div>
+
+                <div class="glass rounded-2xl p-6">
+                    <h3 class="text-lg font-bold mb-6" x-text="t('history.title')"></h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-100">
+                                    <th class="text-left py-2 px-4" x-text="t('history.dateCol')"></th>
+                                    <th class="text-left py-2 px-4" x-text="t('history.profileCol')"></th>
+                                    <th class="text-left py-2 px-4" x-text="t('history.actionCol')"></th>
+                                    <th class="text-left py-2 px-4" x-text="t('history.byWhom')"></th>
+                                    <th class="text-left py-2 px-4" x-text="t('history.detailsCol')"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="action in profileHistory" :key="action.id">
+                                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                        <td class="py-3 px-4 text-sm" x-text="formatHistoryTime(action.created_at)"></td>
+                                        <td class="py-3 px-4 font-mono" x-text="action.profile_id"></td>
+                                        <td class="py-3 px-4">
+                                            <span class="px-2 py-1 rounded-full text-xs"
+                                                  :class="getProfileActionClass(action.action_type)"
+                                                  x-text="getProfileActionLabel(action.action_type)"></span>
+                                        </td>
+                                        <td class="py-3 px-4 text-sm" x-text="action.performed_by || '-'"></td>
+                                        <td class="py-3 px-4 text-sm text-gray-600" x-text="action.details || '-'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="profileHistory.length === 0">
+                                    <td colspan="5" class="py-8 px-4 text-center text-gray-500">
+                                        <i class="fas fa-history text-3xl mb-2 opacity-30"></i>
+                                        <p x-text="t('history.noHistory')"></p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Финансы (только для директора) -->
+            <div x-show="activeMenu === 'finances' && currentUser.role === 'director'" x-cloak class="fade-in">
+                <!-- Форма пополнения -->
+                <div class="glass rounded-2xl p-6 mb-6">
+                    <h3 class="text-lg font-bold mb-6">
+                        <i class="fas fa-plus-circle text-green-500 mr-2"></i>
+                        Пополнить баланс админа
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Выбор админа -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Выберите админа</label>
+                            <select class="glass w-full px-4 py-3 rounded-xl" x-model="financeTopup.adminId">
+                                <option value="">-- Выберите админа --</option>
+                                <template x-for="admin in financeAdmins" :key="admin.id">
+                                    <option :value="admin.id">
+                                        <span x-text="admin.name"></span> (баланс: $<span x-text="admin.balance.toFixed(2)"></span>)
+                                    </option>
+                                </template>
+                            </select>
+                            <p x-show="financeAdmins.length === 0" class="text-sm text-gray-500 mt-1">
+                                Нет админов для пополнения (только админы без галочки "мой админ")
+                            </p>
+                        </div>
+
+                        <!-- Сумма -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Сумма ($)</label>
+                            <input type="number"
+                                   class="glass w-full px-4 py-3 rounded-xl"
+                                   min="1"
+                                   step="1"
+                                   placeholder="Введите сумму"
+                                   x-model.number="financeTopup.amount">
+                            <div class="flex gap-2 mt-2">
+                                <button @click="financeTopup.amount = 5" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$5</button>
+                                <button @click="financeTopup.amount = 10" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$10</button>
+                                <button @click="financeTopup.amount = 20" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$20</button>
+                                <button @click="financeTopup.amount = 50" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$50</button>
+                                <button @click="financeTopup.amount = 100" class="px-3 py-1 text-xs bg-gray-100 rounded hover:bg-gray-200">$100</button>
+                            </div>
+                        </div>
+
+                        <!-- Примечание -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Примечание (опционально)</label>
+                            <input type="text"
+                                   class="glass w-full px-4 py-3 rounded-xl"
+                                   placeholder="Комментарий к пополнению"
+                                   x-model="financeTopup.note">
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end mt-6">
+                        <button @click="submitFinanceTopup()"
+                                :disabled="!financeTopup.adminId || !financeTopup.amount || financeTopup.amount <= 0"
+                                class="glow-button px-6 py-3 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="fas fa-wallet mr-2"></i>
+                            Пополнить баланс
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Форма оплаты анкет -->
+                <div class="glass rounded-2xl p-6 mb-6">
+                    <h3 class="text-lg font-bold mb-6">
+                        <i class="fas fa-id-card text-blue-500 mr-2"></i>
+                        Оплата анкет
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <!-- ID анкеты -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">ID анкеты</label>
+                            <input type="text"
+                                   class="glass w-full px-4 py-3 rounded-xl"
+                                   placeholder="123456, 789012, 345678..."
+                                   x-model="profilePayment.profileId">
+                            <p class="text-xs text-gray-500 mt-1">Один или несколько ID через запятую</p>
+                        </div>
+
+                        <!-- Количество дней -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Период оплаты</label>
+                            <div class="flex gap-2">
+                                <button @click="profilePayment.days = 15"
+                                        class="flex-1 px-3 py-3 rounded-xl text-sm font-medium transition-colors"
+                                        :class="profilePayment.days === 15 ? 'bg-indigo-500 text-white' : 'bg-gray-100 hover:bg-gray-200'">
+                                    15 дней
+                                </button>
+                                <button @click="profilePayment.days = 30"
+                                        class="flex-1 px-3 py-3 rounded-xl text-sm font-medium transition-colors"
+                                        :class="profilePayment.days === 30 ? 'bg-indigo-500 text-white' : 'bg-gray-100 hover:bg-gray-200'">
+                                    30 дней
+                                </button>
+                                <button @click="profilePayment.days = 45"
+                                        class="flex-1 px-3 py-3 rounded-xl text-sm font-medium transition-colors"
+                                        :class="profilePayment.days === 45 ? 'bg-indigo-500 text-white' : 'bg-gray-100 hover:bg-gray-200'">
+                                    45 дней
+                                </button>
+                                <button @click="profilePayment.days = 60"
+                                        class="flex-1 px-3 py-3 rounded-xl text-sm font-medium transition-colors"
+                                        :class="profilePayment.days === 60 ? 'bg-indigo-500 text-white' : 'bg-gray-100 hover:bg-gray-200'">
+                                    60 дней
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Примечание -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Примечание</label>
+                            <input type="text"
+                                   class="glass w-full px-4 py-3 rounded-xl"
+                                   placeholder="Комментарий"
+                                   x-model="profilePayment.note">
+                        </div>
+
+                        <!-- Кнопки -->
+                        <div class="flex items-end gap-2">
+                            <button @click="submitProfilePayment()"
+                                    :disabled="!profilePayment.profileId.trim() || !profilePayment.days"
+                                    class="flex-1 glow-button px-4 py-3 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-credit-card mr-2"></i>Оплатить
+                            </button>
+                            <button @click="removeProfilePayment()"
+                                    :disabled="!profilePayment.profileId.trim()"
+                                    class="px-4 py-3 rounded-xl bg-red-500 hover:bg-red-600 text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                    title="Убрать оплату с анкеты">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Статистика и история -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-green-600">$<span x-text="financeTotalSum.toFixed(2)"></span></div>
+                        <div class="text-sm text-gray-500 mt-1">Всего пополнено</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-blue-600" x-text="financeHistory.length"></div>
+                        <div class="text-sm text-gray-500 mt-1">Транзакций</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-purple-600" x-text="financeAdmins.length"></div>
+                        <div class="text-sm text-gray-500 mt-1">Админов с балансом</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-orange-600">$<span x-text="financeAdminsTotalBalance.toFixed(2)"></span></div>
+                        <div class="text-sm text-gray-500 mt-1">Общий баланс админов</div>
+                    </div>
+                </div>
+
+                <!-- Объединенная таблица истории -->
+                <div class="glass rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-6">
+                        <h3 class="text-lg font-bold">
+                            <i class="fas fa-history text-gray-500 mr-2"></i>
+                            История операций
+                        </h3>
+                        <button @click="loadFinanceData()" class="px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm font-medium transition-all">
+                            <i class="fas fa-sync-alt mr-1"></i> Обновить
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-100">
+                                    <th class="text-left py-3 px-4">Дата</th>
+                                    <th class="text-left py-3 px-4">Тип</th>
+                                    <th class="text-left py-3 px-4">Объект</th>
+                                    <th class="text-left py-3 px-4">Детали</th>
+                                    <th class="text-left py-3 px-4">Примечание</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="item in combinedFinanceHistory" :key="item.uniqueId">
+                                    <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                        <td class="py-3 px-4 text-sm" x-text="formatDateTime(item.createdAt)"></td>
+                                        <td class="py-3 px-4">
+                                            <span x-show="item.type === 'topup'" class="px-2 py-1 bg-green-100 text-green-600 rounded text-xs font-medium">
+                                                <i class="fas fa-wallet mr-1"></i>Пополнение
+                                            </span>
+                                            <span x-show="item.type === 'profile_payment'" class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs font-medium">
+                                                <i class="fas fa-id-card mr-1"></i>Оплата анкеты
+                                            </span>
+                                            <span x-show="item.type === 'profile_removal'" class="px-2 py-1 bg-red-100 text-red-600 rounded text-xs font-medium">
+                                                <i class="fas fa-times mr-1"></i>Снятие оплаты
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <!-- Для пополнения - имя админа -->
+                                            <span x-show="item.type === 'topup'" class="font-medium" x-text="item.adminName"></span>
+                                            <!-- Для оплаты анкеты - ID анкеты -->
+                                            <span x-show="item.type !== 'topup'" class="font-mono font-medium"><span x-text="item.profileId"></span></span>
+                                        </td>
+                                        <td class="py-3 px-4">
+                                            <!-- Для пополнения - сумма и баланс -->
+                                            <template x-if="item.type === 'topup'">
+                                                <div>
+                                                    <span class="text-green-600 font-semibold">+$<span x-text="item.amount?.toFixed(2)"></span></span>
+                                                    <span class="text-gray-400 mx-1">→</span>
+                                                    <span class="text-blue-600">$<span x-text="item.adminBalance?.toFixed(2)"></span></span>
+                                                </div>
+                                            </template>
+                                            <!-- Для оплаты анкеты - количество дней -->
+                                            <template x-if="item.type === 'profile_payment'">
+                                                <span class="text-blue-600 font-semibold" x-text="item.days + ' дней'"></span>
+                                            </template>
+                                            <template x-if="item.type === 'profile_removal'">
+                                                <span class="text-gray-400">Оплата снята</span>
+                                            </template>
+                                        </td>
+                                        <td class="py-3 px-4 text-sm text-gray-500" x-text="item.note || '-'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="combinedFinanceHistory.length === 0">
+                                    <td colspan="5" class="py-8 px-4 text-center text-gray-500">
+                                        <i class="fas fa-history text-3xl mb-2 opacity-30"></i>
+                                        <p>История операций пуста</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Клиенты (только для директора) -->
+            <div x-show="activeMenu === 'clients' && currentUser.role === 'director'" x-cloak class="fade-in"
+                 x-data="clientsComponent()"
+                 x-init="loadClientsData()">
+
+                <!-- Статистика -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-blue-600" x-text="clientsStats.letters.uniqueClients"></div>
+                        <div class="text-sm text-gray-500 mt-1">Клиентов (Письма)</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-purple-600" x-text="clientsStats.chats.uniqueClients"></div>
+                        <div class="text-sm text-gray-500 mt-1">Клиентов (Чаты)</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-green-600" x-text="clientsStats.letters.totalMessages"></div>
+                        <div class="text-sm text-gray-500 mt-1">Всего писем</div>
+                    </div>
+                    <div class="glass rounded-2xl p-6 text-center">
+                        <div class="text-3xl font-bold text-orange-600" x-text="clientsStats.chats.totalMessages"></div>
+                        <div class="text-sm text-gray-500 mt-1">Всего чатов</div>
+                    </div>
+                </div>
+
+                <!-- Фильтры -->
+                <div class="glass rounded-2xl p-6 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+                        <!-- Тип -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Тип</label>
+                            <select class="glass w-full px-4 py-3 rounded-xl" x-model="clientsFilter.type" @change="loadClients()">
+                                <option value="all">Все</option>
+                                <option value="letter">Письма</option>
+                                <option value="chat">Чаты</option>
+                            </select>
+                        </div>
+
+                        <!-- Дата с -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Дата с</label>
+                            <input type="date" class="glass w-full px-4 py-3 rounded-xl" x-model="clientsFilter.dateFrom" @change="loadClients()">
+                        </div>
+
+                        <!-- Дата по -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Дата по</label>
+                            <input type="date" class="glass w-full px-4 py-3 rounded-xl" x-model="clientsFilter.dateTo" @change="loadClients()">
+                        </div>
+
+                        <!-- Поиск -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Поиск</label>
+                            <input type="text" class="glass w-full px-4 py-3 rounded-xl" placeholder="Имя или ID" x-model="clientsFilter.search" @input.debounce.500ms="loadClients()">
+                        </div>
+
+                        <!-- Сортировка -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Сортировка</label>
+                            <select class="glass w-full px-4 py-3 rounded-xl" x-model="clientsFilter.sortBy" @change="loadClients()">
+                                <option value="date">По дате</option>
+                                <option value="name">По имени</option>
+                                <option value="messages">По сообщениям</option>
+                            </select>
+                        </div>
+
+                        <!-- Кнопки -->
+                        <div class="flex items-end gap-2">
+                            <button @click="exportClientsCSV()" class="flex-1 px-4 py-3 rounded-xl bg-green-500 hover:bg-green-600 text-white font-medium transition-all">
+                                <i class="fas fa-file-csv mr-1"></i> CSV
+                            </button>
+                            <button @click="loadClientsData()" class="px-4 py-3 rounded-xl bg-gray-100 hover:bg-gray-200 font-medium transition-all">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Таблица клиентов -->
+                <div class="glass rounded-2xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-bold">
+                            <i class="fas fa-address-book text-gray-500 mr-2"></i>
+                            База клиентов
+                            <span class="text-sm font-normal text-gray-500">(<span x-text="clientsPagination.totalCount"></span> всего)</span>
+                        </h3>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-gray-100">
+                                    <th class="text-left py-3 px-4">ID</th>
+                                    <th class="text-left py-3 px-4">Имя</th>
+                                    <th class="text-left py-3 px-4">Тип</th>
+                                    <th class="text-left py-3 px-4">Анкеты</th>
+                                    <th class="text-left py-3 px-4">Сообщений</th>
+                                    <th class="text-left py-3 px-4">Последнее</th>
+                                    <th class="text-left py-3 px-4">Текст</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="client in clients" :key="client.manId + '_' + client.type">
+                                    <tr class="border-b border-gray-100 hover:bg-gray-50 cursor-pointer" @click="showClientMessages(client)">
+                                        <td class="py-3 px-4 font-mono text-sm" x-text="client.manId"></td>
+                                        <td class="py-3 px-4 font-medium" x-text="client.manName"></td>
+                                        <td class="py-3 px-4">
+                                            <span x-show="client.type === 'letter'" class="px-2 py-1 bg-blue-100 text-blue-600 rounded text-xs font-medium">
+                                                <i class="fas fa-envelope mr-1"></i>Письмо
+                                            </span>
+                                            <span x-show="client.type === 'chat'" class="px-2 py-1 bg-purple-100 text-purple-600 rounded text-xs font-medium">
+                                                <i class="fas fa-comments mr-1"></i>Чат
+                                            </span>
+                                        </td>
+                                        <td class="py-3 px-4 text-sm" x-text="client.profileIds.slice(0, 3).join(', ') + (client.profileIds.length > 3 ? '...' : '')"></td>
+                                        <td class="py-3 px-4">
+                                            <span class="px-2 py-1 bg-gray-100 rounded font-medium" x-text="client.messagesCount"></span>
+                                        </td>
+                                        <td class="py-3 px-4 text-sm text-gray-500" x-text="formatDateTime(client.lastMessageAt)"></td>
+                                        <td class="py-3 px-4 text-sm text-gray-600 max-w-xs truncate" x-text="client.lastMessageText || '-'"></td>
+                                    </tr>
+                                </template>
+                                <tr x-show="clients.length === 0">
+                                    <td colspan="7" class="py-8 px-4 text-center text-gray-500">
+                                        <i class="fas fa-address-book text-3xl mb-2 opacity-30"></i>
+                                        <p>Клиенты не найдены</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Пагинация -->
+                    <div class="flex items-center justify-between mt-6 pt-4 border-t border-gray-100" x-show="clientsPagination.totalPages > 1">
+                        <div class="text-sm text-gray-500">
+                            Страница <span x-text="clientsPagination.page"></span> из <span x-text="clientsPagination.totalPages"></span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button @click="clientsPagination.page--; loadClients()"
+                                    :disabled="clientsPagination.page <= 1"
+                                    class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button @click="clientsPagination.page++; loadClients()"
+                                    :disabled="clientsPagination.page >= clientsPagination.totalPages"
+                                    class="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Модалка с сообщениями клиента -->
+                <div x-show="showClientMessagesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" x-cloak>
+                    <div class="glass rounded-2xl p-6 w-full max-w-4xl max-h-[80vh] overflow-auto" @click.outside="showClientMessagesModal = false">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-xl font-bold">
+                                <i class="fas fa-comments mr-2"></i>
+                                Сообщения от <span x-text="selectedClient?.manName"></span>
+                            </h3>
+                            <button @click="showClientMessagesModal = false" class="text-gray-500 hover:text-gray-700">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+
+                        <div class="space-y-3">
+                            <template x-for="msg in clientMessages" :key="msg.id">
+                                <div class="p-4 bg-gray-50 rounded-xl">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <span class="text-sm text-gray-500">Анкета: <span class="font-mono" x-text="msg.profileId"></span></span>
+                                        <span class="text-xs text-gray-400" x-text="formatDateTime(msg.createdAt)"></span>
+                                    </div>
+                                    <p class="text-gray-700" x-text="msg.messageText || '(текст не сохранён)'"></p>
+                                </div>
+                            </template>
+                            <div x-show="clientMessages.length === 0" class="text-center py-8 text-gray-500">
+                                Сообщения не найдены
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Модальное окно добавления анкеты -->
+    <div x-show="showAddAccountModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-2xl" @click.outside="showAddAccountModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold" x-text="t('modals.addProfiles.title')"></h3>
+                <button @click="showAddAccountModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">ID анкет (6 цифр)</label>
+                    <textarea 
+                        class="glass w-full px-4 py-3 rounded-xl"
+                        placeholder="Введите ID через пробел или запятую: 123456 234567 345678"
+                        rows="3"
+                        x-model="newAccountIds"></textarea>
+                    <p class="text-sm text-gray-500 mt-1">Можно ввести несколько ID через пробел или запятую</p>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Комментарий</label>
+                    <input type="text"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Общий комментарий для всех анкет"
+                           x-model="newAccountComment">
+                </div>
+
+                <!-- Назначить кому (только для директора) -->
+                <div x-show="currentUser.role === 'director'">
+                    <label class="block text-sm font-medium mb-2">Назначить кому (опционально)</label>
+                    <select x-model="newAccountAssignTo" class="glass w-full px-4 py-3 rounded-xl">
+                        <option value="">— Не назначать —</option>
+                        <optgroup label="Админы">
+                            <template x-for="admin in admins" :key="'admin_' + admin.id">
+                                <option :value="'admin_' + admin.id" x-text="admin.name"></option>
+                            </template>
+                        </optgroup>
+                        <optgroup label="Переводчики">
+                            <template x-for="translator in allTranslators" :key="'translator_' + translator.id">
+                                <option :value="'translator_' + translator.id" x-text="translator.name + (translator.adminName ? ' (' + translator.adminName + ')' : '')"></option>
+                            </template>
+                        </optgroup>
+                    </select>
+                    <p class="text-sm text-gray-500 mt-1">Выберите админа или переводчика для назначения анкет</p>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showAddAccountModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
+                        Отмена
+                    </button>
+                    <button @click="saveAccounts" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                        Сохранить анкеты
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Модальное окно добавления админа -->
+    <div x-show="showAddAdminModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-md" @click.outside="showAddAdminModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold" x-text="newAdmin.id ? 'Редактировать администратора' : 'Добавление администратора'"></h3>
+                <button @click="showAddAdminModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Имя</label>
+                    <input type="text" 
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Введите имя"
+                           x-model="newAdmin.name">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Логин</label>
+                    <input type="text" 
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Введите логин"
+                           x-model="newAdmin.login">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Пароль</label>
+                    <input type="password" 
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Введите пароль"
+                           x-model="newAdmin.password">
+                </div>
+                
+                <div class="flex items-center">
+                    <input type="checkbox"
+                           id="myAdminCheckbox"
+                           class="rounded"
+                           x-model="newAdmin.isMyAdmin"
+                           @change="newAdmin.salary = ''">
+                    <label for="myAdminCheckbox" class="ml-2 text-sm" x-text="t('modals.addAdmin.myAdminLabel')">
+                    </label>
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox"
+                           id="aiEnabledCheckbox"
+                           class="rounded"
+                           x-model="newAdmin.aiEnabled">
+                    <label for="aiEnabledCheckbox" class="ml-2 text-sm">
+                        <i class="fas fa-brain text-orange-500 mr-1"></i>
+                        <span x-text="t('team.aiEnabled')"></span>
+                    </label>
+                </div>
+
+                <div x-show="!newAdmin.isMyAdmin">
+                    <label class="block text-sm font-medium mb-2">Сумма</label>
+                    <input type="number"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Введите сумму"
+                           x-model="newAdmin.salary">
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showAddAdminModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
+                        Отмена
+                    </button>
+                    <button @click="saveAdmin" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                        Сохранить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Модальное окно добавления переводчика -->
+    <div x-show="showAddTranslatorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-md" @click.outside="showAddTranslatorModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold" x-text="newTranslator.id ? 'Редактировать переводчика' : 'Добавление переводчика'"></h3>
+                <button @click="showAddTranslatorModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Выбор админа (только для директора) -->
+                <div x-show="currentUser.role === 'director'">
+                    <label class="block text-sm font-medium mb-2">Назначить админу (опционально)</label>
+                    <select class="glass w-full px-4 py-3 rounded-xl" x-model="newTranslator.adminId">
+                        <option value="">Напрямую под директором</option>
+                        <template x-for="admin in admins" :key="admin.id">
+                            <option :value="admin.id" x-text="admin.name"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">Имя</label>
+                    <input type="text"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Введите имя"
+                           x-model="newTranslator.name">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">Логин</label>
+                    <input type="text"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Введите логин"
+                           x-model="newTranslator.login">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">Пароль</label>
+                    <input type="password"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Введите пароль"
+                           x-model="newTranslator.password">
+                </div>
+
+                <!-- Мой переводчик - только для директора и когда переводчик напрямую под ним -->
+                <div x-show="currentUser.role === 'director' && !newTranslator.adminId" class="flex items-center">
+                    <input type="checkbox"
+                           id="isOwnTranslatorCheckbox"
+                           class="rounded"
+                           x-model="newTranslator.isOwnTranslator"
+                           @change="newTranslator.salary = ''">
+                    <label for="isOwnTranslatorCheckbox" class="ml-2 text-sm">
+                        Мой переводчик (без доступа к добавлению анкет и финансам)
+                    </label>
+                </div>
+
+                <div class="flex items-center">
+                    <input type="checkbox"
+                           id="translatorAiEnabledCheckbox"
+                           class="rounded"
+                           x-model="newTranslator.aiEnabled">
+                    <label for="translatorAiEnabledCheckbox" class="ml-2 text-sm">
+                        <i class="fas fa-brain text-orange-500 mr-1"></i>
+                        Разрешить использование ИИ
+                    </label>
+                </div>
+
+                <!-- Поле Сумма - только для директора, когда галочка "Мой переводчик" снята -->
+                <div x-show="currentUser.role === 'director' && !newTranslator.adminId && !newTranslator.isOwnTranslator">
+                    <label class="block text-sm font-medium mb-2">Сумма</label>
+                    <input type="number"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Введите сумму"
+                           x-model="newTranslator.salary">
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showAddTranslatorModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
+                        Отмена
+                    </button>
+                    <button @click="saveTranslator" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                        Сохранить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно распределения анкет админу -->
+    <div x-show="showAssignAccountsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" @click.outside="showAssignAccountsModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">Анкеты для <span x-text="selectedAdmin?.name"></span></h3>
+                <button @click="showAssignAccountsModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Выбор из существующих анкет -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Выбрать из существующих анкет</label>
+                    <div class="glass rounded-xl p-3 max-h-48 overflow-y-auto">
+                        <div class="space-y-2">
+                            <template x-for="account in accounts.filter(a => !a.admin || a.admin === '')" :key="account.id">
+                                <label class="flex items-center p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
+                                    <input type="checkbox"
+                                           :value="account.id"
+                                           x-model="selectedAccountIds"
+                                           class="rounded mr-3">
+                                    <span class="font-mono text-sm font-medium" x-text="account.id"></span>
+                                </label>
+                            </template>
+                            <div x-show="accounts.filter(a => !a.admin || a.admin === '').length === 0" class="text-center text-gray-500 py-4">
+                                Нет свободных анкет
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-1">Выбрано: <span x-text="selectedAccountIds.length"></span> анкет</p>
+                </div>
+
+                <div class="border-t border-gray-200 pt-4">
+                    <label class="block text-sm font-medium mb-2">Или введите ID вручную</label>
+                    <textarea
+                        class="glass w-full px-4 py-3 rounded-xl"
+                        placeholder="Введите ID анкет через запятую: 123456, 234567"
+                        rows="2"
+                        x-model="accountsToAssign"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-2">Комментарий</label>
+                    <input type="text"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Общий комментарий"
+                           x-model="assignComment">
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showAssignAccountsModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
+                        Отмена
+                    </button>
+                    <button @click="assignAccountsToAdminConfirm" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                        Назначить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно назначения анкет переводчику -->
+    <div x-show="showTranslatorProfilesModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" @click.outside="showTranslatorProfilesModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">
+                    <i class="fas fa-user-tag text-indigo-500 mr-2"></i>
+                    Анкеты для <span x-text="selectedTranslatorForProfiles?.name"></span>
+                </h3>
+                <button @click="showTranslatorProfilesModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="mb-4 p-3 bg-indigo-50 rounded-lg text-sm text-indigo-700">
+                <i class="fas fa-info-circle mr-2"></i>
+                Выберите анкеты, которые будут доступны переводчику для работы
+            </div>
+
+            <!-- Список анкет -->
+            <div class="space-y-2 max-h-96 overflow-y-auto mb-4">
+                <template x-for="account in accounts" :key="account.id">
+                    <label class="flex items-center p-3 rounded-lg hover:bg-gray-50 cursor-pointer border border-gray-100"
+                           :class="{ 'bg-indigo-50 border-indigo-200': selectedTranslatorProfileIds.includes(String(account.id)) }">
+                        <input type="checkbox"
+                               class="profile-checkbox mr-3"
+                               :checked="selectedTranslatorProfileIds.includes(String(account.id))"
+                               @change="toggleTranslatorProfile(account.id)">
+                        <div class="flex-1">
+                            <div class="font-medium" x-text="'#' + account.id"></div>
+                            <div class="text-xs text-gray-500">
+                                <span :class="account.status === 'online' ? 'text-green-500' : 'text-gray-400'"
+                                      x-text="account.status === 'online' ? 'Онлайн' : 'Оффлайн'"></span>
+                                <span class="mx-1">•</span>
+                                <span x-text="account.incoming || 0"></span> входящих
+                            </div>
+                        </div>
+                    </label>
+                </template>
+            </div>
+
+            <div class="text-sm text-gray-500 mb-4">
+                Выбрано: <span class="font-medium text-indigo-600" x-text="selectedTranslatorProfileIds.length"></span> анкет
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-4 border-t border-gray-100">
+                <button @click="showTranslatorProfilesModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
+                    Отмена
+                </button>
+                <button @click="saveTranslatorProfiles" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                    <i class="fas fa-save mr-2"></i>Сохранить
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно просмотра деталей админа -->
+    <div x-show="showViewAdminModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-2xl" @click.outside="showViewAdminModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">Детали администратора: <span x-text="selectedAdmin?.name"></span></h3>
+                <button @click="showViewAdminModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <div class="text-sm text-gray-600">Логин:</div>
+                        <div class="font-medium" x-text="selectedAdmin?.login"></div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-600">Пароль:</div>
+                        <div class="font-medium font-mono" x-text="selectedAdmin?.password"></div>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="text-sm text-gray-600 mb-2">Переводчики:</div>
+                    <div class="space-y-3">
+                        <template x-for="translator in selectedAdmin?.translators" :key="translator.id">
+                            <div class="glass p-4 rounded-xl">
+                                <div class="flex justify-between items-center mb-2">
+                                    <div class="font-medium" x-text="translator.name"></div>
+                                    <div class="text-sm text-green-600" x-text="translator.conversion + '% конверсия'"></div>
+                                </div>
+                                <div class="text-sm text-gray-600">
+                                    Логин: <span x-text="translator.login"></span> | 
+                                    Пароль: <span x-text="translator.password"></span>
+                                </div>
+                                <div class="text-sm text-gray-600 mt-2">
+                                    Анкеты: <span x-text="translator.accounts.join(', ') || 'нет'"></span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно продления анкеты -->
+    <div x-show="showExtendModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-md" @click.outside="showExtendModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">Продлить анкету</h3>
+                <button @click="showExtendModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div class="text-center mb-4">
+                    <div class="text-lg font-medium text-gray-700">
+                        Анкета: <span class="text-indigo-600 font-mono" x-text="extendingProfile?.profile_id"></span>
+                    </div>
+                    <div class="text-sm text-gray-500 mt-1">
+                        Текущий статус: <span :class="getPaymentStatusClass(extendingProfile || {})" x-text="getPaymentStatusText(extendingProfile || {})"></span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-3">Выберите период:</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button @click="selectedDays = 15"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="selectedDays === 15 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">15 дней</div>
+                            <div class="text-green-600 font-medium">$1</div>
+                        </button>
+                        <button @click="selectedDays = 30"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="selectedDays === 30 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">30 дней</div>
+                            <div class="text-green-600 font-medium">$2</div>
+                        </button>
+                        <button @click="selectedDays = 45"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="selectedDays === 45 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">45 дней</div>
+                            <div class="text-green-600 font-medium">$3</div>
+                        </button>
+                        <button @click="selectedDays = 60"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="selectedDays === 60 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">60 дней</div>
+                            <div class="text-green-600 font-medium">$4</div>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 rounded-xl p-4 mt-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">К оплате:</span>
+                        <span class="text-2xl font-bold text-green-600">$<span x-text="pricing[selectedDays] || 0"></span></span>
+                    </div>
+                    <div class="flex justify-between items-center mt-2 text-sm">
+                        <span class="text-gray-500">Ваш баланс:</span>
+                        <span :class="userBalance >= (pricing[selectedDays] || 0) ? 'text-green-600' : 'text-red-500'">
+                            $<span x-text="userBalance.toFixed(2)"></span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showExtendModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
+                        Отмена
+                    </button>
+                    <button @click="extendProfile"
+                            :disabled="userBalance < (pricing[selectedDays] || 0)"
+                            class="glow-button px-5 py-2.5 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                        Оплатить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно оплаты выбранных анкет -->
+    <div x-show="showPaymentModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" x-cloak>
+        <div class="glass rounded-2xl p-6 w-full max-w-md" @click.outside="showPaymentModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">Оплатить анкеты</h3>
+                <button @click="showPaymentModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div class="text-center mb-4">
+                    <div class="text-lg font-medium text-gray-700">
+                        Выбрано анкет: <span class="text-indigo-600 font-bold" x-text="selectedProfileIds.length"></span>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-3">Выберите период:</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button @click="paymentDays = 15"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="paymentDays === 15 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">15 дней</div>
+                            <div class="text-green-600 font-medium">$1</div>
+                        </button>
+                        <button @click="paymentDays = 30"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="paymentDays === 30 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">30 дней</div>
+                            <div class="text-green-600 font-medium">$2</div>
+                        </button>
+                        <button @click="paymentDays = 45"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="paymentDays === 45 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">45 дней</div>
+                            <div class="text-green-600 font-medium">$3</div>
+                        </button>
+                        <button @click="paymentDays = 60"
+                                class="p-4 rounded-xl border-2 transition-all"
+                                :class="paymentDays === 60 ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                            <div class="font-semibold">60 дней</div>
+                            <div class="text-green-600 font-medium">$4</div>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-gray-50 rounded-xl p-4 mt-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">К оплате:</span>
+                        <span class="text-2xl font-bold text-green-600">$<span x-text="(pricing[paymentDays] || 0) * selectedProfileIds.length"></span></span>
+                    </div>
+                    <div class="flex justify-between items-center mt-2 text-sm">
+                        <span class="text-gray-500">Ваш баланс:</span>
+                        <span :class="userBalance >= ((pricing[paymentDays] || 0) * selectedProfileIds.length) ? 'text-green-600' : 'text-red-500'">
+                            $<span x-text="userBalance.toFixed(2)"></span>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showPaymentModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
+                        Отмена
+                    </button>
+                    <button @click="confirmPayment"
+                            :disabled="userBalance < ((pricing[paymentDays] || 0) * selectedProfileIds.length)"
+                            class="glow-button px-5 py-2.5 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                        Оплатить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно пополнения баланса (для директора) -->
+    <div x-show="showTopupModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-md" @click.outside="showTopupModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">Пополнить баланс</h3>
+                <button @click="showTopupModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Сумма пополнения ($)</label>
+                    <input type="number"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           min="1"
+                           step="1"
+                           placeholder="Введите сумму"
+                           x-model.number="topupAmount">
+                </div>
+
+                <div class="grid grid-cols-4 gap-2">
+                    <button @click="topupAmount = 5" class="py-2 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm">$5</button>
+                    <button @click="topupAmount = 10" class="py-2 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm">$10</button>
+                    <button @click="topupAmount = 20" class="py-2 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm">$20</button>
+                    <button @click="topupAmount = 50" class="py-2 px-3 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm">$50</button>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showTopupModal = false" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
+                        Отмена
+                    </button>
+                    <button @click="topupBalance" class="glow-button px-5 py-2.5 rounded-xl text-white font-medium">
+                        Пополнить
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно настроек -->
+    <div x-show="showSettingsModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="glass rounded-2xl p-6 w-full max-w-lg" @click.outside="showSettingsModal = false">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold">Настройки профиля</h3>
+                <button @click="showSettingsModal = false" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="space-y-5">
+                <!-- Аватар -->
+                <div class="flex items-center space-x-4">
+                    <div class="w-16 h-16 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center overflow-hidden">
+                        <template x-if="userSettings.avatarUrl || currentUser.avatar_url">
+                            <img :src="userSettings.avatarUrl || currentUser.avatar_url" class="w-full h-full object-cover">
+                        </template>
+                        <template x-if="!userSettings.avatarUrl && !currentUser.avatar_url">
+                            <span class="text-white text-2xl font-medium" x-text="currentUser.username ? currentUser.username.substring(0,1).toUpperCase() : 'U'"></span>
+                        </template>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-sm font-medium mb-1">URL фото профиля</label>
+                        <input type="url"
+                               class="glass w-full px-4 py-2 rounded-xl text-sm"
+                               placeholder="https://example.com/photo.jpg"
+                               x-model="userSettings.avatarUrl">
+                    </div>
+                </div>
+
+                <!-- Никнейм -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Никнейм</label>
+                    <input type="text"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           :placeholder="currentUser.username"
+                           x-model="userSettings.newUsername">
+                </div>
+
+                <!-- Новый пароль -->
+                <div>
+                    <label class="block text-sm font-medium mb-2">Новый пароль</label>
+                    <input type="password"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Оставьте пустым, если не хотите менять"
+                           x-model="userSettings.newPassword">
+                </div>
+
+                <!-- Подтверждение пароля -->
+                <div x-show="userSettings.newPassword">
+                    <label class="block text-sm font-medium mb-2">Подтвердите пароль</label>
+                    <input type="password"
+                           class="glass w-full px-4 py-3 rounded-xl"
+                           placeholder="Повторите новый пароль"
+                           x-model="userSettings.newPasswordConfirm">
+                </div>
+
+                <!-- Разделитель -->
+                <div class="border-t border-gray-200 pt-4">
+                    <h4 class="text-sm font-semibold text-gray-600 mb-3">Настройки интерфейса</h4>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <!-- Язык -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Язык</label>
+                            <select class="glass w-full px-4 py-3 rounded-xl" x-model="language" @change="changeLanguage">
+                                <option value="ru">Русский</option>
+                                <option value="en">English</option>
+                                <option value="uk">Українська</option>
+                            </select>
+                        </div>
+
+                        <!-- Тема -->
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Тема</label>
+                            <button @click="toggleDarkMode()"
+                                    class="glass w-full px-4 py-3 rounded-xl flex items-center justify-between hover:bg-gray-50 transition-all">
+                                <span x-text="darkMode ? 'Тёмная' : 'Светлая'"></span>
+                                <i class="fas" :class="darkMode ? 'fa-moon text-indigo-500' : 'fa-sun text-yellow-500'"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-4">
+                    <button @click="showSettingsModal = false; resetUserSettings()" class="px-5 py-2.5 rounded-xl hover:bg-gray-100 font-medium transition-all">
+                        Отмена
+                    </button>
+                    <button @click="saveUserSettings()"
+                            :disabled="settingsSaving || (userSettings.newPassword && userSettings.newPassword !== userSettings.newPasswordConfirm)"
+                            class="glow-button px-5 py-2.5 rounded-xl text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                        <span x-show="!settingsSaving">Сохранить</span>
+                        <span x-show="settingsSaving"><i class="fas fa-spinner fa-spin mr-2"></i>Сохранение...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- API Module -->
+    <script src="js/api.js"></script>
+    <!-- Dashboard Logic -->
+    <script src="js/dashboard.js"></script>
+</body>
+</html>
