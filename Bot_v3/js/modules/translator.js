@@ -94,24 +94,30 @@ async function translateText(text, targetLang, sourceLang = 'auto', botId = null
     // Определяем botId для прокси
     const effectiveBotId = botId || getCurrentBotId();
 
-    // Выбираем сервис перевода с приоритетом: DeepL → Google → MyMemory
+    // Выбираем сервис перевода с приоритетом: DeepL → Google API → Google Free → MyMemory
     const deeplKey = globalSettings.deeplKey;
     const googleKey = globalSettings.googleTranslateKey;
     const mymemoryEmail = globalSettings.mymemoryEmail;
 
     let result;
     if (deeplKey) {
-        // Приоритет 1: DeepL
+        // Приоритет 1: DeepL (платный, с ключом)
         console.log('[Translator] Используем DeepL');
         result = await translateWithIPC(text, targetLang, sourceLang, 'deepl', deeplKey, null, effectiveBotId);
     } else if (googleKey) {
-        // Приоритет 2: Google Translate
-        console.log('[Translator] Используем Google Translate');
+        // Приоритет 2: Google Cloud API (платный, с ключом)
+        console.log('[Translator] Используем Google Translate API');
         result = await translateWithIPC(text, targetLang, sourceLang, 'google', googleKey, null, effectiveBotId);
     } else {
-        // Приоритет 3: MyMemory (бесплатный)
-        console.log('[Translator] Используем MyMemory' + (mymemoryEmail ? ' (с email)' : ''));
-        result = await translateWithIPC(text, targetLang, sourceLang, 'mymemory', null, mymemoryEmail, effectiveBotId);
+        // Приоритет 3: Google Free (бесплатный, как в QTranslate)
+        console.log('[Translator] Используем Google Free (как в QTranslate)');
+        result = await translateWithIPC(text, targetLang, sourceLang, 'google-free', null, null, effectiveBotId);
+
+        // Если Google Free не сработал (rate limit), пробуем MyMemory
+        if (!result.success && result.error) {
+            console.log('[Translator] Google Free не доступен, пробуем MyMemory');
+            result = await translateWithIPC(text, targetLang, sourceLang, 'mymemory', null, mymemoryEmail, effectiveBotId);
+        }
     }
 
     // Сохраняем в кеш при успехе (кроме случая sameLanguage)

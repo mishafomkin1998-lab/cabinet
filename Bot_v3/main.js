@@ -1083,8 +1083,61 @@ ipcMain.handle('translate-request', async (event, { service, text, targetLang, s
                 result = { success: false, error: 'Нет результата от Google Translate' };
             }
 
+        } else if (service === 'google-free') {
+            // Бесплатный Google Translate (неофициальный API, как в QTranslate)
+            // Не требует API ключа, но может быть заблокирован при чрезмерном использовании
+            const sl = sourceLang === 'auto' ? 'auto' : sourceLang.toLowerCase();
+            const tl = targetLang.toLowerCase();
+
+            // Endpoint который использует сам сайт Google Translate
+            const googleFreeUrl = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(text)}`;
+
+            const axiosConfig = {
+                method: 'GET',
+                url: googleFreeUrl,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                },
+                timeout: 15000,
+                proxy: false
+            };
+
+            if (httpsAgent) {
+                axiosConfig.httpsAgent = httpsAgent;
+            }
+
+            const response = await axios(axiosConfig);
+
+            // Ответ приходит в виде вложенного массива
+            // [[["Привет","Hello",null,null,10]],null,"en",...]
+            if (response.data && Array.isArray(response.data) && response.data[0]) {
+                const translations = response.data[0];
+                let translatedText = '';
+
+                // Собираем все части перевода
+                for (const part of translations) {
+                    if (Array.isArray(part) && part[0]) {
+                        translatedText += part[0];
+                    }
+                }
+
+                if (translatedText) {
+                    const detectedLang = response.data[2]; // Определённый язык
+                    result = {
+                        success: true,
+                        text: translatedText,
+                        detectedLang: detectedLang,
+                        service: 'Google (Free)'
+                    };
+                } else {
+                    result = { success: false, error: 'Нет результата от Google Free' };
+                }
+            } else {
+                result = { success: false, error: 'Неверный ответ от Google Free' };
+            }
+
         } else {
-            // MyMemory API (бесплатный, с email лимит увеличивается до 10000 слов/день)
+            // MyMemory API (бесплатный fallback)
             // MyMemory имеет лимит ~500 символов на запрос, поэтому разбиваем длинные тексты
             const MYMEMORY_CHUNK_SIZE = 450;
 
