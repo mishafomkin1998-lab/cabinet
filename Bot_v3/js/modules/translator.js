@@ -291,11 +291,13 @@ function initTranslatorHotkeys() {
         // Проверяем включён ли переводчик
         if (!globalSettings.translatorEnabled) return;
 
-        // Проверяем что не в процессе захвата горячей клавиши
-        if (capturingHotkey) return;
+        // Проверяем что не в процессе захвата горячей клавиши (переменная из settings.js)
+        if (typeof capturingHotkey !== 'undefined' && capturingHotkey) return;
 
         const hotkeyTranslate = globalSettings.hotkeyTranslate || 'Ctrl+Q';
         const hotkeyReplace = globalSettings.hotkeyReplace || 'Ctrl+S';
+
+        console.log('[Translator] Keydown:', e.key, 'Combo:', getKeyCombo(e), 'Expected:', hotkeyTranslate);
 
         const pressedCombo = getKeyCombo(e);
 
@@ -536,9 +538,19 @@ function initTranslatorIPC() {
 // === ИНИЦИАЛИЗАЦИЯ ===
 // =====================================================
 
-// Инициализируем при загрузке
-document.addEventListener('DOMContentLoaded', function() {
-    initTranslatorHotkeys();
-    initTranslatorIPC();
-    console.log('[Translator] Модуль переводчика инициализирован');
-});
+// Инициализируем сразу (скрипт загружается после DOM)
+(function initTranslator() {
+    // Проверяем готовность DOM
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            initTranslatorHotkeys();
+            initTranslatorIPC();
+            console.log('[Translator] Модуль переводчика инициализирован (DOMContentLoaded)');
+        });
+    } else {
+        // DOM уже готов
+        initTranslatorHotkeys();
+        initTranslatorIPC();
+        console.log('[Translator] Модуль переводчика инициализирован (DOM ready)');
+    }
+})();

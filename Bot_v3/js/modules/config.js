@@ -88,7 +88,19 @@ let defaultSettings = {
         chatPrompt: null
     },
     // Лимит записей логов в DOM (предотвращение утечки памяти)
-    logLimit: DEFAULT_LOG_LIMIT
+    logLimit: DEFAULT_LOG_LIMIT,
+    // Настройки переводчика
+    translatorEnabled: true,
+    deeplKey: '',
+    googleTranslateKey: '',
+    translateFrom: 'auto',
+    translateTo: 'RU',
+    translateReplace: 'EN',
+    translateWidth: 350,
+    translateFontSize: 14,
+    translateAutoClose: 0,
+    hotkeyTranslate: 'Ctrl+Q',
+    hotkeyReplace: 'Ctrl+S'
 };
 
 // Шаблоны промптов (загружаются с сервера)
