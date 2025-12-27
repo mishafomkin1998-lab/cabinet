@@ -1621,6 +1621,576 @@ app.whenReady().then(async () => {
     });
 });
 
+// =====================================================
+// === ГОРЯЧИЕ КЛАВИШИ ПЕРЕВОДЧИКА В WEBVIEW ===
+// =====================================================
+// Перехватываем клавиши во всех WebView для работы переводчика
+// Работают только когда окно бота активно (не глобально)
+
+// Кэш настроек горячих клавиш
+let webviewHotkeySettings = {
+    translate: { ctrl: true, shift: false, code: 'KeyQ' },
+    replace: { ctrl: true, shift: false, code: 'KeyS' },
+    replaceLang: { ctrl: true, shift: true, code: 'KeyS' }
+};
+
+// Обновляем настройки горячих клавиш из renderer
+async function updateWebviewHotkeySettings() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+
+    try {
+        const settings = await mainWindow.webContents.executeJavaScript(`
+            ({
+                hotkeyTranslate: globalSettings.hotkeyTranslate || 'Ctrl+Q',
+                hotkeyReplace: globalSettings.hotkeyReplace || 'Ctrl+S',
+                hotkeyReplaceLang: globalSettings.hotkeyReplaceLang || 'Ctrl+Shift+S'
+            })
+        `);
+
+        webviewHotkeySettings.translate = parseHotkey(settings.hotkeyTranslate);
+        webviewHotkeySettings.replace = parseHotkey(settings.hotkeyReplace);
+        webviewHotkeySettings.replaceLang = parseHotkey(settings.hotkeyReplaceLang);
+
+        console.log('[WebView Hotkeys] Настройки обновлены:', webviewHotkeySettings);
+    } catch (e) {
+        console.log('[WebView Hotkeys] Используем клавиши по умолчанию');
+    }
+}
+
+// Парсим строку горячей клавиши в объект
+function parseHotkey(hotkeyStr) {
+    const parts = hotkeyStr.toUpperCase().split('+');
+    const result = { ctrl: false, shift: false, alt: false, code: '' };
+
+    for (const part of parts) {
+        if (part === 'CTRL' || part === 'CONTROL') result.ctrl = true;
+        else if (part === 'SHIFT') result.shift = true;
+        else if (part === 'ALT') result.alt = true;
+        else {
+            // Преобразуем букву в код клавиши
+            if (part.length === 1 && /[A-Z]/.test(part)) {
+                result.code = 'Key' + part;
+            } else {
+                result.code = part;
+            }
+        }
+    }
+
+    return result;
+}
+
+// Проверяем соответствие нажатой клавиши настройке
+function matchesHotkey(input, hotkey) {
+    // input.code содержит физический код клавиши (KeyQ, KeyS и т.д.)
+    // Это работает независимо от раскладки
+    const inputCode = input.code || '';
+
+    return input.control === hotkey.ctrl &&
+           input.shift === hotkey.shift &&
+           (input.alt || false) === (hotkey.alt || false) &&
+           inputCode.toUpperCase() === hotkey.code.toUpperCase();
+}
+
+// Стили popup для разных тем
+function getWebviewPopupStyles(theme) {
+    const themes = {
+        light: {
+            bg: '#ffffff',
+            headerBg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            text: '#333333',
+            border: '1px solid #ddd',
+            shadow: '0 4px 20px rgba(0,0,0,0.15)',
+            btnBg: '#667eea',
+            btnHover: '#764ba2'
+        },
+        dark: {
+            bg: '#1e1e1e',
+            headerBg: 'linear-gradient(135deg, #00ff88 0%, #00cc6a 100%)',
+            text: '#f0f0f0',
+            border: '1px solid #00ff88',
+            shadow: '0 4px 20px rgba(0,255,136,0.3)',
+            btnBg: '#00ff88',
+            btnHover: '#00cc6a'
+        },
+        ladadate: {
+            bg: '#1a1025',
+            headerBg: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)',
+            text: '#f0d0f0',
+            border: '1px solid #ec4899',
+            shadow: '0 4px 20px rgba(236,72,153,0.4)',
+            btnBg: '#ec4899',
+            btnHover: '#be185d'
+        },
+        novabot: {
+            bg: '#0a1929',
+            headerBg: 'linear-gradient(135deg, #2196f3 0%, #1565c0 100%)',
+            text: '#b0d4f1',
+            border: '1px solid #2196f3',
+            shadow: '0 4px 20px rgba(33,150,243,0.4)',
+            btnBg: '#2196f3',
+            btnHover: '#1565c0'
+        }
+    };
+    return themes[theme] || themes.light;
+}
+
+// Получаем тему из настроек
+async function getCurrentTheme() {
+    if (!mainWindow || mainWindow.isDestroyed()) return 'light';
+    try {
+        return await mainWindow.webContents.executeJavaScript(`globalSettings.theme || 'light'`);
+    } catch (e) {
+        return 'light';
+    }
+}
+
+// Выполняем перевод через renderer
+async function doWebviewTranslate(text, forReplace = false, targetLang = null) {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+        return { success: false, error: 'Main window not available' };
+    }
+
+    try {
+        const result = await mainWindow.webContents.executeJavaScript(`
+            (async function() {
+                if (typeof translateText !== 'function') {
+                    return { success: false, error: 'Переводчик не загружен' };
+                }
+
+                if (!globalSettings || !globalSettings.translatorEnabled) {
+                    return { success: false, error: 'Переводчик выключен' };
+                }
+
+                const text = ${JSON.stringify(text)};
+                const sourceLang = globalSettings.translateFrom || 'auto';
+                let targetLang = ${targetLang ? JSON.stringify(targetLang) : 'null'};
+
+                if (!targetLang) {
+                    if (sourceLang === 'auto') {
+                        const forReplace = ${forReplace};
+                        const defaultTarget = forReplace
+                            ? (globalSettings.translateReplace || 'EN')
+                            : (globalSettings.translateTo || 'RU');
+                        targetLang = getAutoTargetLang(text, defaultTarget);
+                    } else {
+                        targetLang = ${forReplace}
+                            ? (globalSettings.translateReplace || 'EN')
+                            : (globalSettings.translateTo || 'RU');
+                    }
+                }
+
+                return await translateText(text, targetLang, sourceLang);
+            })()
+        `);
+
+        return result;
+    } catch (err) {
+        console.error('[WebView Translate] Error:', err);
+        return { success: false, error: err.message };
+    }
+}
+
+// Инжектим popup перевода в WebView
+async function injectTranslationPopup(contents, translatedText, originalText, x, y) {
+    const theme = await getCurrentTheme();
+    const styles = getWebviewPopupStyles(theme);
+
+    const escapedText = translatedText.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '');
+    const escapedOriginal = originalText.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '');
+
+    await contents.executeJavaScript(`
+        (function() {
+            // Удаляем старый popup если есть
+            const oldPopup = document.getElementById('lababot-translate-popup');
+            if (oldPopup) oldPopup.remove();
+
+            const popup = document.createElement('div');
+            popup.id = 'lababot-translate-popup';
+            popup.innerHTML = \`
+                <div style="
+                    position: fixed;
+                    left: ${Math.min(x, window.innerWidth - 320)}px;
+                    top: ${Math.min(y + 10, window.innerHeight - 200)}px;
+                    width: 300px;
+                    background: ${styles.bg};
+                    border: ${styles.border};
+                    border-radius: 8px;
+                    box-shadow: ${styles.shadow};
+                    z-index: 2147483647;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    overflow: hidden;
+                ">
+                    <div style="
+                        background: ${styles.headerBg};
+                        padding: 8px 12px;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                    ">
+                        <span style="color: white; font-weight: 600; font-size: 13px;">🌐 Перевод</span>
+                        <button onclick="document.getElementById('lababot-translate-popup').remove()" style="
+                            background: none;
+                            border: none;
+                            color: white;
+                            font-size: 18px;
+                            cursor: pointer;
+                            padding: 0 4px;
+                            opacity: 0.8;
+                        ">×</button>
+                    </div>
+                    <div style="
+                        padding: 12px;
+                        color: ${styles.text};
+                        font-size: 14px;
+                        line-height: 1.5;
+                        max-height: 150px;
+                        overflow-y: auto;
+                        word-wrap: break-word;
+                    ">${escapedText.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+                    <div style="
+                        padding: 8px 12px;
+                        border-top: 1px solid ${styles.border.split(' ')[2] || '#ddd'};
+                        display: flex;
+                        gap: 8px;
+                        justify-content: flex-end;
+                    ">
+                        <button onclick="navigator.clipboard.writeText('${escapedText}'); this.textContent='✓ Скопировано'; setTimeout(() => document.getElementById('lababot-translate-popup').remove(), 500);" style="
+                            padding: 6px 12px;
+                            background: ${styles.btnBg};
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 12px;
+                        ">📋 Копировать</button>
+                    </div>
+                </div>
+            \`;
+
+            document.body.appendChild(popup);
+
+            // Закрытие по Escape
+            const escHandler = (e) => {
+                if (e.key === 'Escape') {
+                    document.getElementById('lababot-translate-popup')?.remove();
+                    document.removeEventListener('keydown', escHandler);
+                }
+            };
+            document.addEventListener('keydown', escHandler);
+
+            // Закрытие по клику вне popup
+            setTimeout(() => {
+                const clickHandler = (e) => {
+                    const popup = document.getElementById('lababot-translate-popup');
+                    if (popup && !popup.contains(e.target)) {
+                        popup.remove();
+                        document.removeEventListener('click', clickHandler);
+                    }
+                };
+                document.addEventListener('click', clickHandler);
+            }, 100);
+        })();
+    `);
+}
+
+// Инжектим popup выбора языка в WebView
+async function injectLanguagePickerPopup(contents, originalText, x, y) {
+    const theme = await getCurrentTheme();
+    const styles = getWebviewPopupStyles(theme);
+
+    const escapedText = originalText.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '');
+    const contentsId = contents.id;
+
+    await contents.executeJavaScript(`
+        (function() {
+            // Удаляем старый popup если есть
+            const oldPopup = document.getElementById('lababot-lang-picker');
+            if (oldPopup) oldPopup.remove();
+
+            const languages = [
+                { code: 'EN', name: 'English', flag: '🇬🇧' },
+                { code: 'RU', name: 'Русский', flag: '🇷🇺' },
+                { code: 'DE', name: 'Deutsch', flag: '🇩🇪' },
+                { code: 'FR', name: 'Français', flag: '🇫🇷' },
+                { code: 'ES', name: 'Español', flag: '🇪🇸' },
+                { code: 'IT', name: 'Italiano', flag: '🇮🇹' },
+                { code: 'UK', name: 'Українська', flag: '🇺🇦' },
+                { code: 'PL', name: 'Polski', flag: '🇵🇱' }
+            ];
+
+            const popup = document.createElement('div');
+            popup.id = 'lababot-lang-picker';
+            popup.innerHTML = \`
+                <div style="
+                    position: fixed;
+                    left: ${Math.min(x, window.innerWidth - 200)}px;
+                    top: ${Math.min(y + 10, window.innerHeight - 350)}px;
+                    width: 180px;
+                    background: ${styles.bg};
+                    border: ${styles.border};
+                    border-radius: 8px;
+                    box-shadow: ${styles.shadow};
+                    z-index: 2147483647;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    overflow: hidden;
+                ">
+                    <div style="
+                        background: ${styles.headerBg};
+                        padding: 8px 12px;
+                        color: white;
+                        font-weight: 600;
+                        font-size: 12px;
+                    ">🌐 Выберите язык</div>
+                    <div style="padding: 8px;">
+                        \${languages.map(l => \`
+                            <button class="lababot-lang-btn" data-lang="\${l.code}" style="
+                                display: block;
+                                width: 100%;
+                                padding: 8px 10px;
+                                margin: 4px 0;
+                                background: transparent;
+                                border: 1px solid ${styles.border.split(' ')[2] || '#ddd'};
+                                border-radius: 4px;
+                                color: ${styles.text};
+                                cursor: pointer;
+                                text-align: left;
+                                font-size: 13px;
+                            ">\${l.flag} \${l.name}</button>
+                        \`).join('')}
+                    </div>
+                </div>
+            \`;
+
+            document.body.appendChild(popup);
+
+            // Сохраняем выделение для замены
+            const selection = window.getSelection();
+            const savedRange = selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null;
+            const activeEl = document.activeElement;
+            const selStart = activeEl?.selectionStart;
+            const selEnd = activeEl?.selectionEnd;
+
+            // Обработчики для кнопок языков
+            document.querySelectorAll('.lababot-lang-btn').forEach(btn => {
+                btn.addEventListener('mouseenter', () => {
+                    btn.style.background = '${styles.btnBg}';
+                    btn.style.color = 'white';
+                });
+                btn.addEventListener('mouseleave', () => {
+                    btn.style.background = 'transparent';
+                    btn.style.color = '${styles.text}';
+                });
+                btn.addEventListener('click', async () => {
+                    const lang = btn.dataset.lang;
+                    popup.remove();
+
+                    // Показываем индикатор загрузки
+                    btn.textContent = '⏳ Перевод...';
+
+                    // Отправляем запрос на перевод (через window.postMessage который перехватывается)
+                    window.__lababotTranslateCallback = async (result) => {
+                        if (result.success && !result.sameLanguage) {
+                            // Восстанавливаем выделение и заменяем
+                            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+                                activeEl.focus();
+                                activeEl.selectionStart = selStart;
+                                activeEl.selectionEnd = selEnd;
+                                document.execCommand('insertText', false, result.text);
+                            } else if (savedRange) {
+                                selection.removeAllRanges();
+                                selection.addRange(savedRange);
+                                document.execCommand('insertText', false, result.text);
+                            }
+                        }
+                    };
+
+                    // Посылаем сообщение для перевода
+                    window.postMessage({
+                        type: 'lababot-translate-lang',
+                        text: '${escapedText}',
+                        lang: lang,
+                        contentsId: ${contentsId}
+                    }, '*');
+                });
+            });
+
+            // Закрытие по Escape
+            const escHandler = (e) => {
+                if (e.key === 'Escape') {
+                    document.getElementById('lababot-lang-picker')?.remove();
+                    document.removeEventListener('keydown', escHandler);
+                }
+            };
+            document.addEventListener('keydown', escHandler);
+
+            // Закрытие по клику вне popup
+            setTimeout(() => {
+                const clickHandler = (e) => {
+                    const popup = document.getElementById('lababot-lang-picker');
+                    if (popup && !popup.contains(e.target)) {
+                        popup.remove();
+                        document.removeEventListener('click', clickHandler);
+                    }
+                };
+                document.addEventListener('click', clickHandler);
+            }, 100);
+        })();
+    `);
+}
+
+// Заменяем выделенный текст в WebView
+async function replaceSelectedTextInWebview(contents, newText) {
+    const escapedText = newText.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '');
+
+    await contents.executeJavaScript(`
+        (function() {
+            const activeEl = document.activeElement;
+
+            // Для input/textarea
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+                const start = activeEl.selectionStart;
+                const end = activeEl.selectionEnd;
+                if (start !== end) {
+                    activeEl.focus();
+                    document.execCommand('insertText', false, '${escapedText}');
+                    return true;
+                }
+            }
+
+            // Для contenteditable
+            const selection = window.getSelection();
+            if (selection.rangeCount > 0 && !selection.isCollapsed) {
+                document.execCommand('insertText', false, '${escapedText}');
+                return true;
+            }
+
+            return false;
+        })();
+    `);
+}
+
+// Перехватываем создание webContents для добавления обработчиков клавиш
+app.on('web-contents-created', (event, contents) => {
+    // Обрабатываем только webview
+    if (contents.getType() === 'webview') {
+        console.log('[WebView Hotkeys] Новый WebView создан, добавляем обработчик клавиш');
+
+        contents.on('before-input-event', async (event, input) => {
+            // Только keyDown события
+            if (input.type !== 'keyDown') return;
+
+            // Обновляем настройки клавиш при первом нажатии
+            if (!webviewHotkeySettings._initialized) {
+                await updateWebviewHotkeySettings();
+                webviewHotkeySettings._initialized = true;
+            }
+
+            // Проверяем горячие клавиши
+            let action = null;
+
+            if (matchesHotkey(input, webviewHotkeySettings.replaceLang)) {
+                action = 'replaceLang';  // Ctrl+Shift+S
+            } else if (matchesHotkey(input, webviewHotkeySettings.replace)) {
+                action = 'replace';      // Ctrl+S
+            } else if (matchesHotkey(input, webviewHotkeySettings.translate)) {
+                action = 'translate';    // Ctrl+Q
+            }
+
+            if (!action) return;
+
+            event.preventDefault();
+            console.log(`[WebView Hotkeys] Перехвачено: ${action}`);
+
+            try {
+                // Получаем выделенный текст и позицию
+                const selectionData = await contents.executeJavaScript(`
+                    (function() {
+                        const selection = window.getSelection();
+                        const text = selection.toString().trim();
+
+                        let x = window.innerWidth / 2;
+                        let y = window.innerHeight / 2;
+
+                        if (selection.rangeCount > 0) {
+                            const range = selection.getRangeAt(0);
+                            const rect = range.getBoundingClientRect();
+                            if (rect.width > 0 || rect.height > 0) {
+                                x = rect.left + rect.width / 2;
+                                y = rect.bottom;
+                            }
+                        }
+
+                        return { text, x, y };
+                    })();
+                `);
+
+                if (!selectionData.text) {
+                    console.log('[WebView Hotkeys] Нет выделенного текста');
+                    return;
+                }
+
+                const { text, x, y } = selectionData;
+                console.log('[WebView Hotkeys] Текст:', text.substring(0, 30) + '...');
+
+                if (action === 'translate') {
+                    // Ctrl+Q - показать popup с переводом
+                    const result = await doWebviewTranslate(text, false);
+                    if (result.success && !result.sameLanguage) {
+                        await injectTranslationPopup(contents, result.text, text, x, y);
+                    } else if (result.sameLanguage) {
+                        console.log('[WebView Hotkeys] Текст уже на целевом языке');
+                    } else {
+                        console.error('[WebView Hotkeys] Ошибка перевода:', result.error);
+                    }
+
+                } else if (action === 'replace') {
+                    // Ctrl+S - заменить текст переводом
+                    const result = await doWebviewTranslate(text, true);
+                    if (result.success && !result.sameLanguage) {
+                        await replaceSelectedTextInWebview(contents, result.text);
+                        console.log('[WebView Hotkeys] Текст заменён');
+                    } else if (result.sameLanguage) {
+                        console.log('[WebView Hotkeys] Текст уже на целевом языке');
+                    } else {
+                        console.error('[WebView Hotkeys] Ошибка перевода:', result.error);
+                    }
+
+                } else if (action === 'replaceLang') {
+                    // Ctrl+Shift+S - показать выбор языка
+                    await injectLanguagePickerPopup(contents, text, x, y);
+                }
+
+            } catch (err) {
+                console.error('[WebView Hotkeys] Ошибка:', err);
+            }
+        });
+
+        // Слушаем сообщения от popup выбора языка
+        contents.on('console-message', async (event, level, message) => {
+            // Перехватываем сообщения о переводе на конкретный язык
+            if (message.startsWith('lababot-translate-lang:')) {
+                try {
+                    const data = JSON.parse(message.replace('lababot-translate-lang:', ''));
+                    const result = await doWebviewTranslate(data.text, true, data.lang);
+
+                    // Отправляем результат обратно в webview
+                    await contents.executeJavaScript(`
+                        if (window.__lababotTranslateCallback) {
+                            window.__lababotTranslateCallback(${JSON.stringify(result)});
+                        }
+                    `);
+                } catch (e) {
+                    console.error('[WebView Hotkeys] Ошибка обработки перевода:', e);
+                }
+            }
+        });
+    }
+});
+
+// IPC: Обновить настройки горячих клавиш WebView
+ipcMain.on('update-webview-hotkey-settings', () => {
+    updateWebviewHotkeySettings();
+});
 
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') app.quit();
