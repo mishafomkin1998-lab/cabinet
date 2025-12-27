@@ -428,10 +428,32 @@ function getKeyCombo(e) {
     if (e.shiftKey) parts.push('Shift');
     if (e.altKey) parts.push('Alt');
 
-    let key = e.key.toUpperCase();
-    if (key === ' ') key = 'Space';
-    if (!['CONTROL', 'SHIFT', 'ALT', 'META'].includes(key)) {
-        parts.push(key);
+    // Используем e.code для независимости от раскладки клавиатуры
+    // e.code возвращает физическую клавишу (KeyQ, KeyS) независимо от языка
+    let key = '';
+    if (e.code) {
+        // Преобразуем код клавиши в читаемый формат
+        if (e.code.startsWith('Key')) {
+            key = e.code.replace('Key', ''); // KeyQ -> Q
+        } else if (e.code.startsWith('Digit')) {
+            key = e.code.replace('Digit', ''); // Digit1 -> 1
+        } else if (e.code === 'Space') {
+            key = 'Space';
+        } else if (e.code === 'Escape') {
+            key = 'Escape';
+        } else if (e.code.startsWith('Arrow')) {
+            key = e.code; // ArrowUp, ArrowDown и т.д.
+        } else {
+            key = e.code;
+        }
+    } else {
+        // Fallback на e.key если e.code недоступен
+        key = e.key.toUpperCase();
+        if (key === ' ') key = 'Space';
+    }
+
+    if (!['CONTROL', 'SHIFT', 'ALT', 'META', 'CONTROLLEFT', 'CONTROLRIGHT', 'SHIFTLEFT', 'SHIFTRIGHT', 'ALTLEFT', 'ALTRIGHT'].includes(key.toUpperCase())) {
+        parts.push(key.toUpperCase());
     }
 
     return parts.join('+');
@@ -654,7 +676,7 @@ function initTranslatorIPC() {
             return;
         }
 
-        const { text, x, y, mode } = data;
+        const { text, x, y, mode, botId } = data;
 
         if (!text || !text.trim()) {
             showToast('Нет текста для перевода', 'warning');
@@ -704,7 +726,15 @@ function initTranslatorIPC() {
                 if (result.sameLanguage) {
                     showToast('Текст уже на целевом языке', 'info');
                 } else {
-                    replaceSelectedText(result.text);
+                    // Если это замена в webview - отправляем через IPC
+                    if (botId) {
+                        ipcRenderer.send('replace-text-in-webview', {
+                            botId: botId,
+                            text: result.text
+                        });
+                    } else {
+                        replaceSelectedText(result.text);
+                    }
                     showToast('Текст заменён', 'success');
                 }
             } else {
@@ -745,6 +775,53 @@ function initTranslatorIPC() {
             }
         } else {
             showToast(`Ошибка перевода: ${result.error}`, 'error');
+        }
+    });
+
+    // Обработка замены текста в webview
+    ipcRenderer.on('do-replace-in-webview', async (event, { botId, text }) => {
+        try {
+            // Находим webview по botId
+            const webview = document.getElementById(`webview-${botId}`);
+            if (webview) {
+                // Экранируем текст для безопасной вставки в JS
+                const escapedText = text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n');
+
+                // Выполняем замену выделенного текста в webview
+                await webview.executeJavaScript(`
+                    (function() {
+                        const selection = window.getSelection();
+                        if (selection.rangeCount > 0) {
+                            const range = selection.getRangeAt(0);
+                            const activeElement = document.activeElement;
+
+                            // Если фокус в input/textarea
+                            if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')) {
+                                const start = activeElement.selectionStart;
+                                const end = activeElement.selectionEnd;
+                                const value = activeElement.value;
+                                activeElement.value = value.substring(0, start) + '${escapedText}' + value.substring(end);
+                                activeElement.selectionStart = activeElement.selectionEnd = start + '${escapedText}'.length;
+                                activeElement.dispatchEvent(new Event('input', { bubbles: true }));
+                            }
+                            // Если contenteditable
+                            else if (activeElement && activeElement.isContentEditable) {
+                                document.execCommand('insertText', false, '${escapedText}');
+                            }
+                            // Иначе пробуем обычную замену
+                            else {
+                                range.deleteContents();
+                                range.insertNode(document.createTextNode('${escapedText}'));
+                            }
+                        }
+                    })();
+                `);
+                console.log('[Translator] Текст заменён в webview', botId);
+            } else {
+                console.error('[Translator] WebView не найден:', botId);
+            }
+        } catch (err) {
+            console.error('[Translator] Ошибка замены в webview:', err);
         }
     });
 

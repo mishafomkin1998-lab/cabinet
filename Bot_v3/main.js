@@ -828,6 +828,14 @@ ipcMain.on('show-webview-context-menu', (event, { botId, x, y, selectionText, is
     contextMenu.popup();
 });
 
+// IPC: Замена текста в webview (для переводчика)
+ipcMain.on('replace-text-in-webview', (event, { botId, text }) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        // Отправляем команду в renderer чтобы он заменил текст в webview
+        mainWindow.webContents.send('do-replace-in-webview', { botId, text });
+    }
+});
+
 // =====================================================
 
 // Хранилище прокси настроек для ботов
