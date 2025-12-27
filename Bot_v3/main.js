@@ -1818,13 +1818,17 @@ async function injectTranslationPopup(contents, translatedText, originalText, x,
             const oldPopup = document.getElementById('lababot-translate-popup');
             if (oldPopup) oldPopup.remove();
 
+            // Вычисляем позицию с учётом границ окна
+            const popupX = Math.min(${x}, window.innerWidth - 320);
+            const popupY = Math.min(${y} + 10, window.innerHeight - 200);
+
             const popup = document.createElement('div');
             popup.id = 'lababot-translate-popup';
             popup.innerHTML = \`
                 <div style="
                     position: fixed;
-                    left: ${Math.min(x, window.innerWidth - 320)}px;
-                    top: ${Math.min(y + 10, window.innerHeight - 200)}px;
+                    left: \${popupX}px;
+                    top: \${popupY}px;
                     width: 300px;
                     background: ${styles.bg};
                     border: ${styles.border};
@@ -1921,6 +1925,10 @@ async function injectLanguagePickerPopup(contents, originalText, x, y) {
             const oldPopup = document.getElementById('lababot-lang-picker');
             if (oldPopup) oldPopup.remove();
 
+            // Вычисляем позицию с учётом границ окна
+            const popupX = Math.min(${x}, window.innerWidth - 200);
+            const popupY = Math.min(${y} + 10, window.innerHeight - 350);
+
             const languages = [
                 { code: 'EN', name: 'English', flag: '🇬🇧' },
                 { code: 'RU', name: 'Русский', flag: '🇷🇺' },
@@ -1937,8 +1945,8 @@ async function injectLanguagePickerPopup(contents, originalText, x, y) {
             popup.innerHTML = \`
                 <div style="
                     position: fixed;
-                    left: ${Math.min(x, window.innerWidth - 200)}px;
-                    top: ${Math.min(y + 10, window.innerHeight - 350)}px;
+                    left: \${popupX}px;
+                    top: \${popupY}px;
                     width: 180px;
                     background: ${styles.bg};
                     border: ${styles.border};
