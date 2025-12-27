@@ -32,7 +32,6 @@ function loadGlobalSettingsUI() {
     document.getElementById('set-translator-enabled').checked = globalSettings.translatorEnabled !== false;
     document.getElementById('set-deepl-key').value = globalSettings.deeplKey || '';
     document.getElementById('set-google-translate-key').value = globalSettings.googleTranslateKey || '';
-    document.getElementById('set-mymemory-email').value = globalSettings.mymemoryEmail || '';
     document.getElementById('set-translate-from').value = globalSettings.translateFrom || 'auto';
     document.getElementById('set-translate-to').value = globalSettings.translateTo || 'RU';
     document.getElementById('set-translate-replace').value = globalSettings.translateReplace || 'EN';
@@ -119,7 +118,6 @@ function saveGlobalSettings() {
     globalSettings.translatorEnabled = document.getElementById('set-translator-enabled').checked;
     globalSettings.deeplKey = document.getElementById('set-deepl-key').value.trim();
     globalSettings.googleTranslateKey = document.getElementById('set-google-translate-key').value.trim();
-    globalSettings.mymemoryEmail = document.getElementById('set-mymemory-email').value.trim();
     globalSettings.translateFrom = document.getElementById('set-translate-from').value;
     globalSettings.translateTo = document.getElementById('set-translate-to').value;
     globalSettings.translateReplace = document.getElementById('set-translate-replace').value;
@@ -193,7 +191,6 @@ function openGlobalSettings() {
     document.getElementById('set-translator-enabled').checked = globalSettings.translatorEnabled !== false;
     document.getElementById('set-deepl-key').value = globalSettings.deeplKey || '';
     document.getElementById('set-google-translate-key').value = globalSettings.googleTranslateKey || '';
-    document.getElementById('set-mymemory-email').value = globalSettings.mymemoryEmail || '';
     document.getElementById('set-translate-from').value = globalSettings.translateFrom || 'auto';
     document.getElementById('set-translate-to').value = globalSettings.translateTo || 'RU';
     document.getElementById('set-translate-replace').value = globalSettings.translateReplace || 'EN';

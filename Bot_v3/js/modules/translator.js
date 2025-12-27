@@ -94,10 +94,9 @@ async function translateText(text, targetLang, sourceLang = 'auto', botId = null
     // Определяем botId для прокси
     const effectiveBotId = botId || getCurrentBotId();
 
-    // Выбираем сервис перевода с приоритетом: DeepL → Google API → Google Free → MyMemory
+    // Выбираем сервис перевода с приоритетом: DeepL → Google API → Google Free
     const deeplKey = globalSettings.deeplKey;
     const googleKey = globalSettings.googleTranslateKey;
-    const mymemoryEmail = globalSettings.mymemoryEmail;
 
     let result;
     if (deeplKey) {
@@ -109,15 +108,9 @@ async function translateText(text, targetLang, sourceLang = 'auto', botId = null
         console.log('[Translator] Используем Google Translate API');
         result = await translateWithIPC(text, targetLang, sourceLang, 'google', googleKey, null, effectiveBotId);
     } else {
-        // Приоритет 3: Google Free (бесплатный, как в QTranslate)
+        // Google Free (бесплатный, как в QTranslate) - работает без ключа!
         console.log('[Translator] Используем Google Free (как в QTranslate)');
         result = await translateWithIPC(text, targetLang, sourceLang, 'google-free', null, null, effectiveBotId);
-
-        // Если Google Free не сработал (rate limit), пробуем MyMemory
-        if (!result.success && result.error) {
-            console.log('[Translator] Google Free не доступен, пробуем MyMemory');
-            result = await translateWithIPC(text, targetLang, sourceLang, 'mymemory', null, mymemoryEmail, effectiveBotId);
-        }
     }
 
     // Сохраняем в кеш при успехе (кроме случая sameLanguage)
